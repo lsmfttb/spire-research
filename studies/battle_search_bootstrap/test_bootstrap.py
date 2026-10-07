@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -70,6 +72,34 @@ class SearchFailureMarkerTest(unittest.TestCase):
             )
             self.assertEqual(events[-1]["last_completed_phase"], "search_entered")
             self.assertFalse((output_dir / "result.json").exists())
+
+    def test_fsynced_search_entered_marker_survives_controlled_process_exit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            progress_path = Path(temporary) / "progress.jsonl"
+            child = (
+                "import os,sys; from pathlib import Path; "
+                "sys.path.insert(0,sys.argv[2]); "
+                "from run import _record_phase; "
+                "path=Path(sys.argv[1]); "
+                "[( _record_phase(path, phase) ) for phase in "
+                "('prepared','simulator_ready','input_qualified','search_entered')]; "
+                "os._exit(23)"
+            )
+            completed = subprocess.run(
+                [sys.executable, "-c", child, str(progress_path), str(Path(__file__).parent)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(completed.returncode, 23)
+            events = [
+                json.loads(line)
+                for line in progress_path.read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual(
+                [event["phase"] for event in events],
+                ["prepared", "simulator_ready", "input_qualified", "search_entered"],
+            )
 
 
 if __name__ == "__main__":
