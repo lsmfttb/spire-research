@@ -1,0 +1,264 @@
+{
+  "created_at_utc": "2026-10-07T04:27:10.131866Z",
+  "deployable_normal_public_controller": false,
+  "information_regime": "full_simulator_state_oracle_like",
+  "legal_action_surface": {
+    "actions": [
+      {
+        "bits": 2147483648,
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "end_turn",
+        "label": "{ end turn }",
+        "scope": "battle"
+      },
+      {
+        "bits": 0,
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "card",
+        "label": "{ use card (0) (Strike,4,1,1) -> (0) CULTIST }",
+        "scope": "battle"
+      },
+      {
+        "bits": 1,
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 1,
+        "kind": "card",
+        "label": "{ use card (1) (Strike,2,1,1) -> (0) CULTIST }",
+        "scope": "battle"
+      },
+      {
+        "bits": 2,
+        "idx1": 2,
+        "idx2": 0,
+        "idx3": 2,
+        "kind": "card",
+        "label": "{ use card (2) (Strike,0,1,1) -> (0) CULTIST }",
+        "scope": "battle"
+      },
+      {
+        "bits": 3,
+        "idx1": 3,
+        "idx2": 0,
+        "idx3": 3,
+        "kind": "card",
+        "label": "{ use card (3) (Panacea,10,0,0) }",
+        "scope": "battle"
+      },
+      {
+        "bits": 4,
+        "idx1": 4,
+        "idx2": 0,
+        "idx3": 4,
+        "kind": "card",
+        "label": "{ use card (4) (Defend,8,1,1) }",
+        "scope": "battle"
+      }
+    ],
+    "sha256": "afb49561e765f51b4cf5df173222a31e449abb13982cd742b0d64c1bc896441d"
+  },
+  "provenance": {
+    "experiment_config": {
+      "ascension": 0,
+      "battle_entry": {
+        "max_steps": 32,
+        "selector": "first_legal_action"
+      },
+      "character": "IRONCLAD",
+      "information_regime": "full_simulator_state_oracle_like",
+      "search": {
+        "api": "battle_search_v2",
+        "include_potions": false,
+        "leaf_value_callback": null,
+        "policy_prior_callback": null,
+        "simulations": 400
+      },
+      "seed": 1,
+      "simulator_commit": "d61c7c2a120aa90730fd8530718a7cd7cd856b46"
+    },
+    "experiment_config_sha256": "6a238105d872cebb673e754d1970e141e621938009132ddc886aa70d03f84f35",
+    "spire_research_commit": "18b08d343cb9fa640c1642447efeff6e1d66b2f3",
+    "sts_lightspeed_commit": "d61c7c2a120aa90730fd8530718a7cd7cd856b46"
+  },
+  "result_schema": "battle-search-bootstrap-v1",
+  "run_id": "20261007T042710049607Z",
+  "search": {
+    "metrics": {
+      "model_calls": 0,
+      "native_simulator_steps": 7813,
+      "root_row_count": 6,
+      "root_visits": 400,
+      "runtime_seconds": 0.003709,
+      "search_edge_count": 4,
+      "simulations_requested": 400,
+      "unmapped_search_edge_count": 0,
+      "unsearched_legal_action_count": 2
+    },
+    "native_api": "StepSimulator.battle_search_v2.v1",
+    "native_information_regime": "full_simulator_state_oracle_like",
+    "root_rows": [
+      {
+        "action": {
+          "bits": 2147483648,
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "end_turn",
+          "label": "{ end turn }",
+          "scope": "battle"
+        },
+        "legal_action_ordinal": 0,
+        "mean_value": 2463.6636776661885,
+        "search_edge_index": 3,
+        "search_tree_present": true,
+        "visits": 82
+      },
+      {
+        "action": {
+          "bits": 0,
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "card",
+          "label": "{ use card (0) (Strike,4,1,1) -> (0) CULTIST }",
+          "scope": "battle"
+        },
+        "legal_action_ordinal": 1,
+        "mean_value": 4538.085734463276,
+        "search_edge_index": 1,
+        "search_tree_present": true,
+        "visits": 118
+      },
+      {
+        "action": {
+          "bits": 1,
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 1,
+          "kind": "card",
+          "label": "{ use card (1) (Strike,2,1,1) -> (0) CULTIST }",
+          "scope": "battle"
+        },
+        "legal_action_ordinal": 2,
+        "mean_value": null,
+        "search_edge_index": null,
+        "search_tree_present": false,
+        "visits": 0
+      },
+      {
+        "action": {
+          "bits": 2,
+          "idx1": 2,
+          "idx2": 0,
+          "idx3": 2,
+          "kind": "card",
+          "label": "{ use card (2) (Strike,0,1,1) -> (0) CULTIST }",
+          "scope": "battle"
+        },
+        "legal_action_ordinal": 3,
+        "mean_value": null,
+        "search_edge_index": null,
+        "search_tree_present": false,
+        "visits": 0
+      },
+      {
+        "action": {
+          "bits": 3,
+          "idx1": 3,
+          "idx2": 0,
+          "idx3": 3,
+          "kind": "card",
+          "label": "{ use card (3) (Panacea,10,0,0) }",
+          "scope": "battle"
+        },
+        "legal_action_ordinal": 4,
+        "mean_value": 3621.111566646861,
+        "search_edge_index": 0,
+        "search_tree_present": true,
+        "visits": 99
+      },
+      {
+        "action": {
+          "bits": 4,
+          "idx1": 4,
+          "idx2": 0,
+          "idx3": 4,
+          "kind": "card",
+          "label": "{ use card (4) (Defend,8,1,1) }",
+          "scope": "battle"
+        },
+        "legal_action_ordinal": 5,
+        "mean_value": 3685.8337895554255,
+        "search_edge_index": 2,
+        "search_tree_present": true,
+        "visits": 101
+      }
+    ],
+    "selected_action": {
+      "action": {
+        "bits": 0,
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "card",
+        "label": "{ use card (0) (Strike,4,1,1) -> (0) CULTIST }",
+        "scope": "battle"
+      },
+      "legal_action_ordinal": 1,
+      "mean_value": 4538.085734463276,
+      "visits": 118
+    },
+    "selection_rule": "maximum root visits; ties preserve simulator legal-action order"
+  },
+  "state_identity": {
+    "ascension": 0,
+    "battle_screen_state": "BATTLE",
+    "battle_snapshot_sha256": "34529710c0000da688d903263ab6c434adfa8c8ab71a4938d15c7d6abe50bf18",
+    "character": "IRONCLAD",
+    "construction": "seeded StepSimulator start; first simulator legal action until battle_active",
+    "entry_actions": [
+      {
+        "bits": 0,
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "event",
+        "label": "game.event bits=0 idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "bits": 0,
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card bits=0 idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "bits": 805306368,
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "skip",
+        "label": "game.skip bits=805306368 idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "bits": 1,
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "map",
+        "label": "game.map bits=1 idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      }
+    ],
+    "identity_sha256": "c6791774c9212bd054e345dd0a1e7ddd2f8108ad8d023262ffee1a648425e7e9",
+    "seed": 1
+  }
+}
