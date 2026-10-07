@@ -19,6 +19,13 @@ Global rules:
 - Review the scientific claim independently from the implementation that produced it.
 - Do not create task-history registries or copy historical governance into this repository.
 
+Git handoff:
+
+- Start work from a freshly synchronized `origin/main`.
+- Use a separate study/feature branch for non-trivial work.
+- Before claiming completion or handing work to another agent, push that branch and report the remote branch plus exact commit SHA.
+- Local-only commits are not reviewable project state.
+
 Roles are intentionally lightweight:
 
 - Planner: scientific question, information boundary, evaluation, interpretation, and long-lived architecture.
