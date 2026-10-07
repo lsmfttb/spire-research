@@ -19,12 +19,26 @@ Global rules:
 - Review the scientific claim independently from the implementation that produced it.
 - Do not create task-history registries or copy historical governance into this repository.
 
-Git handoff:
+Git and worktrees:
 
-- Start work from a freshly synchronized `origin/main`.
-- Use a separate study/feature branch for non-trivial work.
-- Before claiming completion or handing work to another agent, push that branch and report the remote branch plus exact commit SHA.
-- Local-only commits are not reviewable project state.
+- Fetch/prune remote state before starting and base new work on current `origin/main`, or on the exact remote study branch for a repair.
+- Use a separate worktree for non-trivial work. A worktree is a disposable execution environment, not durable task state.
+- Push before handoff and report the remote branch plus exact commit SHA. Local-only commits are not reviewable project state.
+- After handoff, remove the local worktree unless an active long-running process still needs it. A later repair should create a fresh worktree from remote state.
+- Reviewer worktrees should be detached at the exact reviewed commit and removed after review.
+
+Data:
+
+- Generated data must not make a worktree non-disposable.
+- Retained local data belongs outside worktrees and must have a producer commit plus either a named downstream consumer or a review/delete date.
+- "Might be useful later" is not a retention reason.
+
+Routing:
+
+- GitHub is the durable handoff surface. Direct agent messages are notifications, not authority.
+- When an open work Issue is routed to your role, that is sufficient authority to act within the Issue scope.
+- Ordinary repair, rerun, push, review, cleanup, and handoff do not require Planner approval.
+- Stop for Planner only when a decision would materially change scientific meaning, information regime, evaluation meaning, or long-lived architecture.
 
 Roles are intentionally lightweight:
 
