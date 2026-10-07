@@ -1,0 +1,18 @@
+{
+  "character": "IRONCLAD",
+  "ascension": 0,
+  "seed": 1,
+  "simulator_commit": "d61c7c2a120aa90730fd8530718a7cd7cd856b46",
+  "information_regime": "full_simulator_state_oracle_like",
+  "battle_entry": {
+    "selector": "first_legal_action",
+    "max_steps": 32
+  },
+  "search": {
+    "api": "battle_search_v2",
+    "simulations": 400,
+    "include_potions": false,
+    "policy_prior_callback": null,
+    "leaf_value_callback": null
+  }
+}
