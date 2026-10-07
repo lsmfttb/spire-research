@@ -10,6 +10,7 @@ Before working, read only:
 Global rules:
 
 - `sts_lightspeed` or another explicitly adopted external simulator owns game mechanics. Do not implement game rules locally.
+- The active native integration line is `lsmfttb/sts_lightspeed` branch `spire/main`. Treat `stsrl/main` and task-named native branches as legacy provenance, not default bases for new work.
 - Normal-public code must not receive simulator-private information.
 - Study-specific code is disposable by default and should not become a core dependency automatically.
 - A permanent core addition must represent a reusable semantic capability. Prefer replacement/consolidation over coexistence with historical versions.
