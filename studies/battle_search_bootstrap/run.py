@@ -74,6 +74,16 @@ def _write_result(path: Path, result: Mapping[str, Any]) -> str:
 
 
 def _git_commit() -> str:
+    import os
+
+    supplied_commit = os.environ.get("SPIRE_RESEARCH_COMMIT")
+    if supplied_commit is not None:
+        if len(supplied_commit) != 40 or any(
+            character not in "0123456789abcdefABCDEF" for character in supplied_commit
+        ):
+            raise RuntimeError("SPIRE_RESEARCH_COMMIT must be a full Git commit SHA")
+        return supplied_commit.lower()
+
     status = subprocess.run(
         ["git", "-C", str(ROOT), "status", "--porcelain", "--untracked-files=normal"],
         check=True, capture_output=True, text=True,
