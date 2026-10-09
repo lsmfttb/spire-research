@@ -10,7 +10,7 @@ This repository is a clean restart. It intentionally does **not** inherit the fu
 
 The active system should stay small enough that a new contributor or coding agent can understand the relevant path from the current issue and the code it touches, without reconstructing years of task history.
 
-Historical scientific results may be reused selectively. Historical software structure is not automatically reused.
+**The accepted STSRL runtime and experiment record are the reuse-first baseline.** The existing STSRL `execute_controlled_run`, its separately named Battle/Non-Combat controllers, and the simulator commit pinned in STSRL's `docs/sts_lightspeed_source_manifest.json` already support full-run simulation and source/evaluation workflows. Reuse working capabilities and accepted positive/negative findings; do not wholesale port old task scaffolding. The `sts_lightspeed:spire/main` public-projection-v3 path is **retired as an integration/development direction**; its prior SHA is preserved on `archive/spire-v3-2026-10-09` for study reproducibility.
 
 ## Working model
 
@@ -22,9 +22,9 @@ Code is promoted to `main` only when it is a genuinely reusable current capabili
 
 Git history, study commits, Issues, and retained artifact manifests preserve provenance. The current runtime does not need to remain backward-compatible with every historical experiment.
 
-## Initial architecture
+## Existing architecture and change boundary
 
-The active platform should grow only as needed around a few stable boundaries:
+These capabilities already exist in the accepted STSRL/native pair. Propose additions only after a concrete failure of the existing control/observation path, with a minimal reuse-first alternative:
 
 - authoritative simulator adapter;
 - public state and legal actions;
@@ -34,7 +34,7 @@ The active platform should grow only as needed around a few stable boundaries:
 - experiment execution and durable result recording;
 - training/evaluation only when justified by an active research question.
 
-There is no task-ID-based core architecture.
+There is no task-ID-based core architecture. In particular, `native-public-projection-v3` screen coverage is **not** a research KPI or a prerequisite to ordinary full-run experiments. A new public-input guard must protect a concrete named policy and must not silently rebuild an existing simulator/run path.
 
 ## Global invariants
 
