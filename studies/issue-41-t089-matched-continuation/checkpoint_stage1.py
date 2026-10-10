@@ -86,8 +86,8 @@ def main() -> int:
     if git("branch", "--show-current") != BRANCH:
         print("checkpoint branch does not match the fixed Issue 41 branch", file=sys.stderr)
         return 2
-    if git("status", "--porcelain"):
-        print("worktree must be clean before starting the progress checkpoint", file=sys.stderr)
+    if git("diff", "--cached", "--name-only"):
+        print("staging area must be clear before starting the progress checkpoint", file=sys.stderr)
         return 2
     checkpointed = 0
     while process_running(pid):
