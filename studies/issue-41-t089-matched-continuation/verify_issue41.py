@@ -213,6 +213,22 @@ def verify_previous_manifest() -> bool:
     return True
 
 
+def verify_manifest_inputs_tracked() -> None:
+    """Require every file eligible for the final manifest to match reviewed HEAD."""
+    study_dir = RUNNER_REL.rsplit("/", 1)[0]
+    for path in sorted(HERE.iterdir()):
+        if not path.is_file() or path.name == "final-manifest.json":
+            continue
+        committed_path = f"{study_dir}/{path.name}"
+        try:
+            committed_oid, committed_bytes = git_blob_for_commit("HEAD", committed_path)
+        except subprocess.CalledProcessError as exc:
+            raise VerifyError(f"manifest candidate is not present in HEAD: {path.name}") from exc
+        worktree_oid, worktree_bytes = git_blob_for_worktree(path)
+        check(worktree_oid == committed_oid, f"manifest candidate Git blob differs from HEAD: {path.name}")
+        check(worktree_bytes == committed_bytes, f"manifest candidate bytes differ from HEAD: {path.name}")
+
+
 def iter_array(path: Path, key: str):
     marker = f'  "{key}": ['
     decoder = json.JSONDecoder()
@@ -306,6 +322,9 @@ def near(a: Any, b: Any) -> bool:
 def validate() -> dict[str, Any]:
     global CHECKS
     CHECKS = 0
+    # Run before writing verification.json so an untracked or modified file
+    # fails without changing either generated output.
+    verify_manifest_inputs_tracked()
     verifier_source = verify_executed_verifier()
     runner_source = verify_runner_source()
     previous_manifest_git_checked = verify_previous_manifest()
@@ -522,11 +541,22 @@ def validate() -> dict[str, Any]:
 def main() -> int:
     try:
         report = validate()
-        (HERE / "verification.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        verification_text = json.dumps(report, indent=2, sort_keys=True) + "\n"
+        (HERE / "verification.json").write_text(verification_text, encoding="utf-8")
         manifest_files = []
         for path in sorted(HERE.iterdir()):
             if path.is_file() and path.name != "final-manifest.json":
+                committed_path = f"{RUNNER_REL.rsplit('/', 1)[0]}/{path.name}"
+                try:
+                    committed_oid, committed_bytes = git_blob_for_commit("HEAD", committed_path)
+                except subprocess.CalledProcessError as exc:
+                    raise VerifyError(f"manifest candidate is not present in HEAD: {path.name}") from exc
                 git_blob_oid, canonical_bytes = git_blob_for_worktree(path)
+                if path.name == "verification.json":
+                    check(canonical_bytes == verification_text.encode("utf-8"), "generated verification bytes changed before manifesting")
+                else:
+                    check(git_blob_oid == committed_oid, f"manifest candidate Git blob differs from HEAD: {path.name}")
+                    check(canonical_bytes == committed_bytes, f"manifest candidate bytes differ from HEAD: {path.name}")
                 manifest_files.append({
                     "path": path.name,
                     "size_bytes": len(canonical_bytes),
