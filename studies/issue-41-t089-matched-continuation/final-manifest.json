@@ -4,7 +4,11 @@
     "runner_git_blob_oid": "7bbc36a1f2a1fff4424574dd475e82fb5dfb801a",
     "runner_path": "studies/issue-41-t089-matched-continuation/run_stage1.py",
     "runner_sha256": "9168cc5e49b240e46f89bddfe99ee6d6fd5da100b9b869aeee25b8fa1ba85a9a",
-    "runner_size_bytes": 36850
+    "runner_size_bytes": 36850,
+    "verifier_git_blob_oid": "080d152aeba78e2eed9955eb73cbc47d7b0e5edb",
+    "verifier_path": "studies/issue-41-t089-matched-continuation/verify_issue41.py",
+    "verifier_sha256": "cc59903697c96e0764198b0d57b5c930706e0129ed2eb4fdb2b1b647f4f424a2",
+    "verifier_size_bytes": 36688
   },
   "files": [
     {
@@ -104,16 +108,16 @@
       "size_bytes": 21422
     },
     {
-      "git_blob_oid": "4613ff8d1090e6ddd03fde6cc16c54c20f9f112e",
+      "git_blob_oid": "2335539d50b0f5d0ebc0bc2f061b0ba1fa632fec",
       "path": "verification.json",
-      "sha256": "d1336cea1552ae8dd4d56da8986bebcfbbae70d7a1cc0b3b1892296247608544",
-      "size_bytes": 940
+      "sha256": "063115dd0145a0929749922661850df9906620c0e3249a60291c29b2962bda54",
+      "size_bytes": 1214
     },
     {
-      "git_blob_oid": "024d211480ed111e8d5c69b7ab331ea8127569dc",
+      "git_blob_oid": "080d152aeba78e2eed9955eb73cbc47d7b0e5edb",
       "path": "verify_issue41.py",
-      "sha256": "1c94cfe040ec1fd4ef0238bbac09e80f5d79f22208b4f7c027946bd72ad72e9b",
-      "size_bytes": 33746
+      "sha256": "cc59903697c96e0764198b0d57b5c930706e0129ed2eb4fdb2b1b647f4f424a2",
+      "size_bytes": 36688
     }
   ],
   "issue": 41,
@@ -122,7 +126,7 @@
   "self_hash_excluded": true,
   "study_disposition": "STUDY_ONLY",
   "verification": {
-    "checks": 3952,
+    "checks": 3992,
     "complete_result_rows": 380,
     "failed_attempts": 0,
     "minimum_available_memory_mib": 19949.39,
@@ -143,6 +147,12 @@
     "schema_id": "issue-41-verification-v2",
     "stage1_process_cpu_seconds": 4150.94,
     "stage1_wall_seconds": 4329.929,
-    "terminal": "PASS_COMPLETE"
+    "terminal": "PASS_COMPLETE",
+    "verifier_source": {
+      "git_blob_oid": "080d152aeba78e2eed9955eb73cbc47d7b0e5edb",
+      "path": "studies/issue-41-t089-matched-continuation/verify_issue41.py",
+      "sha256": "cc59903697c96e0764198b0d57b5c930706e0129ed2eb4fdb2b1b647f4f424a2",
+      "size_bytes": 36688
+    }
   }
 }
