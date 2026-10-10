@@ -18,10 +18,13 @@ STATE = HERE / "stage1-state.json"
 BRANCH = "codex/issue-41-t089-stage1"
 CHECKPOINT_EVERY = 8
 POLL_SECONDS = 10
+WINDOWS_REPO = subprocess.run(["wslpath", "-w", str(REPO)], check=True, text=True, capture_output=True).stdout.strip()
 
 
 def git(*args: str) -> str:
-    result = subprocess.run(["git", "-C", str(REPO), *args], check=True, text=True, capture_output=True)
+    # Git's worktree metadata points to a Windows .git directory; use Windows
+    # Git from WSL so it resolves the shared checkout's .git file correctly.
+    result = subprocess.run(["git.exe", "-C", WINDOWS_REPO, *args], check=True, text=True, capture_output=True)
     return result.stdout.strip()
 
 
