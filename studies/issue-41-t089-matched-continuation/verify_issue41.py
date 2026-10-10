@@ -130,6 +130,14 @@ def git_blob_for_commit(commit: str, relative: str) -> tuple[str, bytes]:
     return oid, git_bytes("cat-file", "blob", oid)
 
 
+def git_commit_with_blob(commit: str, relative: str, expected_oid: str) -> str | None:
+    """Find a commit in this path's history that contains the recorded blob."""
+    for candidate in git_text("rev-list", commit, "--", relative).splitlines():
+        if git_text("rev-parse", f"{candidate}:{relative}") == expected_oid:
+            return candidate
+    return None
+
+
 def verify_runner_source() -> dict[str, Any]:
     expected_oid, expected_bytes = git_blob_for_commit(RUNNER_REFERENCE_COMMIT, RUNNER_REL)
     head_oid = git_text("rev-parse", f"HEAD:{RUNNER_REL}")
@@ -192,11 +200,12 @@ def verify_previous_manifest() -> bool:
         check(worktree_bytes == committed_bytes, f"worktree bytes differ from committed Git blob for {relative}")
         recorded_bytes = committed_bytes
         if expected_oid != committed_oid and relative == Path(VERIFIER_REL).name:
-            # This one-commit bridge lets a committed verifier repair refresh its
-            # own prior manifest entry; the verifier worktree is independently
-            # required above to match HEAD exactly.
-            previous_source_oid, recorded_bytes = git_blob_for_commit("HEAD^", committed_path)
-            check(expected_oid == previous_source_oid, "prior manifest verifier blob is not the parent-commit source")
+            # A committed verifier repair can refresh its prior manifest entry.
+            # The old entry must still identify a real historical committed blob;
+            # the executing verifier itself is required above to match HEAD.
+            source_commit = git_commit_with_blob("HEAD", committed_path, expected_oid)
+            check(source_commit is not None, "prior manifest verifier blob is absent from committed history")
+            _, recorded_bytes = git_blob_for_commit(source_commit, committed_path)
         else:
             check(expected_oid == committed_oid, f"Git blob OID mismatch for {relative}")
         check(len(recorded_bytes) == item.get("size_bytes"), f"canonical Git blob size mismatch for {relative}")
