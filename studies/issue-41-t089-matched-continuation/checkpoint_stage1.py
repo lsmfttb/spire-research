@@ -52,13 +52,13 @@ def stable_progress() -> tuple[bytes, list[dict[str, Any]]] | None:
     return data, rows
 
 
-def checkpoint(expected_count: int) -> int:
+def checkpoint(expected_count: int, *, force: bool = False) -> int:
     snapshot = stable_progress()
     if snapshot is None:
         return expected_count
     data, events = snapshot
     completions = sum(1 for row in events if row.get("event") == "continuation_completed")
-    if completions < expected_count + CHECKPOINT_EVERY and completions != 336:
+    if not force and completions < expected_count + CHECKPOINT_EVERY and completions != 336:
         return expected_count
     paths = [PROGRESS.relative_to(REPO).as_posix(), STATE.relative_to(REPO).as_posix()]
     before_state = STATE.read_bytes() if STATE.exists() else b""
@@ -74,7 +74,12 @@ def checkpoint(expected_count: int) -> int:
         raise RuntimeError(f"refusing checkpoint with unrelated staged paths: {sorted(staged)}")
     if staged:
         git("commit", "-m", f"Study 41: checkpoint {completions} completed continuations")
+    try:
         git("push", "origin", f"HEAD:refs/heads/{BRANCH}")
+    except subprocess.CalledProcessError as exc:
+        # Keep the local checkpoint commit and retry after the next interval.
+        # The final forced checkpoint also retries even if no files changed.
+        print(f"checkpoint push failed; retaining local commit for retry: {exc.stderr.strip()}", flush=True)
     return completions
 
 
@@ -93,7 +98,7 @@ def main() -> int:
     while process_running(pid):
         checkpointed = checkpoint(checkpointed)
         time.sleep(POLL_SECONDS)
-    checkpointed = checkpoint(0)
+    checkpointed = checkpoint(checkpointed, force=True)
     print(json.dumps({"terminal": "CHECKPOINT_MONITOR_COMPLETE", "last_completed_key_count": checkpointed}, sort_keys=True))
     return 0
 
