@@ -1,103 +1,128 @@
 {
+  "code_source": {
+    "reviewed_commit": "e48146c1b28f060e12e4d6c0c8e098db332bda7c",
+    "runner_git_blob_oid": "7bbc36a1f2a1fff4424574dd475e82fb5dfb801a",
+    "runner_path": "studies/issue-41-t089-matched-continuation/run_stage1.py",
+    "runner_sha256": "9168cc5e49b240e46f89bddfe99ee6d6fd5da100b9b869aeee25b8fa1ba85a9a",
+    "runner_size_bytes": 36850
+  },
   "files": [
     {
+      "git_blob_oid": "b88a5ef4d8a383233b1891641bf316d04a987970",
       "path": "README.md",
       "sha256": "48fccc3275b35b6cb8a379cc460eccca89991bed5038710574f2cd204d38a9fb",
       "size_bytes": 3818
     },
     {
+      "git_blob_oid": "1b66ed6a9b4e1b1bc3b4e7430e7e80bc795230f7",
       "path": "build_stage1_plan.py",
       "sha256": "8d1c2a3e272616ea0e61cacf1925f56cd4caf347f540ee046f3c95939bec1ed1",
       "size_bytes": 26671
     },
     {
+      "git_blob_oid": "3d8c716e48d9548eb4004f0d743b2410142570c3",
       "path": "checkpoint_stage1.py",
       "sha256": "68b64924d110f1e5a9c3fd9d0dece7c893e5ba6c659739c30f085dbfc2b98957",
       "size_bytes": 4282
     },
     {
+      "git_blob_oid": "7bbc36a1f2a1fff4424574dd475e82fb5dfb801a",
       "path": "run_stage1.py",
-      "sha256": "e6c430312680cc89786fb2d2e05694b3a1319c1a52ccaffa85b684558954fc01",
-      "size_bytes": 37282
+      "sha256": "9168cc5e49b240e46f89bddfe99ee6d6fd5da100b9b869aeee25b8fa1ba85a9a",
+      "size_bytes": 36850
     },
     {
+      "git_blob_oid": "7442ea1d4a7c456ee52d8f9eccaafd1c77fae72f",
       "path": "stage1-budget.json",
       "sha256": "5796b7b18684a1d72028d93c1112e5c0884690468f82fd777e850cb9cede7db4",
       "size_bytes": 3646
     },
     {
+      "git_blob_oid": "c7257c991cfc6bb34f5656f29a9b2aac0ee3dfd9",
       "path": "stage1-execute.log",
       "sha256": "44726604b09eaf916a0d824d982af90eb35b18662fd701cba0115ee5c8df0bb0",
       "size_bytes": 499
     },
     {
+      "git_blob_oid": "c7933369cfcb95375e2073e5449bf5c1f6825b4d",
       "path": "stage1-plan.json",
       "sha256": "d5c86ca034e92873902cb66ed798ec752bb35d8b4a6f2273bba896b240556c1a",
       "size_bytes": 135875
     },
     {
+      "git_blob_oid": "fc6972c075fd7d74200ae5b94159ba8be077fec6",
       "path": "stage1-plan.log",
       "sha256": "396849d9032d0f16944f75669bbc25b50e31a23b16d9a3a7145bd59110dc4696",
       "size_bytes": 1188
     },
     {
+      "git_blob_oid": "0ff6d61e4c411b9ca701c96d428e4de307ede379",
       "path": "stage1-preflight.json",
       "sha256": "c8575f077b63122f56ca1291f81ba2c6e11dff5e7bbeffbec6d60fe974e2370d",
       "size_bytes": 2492
     },
     {
+      "git_blob_oid": "1345e6429cc8957f33deb602efa5915adec0d1b3",
       "path": "stage1-preflight.log",
       "sha256": "3205966fe4007a643abc7f5285fa9bf4231f8c5d1f09f54e7a92510638388704",
       "size_bytes": 1219
     },
     {
+      "git_blob_oid": "88f7066e3bc0fea141e8c0c453ba5527640f0e2e",
       "path": "stage1-progress.jsonl",
       "sha256": "54e40c06fda388ea1e9b0af69e4e1df18356fa26b3cf6f8fdeb61807a97a43d8",
       "size_bytes": 1198283
     },
     {
+      "git_blob_oid": "3e9bf492e8958f0af3295f5fc42e8a45ff2f17e3",
       "path": "stage1-resource-review.json",
       "sha256": "b5549cc0f996a4d0e71cc9f9b282342d7df11c1eb9a6cb0405f017757e625e94",
       "size_bytes": 1652
     },
     {
+      "git_blob_oid": "25e9ce122048049706db25d5e08505dcc32fc13a",
       "path": "stage1-result.json",
       "sha256": "8eea6dfece0829683503aa0bbf9b510b48961d453b252a95c7143c6f1c17f4fe",
       "size_bytes": 1559241
     },
     {
+      "git_blob_oid": "963af5cd9013dd99d8bce7aed84df5f44adffae4",
       "path": "stage1-state.json",
       "sha256": "df1c86ede4b653bb2d06b1a30e961d62138451f54c16a792aaf5a9c1953e9cab",
       "size_bytes": 469
     },
     {
+      "git_blob_oid": "e2a0ea36bdace5199e1d9efa8af1487c4e3ee886",
       "path": "stage1-supervisor.jsonl",
       "sha256": "a7a0ac2502a74fbcfcc7889ea7f19699c6efb018664aee03478754c631a2c2d9",
       "size_bytes": 2617
     },
     {
+      "git_blob_oid": "bef4db4c1e654e91af4d860025fb3b5be6685660",
       "path": "stage1_supervisor.py",
       "sha256": "cb882c7d2b392a7c4ec412bd3c6e53d0694b26a04c9facd4e23bef4106d4a0f2",
       "size_bytes": 21422
     },
     {
+      "git_blob_oid": "bc005b5ba31d1d6abce2c9bcf3937071f8d81e8a",
       "path": "verification.json",
-      "sha256": "07170df5a328c3fdec8aeda4f353b09049f95b0e0f43a4e9b335faa7183b2b88",
-      "size_bytes": 564
+      "sha256": "058e3172a55dab39f30348b3e974759b2df71f0b30178472230e1da32b6290e1",
+      "size_bytes": 941
     },
     {
+      "git_blob_oid": "024d211480ed111e8d5c69b7ab331ea8127569dc",
       "path": "verify_issue41.py",
-      "sha256": "cd394082f77280b900c00dcfedabb9ebafc6e747fc73d97d046da5c06d66a817",
-      "size_bytes": 27497
+      "sha256": "1c94cfe040ec1fd4ef0238bbac09e80f5d79f22208b4f7c027946bd72ad72e9b",
+      "size_bytes": 33746
     }
   ],
   "issue": 41,
-  "schema_id": "issue-41-final-manifest-v1",
-  "schema_version": 1,
+  "schema_id": "issue-41-final-manifest-v2",
+  "schema_version": 2,
   "self_hash_excluded": true,
   "study_disposition": "STUDY_ONLY",
   "verification": {
-    "checks": 3854,
+    "checks": 3857,
     "complete_result_rows": 380,
     "failed_attempts": 0,
     "minimum_available_memory_mib": 19949.39,
@@ -106,8 +131,16 @@
     "peak_process_tree_rss_mib": 1430.91,
     "plan_sha256": "d5c86ca034e92873902cb66ed798ec752bb35d8b4a6f2273bba896b240556c1a",
     "preflight_terminal": "PREFLIGHT_PASS_STAGE1_READY",
+    "previous_manifest_git_checked": false,
     "result_terminal": "CONTINUATION_POLICY_SIGNAL_SURVIVES",
-    "schema_id": "issue-41-verification-v1",
+    "runner_source": {
+      "git_blob_oid": "7bbc36a1f2a1fff4424574dd475e82fb5dfb801a",
+      "path": "studies/issue-41-t089-matched-continuation/run_stage1.py",
+      "reviewed_commit": "e48146c1b28f060e12e4d6c0c8e098db332bda7c",
+      "sha256": "9168cc5e49b240e46f89bddfe99ee6d6fd5da100b9b869aeee25b8fa1ba85a9a",
+      "size_bytes": 36850
+    },
+    "schema_id": "issue-41-verification-v2",
     "stage1_process_cpu_seconds": 4150.94,
     "stage1_wall_seconds": 4329.929,
     "terminal": "PASS_COMPLETE"

@@ -1,5 +1,5 @@
 {
-  "checks": 3854,
+  "checks": 3857,
   "complete_result_rows": 380,
   "failed_attempts": 0,
   "minimum_available_memory_mib": 19949.39,
@@ -8,8 +8,16 @@
   "peak_process_tree_rss_mib": 1430.91,
   "plan_sha256": "d5c86ca034e92873902cb66ed798ec752bb35d8b4a6f2273bba896b240556c1a",
   "preflight_terminal": "PREFLIGHT_PASS_STAGE1_READY",
+  "previous_manifest_git_checked": false,
   "result_terminal": "CONTINUATION_POLICY_SIGNAL_SURVIVES",
-  "schema_id": "issue-41-verification-v1",
+  "runner_source": {
+    "git_blob_oid": "7bbc36a1f2a1fff4424574dd475e82fb5dfb801a",
+    "path": "studies/issue-41-t089-matched-continuation/run_stage1.py",
+    "reviewed_commit": "e48146c1b28f060e12e4d6c0c8e098db332bda7c",
+    "sha256": "9168cc5e49b240e46f89bddfe99ee6d6fd5da100b9b869aeee25b8fa1ba85a9a",
+    "size_bytes": 36850
+  },
+  "schema_id": "issue-41-verification-v2",
   "stage1_process_cpu_seconds": 4150.94,
   "stage1_wall_seconds": 4329.929,
   "terminal": "PASS_COMPLETE"

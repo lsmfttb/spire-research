@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import os
 import statistics
 import subprocess
 import sys
@@ -16,6 +17,11 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 I40 = REPO / "studies/issue-40-native-recovery"
+RUNNER = HERE / "run_stage1.py"
+RUNNER_REL = "studies/issue-41-t089-matched-continuation/run_stage1.py"
+# Pin the runner to the exact reviewed head. Its blob is unchanged from the
+# source used during execution; later evidence-only commits must preserve it.
+RUNNER_REFERENCE_COMMIT = "e48146c1b28f060e12e4d6c0c8e098db332bda7c"
 ART = Path("/mnt/d/DeadlyCatCoding/STSRL/artifacts")
 T075 = ART / "t075-leakage-safe-non-combat-cohort-repair"
 T089 = ART / "t089-frozen-search-self-generated-non-combat-policy"
@@ -53,11 +59,117 @@ def load(path: Path) -> Any:
 
 
 def sha(path: Path) -> str:
+    if path.resolve().is_relative_to(REPO.resolve()):
+        # Git's core.autocrlf clean conversion canonicalizes CRLF text to LF.
+        # Match committed evidence bytes so verification is checkout-independent.
+        return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def git_prefix() -> list[str]:
+    git_marker = REPO / ".git"
+    if not git_marker.is_file() or os.name == "nt":
+        return ["-C", str(REPO)]
+    line = git_marker.read_text(encoding="utf-8").strip()
+    if not line.startswith("gitdir:"):
+        raise VerifyError("worktree .git file has an unexpected format")
+    git_dir = line.split(":", 1)[1].strip()
+    if len(git_dir) >= 3 and git_dir[1] == ":" and git_dir[2] in {"/", "\\"}:
+        git_dir = f"/mnt/{git_dir[0].lower()}/{git_dir[3:].replace(chr(92), '/') }"
+    elif not Path(git_dir).is_absolute():
+        git_dir = str((REPO / git_dir).resolve())
+    return ["--git-dir", git_dir, "--work-tree", str(REPO)]
+
+
+def git_bytes(*args: str) -> bytes:
+    return subprocess.run(
+        ["git", *git_prefix(), *args],
+        cwd=REPO,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout
+
+
+def git_text(*args: str) -> str:
+    return git_bytes(*args).decode("ascii").strip()
+
+
+def git_oid_for_bytes(data: bytes) -> str:
+    return subprocess.run(
+        ["git", *git_prefix(), "hash-object", "-w", "--stdin"],
+        cwd=REPO,
+        input=data,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout.decode("ascii").strip()
+
+
+def git_blob_for_worktree(path: Path) -> tuple[str, bytes]:
+    """Return canonical LF Git bytes independent of Windows checkout EOLs."""
+    raw = path.read_bytes()
+    canonical = raw.replace(b"\r\n", b"\n")
+    oid = git_oid_for_bytes(canonical)
+    blob = git_bytes("cat-file", "blob", oid)
+    if blob != canonical:
+        raise VerifyError(f"Git blob bytes differ from canonical contents for {path.name}")
+    return oid, blob
+
+
+def git_blob_for_commit(commit: str, relative: str) -> tuple[str, bytes]:
+    oid = git_text("rev-parse", f"{commit}:{relative}")
+    return oid, git_bytes("cat-file", "blob", oid)
+
+
+def verify_runner_source() -> dict[str, Any]:
+    expected_oid, expected_bytes = git_blob_for_commit(RUNNER_REFERENCE_COMMIT, RUNNER_REL)
+    head_oid = git_text("rev-parse", f"HEAD:{RUNNER_REL}")
+    worktree_oid, canonical_bytes = git_blob_for_worktree(RUNNER)
+    check(head_oid == expected_oid, "reviewed HEAD runner Git blob differs from the executed Stage-1 runner")
+    check(worktree_oid == expected_oid, "runner worktree does not clean to the executed Stage-1 Git blob")
+    check(canonical_bytes == expected_bytes, "runner canonical Git blob bytes differ from the executed source")
+    return {
+        "path": RUNNER_REL,
+        "reviewed_commit": RUNNER_REFERENCE_COMMIT,
+        "git_blob_oid": expected_oid,
+        "sha256": hashlib.sha256(expected_bytes).hexdigest(),
+        "size_bytes": len(expected_bytes),
+    }
+
+
+def verify_previous_manifest() -> bool:
+    """On reruns, compare the previous v2 manifest with committed blob bytes."""
+    manifest_path = HERE / "final-manifest.json"
+    if not manifest_path.is_file():
+        return False
+    previous = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if previous.get("schema_id") != "issue-41-final-manifest-v2":
+        return False
+    source = previous.get("code_source", {})
+    check(source.get("reviewed_commit") == RUNNER_REFERENCE_COMMIT, "manifest reviewed-source commit mismatch")
+    runner_oid, runner_bytes = git_blob_for_commit(RUNNER_REFERENCE_COMMIT, RUNNER_REL)
+    runner_entry = next((item for item in previous.get("files", []) if item.get("path") == "run_stage1.py"), {})
+    check(source.get("runner_git_blob_oid") == runner_oid, "manifest runner Git blob OID mismatch")
+    check(runner_entry.get("git_blob_oid") == runner_oid, "manifest runner file Git blob OID mismatch")
+    check(runner_entry.get("size_bytes") == len(runner_bytes), "manifest runner canonical size mismatch")
+    check(runner_entry.get("sha256") == hashlib.sha256(runner_bytes).hexdigest(), "manifest runner canonical SHA-256 mismatch")
+    for item in previous.get("files", []):
+        relative = str(item.get("path", ""))
+        check(relative and Path(relative).name == relative, "manifest path is not a study-local filename")
+        path = HERE / relative
+        check(path.is_file(), f"manifest-listed file missing: {relative}")
+        expected_oid = str(item.get("git_blob_oid", ""))
+        committed_path = f"{RUNNER_REL.rsplit('/', 1)[0]}/{relative}"
+        committed_oid, blob = git_blob_for_commit("HEAD", committed_path)
+        check(expected_oid == committed_oid, f"Git blob OID mismatch for {relative}")
+        check(len(blob) == item.get("size_bytes"), f"canonical Git blob size mismatch for {relative}")
+        check(hashlib.sha256(blob).hexdigest() == item.get("sha256"), f"canonical Git blob SHA-256 mismatch for {relative}")
+    return True
 
 
 def iter_array(path: Path, key: str):
@@ -153,6 +265,8 @@ def near(a: Any, b: Any) -> bool:
 def validate() -> dict[str, Any]:
     global CHECKS
     CHECKS = 0
+    runner_source = verify_runner_source()
+    previous_manifest_git_checked = verify_previous_manifest()
     plan = load(HERE / "stage1-plan.json")
     check(plan.get("schema_id") == "issue-41-t089-matched-continuation-plan-v1", "unexpected plan schema")
     check(plan.get("study_disposition") == "STUDY_ONLY", "study disposition changed")
@@ -343,9 +457,11 @@ def validate() -> dict[str, Any]:
         check(result.get("hypothesis_result_reported") is not True, "partial data must not produce a hypothesis result")
         check(not result.get("primary_analysis"), "partial data must not publish a full-cohort analysis")
     return {
-        "schema_id": "issue-41-verification-v1",
+        "schema_id": "issue-41-verification-v2",
         "terminal": "PASS_COMPLETE" if complete_result else "PASS_FAIL_CLOSED",
         "checks": CHECKS,
+        "runner_source": runner_source,
+        "previous_manifest_git_checked": previous_manifest_git_checked,
         "plan_sha256": sha(HERE / "stage1-plan.json"),
         "preflight_terminal": preflight.get("terminal"),
         "result_terminal": result.get("terminal"),
@@ -367,13 +483,27 @@ def main() -> int:
         manifest_files = []
         for path in sorted(HERE.iterdir()):
             if path.is_file() and path.name != "final-manifest.json":
-                manifest_files.append({"path": path.name, "size_bytes": path.stat().st_size, "sha256": sha(path)})
+                git_blob_oid, canonical_bytes = git_blob_for_worktree(path)
+                manifest_files.append({
+                    "path": path.name,
+                    "size_bytes": len(canonical_bytes),
+                    "sha256": hashlib.sha256(canonical_bytes).hexdigest(),
+                    "git_blob_oid": git_blob_oid,
+                })
+        runner_source = report["runner_source"]
         manifest = {
-            "schema_id": "issue-41-final-manifest-v1",
-            "schema_version": 1,
+            "schema_id": "issue-41-final-manifest-v2",
+            "schema_version": 2,
             "issue": 41,
             "study_disposition": "STUDY_ONLY",
             "self_hash_excluded": True,
+            "code_source": {
+                "reviewed_commit": runner_source["reviewed_commit"],
+                "runner_path": runner_source["path"],
+                "runner_git_blob_oid": runner_source["git_blob_oid"],
+                "runner_sha256": runner_source["sha256"],
+                "runner_size_bytes": runner_source["size_bytes"],
+            },
             "files": manifest_files,
             "verification": report,
         }
