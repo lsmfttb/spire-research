@@ -21,6 +21,8 @@ RUNNER = HERE / "run_stage1.py"
 RUNNER_REL = "studies/issue-41-t089-matched-continuation/run_stage1.py"
 VERIFIER = HERE / "verify_issue41.py"
 VERIFIER_REL = "studies/issue-41-t089-matched-continuation/verify_issue41.py"
+MANIFEST = HERE / "final-manifest.json"
+MANIFEST_REL = "studies/issue-41-t089-matched-continuation/final-manifest.json"
 # Pin the runner to the exact reviewed head. Its blob is unchanged from the
 # source used during execution; later evidence-only commits must preserve it.
 RUNNER_REFERENCE_COMMIT = "e48146c1b28f060e12e4d6c0c8e098db332bda7c"
@@ -160,10 +162,13 @@ def verify_executed_verifier() -> dict[str, Any]:
 
 def verify_previous_manifest() -> bool:
     """On reruns, compare the previous v2 manifest with committed blob bytes."""
-    manifest_path = HERE / "final-manifest.json"
-    if not manifest_path.is_file():
+    if not MANIFEST.is_file():
         return False
-    previous = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest_head_oid, manifest_head_bytes = git_blob_for_commit("HEAD", MANIFEST_REL)
+    manifest_worktree_oid, manifest_worktree_bytes = git_blob_for_worktree(MANIFEST)
+    check(manifest_worktree_oid == manifest_head_oid, "manifest worktree differs from HEAD Git blob")
+    check(manifest_worktree_bytes == manifest_head_bytes, "manifest bytes differ from HEAD Git blob")
+    previous = json.loads(manifest_worktree_bytes.decode("utf-8"))
     if previous.get("schema_id") != "issue-41-final-manifest-v2":
         return False
     source = previous.get("code_source", {})
@@ -181,13 +186,21 @@ def verify_previous_manifest() -> bool:
         check(path.is_file(), f"manifest-listed file missing: {relative}")
         expected_oid = str(item.get("git_blob_oid", ""))
         committed_path = f"{RUNNER_REL.rsplit('/', 1)[0]}/{relative}"
-        committed_oid, blob = git_blob_for_commit("HEAD", committed_path)
+        committed_oid, committed_bytes = git_blob_for_commit("HEAD", committed_path)
         worktree_oid, worktree_bytes = git_blob_for_worktree(path)
-        check(expected_oid == committed_oid, f"Git blob OID mismatch for {relative}")
         check(worktree_oid == committed_oid, f"worktree differs from committed Git blob for {relative}")
-        check(worktree_bytes == blob, f"worktree bytes differ from committed Git blob for {relative}")
-        check(len(blob) == item.get("size_bytes"), f"canonical Git blob size mismatch for {relative}")
-        check(hashlib.sha256(blob).hexdigest() == item.get("sha256"), f"canonical Git blob SHA-256 mismatch for {relative}")
+        check(worktree_bytes == committed_bytes, f"worktree bytes differ from committed Git blob for {relative}")
+        recorded_bytes = committed_bytes
+        if expected_oid != committed_oid and relative == Path(VERIFIER_REL).name:
+            # This one-commit bridge lets a committed verifier repair refresh its
+            # own prior manifest entry; the verifier worktree is independently
+            # required above to match HEAD exactly.
+            previous_source_oid, recorded_bytes = git_blob_for_commit("HEAD^", committed_path)
+            check(expected_oid == previous_source_oid, "prior manifest verifier blob is not the parent-commit source")
+        else:
+            check(expected_oid == committed_oid, f"Git blob OID mismatch for {relative}")
+        check(len(recorded_bytes) == item.get("size_bytes"), f"canonical Git blob size mismatch for {relative}")
+        check(hashlib.sha256(recorded_bytes).hexdigest() == item.get("sha256"), f"canonical Git blob SHA-256 mismatch for {relative}")
     return True
 
 
@@ -532,7 +545,7 @@ def main() -> int:
             "files": manifest_files,
             "verification": report,
         }
-        (HERE / "final-manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(f"PASS Issue 41 verification: {report['checks']} checks; {report['terminal']}; result={report['result_terminal']}; rows={report['complete_result_rows']}; manifest_files={len(manifest_files)}")
         return 0
     except Exception as exc:
