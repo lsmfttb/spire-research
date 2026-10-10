@@ -1,0 +1,71 @@
+{
+  "exact_issue40_rows_reused": 44,
+  "issue": 41,
+  "new_unique_keys": 336,
+  "plan_sha256": "d5c86ca034e92873902cb66ed798ec752bb35d8b4a6f2273bba896b240556c1a",
+  "resources": {
+    "mem_available_mib": 19951.97,
+    "peak_rss_mib": 987.64,
+    "process_cpu_seconds": 475.883,
+    "wall_seconds": 510.046
+  },
+  "retained_roles": 14,
+  "root_decisions_verified": 64,
+  "runtime_identity": {
+    "STSRL_commit": "95abc8b1afe7d84e567aa70fb7225eba09fdff25",
+    "battle_controller": {
+      "action_space": {
+        "allow_excluded_fallback": true,
+        "excluded_kinds": [
+          "game_potion_discard",
+          "game_potion_use",
+          "potion",
+          "potion_discard",
+          "reward_potion",
+          "shop_reward_potion"
+        ],
+        "include_non_combat_potions": true,
+        "preferred_kinds": [
+          "card",
+          "end_turn"
+        ]
+      },
+      "controller": "unguided_search_v2",
+      "implementation": "BattleScumSearcher2",
+      "information_regime": "full_simulator_state_oracle_like",
+      "learned_leaf_value_callback": null,
+      "model_calls": 0,
+      "native_identity": {
+        "commit": "20a6c2b3a9cea817c988178b814f083ff889853f",
+        "ref": "refs/heads/stsrl/main",
+        "repository": "lsmfttb/sts_lightspeed"
+      },
+      "policy_prior_callback": null,
+      "rollout_continuation": "playoutRandom",
+      "root_selection": "highest_mean",
+      "search_budget": {
+        "budget_unit": "native_tree_search_playouts",
+        "simulations": 400
+      },
+      "terminal_utility": "evaluateEndState",
+      "version": "search-v2"
+    },
+    "checkpoint_sha256": "a3a136f729b5cee69815a0b128411eec49a9b4f7695c6aae5a3796345fbd972e",
+    "extension_path": "/home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6/build-py/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "extension_sha256": "108416736aa83973e963cb06e02411d0eb389109003c62e414631053e35ef062",
+    "json_submodule": "0b345b20c888f7dc8888485768e4bf9a6be29de0",
+    "machine": "x86_64",
+    "native_commit": "20a6c2b3a9cea817c988178b814f083ff889853f",
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "pybind11_submodule": "d03662f0984f652b60e7ddce53d3868002275197",
+    "python": "3.13.13",
+    "torch": "2.12.0+cpu"
+  },
+  "schema_id": "issue-41-stage1-preflight-v1",
+  "schema_version": 1,
+  "source_runs": 43,
+  "source_states": 64,
+  "stage1_started": false,
+  "target_rows": 221,
+  "terminal": "PREFLIGHT_PASS_STAGE1_READY"
+}

@@ -1,0 +1,45 @@
+{
+  "actual_plan_and_preflight_history": {
+    "process_cpu_seconds": 504.52,
+    "wall_seconds": 621.834
+  },
+  "additional_caps_seconds": {
+    "process_cpu": 12000.0,
+    "wall": 12000.0
+  },
+  "attempt_cap": 512,
+  "issue": 41,
+  "issue40_observed_cost_basis": {
+    "completed_rows": 44,
+    "mean_successful_row_cpu_seconds": 10.453,
+    "mean_successful_row_wall_seconds": 10.454,
+    "process_cpu_seconds_cumulative": 718.17,
+    "wall_seconds_cumulative": 776.518
+  },
+  "latest_64_root_preflight": {
+    "process_cpu_seconds": 476.72,
+    "wall_seconds": 511.637
+  },
+  "observed_memory": {
+    "max_process_tree_rss_bytes": 8589934592,
+    "min_available_memory_bytes": 4294967296,
+    "minimum_available_memory_bytes": 20918452224,
+    "peak_process_tree_rss_bytes": 1035620352
+  },
+  "plan_sha256": "d5c86ca034e92873902cb66ed798ec752bb35d8b4a6f2273bba896b240556c1a",
+  "remaining_unique_continuations": 336,
+  "schema_id": "issue-41-observed-resource-review-v1",
+  "stage1_started": false,
+  "terminal": "RESOURCE_PROJECTION_PASS",
+  "total_attempts_if_no_retry_including_issue40": 381,
+  "typical_projection_from_start": {
+    "method": "actual completed plan/preflight invocations plus one observed 64-root preflight and all 336 new keys charged the Issue 40 successful-row mean",
+    "process_cpu_seconds": 4493.448,
+    "wall_seconds": 4646.015
+  },
+  "upper_projection_from_start": {
+    "method": "actual completed plan/preflight invocations plus one observed 64-root preflight and all 336 new keys charged the full Issue 40 cumulative cost per completed row",
+    "process_cpu_seconds": 6465.447,
+    "wall_seconds": 7063.245
+  }
+}

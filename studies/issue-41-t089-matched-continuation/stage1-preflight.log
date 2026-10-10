@@ -1,0 +1,10 @@
+
+[2026-10-10T16:56:46Z] START preflight: ['/home/lsmft/stsrl-spikes/py313-torch/bin/python', '/mnt/d/DeadlyCatCoding/spire-research-issue41/studies/issue-41-t089-matched-continuation/run_stage1.py']
+{"stage1_started": false, "stop_detail": "Issue 40 verification failed: Traceback (most recent call last):\n  File \"/mnt/d/DeadlyCatCoding/spire-research-issue41/studies/issue-40-native-recovery/verify_issue40.py\", line 257, in <module>\n    raise AssertionError(\"final-manifest.json does not match current study artifacts\")\nAssertionError: final-manifest.json does not match current study artifacts\n", "terminal": "HISTORICAL_IDENTITY_UNAVAILABLE"}
+
+[2026-10-10T16:57:03Z] END preflight return_code=2 stop_reason=None
+
+[2026-10-10T16:59:41Z] START preflight: ['/home/lsmft/stsrl-spikes/py313-torch/bin/python', '/mnt/d/DeadlyCatCoding/spire-research-issue41/studies/issue-41-t089-matched-continuation/run_stage1.py']
+{"resources": {"mem_available_mib": 19951.97, "peak_rss_mib": 987.64, "process_cpu_seconds": 475.884, "wall_seconds": 510.051}, "root_decisions_verified": 64, "stage1_started": false, "terminal": "PREFLIGHT_PASS_STAGE1_READY"}
+
+[2026-10-10T17:08:13Z] END preflight return_code=0 stop_reason=None
