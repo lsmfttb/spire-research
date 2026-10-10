@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "path": "audit_stage0.py",
+      "role": "stage0_audit_script",
+      "sha256": "553495867516621a89e4c7fb93352c4caee6022b92c8ff3b5dac3e715b5884fa",
+      "size_bytes": 46617
+    },
+    {
+      "path": "source-audit.json",
+      "role": "stage0_source_audit",
+      "sha256": "ec18b1de93549bbba307449fb2299cc62824b1bf20fcb456239f51e32c985ab4",
+      "size_bytes": 16380
+    },
+    {
+      "path": "run-state.json",
+      "role": "run_state",
+      "sha256": "4b9bbe027d1050682f3d3bde85a64024adeaa8b1ae48e5d5e47c29be9104b52c",
+      "size_bytes": 281
+    },
+    {
+      "path": "README.md",
+      "role": "study_readme",
+      "sha256": "e184df0351472df483d98ef09d87e468fa61d4e9996f6c185730af3aa87154fa",
+      "size_bytes": 2063
+    }
+  ],
+  "issue": 39,
+  "schema_id": "issue-39-output-manifest-v1",
+  "schema_version": 1
+}
