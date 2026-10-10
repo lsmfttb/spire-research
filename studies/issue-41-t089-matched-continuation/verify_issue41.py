@@ -19,6 +19,8 @@ REPO = HERE.parents[1]
 I40 = REPO / "studies/issue-40-native-recovery"
 RUNNER = HERE / "run_stage1.py"
 RUNNER_REL = "studies/issue-41-t089-matched-continuation/run_stage1.py"
+VERIFIER = HERE / "verify_issue41.py"
+VERIFIER_REL = "studies/issue-41-t089-matched-continuation/verify_issue41.py"
 # Pin the runner to the exact reviewed head. Its blob is unchanged from the
 # source used during execution; later evidence-only commits must preserve it.
 RUNNER_REFERENCE_COMMIT = "e48146c1b28f060e12e4d6c0c8e098db332bda7c"
@@ -142,6 +144,20 @@ def verify_runner_source() -> dict[str, Any]:
     }
 
 
+def verify_executed_verifier() -> dict[str, Any]:
+    """Fail closed unless the verifier on disk is the exact committed source."""
+    expected_oid, expected_bytes = git_blob_for_commit("HEAD", VERIFIER_REL)
+    worktree_oid, worktree_bytes = git_blob_for_worktree(VERIFIER)
+    check(worktree_oid == expected_oid, "executed verifier worktree differs from HEAD Git blob")
+    check(worktree_bytes == expected_bytes, "executed verifier bytes differ from HEAD Git blob")
+    return {
+        "path": VERIFIER_REL,
+        "git_blob_oid": expected_oid,
+        "sha256": hashlib.sha256(expected_bytes).hexdigest(),
+        "size_bytes": len(expected_bytes),
+    }
+
+
 def verify_previous_manifest() -> bool:
     """On reruns, compare the previous v2 manifest with committed blob bytes."""
     manifest_path = HERE / "final-manifest.json"
@@ -166,7 +182,10 @@ def verify_previous_manifest() -> bool:
         expected_oid = str(item.get("git_blob_oid", ""))
         committed_path = f"{RUNNER_REL.rsplit('/', 1)[0]}/{relative}"
         committed_oid, blob = git_blob_for_commit("HEAD", committed_path)
+        worktree_oid, worktree_bytes = git_blob_for_worktree(path)
         check(expected_oid == committed_oid, f"Git blob OID mismatch for {relative}")
+        check(worktree_oid == committed_oid, f"worktree differs from committed Git blob for {relative}")
+        check(worktree_bytes == blob, f"worktree bytes differ from committed Git blob for {relative}")
         check(len(blob) == item.get("size_bytes"), f"canonical Git blob size mismatch for {relative}")
         check(hashlib.sha256(blob).hexdigest() == item.get("sha256"), f"canonical Git blob SHA-256 mismatch for {relative}")
     return True
@@ -265,6 +284,7 @@ def near(a: Any, b: Any) -> bool:
 def validate() -> dict[str, Any]:
     global CHECKS
     CHECKS = 0
+    verifier_source = verify_executed_verifier()
     runner_source = verify_runner_source()
     previous_manifest_git_checked = verify_previous_manifest()
     plan = load(HERE / "stage1-plan.json")
@@ -460,6 +480,7 @@ def validate() -> dict[str, Any]:
         "schema_id": "issue-41-verification-v2",
         "terminal": "PASS_COMPLETE" if complete_result else "PASS_FAIL_CLOSED",
         "checks": CHECKS,
+        "verifier_source": verifier_source,
         "runner_source": runner_source,
         "previous_manifest_git_checked": previous_manifest_git_checked,
         "plan_sha256": sha(HERE / "stage1-plan.json"),
@@ -498,6 +519,10 @@ def main() -> int:
             "study_disposition": "STUDY_ONLY",
             "self_hash_excluded": True,
             "code_source": {
+                "verifier_path": report["verifier_source"]["path"],
+                "verifier_git_blob_oid": report["verifier_source"]["git_blob_oid"],
+                "verifier_sha256": report["verifier_source"]["sha256"],
+                "verifier_size_bytes": report["verifier_source"]["size_bytes"],
                 "reviewed_commit": runner_source["reviewed_commit"],
                 "runner_path": runner_source["path"],
                 "runner_git_blob_oid": runner_source["git_blob_oid"],
