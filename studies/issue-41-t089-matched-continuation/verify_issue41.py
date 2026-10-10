@@ -317,7 +317,7 @@ def validate() -> dict[str, Any]:
         check(result.get("runtime", {}).get("total_attempts_including_issue40", MAX_ATTEMPTS + 1) <= MAX_ATTEMPTS, "result reports attempt-cap violation")
         check(result["runtime"]["stage1_attempts_started"] == len(starts) and result["runtime"]["total_attempts_including_issue40"] == HISTORICAL_STARTS + len(starts), "result and durable attempt ledger counts disagree")
         check(near(result["runtime"]["stage1_wall_seconds"], total_wall) and near(result["runtime"]["stage1_process_cpu_seconds"], total_cpu), "result and external resource ledger totals disagree")
-        check(near(result["runtime"]["peak_process_tree_rss_mib"], peak_rss / (1024 * 1024)) and near(result["runtime"]["minimum_available_memory_mib"], min_mem / (1024 * 1024)), "result and external memory ledger disagree")
+        check(near(result["runtime"]["peak_process_tree_rss_mib"], round(peak_rss / (1024 * 1024), 2)) and near(result["runtime"]["minimum_available_memory_mib"], round(min_mem / (1024 * 1024), 2)), "result and external memory ledger disagree")
         noncoincident = [s for s in derived if not next(x for x in selection if int(x["index"]) == s["state_index"])["coincident_root_action"]]
         switches = [s["state_index"] for s in noncoincident if (s["d_e"] > 0 > s["d_m"]) or (s["d_e"] < 0 < s["d_m"])]
         zero_crossings = [s["state_index"] for s in noncoincident if (s["d_e"] == 0) != (s["d_m"] == 0)]
