@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/mnt/d/DeadlycatCoding/spire-research-issue-40-native-recovery/studies/issue-40-native-recovery/run_smoke.py", line 670, in <module>
+    "maximum_authorized_continuations": int(budget["max_complete_continuation_attempts"]),
+                                            ^^^^^^
+NameError: name 'budget' is not defined

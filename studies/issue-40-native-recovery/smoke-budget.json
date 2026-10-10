@@ -1,0 +1,61 @@
+{
+  "attempted_continuations_before_current": 45,
+  "concurrency": 1,
+  "execution_history": [
+    {
+      "attempt": "64:1:892201",
+      "child_returncode": 2,
+      "continuation_attempts_started": 1,
+      "continuations_logged_complete": 0,
+      "failure": "The native terminal run completed, then output accounting raised KeyError for an uninitialized native_search_simulator_steps counter. It is logged in smoke-attempt-1-progress.jsonl; no result row was written, so that exact predeclared branch is retried once.",
+      "finished_at_utc": "2026-10-10T15:41:23Z",
+      "minimum_mem_available_bytes_observed": 21025918976,
+      "peak_rss_bytes_observed": 1009782784,
+      "process_cpu_seconds_observed": 122.09,
+      "started_at_utc": "2026-10-10T15:38:56Z",
+      "stop_reason": null,
+      "wall_seconds": 147.231
+    },
+    {
+      "child_returncode": -15,
+      "continuation_attempts_started": 0,
+      "continuations_logged_complete": 0,
+      "finished_at_utc": "2026-10-10T15:45:03Z",
+      "minimum_mem_available_bytes_observed": 21025918976,
+      "peak_rss_bytes_observed": 1009782784,
+      "process_cpu_seconds_observed": 5.0,
+      "root_replays_may_have_started": true,
+      "started_at_utc": "2026-10-10T15:44:54Z",
+      "stop_reason": "Supervisor variable bug caused an unmonitored runner; it was stopped by SIGTERM during preflight before any continuation_started record.",
+      "wall_seconds": 10.0
+    },
+    {
+      "child_returncode": 0,
+      "continuation_attempts_started": 44,
+      "continuations_logged_complete": 44,
+      "finished_at_utc": "2026-10-10T15:56:32Z",
+      "minimum_mem_available_bytes_observed": 20766265344,
+      "peak_rss_bytes_observed": 1264943104,
+      "process_cpu_seconds_observed": 591.08,
+      "started_at_utc": "2026-10-10T15:46:12Z",
+      "stop_reason": null,
+      "wall_seconds": 619.287
+    }
+  ],
+  "expected_complete_continuation_attempts": 44,
+  "max_complete_continuation_attempts": 64,
+  "max_peak_rss_mib": 8192,
+  "max_process_cpu_seconds": 1800,
+  "max_wall_clock_seconds": 1800,
+  "minimum_mem_available_mib": 4096,
+  "no_stage1": true,
+  "per_continuation_step_limit": 500,
+  "reserved_at_utc": "2026-10-10T15:37:01Z",
+  "schema_id": "issue-40-smoke-resource-budget-v1",
+  "schema_version": 1,
+  "spent_process_cpu_seconds_before_current": 718.17,
+  "spent_wall_seconds_before_current": 776.518,
+  "status": "CONSUMED",
+  "stop_behavior": "Fail closed before starting the next continuation when an observed limit is reached; external timeout and CPU limit enforce the global ceilings during a native call.",
+  "unreported_terminal_complete_attempts_before_current": 1
+}

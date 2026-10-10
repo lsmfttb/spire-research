@@ -1,0 +1,147 @@
+{
+  "schema_id": "issue-40-native-smoke-plan-v1",
+  "schema_version": 1,
+  "issue": 40,
+  "authorized_terminal_after_pass": "SMOKE_PASS_STAGE1_AWAITING_PLANNER",
+  "study_disposition": "STUDY_ONLY",
+  "stage_0_terminal": "STAGE0_READY_FOR_SMOKE",
+  "stage_0_snapshot": {
+    "directory": "studies/issue-40-native-recovery",
+    "source_audit_sha256": "57417638a8feb1055842356780d95c9fc15e2e22aa19910396ee7e8726656249",
+    "audit_script_sha256": "553495867516621a89e4c7fb93352c4caee6022b92c8ff3b5dac3e715b5884fa"
+  },
+  "native": {
+    "repository": "lsmfttb/sts_lightspeed",
+    "commit": "20a6c2b3a9cea817c988178b814f083ff889853f",
+    "json_commit": "0b345b20c888f7dc8888485768e4bf9a6be29de0",
+    "pybind11_commit": "d03662f0984f652b60e7ddce53d3868002275197",
+    "search": "Search-v2@400",
+    "root_selection": "highest_mean",
+    "potions": "disabled",
+    "model_input": "non-combat-model-input-v1"
+  },
+  "model": {
+    "code_commit": "95abc8b1afe7d84e567aa70fb7225eba09fdff25",
+    "checkpoint_seed": 893002,
+    "checkpoint_sha256": "a3a136f729b5cee69815a0b128411eec49a9b4f7695c6aae5a3796345fbd972e"
+  },
+  "selection": {
+    "source_selection_sha256": "94857d0e310f34cdd2780920ec81f9dc60e179c94244b9e231952a43a5f4e8b8",
+    "heldout_states": [
+      {
+        "index": 64,
+        "family": "MAP_SCREEN",
+        "model": {
+          "index": 1,
+          "action_id": "game:6"
+        },
+        "expert": {
+          "index": 0,
+          "action_id": "game:5"
+        }
+      },
+      {
+        "index": 65,
+        "family": "MAP_SCREEN",
+        "model": {
+          "index": 0,
+          "action_id": "game:1"
+        },
+        "expert": {
+          "index": 0,
+          "action_id": "game:1"
+        }
+      },
+      {
+        "index": 144,
+        "family": "REST_ROOM",
+        "model": {
+          "index": 4,
+          "action_id": "game:3221225473"
+        },
+        "expert": {
+          "index": 2,
+          "action_id": "game:2"
+        }
+      },
+      {
+        "index": 145,
+        "family": "REST_ROOM",
+        "model": {
+          "index": 0,
+          "action_id": "game:0"
+        },
+        "expert": {
+          "index": 0,
+          "action_id": "game:0"
+        }
+      },
+      {
+        "index": 224,
+        "family": "REWARDS",
+        "model": {
+          "index": 0,
+          "action_id": "game:134217728"
+        },
+        "expert": {
+          "index": 0,
+          "action_id": "game:134217728"
+        }
+      },
+      {
+        "index": 225,
+        "family": "REWARDS",
+        "model": {
+          "index": 0,
+          "action_id": "game:134217728"
+        },
+        "expert": {
+          "index": 2,
+          "action_id": "game:402653184"
+        }
+      },
+      {
+        "index": 304,
+        "family": "TREASURE_ROOM",
+        "model": {
+          "index": 0,
+          "action_id": "game:0"
+        },
+        "expert": {
+          "index": 0,
+          "action_id": "game:0"
+        }
+      },
+      {
+        "index": 305,
+        "family": "TREASURE_ROOM",
+        "model": {
+          "index": 0,
+          "action_id": "game:0"
+        },
+        "expert": {
+          "index": 0,
+          "action_id": "game:0"
+        }
+      }
+    ],
+    "continuation_seeds": [
+      892201,
+      892202,
+      892203,
+      892204
+    ],
+    "historical_reference": "Exact T089 target-table rows for each selected state/root-action/continuation-seed; q_floor only, not used to select states or actions."
+  },
+  "execution": {
+    "unique_root_state_action_pairs": 11,
+    "expected_complete_continuations": 44,
+    "maximum_authorized_complete_continuations": 64,
+    "max_steps": 500,
+    "concurrency": 1,
+    "root_action_policy": "Frozen checkpoint T089 model and frozen held-out Expert comparator; deterministic choices checked against this plan before any continuation branch.",
+    "future_noncombat_policy": "Frozen T089 model on supported public four-family contexts; Expert fallback on unsupported contexts with driver seed equal to continuation seed.",
+    "future_battle_policy": "Frozen exact Search-v2@400, highest_mean, no-potions."
+  },
+  "no_reselection": "The root indices, action identities, family strata, and continuation seeds are fixed above. Smoke results cannot change them."
+}

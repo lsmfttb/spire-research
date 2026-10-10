@@ -1,0 +1,253 @@
+{
+  "attempts": [],
+  "authorized_stage1_followup": "Planner decision required after independent Reviewer PASS; no Stage-1 work performed.",
+  "complete_continuations": 0,
+  "expected_continuations": 44,
+  "finished_at_utc": "2026-10-10T15:41:21Z",
+  "issue": 40,
+  "maximum_authorized_continuations": 64,
+  "resources": {
+    "mem_available_mib": 20051.52,
+    "peak_rss_mib": 964.42,
+    "process_cpu_seconds": 121.065,
+    "wall_seconds": 144.798
+  },
+  "runtime_evidence": {
+    "battle_controller_provenance": {
+      "action_space": {
+        "allow_excluded_fallback": true,
+        "excluded_kinds": [
+          "game_potion_discard",
+          "game_potion_use",
+          "potion",
+          "potion_discard",
+          "reward_potion",
+          "shop_reward_potion"
+        ],
+        "include_non_combat_potions": true,
+        "preferred_kinds": [
+          "card",
+          "end_turn"
+        ]
+      },
+      "controller": "unguided_search_v2",
+      "implementation": "BattleScumSearcher2",
+      "information_regime": "full_simulator_state_oracle_like",
+      "learned_leaf_value_callback": null,
+      "model_calls": 0,
+      "native_identity": {
+        "commit": "20a6c2b3a9cea817c988178b814f083ff889853f",
+        "ref": "refs/heads/stsrl/main",
+        "repository": "lsmfttb/sts_lightspeed"
+      },
+      "policy_prior_callback": null,
+      "rollout_continuation": "playoutRandom",
+      "root_selection": "highest_mean",
+      "search_budget": {
+        "budget_unit": "native_tree_search_playouts",
+        "simulations": 400
+      },
+      "terminal_utility": "evaluateEndState",
+      "version": "search-v2"
+    },
+    "checkpoint_model_seed": 893002,
+    "checkpoint_sha256": "a3a136f729b5cee69815a0b128411eec49a9b4f7695c6aae5a3796345fbd972e",
+    "loaded_extension_path": "/home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6/build-py/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "loaded_extension_sha256": "108416736aa83973e963cb06e02411d0eb389109003c62e414631053e35ef062",
+    "loaded_extension_size_bytes": 1632040,
+    "native_head": "20a6c2b3a9cea817c988178b814f083ff889853f",
+    "native_submodule_status": [
+      "0b345b20c888f7dc8888485768e4bf9a6be29de0 json (v3.10.1-10-g0b345b20c)",
+      "d03662f0984f652b60e7ddce53d3868002275197 pybind11 (v3.0.4)"
+    ],
+    "planned_complete_continuations": 44,
+    "root_decisions": [
+      {
+        "expert_root_action_identity": {
+          "action_id": "game:5",
+          "kind": "map",
+          "label": "game.map bits=5 idx1=5 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:5\",\"kind\":\"map\",\"occurrence\":0}"
+        },
+        "expert_root_action_index": 0,
+        "family": "MAP_SCREEN",
+        "model_root_action_identity": {
+          "action_id": "game:6",
+          "kind": "map",
+          "label": "game.map bits=6 idx1=6 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:6\",\"kind\":\"map\",\"occurrence\":0}"
+        },
+        "model_root_action_index": 1,
+        "public_context_status": "available",
+        "same_root_action": false,
+        "state_index": 64
+      },
+      {
+        "expert_root_action_identity": {
+          "action_id": "game:1",
+          "kind": "map",
+          "label": "game.map bits=1 idx1=1 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:1\",\"kind\":\"map\",\"occurrence\":0}"
+        },
+        "expert_root_action_index": 0,
+        "family": "MAP_SCREEN",
+        "model_root_action_identity": {
+          "action_id": "game:1",
+          "kind": "map",
+          "label": "game.map bits=1 idx1=1 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:1\",\"kind\":\"map\",\"occurrence\":0}"
+        },
+        "model_root_action_index": 0,
+        "public_context_status": "available",
+        "same_root_action": true,
+        "state_index": 65
+      },
+      {
+        "expert_root_action_identity": {
+          "action_id": "game:2",
+          "kind": "rest",
+          "label": "game.rest bits=2 idx1=2 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:2\",\"kind\":\"rest\",\"occurrence\":0}"
+        },
+        "expert_root_action_index": 2,
+        "family": "REST_ROOM",
+        "model_root_action_identity": {
+          "action_id": "game:3221225473",
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard bits=3221225473 idx1=1 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:3221225473\",\"kind\":\"game_potion_discard\",\"occurrence\":0}"
+        },
+        "model_root_action_index": 4,
+        "public_context_status": "available",
+        "same_root_action": false,
+        "state_index": 144
+      },
+      {
+        "expert_root_action_identity": {
+          "action_id": "game:0",
+          "kind": "rest",
+          "label": "game.rest bits=0 idx1=0 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:0\",\"kind\":\"rest\",\"occurrence\":0}"
+        },
+        "expert_root_action_index": 0,
+        "family": "REST_ROOM",
+        "model_root_action_identity": {
+          "action_id": "game:0",
+          "kind": "rest",
+          "label": "game.rest bits=0 idx1=0 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:0\",\"kind\":\"rest\",\"occurrence\":0}"
+        },
+        "model_root_action_index": 0,
+        "public_context_status": "available",
+        "same_root_action": true,
+        "state_index": 145
+      },
+      {
+        "expert_root_action_identity": {
+          "action_id": "game:134217728",
+          "kind": "reward_gold",
+          "label": "game.reward_gold bits=134217728 idx1=0 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:134217728\",\"kind\":\"reward_gold\",\"occurrence\":0}"
+        },
+        "expert_root_action_index": 0,
+        "family": "REWARDS",
+        "model_root_action_identity": {
+          "action_id": "game:134217728",
+          "kind": "reward_gold",
+          "label": "game.reward_gold bits=134217728 idx1=0 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:134217728\",\"kind\":\"reward_gold\",\"occurrence\":0}"
+        },
+        "model_root_action_index": 0,
+        "public_context_status": "available",
+        "same_root_action": true,
+        "state_index": 224
+      },
+      {
+        "expert_root_action_identity": {
+          "action_id": "game:402653184",
+          "kind": "reward_potion",
+          "label": "game.reward_potion bits=402653184 idx1=0 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:402653184\",\"kind\":\"reward_potion\",\"occurrence\":0}"
+        },
+        "expert_root_action_index": 2,
+        "family": "REWARDS",
+        "model_root_action_identity": {
+          "action_id": "game:134217728",
+          "kind": "reward_gold",
+          "label": "game.reward_gold bits=134217728 idx1=0 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:134217728\",\"kind\":\"reward_gold\",\"occurrence\":0}"
+        },
+        "model_root_action_index": 0,
+        "public_context_status": "available",
+        "same_root_action": false,
+        "state_index": 225
+      },
+      {
+        "expert_root_action_identity": {
+          "action_id": "game:0",
+          "kind": "treasure_open",
+          "label": "game.treasure_open bits=0 idx1=0 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:0\",\"kind\":\"treasure_open\",\"occurrence\":0}"
+        },
+        "expert_root_action_index": 0,
+        "family": "TREASURE_ROOM",
+        "model_root_action_identity": {
+          "action_id": "game:0",
+          "kind": "treasure_open",
+          "label": "game.treasure_open bits=0 idx1=0 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:0\",\"kind\":\"treasure_open\",\"occurrence\":0}"
+        },
+        "model_root_action_index": 0,
+        "public_context_status": "available",
+        "same_root_action": true,
+        "state_index": 304
+      },
+      {
+        "expert_root_action_identity": {
+          "action_id": "game:0",
+          "kind": "treasure_open",
+          "label": "game.treasure_open bits=0 idx1=0 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:0\",\"kind\":\"treasure_open\",\"occurrence\":0}"
+        },
+        "expert_root_action_index": 0,
+        "family": "TREASURE_ROOM",
+        "model_root_action_identity": {
+          "action_id": "game:0",
+          "kind": "treasure_open",
+          "label": "game.treasure_open bits=0 idx1=0 idx2=0 idx3=0",
+          "occurrence": 0,
+          "stable_id": "{\"action_id\":\"game:0\",\"kind\":\"treasure_open\",\"occurrence\":0}"
+        },
+        "model_root_action_index": 0,
+        "public_context_status": "available",
+        "same_root_action": true,
+        "state_index": 305
+      }
+    ],
+    "source_selection_sha256": "94857d0e310f34cdd2780920ec81f9dc60e179c94244b9e231952a43a5f4e8b8",
+    "target_table_sha256": "b8551454f764d47b43d068d507df783226f4b2651ea74fe82bec7fd4b0b8de11",
+    "unique_root_action_pairs": 11
+  },
+  "schema_id": "issue-40-continuation-smoke-v1",
+  "schema_version": 1,
+  "stage1_started": false,
+  "started_at_utc": "2026-10-10T15:38:56Z",
+  "stop_detail": "64:1:892201: KeyError: 'native_search_simulator_steps'",
+  "study_disposition": "STUDY_ONLY",
+  "terminal": "INCOMPLETE"
+}

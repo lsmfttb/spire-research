@@ -1,0 +1,19 @@
+{
+  "complete_continuations": 0,
+  "expected_continuations": 44,
+  "issue": 40,
+  "resources": {
+    "mem_available_mib": 20051.52,
+    "peak_rss_mib": 964.42,
+    "process_cpu_seconds": 121.068,
+    "wall_seconds": 144.819
+  },
+  "result_sha256": "e58bc562b053c61ea3695c69f4ea29405d975942b1566b416135c1b210331f59",
+  "schema_id": "issue-40-smoke-state-v1",
+  "schema_version": 1,
+  "stage1_started": false,
+  "started_at_utc": "2026-10-10T15:38:56Z",
+  "stop_detail": "64:1:892201: KeyError: 'native_search_simulator_steps'",
+  "terminal": "INCOMPLETE",
+  "updated_at_utc": "2026-10-10T15:41:21Z"
+}

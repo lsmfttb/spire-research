@@ -1,0 +1,60 @@
+COMMAND: /home/lsmft/stsrl-spikes/py313-torch/bin/cmake --fresh -S /home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6 -B /home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6/build-py -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE=/home/lsmft/stsrl-spikes/py313-torch/bin/python -DPYTHON_EXECUTABLE=/home/lsmft/stsrl-spikes/py313-torch/bin/python -DCMAKE_CXX_COMPILER=/usr/bin/c++ -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+-- The CXX compiler identification is GNU 15.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+CMake Deprecation Warning at json/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Using the single-header code from /home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6/json/single_include/
+-- pybind11 v3.0.4 
+-- Found Python: /home/lsmft/stsrl-spikes/py313-torch/bin/python (found suitable version "3.13.13", minimum required is "3.8") found components: Interpreter Development.Module Development.Embed
+Using compatibility mode for Python, set PYBIND11_FINDPYTHON to NEW/OLD to silence this message
+-- Performing Test HAS_FLTO_AUTO
+-- Performing Test HAS_FLTO_AUTO - Success
+-- Configuring done (3.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6/build-py
+CONFIGURE_EXIT=0
+COMMAND: timeout 600s /home/lsmft/stsrl-spikes/py313-torch/bin/cmake --build /home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6/build-py --target slaythespire -j8
+[ 23%] Building CXX object CMakeFiles/slaythespire.dir/src/combat/CardQueue.cpp.o
+[ 23%] Building CXX object CMakeFiles/slaythespire.dir/src/combat/Actions.cpp.o
+[ 23%] Building CXX object CMakeFiles/slaythespire.dir/bindings/bindings-util.cpp.o
+[ 23%] Building CXX object CMakeFiles/slaythespire.dir/src/combat/CardManager.cpp.o
+[ 23%] Building CXX object CMakeFiles/slaythespire.dir/bindings/slaythespire.cpp.o
+[ 23%] Building CXX object CMakeFiles/slaythespire.dir/src/combat/BattleContext.cpp.o
+[ 23%] Building CXX object CMakeFiles/slaythespire.dir/src/combat/Monster.cpp.o
+[ 28%] Building CXX object CMakeFiles/slaythespire.dir/src/combat/MonsterGroup.cpp.o
+[ 33%] Building CXX object CMakeFiles/slaythespire.dir/src/combat/MonsterMoveDamage.cpp.o
+[ 33%] Building CXX object CMakeFiles/slaythespire.dir/src/combat/MonsterSpecific.cpp.o
+[ 38%] Building CXX object CMakeFiles/slaythespire.dir/src/combat/Player.cpp.o
+[ 42%] Building CXX object CMakeFiles/slaythespire.dir/src/game/Card.cpp.o
+[ 42%] Building CXX object CMakeFiles/slaythespire.dir/src/game/CombatReward.cpp.o
+[ 47%] Building CXX object CMakeFiles/slaythespire.dir/src/game/Deck.cpp.o
+[ 47%] Building CXX object CMakeFiles/slaythespire.dir/src/game/Game.cpp.o
+[ 52%] Building CXX object CMakeFiles/slaythespire.dir/src/game/GameContext.cpp.o
+[ 57%] Building CXX object CMakeFiles/slaythespire.dir/src/game/Map.cpp.o
+[ 57%] Building CXX object CMakeFiles/slaythespire.dir/src/game/Neow.cpp.o
+[ 61%] Building CXX object CMakeFiles/slaythespire.dir/src/game/SaveFile.cpp.o
+[ 66%] Building CXX object CMakeFiles/slaythespire.dir/src/game/Shop.cpp.o
+[ 66%] Building CXX object CMakeFiles/slaythespire.dir/src/sim/BattleSimulator.cpp.o
+[ 71%] Building CXX object CMakeFiles/slaythespire.dir/src/sim/ConsoleSimulator.cpp.o
+[ 76%] Building CXX object CMakeFiles/slaythespire.dir/src/sim/PrintHelpers.cpp.o
+[ 76%] Building CXX object CMakeFiles/slaythespire.dir/src/sim/SimHelpers.cpp.o
+[ 80%] Building CXX object CMakeFiles/slaythespire.dir/src/sim/search/Action.cpp.o
+[ 80%] Building CXX object CMakeFiles/slaythespire.dir/src/sim/search/BattleScumSearcher2.cpp.o
+[ 85%] Building CXX object CMakeFiles/slaythespire.dir/src/sim/search/ExpertKnowledge.cpp.o
+[ 90%] Building CXX object CMakeFiles/slaythespire.dir/src/sim/search/GameAction.cpp.o
+[ 90%] Building CXX object CMakeFiles/slaythespire.dir/src/sim/search/ScumSearchAgent2.cpp.o
+[ 95%] Building CXX object CMakeFiles/slaythespire.dir/src/sim/search/SimpleAgent.cpp.o
+[100%] Linking CXX shared module slaythespire.cpython-313-x86_64-linux-gnu.so
+[100%] Built target slaythespire
+BUILD_EXIT=0

@@ -1,0 +1,56 @@
+{
+  "schema_id": "issue-40-native-recovery-v1",
+  "schema_version": 1,
+  "execution_host": {
+    "os": "Ubuntu 24.04 on WSL2",
+    "python": "3.13.13",
+    "python_environment": "/home/lsmft/stsrl-spikes/py313-torch",
+    "torch": "2.12.0+cpu",
+    "cmake": "4.3.3 (/home/lsmft/stsrl-spikes/py313-torch/bin/cmake)",
+    "compiler": "GNU 15.2.0 (/usr/bin/c++)"
+  },
+  "exact_native_source": {
+    "path": "/home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6",
+    "head": "20a6c2b3a9cea817c988178b814f083ff889853f",
+    "status": "detached",
+    "submodules": {
+      "json": {
+        "commit": "0b345b20c888f7dc8888485768e4bf9a6be29de0",
+        "initialized": true
+      },
+      "pybind11": {
+        "commit": "d03662f0984f652b60e7ddce53d3868002275197",
+        "initialized": true
+      }
+    },
+    "submodule_recovery_command": "git -c protocol.file.allow=always -c submodule.json.url=/home/lsmft/stsrl-spikes/sts_lightspeed-t062/json -c submodule.pybind11.url=/home/lsmft/stsrl-spikes/sts_lightspeed-py313-t035/pybind11 -C /home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6 submodule update --init --recursive json pybind11"
+  },
+  "build": {
+    "path": "/home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6/build-py",
+    "command": "/home/lsmft/stsrl-spikes/py313-torch/bin/cmake --fresh -S /home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6 -B /home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6/build-py -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE=/home/lsmft/stsrl-spikes/py313-torch/bin/python -DPYTHON_EXECUTABLE=/home/lsmft/stsrl-spikes/py313-torch/bin/python -DCMAKE_CXX_COMPILER=/usr/bin/c++ -DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+    "result": "Built target slaythespire",
+    "log": "studies/issue-40-native-recovery/native-build.log"
+  },
+  "loaded_extension": {
+    "path": "/home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6/build-py/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "sha256": "108416736aa83973e963cb06e02411d0eb389109003c62e414631053e35ef062",
+    "size_bytes": 1632040,
+    "loaded_successfully": true
+  },
+  "other_required_source_identity": {
+    "STSRL_code": {
+      "commit": "95abc8b1afe7d84e567aa70fb7225eba09fdff25",
+      "worktree": "/home/lsmft/stsrl-spikes/STSRL-issue40-95abc",
+      "source_object_present": true,
+      "fetch_command_attempted": "git -C /mnt/d/DeadlycatCoding/STSRL fetch --prune origin",
+      "fetch_error": "GnuTLS recv error (-110): The TLS connection was non-properly terminated."
+    },
+    "approved_spec_commit": "afffcdda5cebfe47a2cfa1624911d916191bab76"
+  },
+  "limitations": [
+    "The accepted STSRL commit was available as a retained local Git object and checked out detached; no successful remote fetch was needed for identity verification.",
+    "Submodules were restored from retained local caches only after their exact HEAD/object identities matched the pinned commits.",
+    "The system CMake 4.2.3 path was not used because the legacy pinned JSON CMakeLists requires a policy compatibility setting; the Python-environment CMake 4.3.3 build with CMAKE_POLICY_VERSION_MINIMUM=3.5 succeeded.",
+    "The native source and STSRL source trees/build products are external host inputs and are not bundled in this study commit."
+  ]
+}

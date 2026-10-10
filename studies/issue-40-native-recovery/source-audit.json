@@ -1,0 +1,361 @@
+{
+  "blocker": null,
+  "cohort": {
+    "T075_selected_state_count": 320,
+    "distinct_heldout_source_run_count": 43,
+    "family_counts_all_splits": {
+      "MAP_SCREEN": 80,
+      "REST_ROOM": 80,
+      "REWARDS": 80,
+      "TREASURE_ROOM": 80
+    },
+    "heldout_comparator_seed": 895001,
+    "heldout_family_counts": {
+      "MAP_SCREEN": 16,
+      "REST_ROOM": 16,
+      "REWARDS": 16,
+      "TREASURE_ROOM": 16
+    },
+    "heldout_state_count": 64,
+    "heldout_target_rows_expected": 221,
+    "heldout_target_rows_per_eligible_action": 221,
+    "heldout_target_seed_shapes": {
+      "[892201, 892202, 892203, 892204]": 221
+    },
+    "heldout_target_states_verified": 64,
+    "historical_expert_comparator_action_identities_verified": 64,
+    "model_action_identities_verified": 64,
+    "preselected_smoke_states_per_family": 2,
+    "public_state_and_ordered_legal_action_parity_verified": true,
+    "selected_state_global_owner_membership_verified": 320,
+    "smoke_state_indices_by_family": {
+      "MAP_SCREEN": [
+        64,
+        65
+      ],
+      "REST_ROOM": [
+        144,
+        145
+      ],
+      "REWARDS": [
+        224,
+        225
+      ],
+      "TREASURE_ROOM": [
+        304,
+        305
+      ]
+    },
+    "split_counts": {
+      "heldout": 64,
+      "train": 192,
+      "validation": 64
+    },
+    "target_table_total_rows_verified": 1111
+  },
+  "execution": {
+    "eight_state_smoke_executed": false,
+    "new_simulator_runs": 0,
+    "reason": null,
+    "stage1_attempts": 0
+  },
+  "frozen_T089_contract": {
+    "approved_spec_commit": "afffcdda5cebfe47a2cfa1624911d916191bab76",
+    "battle_controller": {
+      "action_space": {
+        "allow_excluded_fallback": true,
+        "excluded_kinds": [
+          "game_potion_discard",
+          "game_potion_use",
+          "potion",
+          "potion_discard",
+          "reward_potion",
+          "shop_reward_potion"
+        ],
+        "include_non_combat_potions": true,
+        "preferred_kinds": [
+          "card",
+          "end_turn"
+        ]
+      },
+      "controller": "unguided_search_v2",
+      "implementation": "BattleScumSearcher2",
+      "information_regime": "full_simulator_state_oracle_like",
+      "learned_leaf_value_callback": null,
+      "model_calls": 0,
+      "native_identity": {
+        "commit": "20a6c2b3a9cea817c988178b814f083ff889853f",
+        "ref": "refs/heads/stsrl/main",
+        "repository": "lsmfttb/sts_lightspeed"
+      },
+      "policy_prior_callback": null,
+      "rollout_continuation": "playoutRandom",
+      "root_selection": "highest_mean",
+      "search_budget": {
+        "budget_unit": "native_tree_search_playouts",
+        "simulations": 400
+      },
+      "terminal_utility": "evaluateEndState",
+      "version": "search-v2"
+    },
+    "heldout_continuation_seeds": [
+      892201,
+      892202,
+      892203,
+      892204
+    ],
+    "heldout_expert_comparator_seed": 895001,
+    "model_input_schema": {
+      "action_feature_size": 92,
+      "schema_id": "non-combat-model-input-v1",
+      "state_feature_size": 4737
+    },
+    "native_identity": {
+      "commit": "20a6c2b3a9cea817c988178b814f083ff889853f",
+      "ref": "refs/heads/stsrl/main",
+      "repository": "lsmfttb/sts_lightspeed"
+    },
+    "target_generation_code_identity": {
+      "commit": "a813667b4e1de6423e7a21a44a6080af57ea270d",
+      "repository": "/mnt/d/DeadlyCatCoding/STSRL-T089"
+    },
+    "target_source_identity": {
+      "path": "/mnt/d/DeadlyCatCoding/STSRL/artifacts/t075-leakage-safe-non-combat-cohort-repair/selected-states.jsonl",
+      "record_count": 320,
+      "schema_id": "t065-source-state-v1",
+      "sha256": "94857d0e310f34cdd2780920ec81f9dc60e179c94244b9e231952a43a5f4e8b8",
+      "size_bytes": 226521456
+    }
+  },
+  "identity": {
+    "T075_retention_manifest_sha256": "ebc6d107ba36322890a1e522a18ab5265d8003d0ba7c6529dc49d454346d4e46",
+    "T075_selection_sha256": "94857d0e310f34cdd2780920ec81f9dc60e179c94244b9e231952a43a5f4e8b8",
+    "T089_accepted_code_head": "95abc8b1afe7d84e567aa70fb7225eba09fdff25",
+    "T089_approved_spec_commit": "afffcdda5cebfe47a2cfa1624911d916191bab76",
+    "T089_retention_manifest_sha256": "c29145e102089432ff920102ef9a1e56056e05f32e4e6b4ddd19c8dfdb7b4a1f",
+    "native": {
+      "commit": "20a6c2b3a9cea817c988178b814f083ff889853f",
+      "ref": "refs/heads/stsrl/main",
+      "repository": "lsmfttb/sts_lightspeed"
+    }
+  },
+  "issue": 39,
+  "limitations": [
+    "The source commit exists, but no provenance-qualified T089 native binary is retained at the path recorded by T089.",
+    "The exact native worktree has uninitialized pinned JSON and pybind11 submodules; GitHub fetches for those dependencies failed in this run.",
+    "No result is reported for changed-continuation outcomes; current/later native builds were not substituted.",
+    "The T089 retained held-out gate and target-table hashes were verified; this audit did not recompute targets or use them as model input."
+  ],
+  "native_readiness": {
+    "T089_accepted_code_commit_available": true,
+    "T089_approved_spec_commit_available": true,
+    "exact_native_ready_for_smoke": true,
+    "historical_native_build_available": true,
+    "historical_native_build_path": "/home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6/build-py",
+    "pinned_submodules": {
+      "all_initialized": true,
+      "command_succeeded": true,
+      "rows": [
+        {
+          "commit": "0b345b20c888f7dc8888485768e4bf9a6be29de0",
+          "initialized": true,
+          "marker": " ",
+          "path": "json"
+        },
+        {
+          "commit": "d03662f0984f652b60e7ddce53d3868002275197",
+          "initialized": true,
+          "marker": " ",
+          "path": "pybind11"
+        }
+      ],
+      "stderr": null
+    },
+    "pinned_submodules_match": true,
+    "required_pinned_submodules": {
+      "json": "0b345b20c888f7dc8888485768e4bf9a6be29de0",
+      "pybind11": "d03662f0984f652b60e7ddce53d3868002275197"
+    },
+    "source_commit_available_in_local_git_object_database": true,
+    "worktree_head": "20a6c2b3a9cea817c988178b814f083ff889853f",
+    "worktree_head_matches_required_commit": true
+  },
+  "retained_artifacts": {
+    "T075_required_roles": {
+      "ownership_audit": {
+        "available": true,
+        "expected_sha256": "b6f6fc71c61747faf0f2bd33bb67e81f431ffa204f2f4a3bc1dabe3d03b1ece1",
+        "expected_size_bytes": 4536275,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t075-leakage-safe-non-combat-cohort-repair/ownership-audit.json",
+        "problems": [],
+        "sha256": "b6f6fc71c61747faf0f2bd33bb67e81f431ffa204f2f4a3bc1dabe3d03b1ece1",
+        "size_bytes": 4536275,
+        "verified": true
+      },
+      "preflight_audit": {
+        "available": true,
+        "expected_sha256": "682f6b08c92060d6197ba251e73c6a4322495fe452f3d5c71d47ea46e3fd13b6",
+        "expected_size_bytes": 584,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t075-leakage-safe-non-combat-cohort-repair/preflight-audit.json",
+        "problems": [],
+        "sha256": "682f6b08c92060d6197ba251e73c6a4322495fe452f3d5c71d47ea46e3fd13b6",
+        "size_bytes": 584,
+        "verified": true
+      },
+      "selected_states": {
+        "available": true,
+        "expected_sha256": "94857d0e310f34cdd2780920ec81f9dc60e179c94244b9e231952a43a5f4e8b8",
+        "expected_size_bytes": 226521456,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t075-leakage-safe-non-combat-cohort-repair/selected-states.jsonl",
+        "problems": [],
+        "sha256": "94857d0e310f34cdd2780920ec81f9dc60e179c94244b9e231952a43a5f4e8b8",
+        "size_bytes": 226521456,
+        "verified": true
+      },
+      "source_reuse_audit": {
+        "available": true,
+        "expected_sha256": "319158ad3be2da2b1f3d31939b0e80e58a858235b9511f2ab56efb359350ba32",
+        "expected_size_bytes": 640,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t075-leakage-safe-non-combat-cohort-repair/source-reuse-audit.json",
+        "problems": [],
+        "sha256": "319158ad3be2da2b1f3d31939b0e80e58a858235b9511f2ab56efb359350ba32",
+        "size_bytes": 640,
+        "verified": true
+      },
+      "terminal_report": {
+        "available": true,
+        "expected_sha256": "fde7538a4a58ceffa7f52903d92b4cb873b2eb0902ee45632285bce3bf400886",
+        "expected_size_bytes": 1107,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t075-leakage-safe-non-combat-cohort-repair/terminal-decision.json",
+        "problems": [],
+        "sha256": "fde7538a4a58ceffa7f52903d92b4cb873b2eb0902ee45632285bce3bf400886",
+        "size_bytes": 1107,
+        "verified": true
+      }
+    },
+    "T075_selected_states": {
+      "available": true,
+      "expected_sha256": "94857d0e310f34cdd2780920ec81f9dc60e179c94244b9e231952a43a5f4e8b8",
+      "expected_size_bytes": 226521456,
+      "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t075-leakage-safe-non-combat-cohort-repair/selected-states.jsonl",
+      "problems": [],
+      "sha256": "94857d0e310f34cdd2780920ec81f9dc60e179c94244b9e231952a43a5f4e8b8",
+      "size_bytes": 226521456,
+      "verified": true
+    },
+    "T089_checkpoint_sha256": "a3a136f729b5cee69815a0b128411eec49a9b4f7695c6aae5a3796345fbd972e",
+    "T089_model_checkpoint_seed": 893002,
+    "T089_normalizer_schema": {
+      "action_width": 92,
+      "embedded": true,
+      "state_width": 4737
+    },
+    "T089_required_roles": {
+      "checkpoint_893002": {
+        "available": true,
+        "expected_sha256": "a3a136f729b5cee69815a0b128411eec49a9b4f7695c6aae5a3796345fbd972e",
+        "expected_size_bytes": 1489817,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/training-attempt-4/checkpoints/model-893002.pt",
+        "problems": [],
+        "sha256": "a3a136f729b5cee69815a0b128411eec49a9b4f7695c6aae5a3796345fbd972e",
+        "size_bytes": 1489817,
+        "verified": true
+      },
+      "current_native_revalidation": {
+        "available": true,
+        "expected_sha256": "171c529c0dd8960e81d6c9f4629a9727344cf3434d0d68d9726cdef1ce661ae6",
+        "expected_size_bytes": 20636063,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/current-native-revalidation.json",
+        "problems": [],
+        "sha256": "171c529c0dd8960e81d6c9f4629a9727344cf3434d0d68d9726cdef1ce661ae6",
+        "size_bytes": 20636063,
+        "verified": true
+      },
+      "formal_target_status": {
+        "available": true,
+        "expected_sha256": "82c77b42cb0e02db5b62c71bdb2c5d3e1fa434bb2aff81ef27441630090a2374",
+        "expected_size_bytes": 2538,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/target-generation-formal-attempt-2.status.json",
+        "problems": [],
+        "sha256": "82c77b42cb0e02db5b62c71bdb2c5d3e1fa434bb2aff81ef27441630090a2374",
+        "size_bytes": 2538,
+        "verified": true
+      },
+      "heldout_gate": {
+        "available": true,
+        "expected_sha256": "ed891e663eeb3e33d7eceda3d590368bcf1d918e0d620403edcb40e2629984c7",
+        "expected_size_bytes": 242114,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/heldout-attempt-1/heldout-gate.json",
+        "problems": [],
+        "sha256": "ed891e663eeb3e33d7eceda3d590368bcf1d918e0d620403edcb40e2629984c7",
+        "size_bytes": 242114,
+        "verified": true
+      },
+      "heldout_status": {
+        "available": true,
+        "expected_sha256": "831e501416c4349f0916f189f740f7232bef0b43a36110f98c55332cb99d13cd",
+        "expected_size_bytes": 2881,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/heldout-attempt-1/status.json",
+        "problems": [],
+        "sha256": "831e501416c4349f0916f189f740f7232bef0b43a36110f98c55332cb99d13cd",
+        "size_bytes": 2881,
+        "verified": true
+      },
+      "input_eligibility": {
+        "available": true,
+        "expected_sha256": "a8a6f7c8044c615c73a0d6dc11fc6af6984d6705d3f4d1e2b67c8df6df420294",
+        "expected_size_bytes": 7427,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/input-eligibility.json",
+        "problems": [],
+        "sha256": "a8a6f7c8044c615c73a0d6dc11fc6af6984d6705d3f4d1e2b67c8df6df420294",
+        "size_bytes": 7427,
+        "verified": true
+      },
+      "target_table": {
+        "available": true,
+        "expected_sha256": "b8551454f764d47b43d068d507df783226f4b2651ea74fe82bec7fd4b0b8de11",
+        "expected_size_bytes": 399134082,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/target-table-formal-attempt-2.json",
+        "problems": [],
+        "sha256": "b8551454f764d47b43d068d507df783226f4b2651ea74fe82bec7fd4b0b8de11",
+        "size_bytes": 399134082,
+        "verified": true
+      },
+      "training_batch_plans": {
+        "available": true,
+        "expected_sha256": "93a9888483990afc699e8af4c8d84660fba411aa5a3045317d935fe2609f138e",
+        "expected_size_bytes": 4181,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/training-attempt-4/training-provenance.json",
+        "problems": [],
+        "sha256": "93a9888483990afc699e8af4c8d84660fba411aa5a3045317d935fe2609f138e",
+        "size_bytes": 4181,
+        "verified": true
+      },
+      "validation_selection": {
+        "available": true,
+        "expected_sha256": "9732bb40c902d96d0981c220f80f8ffb1c332a603b9f9493d891afcb35d60bf8",
+        "expected_size_bytes": 1186,
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/training-attempt-4/validation-selection.json",
+        "problems": [],
+        "sha256": "9732bb40c902d96d0981c220f80f8ffb1c332a603b9f9493d891afcb35d60bf8",
+        "size_bytes": 1186,
+        "verified": true
+      }
+    },
+    "T089_target_record_count_from_training_provenance": 1111
+  },
+  "schema_id": "issue-39-stage0-source-audit-v1",
+  "schema_version": 1,
+  "source_paths": {
+    "T089_accepted_code_commit_available": true,
+    "T089_approved_spec_commit_available": true,
+    "artifact_root": "/mnt/d/DeadlycatCoding/STSRL/artifacts",
+    "expected_spire_research_base": "9525d416b9488bb2455435699893b03fe19fe30a",
+    "native_repository": "/home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6",
+    "native_worktree": "/home/lsmft/stsrl-spikes/sts_lightspeed-t088-20a6",
+    "spire_research_head": "9525d416b9488bb2455435699893b03fe19fe30a",
+    "stsr_root": "/mnt/d/DeadlycatCoding/STSRL"
+  },
+  "stage": "STAGE0_SOURCE_AVAILABILITY_AND_IDENTITY",
+  "terminal": "STAGE0_READY_FOR_SMOKE"
+}

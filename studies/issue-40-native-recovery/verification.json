@@ -1,0 +1,361 @@
+{
+  "checks": {
+    "accepted_code_and_spec_identity": {
+      "evidence": null,
+      "passed": true
+    },
+    "accepted_stsrl_git_head": {
+      "evidence": null,
+      "passed": true
+    },
+    "aggregate_memory_budget_respected": {
+      "evidence": null,
+      "passed": true
+    },
+    "aggregate_wall_and_cpu_budgets_respected": {
+      "evidence": null,
+      "passed": true
+    },
+    "all_preselected_root_decisions_present": {
+      "evidence": null,
+      "passed": true
+    },
+    "approved_spec_object_present": {
+      "evidence": null,
+      "passed": true
+    },
+    "attempt_limit_respected": {
+      "evidence": null,
+      "passed": true
+    },
+    "budget_ledger_consistency": {
+      "evidence": null,
+      "passed": true
+    },
+    "conservative_resource_totals_match_supervisor": {
+      "evidence": null,
+      "passed": true
+    },
+    "continuation_id_matches_fixed_plan": {
+      "evidence": null,
+      "passed": true
+    },
+    "continuation_identity_matches_plan": {
+      "evidence": null,
+      "passed": true
+    },
+    "continuation_scored_against_frozen_reference": {
+      "evidence": null,
+      "passed": true
+    },
+    "correct_learned_or_fallback_routing": {
+      "evidence": {
+        "family": "MAP_SCREEN",
+        "status": "learned_success"
+      },
+      "passed": true
+    },
+    "exact_planned_continuation_set": {
+      "evidence": {
+        "missing": [],
+        "unexpected": []
+      },
+      "passed": true
+    },
+    "external_hash_T075 selected states": {
+      "evidence": {
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t075-leakage-safe-non-combat-cohort-repair/selected-states.jsonl",
+        "sha256": "94857d0e310f34cdd2780920ec81f9dc60e179c94244b9e231952a43a5f4e8b8",
+        "size_bytes": 226521456
+      },
+      "passed": true
+    },
+    "external_hash_T089 checkpoint": {
+      "evidence": {
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/training-attempt-4/checkpoints/model-893002.pt",
+        "sha256": "a3a136f729b5cee69815a0b128411eec49a9b4f7695c6aae5a3796345fbd972e",
+        "size_bytes": 1489817
+      },
+      "passed": true
+    },
+    "external_hash_T089 target table": {
+      "evidence": {
+        "path": "/mnt/d/DeadlycatCoding/STSRL/artifacts/t089-frozen-search-self-generated-non-combat-policy/target-table-formal-attempt-2.json",
+        "sha256": "b8551454f764d47b43d068d507df783226f4b2651ea74fe82bec7fd4b0b8de11",
+        "size_bytes": 399134082
+      },
+      "passed": true
+    },
+    "fixed_failure_and_retry_accounted": {
+      "evidence": null,
+      "passed": true
+    },
+    "human_handoff_notes_match_exact_sources": {
+      "evidence": null,
+      "passed": true
+    },
+    "known_noncombat_policy_family": {
+      "evidence": "MAP_SCREEN",
+      "passed": true
+    },
+    "learned_and_explicit_fallback_observed": {
+      "evidence": {
+        "learned_success": 575,
+        "unsupported_fallback": 122
+      },
+      "passed": true
+    },
+    "native_build_provenance": {
+      "evidence": null,
+      "passed": true
+    },
+    "native_build_succeeded": {
+      "evidence": null,
+      "passed": true
+    },
+    "native_extension_loaded_identity": {
+      "evidence": null,
+      "passed": true
+    },
+    "native_git_submodule_heads": {
+      "evidence": {
+        "json": "0b345b20c888f7dc8888485768e4bf9a6be29de0",
+        "pybind11": "d03662f0984f652b60e7ddce53d3868002275197"
+      },
+      "passed": true
+    },
+    "native_search_cost_recorded": {
+      "evidence": null,
+      "passed": true
+    },
+    "native_source_git_head": {
+      "evidence": null,
+      "passed": true
+    },
+    "native_terminal_not_truncation": {
+      "evidence": null,
+      "passed": true
+    },
+    "no_duplicate_continuation_row": {
+      "evidence": [
+        305,
+        0,
+        892204
+      ],
+      "passed": true
+    },
+    "plan_disposition_and_terminal": {
+      "evidence": null,
+      "passed": true
+    },
+    "planned_action_index_identity_consistent": {
+      "evidence": [
+        305,
+        0
+      ],
+      "passed": true
+    },
+    "planned_continuation_count": {
+      "evidence": null,
+      "passed": true
+    },
+    "planned_exact_source_identities": {
+      "evidence": null,
+      "passed": true
+    },
+    "planned_unique_root_action_pairs": {
+      "evidence": null,
+      "passed": true
+    },
+    "progress_log_complete_and_failure_free": {
+      "evidence": null,
+      "passed": true
+    },
+    "retained_input_audit": {
+      "evidence": null,
+      "passed": true
+    },
+    "retained_role_inventory": {
+      "evidence": null,
+      "passed": true
+    },
+    "root_decision_144": {
+      "evidence": null,
+      "passed": true
+    },
+    "root_decision_145": {
+      "evidence": null,
+      "passed": true
+    },
+    "root_decision_224": {
+      "evidence": null,
+      "passed": true
+    },
+    "root_decision_225": {
+      "evidence": null,
+      "passed": true
+    },
+    "root_decision_304": {
+      "evidence": null,
+      "passed": true
+    },
+    "root_decision_305": {
+      "evidence": null,
+      "passed": true
+    },
+    "root_decision_64": {
+      "evidence": null,
+      "passed": true
+    },
+    "root_decision_65": {
+      "evidence": null,
+      "passed": true
+    },
+    "root_decision_states_unique_and_exact": {
+      "evidence": null,
+      "passed": true
+    },
+    "smoke_pass_terminal": {
+      "evidence": null,
+      "passed": true
+    },
+    "smoke_result_counts": {
+      "evidence": null,
+      "passed": true
+    },
+    "smoke_result_state_hash": {
+      "evidence": null,
+      "passed": true
+    },
+    "smoke_rows_count": {
+      "evidence": null,
+      "passed": true
+    },
+    "stage0_cohort_ownership": {
+      "evidence": null,
+      "passed": true
+    },
+    "stage0_family_balance": {
+      "evidence": null,
+      "passed": true
+    },
+    "stage0_immutable_README.md": {
+      "evidence": {
+        "sha256": "c87867c1e48764875c34fe9881256a0005add0915044a11a1c67249effea89af",
+        "size_bytes": 1050
+      },
+      "passed": true
+    },
+    "stage0_immutable_audit_stage0.py": {
+      "evidence": {
+        "sha256": "553495867516621a89e4c7fb93352c4caee6022b92c8ff3b5dac3e715b5884fa",
+        "size_bytes": 46617
+      },
+      "passed": true
+    },
+    "stage0_immutable_run-state.json": {
+      "evidence": {
+        "sha256": "6a8901ef08809727473504e6ce8bd8e2adf713526e2e429b8ff28471509aae8e",
+        "size_bytes": 272
+      },
+      "passed": true
+    },
+    "stage0_immutable_source-audit.json": {
+      "evidence": {
+        "sha256": "57417638a8feb1055842356780d95c9fc15e2e22aa19910396ee7e8726656249",
+        "size_bytes": 14754
+      },
+      "passed": true
+    },
+    "stage0_manifest_files": {
+      "evidence": [
+        "README.md",
+        "audit_stage0.py",
+        "run-state.json",
+        "source-audit.json"
+      ],
+      "passed": true
+    },
+    "stage0_manifest_identity": {
+      "evidence": null,
+      "passed": true
+    },
+    "stage0_no_smoke_or_stage1_mutation": {
+      "evidence": null,
+      "passed": true
+    },
+    "stage0_plan_links": {
+      "evidence": null,
+      "passed": true
+    },
+    "stage0_ready": {
+      "evidence": null,
+      "passed": true
+    },
+    "stage0_target_identity": {
+      "evidence": null,
+      "passed": true
+    },
+    "stage1_not_started": {
+      "evidence": null,
+      "passed": true
+    },
+    "successful_supervised_execution": {
+      "evidence": null,
+      "passed": true
+    },
+    "supervisor_memory_limits_respected": {
+      "evidence": null,
+      "passed": true
+    },
+    "terminal_console_recorded": {
+      "evidence": null,
+      "passed": true
+    }
+  },
+  "evidence": {
+    "accepted_spec_commit": "afffcdda5cebfe47a2cfa1624911d916191bab76",
+    "checkpoint_sha256": "a3a136f729b5cee69815a0b128411eec49a9b4f7695c6aae5a3796345fbd972e",
+    "continuation_attempts_counted": 45,
+    "continuation_seeds": [
+      892201,
+      892202,
+      892203,
+      892204
+    ],
+    "max_observed_steps": 103,
+    "minimum_available_memory_bytes": 20766265344,
+    "native_commit": "20a6c2b3a9cea817c988178b814f083ff889853f",
+    "native_extension_sha256": "108416736aa83973e963cb06e02411d0eb389109003c62e414631053e35ef062",
+    "noncombat_policy_events": {
+      "learned_success": 575,
+      "unsupported_fallback": 122
+    },
+    "peak_rss_bytes_cumulative_max": 1264943104,
+    "process_cpu_seconds_cumulative": 718.17,
+    "result_sha256": "c06a9d893e5a157913c59ee0d30dbef79a941ec931b753c9046b0c9857044d7f",
+    "smoke_rows": 44,
+    "stage0_cohort": {
+      "heldout_states": 64,
+      "heldout_target_rows": 221,
+      "source_states": 320
+    },
+    "stage0_manifest_file_count": 4,
+    "state_sha256": "45611fe493b2d21f7ff5973e3a35d3ccd604e80598ba81086e6c9e8141c7737c",
+    "step_limit": 500,
+    "stsr_code_commit": "95abc8b1afe7d84e567aa70fb7225eba09fdff25",
+    "target_table_sha256": "b8551454f764d47b43d068d507df783226f4b2651ea74fe82bec7fd4b0b8de11",
+    "terminal_outcomes": {
+      "PLAYER_LOSS": 44
+    },
+    "unique_state_action_pairs": 11,
+    "wall_seconds_cumulative": 776.518
+  },
+  "issue": 40,
+  "passed": true,
+  "proposed_disposition": "STUDY_ONLY",
+  "schema_id": "issue-40-verification-v1",
+  "schema_version": 1,
+  "stage1_started": false,
+  "terminal": "SMOKE_PASS_STAGE1_AWAITING_PLANNER"
+}
