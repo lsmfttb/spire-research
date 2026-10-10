@@ -22,6 +22,8 @@ Review and commit `stage1-plan.json` and `stage1-preflight.json` before executio
 /home/lsmft/stsrl-spikes/py313-torch/bin/python studies/issue-41-t089-matched-continuation/verify_issue41.py
 ```
 
+During the long execution invocation, run `checkpoint_stage1.py <supervisor-pid>` from a second WSL shell. It pushes an append-only progress/state checkpoint every eight completed continuations to the same fixed branch; it stops when the external supervisor exits. This makes completed rows recoverable from the remote if the local run is interrupted.
+
 The primary bootstrap is 10,000 family-stratified paired resamples over the 64 source-state units using NumPy `default_rng(391089)` and linear 2.5/97.5 percentiles. It preserves paired seed outcomes and applies only the predeclared Issue 39 terminal rules after all valid keys complete. The 43-source-run dependence is reported as a limitation; the primary CI is not replaced.
 
 `stage1-progress.jsonl` is append-only and fsynced before and after each continuation. `stage1-state.json` records the durable boundary. `stage1-result.json` reports one of the three preregistered hypotheses only when all 380 physical keys are complete; otherwise it reports a fail-closed terminal and no hypothesis result. `verify_issue41.py` checks the original 44 reused rows, target arithmetic, full key coverage, bootstrap, resource ledger, and exact terminal rule, then writes `verification.json` and a hash manifest. The manifest covers the compact study artifacts and source code; the large frozen state and target tables remain external and are represented by their pinned hashes.
