@@ -1,0 +1,97 @@
+{
+  "generated_utc": "2026-10-10T11:44:37+00:00",
+  "limitations": [
+    "Legal-action alternatives were not retained.",
+    "A-F are a deliberate audit subset, not a representative sample.",
+    "Old resource impressions remain provisional."
+  ],
+  "new_human_annotations_started": false,
+  "outputs": {
+    "decision-timeline.json": {
+      "sha256": "b0c7161a8daa751c6d526c399c2344018a2bdd452c866c36b2b645ba9e842528",
+      "size_bytes": 319454
+    },
+    "entry-view.json": {
+      "sha256": "1bde0e3804f15e1a303d8cdee8b5bfe735128d05c692c114795d9e5870568e0c",
+      "size_bytes": 40789
+    },
+    "field-allowlist.json": {
+      "sha256": "8b33a12b28696679e6dc7a1c897e5597bf074628c8ba784f115de599676bd375",
+      "size_bytes": 4876
+    },
+    "field-coverage.json": {
+      "sha256": "fd83b4bd3b3b520e6a4ea74ce2bb72e3bacab8381b2829d2d15f27796431d947",
+      "size_bytes": 3771
+    },
+    "index.html": {
+      "sha256": "2aafc06f88c11ff4833868f7823ebb9cc75608f9ec2ca89e38ba97352f62bcaa",
+      "size_bytes": 18495
+    },
+    "outcomes.html": {
+      "sha256": "498857529194f0d9f88484875e0da7cf8c85b56abba6e00b15431d626037bddf",
+      "size_bytes": 2802
+    },
+    "prior-impressions.json": {
+      "sha256": "22dd3fca074723359e493fdd6a5cb12a9c555b2435415092e41d89ec61537dae",
+      "size_bytes": 2238
+    },
+    "prior-notes.html": {
+      "sha256": "956b18d5045cec907f47318855d0968d5025298182d78971853fa15f9a350b71",
+      "size_bytes": 3596
+    },
+    "source-provenance.private.json": {
+      "sha256": "6c2f439cc7e7cbdde485958189c66bbb13f5b4f3aad99e7e7e1980d088bf922c",
+      "size_bytes": 3519
+    },
+    "terminal-results.private.json": {
+      "sha256": "17105fe16e874893dfda7fd17c52ab3c61beedad8d26a67fbe46ef20a1dd0b9b",
+      "size_bytes": 1526
+    },
+    "timeline.html": {
+      "sha256": "35e26ae254e58125d4416e64a10966c7a61c62fb134c074bb1e5808a8c64a935",
+      "size_bytes": 44738
+    }
+  },
+  "producer": {
+    "file": "rehydrate.py",
+    "sha256": "31b02cdf2a7219586c2ad31324c52000a90024030bee1959b87af4fc359d30a7",
+    "size_bytes": 40912
+  },
+  "replay_performed": false,
+  "schema_id": "issue-37-output-manifest-v1",
+  "simulation_performed": false,
+  "source_artifacts": {
+    "blind_audit_bundle": {
+      "file": "t087-blind-audit-bundle.json",
+      "schema_id": "t087-blind-audit-bundle-v1",
+      "sha256": "03d30961312a833af35119b701d9c7acd7b314684d9472fb24201ce93e4dc273",
+      "size_bytes": 11079093
+    },
+    "blind_audit_hidden_provenance": {
+      "file": "t087-blind-audit-hidden-provenance.json",
+      "schema_id": "t087-blind-audit-hidden-provenance-v1",
+      "sha256": "665278245ea6475512c7fe06ab4441905b907806874dcbbf4d47247710c4e8cd",
+      "size_bytes": 36181
+    },
+    "natural_evidence": {
+      "file": "t087-natural-evidence.json",
+      "schema_id": "t087-natural-evidence-v1",
+      "sha256": "1cecd6b29239bbd57c3351f58578459aaf921fba7369c1a92fa7cf1e3517b61a",
+      "size_bytes": 402941355
+    },
+    "natural_run_manifest": {
+      "file": "t087-natural-run-manifest.json",
+      "schema_id": "t087-natural-run-manifest-v1",
+      "sha256": "118a00a82190d0c7026e99855b733c1de53bb260555493edb306a25e295c95ba",
+      "size_bytes": 19799
+    },
+    "retention_manifest": {
+      "file": "t087-retention-manifest.json",
+      "schema_id": "t087-retention-manifest-v1",
+      "sha256": "5afe39476965a192c9bdd8d6bed121cd0169e68925cabfe9b8366ee320938adc",
+      "size_bytes": 9034
+    }
+  },
+  "source_rows_seen": 413,
+  "status": "STAGE_0_PASS_STAGE_1_PACKET_READY_FOR_REVIEW"
+}

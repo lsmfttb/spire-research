@@ -1,0 +1,119 @@
+{
+  "decision_timeline": {
+    "chosen_action": "action_trace[*].chosen_action_identity (action_id/kind/label/occurrence/stable_id)",
+    "enemies": {
+      "alive": "snapshot_raw.battle_monsters[*].alive",
+      "block": "snapshot_raw.battle_monsters[*].block",
+      "current_hp": "snapshot_raw.battle_monsters[*].current_hp",
+      "current_move": "snapshot_raw.battle_monsters[*].current_move",
+      "intent": "snapshot_raw.battle_monsters[*].intent",
+      "intent_category": "snapshot_raw.battle_monsters[*].intent_category",
+      "max_hp": "snapshot_raw.battle_monsters[*].max_hp",
+      "name": "snapshot_raw.battle_monsters[*].name"
+    },
+    "hand": {
+      "cost": "snapshot_raw.battle_hand[*].cost",
+      "cost_for_turn": "snapshot_raw.battle_hand[*].cost_for_turn",
+      "name": "snapshot_raw.battle_hand[*].name",
+      "playable": "snapshot_raw.battle_hand[*].playable",
+      "requires_target": "snapshot_raw.battle_hand[*].requires_target",
+      "type": "snapshot_raw.battle_hand[*].type",
+      "upgrade_count": "snapshot_raw.battle_hand[*].upgrade_count",
+      "upgraded": "snapshot_raw.battle_hand[*].upgraded"
+    },
+    "player": {
+      "artifact": "snapshot_raw.battle_player.artifact",
+      "block": "snapshot_raw.battle_player.block",
+      "current_hp": "snapshot_raw.battle_player.current_hp",
+      "dexterity": "snapshot_raw.battle_player.dexterity",
+      "energy": "snapshot_raw.battle_player.energy",
+      "energy_per_turn": "snapshot_raw.battle_player.energy_per_turn",
+      "focus": "snapshot_raw.battle_player.focus",
+      "frail": "snapshot_raw.battle_player.frail",
+      "max_hp": "snapshot_raw.battle_player.max_hp",
+      "strength": "snapshot_raw.battle_player.strength",
+      "vulnerable": "snapshot_raw.battle_player.vulnerable",
+      "weak": "snapshot_raw.battle_player.weak"
+    },
+    "potions": {
+      "id_label": "snapshot_raw.battle_potions[*].id_label",
+      "name": "snapshot_raw.battle_potions[*].name"
+    }
+  },
+  "entry": {
+    "context": {
+      "act": "snapshot_raw.act",
+      "boss_encounter": "snapshot_raw.encounter_id",
+      "floor": "snapshot_raw.floor_num",
+      "room_type": "snapshot_raw.room_type"
+    },
+    "deck": {
+      "id_label": "snapshot_raw.deck[*].id_label",
+      "name": "snapshot_raw.deck[*].name",
+      "rarity": "snapshot_raw.deck[*].rarity",
+      "type": "snapshot_raw.deck[*].type",
+      "upgrade_count": "snapshot_raw.deck[*].upgrade_count",
+      "upgraded": "snapshot_raw.deck[*].upgraded"
+    },
+    "first_turn": {
+      "block": "snapshot_raw.battle_player_block (fallback battle_player.block)",
+      "enemies": {
+        "alive": "snapshot_raw.battle_monsters[*].alive",
+        "block": "snapshot_raw.battle_monsters[*].block",
+        "current_hp": "snapshot_raw.battle_monsters[*].current_hp",
+        "current_move": "snapshot_raw.battle_monsters[*].current_move",
+        "intent": "snapshot_raw.battle_monsters[*].intent",
+        "intent_category": "snapshot_raw.battle_monsters[*].intent_category",
+        "max_hp": "snapshot_raw.battle_monsters[*].max_hp",
+        "name": "snapshot_raw.battle_monsters[*].name"
+      },
+      "energy": "snapshot_raw.battle_player_energy (fallback battle_player.energy)",
+      "hand": {
+        "cost": "snapshot_raw.battle_hand[*].cost",
+        "cost_for_turn": "snapshot_raw.battle_hand[*].cost_for_turn",
+        "name": "snapshot_raw.battle_hand[*].name",
+        "playable": "snapshot_raw.battle_hand[*].playable",
+        "requires_target": "snapshot_raw.battle_hand[*].requires_target",
+        "type": "snapshot_raw.battle_hand[*].type",
+        "upgrade_count": "snapshot_raw.battle_hand[*].upgrade_count",
+        "upgraded": "snapshot_raw.battle_hand[*].upgraded"
+      },
+      "turn": "snapshot_raw.battle_turn"
+    },
+    "potions": {
+      "id_label": "snapshot_raw.potions[*].id_label",
+      "name": "snapshot_raw.potions[*].name"
+    },
+    "relics": {
+      "counter": "snapshot_raw.relics[*].counter",
+      "id_label": "snapshot_raw.relics[*].id_label",
+      "name": "snapshot_raw.relics[*].name"
+    },
+    "resources": {
+      "gold": "snapshot_raw.gold",
+      "max_hp": "snapshot_raw.battle_player.max_hp (fallback snapshot_raw.max_hp)",
+      "potion_capacity": "snapshot_raw.potion_capacity",
+      "potion_count": "snapshot_raw.potion_count",
+      "starting_hp": "snapshot_raw.battle_player_hp (fallback cur_hp/current_hp)"
+    }
+  },
+  "explicitly_excluded": [
+    "battle_draw_pile",
+    "battle_outcome",
+    "draw_pile",
+    "next_snapshot_raw",
+    "oracle",
+    "outcome",
+    "private",
+    "provenance",
+    "rng",
+    "sampler_seed",
+    "search_trace",
+    "seed",
+    "selection_identity",
+    "snapshot_raw",
+    "trace_id"
+  ],
+  "legal_action_alternatives": "not recorded in retained action_trace; not reconstructed",
+  "schema_id": "issue-37-public-field-allowlist-v1"
+}

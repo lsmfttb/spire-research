@@ -1,0 +1,96 @@
+{
+  "binding_artifacts": {
+    "blind_audit_bundle": {
+      "file": "t087-blind-audit-bundle.json",
+      "schema_id": "t087-blind-audit-bundle-v1",
+      "sha256": "03d30961312a833af35119b701d9c7acd7b314684d9472fb24201ce93e4dc273",
+      "size_bytes": 11079093
+    },
+    "blind_audit_hidden_provenance": {
+      "file": "t087-blind-audit-hidden-provenance.json",
+      "schema_id": "t087-blind-audit-hidden-provenance-v1",
+      "sha256": "665278245ea6475512c7fe06ab4441905b907806874dcbbf4d47247710c4e8cd",
+      "size_bytes": 36181
+    },
+    "natural_evidence": {
+      "file": "t087-natural-evidence.json",
+      "schema_id": "t087-natural-evidence-v1",
+      "sha256": "1cecd6b29239bbd57c3351f58578459aaf921fba7369c1a92fa7cf1e3517b61a",
+      "size_bytes": 402941355
+    },
+    "natural_run_manifest": {
+      "file": "t087-natural-run-manifest.json",
+      "schema_id": "t087-natural-run-manifest-v1",
+      "sha256": "118a00a82190d0c7026e99855b733c1de53bb260555493edb306a25e295c95ba",
+      "size_bytes": 19799
+    },
+    "retention_manifest": {
+      "file": "t087-retention-manifest.json",
+      "schema_id": "t087-retention-manifest-v1",
+      "sha256": "5afe39476965a192c9bdd8d6bed121cd0169e68925cabfe9b8366ee320938adc",
+      "size_bytes": 9034
+    }
+  },
+  "binding_sha256": "5826d732b8441bf8470518815a70ffee4aae7eb40a21395f137bcf9ac74ceec9",
+  "mapping": [
+    {
+      "case": "A",
+      "original_trace_id": 9,
+      "selection_identity": "lightspeed:140488623242752:233",
+      "source_row_join_field": "selection_identity"
+    },
+    {
+      "case": "B",
+      "original_trace_id": 11,
+      "selection_identity": "lightspeed:138611790724608:200",
+      "source_row_join_field": "selection_identity"
+    },
+    {
+      "case": "C",
+      "original_trace_id": 14,
+      "selection_identity": "lightspeed:124493673250304:224",
+      "source_row_join_field": "selection_identity"
+    },
+    {
+      "case": "D",
+      "original_trace_id": 17,
+      "selection_identity": "lightspeed:123889171299840:69",
+      "source_row_join_field": "selection_identity"
+    },
+    {
+      "case": "E",
+      "original_trace_id": 21,
+      "selection_identity": "lightspeed:128747157814784:292",
+      "source_row_join_field": "selection_identity"
+    },
+    {
+      "case": "F",
+      "original_trace_id": 23,
+      "selection_identity": "lightspeed:127525300485632:271",
+      "source_row_join_field": "selection_identity"
+    }
+  ],
+  "mapping_sha256": "8943493e2030f1bef971367e80824e307039d10bb94b7cd71d199badc992cceb",
+  "native_source_identity": {
+    "lineage_verifier_result": "lineage: PASS (d62ff35579b54d70a7428afdf84743c94df3fe0c -> 96052d24b9c2c16ff25b6f7241edd972613be997 on refs/heads/stsrl/main)",
+    "natural_run_manifest_native_identity": {
+      "commit": "96052d24b9c2c16ff25b6f7241edd972613be997",
+      "ref": "refs/heads/stsrl/main",
+      "repository": "lsmfttb/sts_lightspeed"
+    },
+    "retention_manifest_historical_identity": {
+      "commit": "d62ff35579b54d70a7428afdf84743c94df3fe0c",
+      "ref": "refs/heads/stsrl/main",
+      "repository": "lsmfttb/sts_lightspeed"
+    },
+    "retention_manifest_verified_ancestor": {
+      "commit": "96052d24b9c2c16ff25b6f7241edd972613be997",
+      "ref": "refs/heads/stsrl/main",
+      "repository": "lsmfttb/sts_lightspeed"
+    },
+    "t087_implementation_run_head": "8d7e449b2e13cdf271cbf7585f7cddbb3fee7d6e"
+  },
+  "provenance_is_separate_from_human_pages": true,
+  "replay_performed": false,
+  "schema_id": "issue-37-private-source-map-v1"
+}
