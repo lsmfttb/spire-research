@@ -87,16 +87,28 @@ def synthetic_smoke(serialized):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--artifacts',type=Path,required=True)
+    parser.add_argument('--resume-ledger',type=Path)
     args=parser.parse_args()
     args.artifacts.mkdir(parents=True,exist_ok=True)
     log=args.artifacts/'stage0.jsonl'
     if log.exists():
         raise RuntimeError('Use a new attempt directory; completed/failed attempts stay immutable.')
     extension=Path(slaythespire.__file__)
+    completed={}
+    resumed=[]
+    if args.resume_ledger:
+        resumed=[json.loads(line) for line in args.resume_ledger.read_text().splitlines()]
+        origin=resumed[0]
+        if origin['config_sha256']!=digest(CONFIG) or origin['native_extension_sha256']!=hashlib.sha256(extension.read_bytes()).hexdigest():
+            raise RuntimeError('resume config/native identity mismatch')
+        completed={tuple(row['key']):row for row in resumed if row['boundary']=='branch_completed' and row['terminal'] and not row['problems']}
     ledger(log,{'boundary':'start','config_sha256':digest(CONFIG),'native_extension':str(extension),
         'native_extension_sha256':hashlib.sha256(extension.read_bytes()).hexdigest(),
         'python':sys.version,'pid':os.getpid(),'native_commit':CONFIG['native_commit'],
-        'frozen_stsrl_commit':CONFIG['frozen_stsrl_commit'],'attempt':args.artifacts.name})
+        'frozen_stsrl_commit':CONFIG['frozen_stsrl_commit'],'attempt':args.artifacts.name,
+        'producer_commit':os.environ.get('ISSUE43_PRODUCER_COMMIT','uncommitted'),
+        'source_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        'resume_ledger_sha256':hashlib.sha256(args.resume_ledger.read_bytes()).hexdigest() if args.resume_ledger else None})
     adapter=LightSpeedAdapter(seed=430001,ascension=20,module=slaythespire)
     roots=[]
     counts={'MAP_SCREEN':0,'REWARDS':0}
@@ -109,6 +121,9 @@ def main():
                     p=prepared(adapter) # fail closed even on nonselected variants
                     if screen not in captured and counts[screen]<2 and len(actions)>=2:
                         cp=adapter.capture_checkpoint(snapshot)
+                        original=next((row for row in resumed if row['boundary']=='root_captured' and row['seed']==seed and row['screen']==screen),None)
+                        if original and original['public_sha256']!=digest(json.loads(p.serialized_input)):
+                            raise RuntimeError('resume root public identity mismatch')
                         roots.append((seed,screen,index,cp,p,adapter.checkpoint_fingerprint(snapshot),
                                       context.public_run_context.get('history',[])))
                         counts[screen]+=1
@@ -144,6 +159,9 @@ def main():
             for ordinal in CONFIG['canary']['forced_ordinals']:
                 for driver_seed in CONFIG['continuation_seeds']['canary']:
                     key=[root_index,ordinal,driver_seed]
+                    if tuple(key) in completed:
+                        ledger(log,{'boundary':'branch_resumed','key':key,'original':completed[tuple(key)]})
+                        continue
                     ledger(log,{'boundary':'branch_started','key':key})
                     restored=adapter.restore_checkpoint(cp)
                     assert adapter.checkpoint_fingerprint(restored)==fingerprint
@@ -154,8 +172,13 @@ def main():
                     transition=adapter.step(native_actions[ordinal])
                     after=adapter.capture_checkpoint(transition.snapshot)
                     begin=time.monotonic(); cpu=time.process_time()
+                    def progress(snapshot,actions,context,index):
+                        if index%25==0:
+                            ledger(log,{'boundary':'branch_progress','key':key,'step':index,'screen':context.screen_state})
+                        if time.monotonic()-START>CONFIG['resource_caps']['stage0']['wall_seconds']:
+                            raise RuntimeError('RESOURCE_BLOCKED: Stage0 wall cap')
                     run=execute_controlled_run(Restored(adapter,after),controller(driver_seed),seed=seed,
-                        max_steps=CONFIG['max_steps'],action_space=ActionSpaceConfig.initial_no_potions())
+                        max_steps=CONFIG['max_steps'],action_space=ActionSpaceConfig.initial_no_potions(),before_decision=progress)
                     ledger(log,{'boundary':'branch_completed','key':key,'terminal':run.terminal,
                         'problems':run.problems,'steps':len(run.steps),'floor':run.final_raw.get('floor_num'),
                         'outcome':run.outcome,'branch_wall':time.monotonic()-begin,'branch_cpu':time.process_time()-cpu})
