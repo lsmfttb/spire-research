@@ -5,6 +5,41 @@
 Synthetic gradient smoke targets are explicitly unrelated to simulator outcomes.
 Formal Stage 1/2 must remain closed until every Stage 0 gate passes.
 
+## Current admission follow-up
+
+`followup-admission.json`: **RESOURCE_BLOCKED**, readiness only. The Planner's
+2026-10-11 amendment retained every original cap and authorized a fixed cost
+pilot plus synthetic pipeline checks. Eight ascending admission source owners
+434001..434008 supplied eight MAP and eight REWARDS roots; all 146 original
+action/driver keys reached true terminal. All eight owners are shared across
+families. MAP-only owners were eligible; none occurred among the selected roots.
+
+The first pilot attempt stopped at a per-root CPU guard. Recovery preserved 98
+completed keys and replayed all 48 unfinished keys under a separately debited
+full-remaining preflight. Combined Stage0 upper accounting is 6267.15 CPU and
+2064.48 wall seconds, within 14400/3600. Peak job RSS is 0.964 GiB.
+
+| Cost sample | Original formula + 240 sources | Action-count-weighted + 240 sources |
+|---|---:|---:|
+| Original Builder, two owners |96352.44 CPU s|99453.19 CPU s|
+| Independent Reviewer, same two owners |52249.89 CPU s|53950.47 CPU s|
+| New all-action pilot, eight owners |106341.23 CPU s|99947.36 CPU s|
+
+Including source regeneration, training/checkpoint/launch allowances and an
+explicit 20% uncertainty/retry reserve gives 123839.06 CPU seconds centrally.
+The source-owner bootstrap 90th sensitivity with full-range source-scan and
+owner-regeneration allowances is 155373.66 CPU / 22124.30 wall seconds. Both
+exceed the unchanged Stage1 caps 72000/18000. Small-owner sensitivity is not a
+certified confidence bound or runtime guarantee.
+
+Nineteen focused Python tests and exact-native Sapphire/indexed-gold checks
+pass. Synthetic frozen scorers plus Expert complete three admission-only
+controller runs on 434001. No formal labels/models, heldout results, 433xxx runs
+or learning claim exist. See `READINESS.md` for tested primitives, exact
+conditional plan, recovery commands, lifecycle and remaining formal launcher/
+report gates. Code remains disposable STUDY_ONLY; independent review precedes
+any separate Planner decision. No CPU-cap increase is implied.
+
 ## Runtime and boundaries
 
 Build native `stsrl/main@7fef4e19c7ee13f049ee0fb45c9967e7e349fcfb` with
@@ -48,9 +83,9 @@ For an interrupted attempt, add `--resume-ledger /absolute/path/stage0.jsonl`.
 The runner replays the same source seeds, checks config/native/public identity,
 and skips completed exact `(root, ordinal, continuation seed)` keys. Opaque
 checkpoints remain process-local; failed attempts and replay cost are retained.
-Formal generation needs a separate completed-key manifest and
-fidelity-checked checkpoint persistence before it is admitted; no formal runner
-is claimed here. Raw/evidence retention consumer: independent Reviewer for
+Formal generation needs the separately tested completed-key manifest and
+fidelity-checked source regeneration before it is admitted; opaque checkpoints
+are not persisted across processes. Raw/evidence retention consumer: independent Reviewer for
 Issue 43; delete/review by 2026-10-18 unless another consumer is named.
 
 Stage 0 has 3,600 wall / 14,400 aggregate CPU seconds including failed smoke
@@ -75,7 +110,7 @@ launcher crash as a completed native regression. Artifact reports must identify
 which exact commands passed and which failed. No learning claim follows from
 synthetic gradients or Stage 0 continuation costs.
 
-## Admission result
+## Original four-root admission evidence
 
 `admission.json`: **RESOURCE_BLOCKED**. All 16 canary branches reached true
 terminal with identical restore/action mappings. Thirteen focused Python tests
@@ -95,9 +130,8 @@ trajectory costs/support cannot be certified without Stage1.
 
 Formal labels, fitted scientific model checkpoints, heldout estimation and
 fresh 128x3 runs were not opened. No inference about learning gain or harm is
-made. Planner's next explicit choice is to increase Stage1 aggregate CPU to
-144,000 s with the scientific contracts unchanged, or redesign budget/sample
-under a separate amendment. The study does not authorize either change.
+made. The later Planner amendment retained the original caps and authorized the
+independent-owner follow-up above; any next scientific choice remains separate.
 The reports record early failures and producer/accounting limitations. Retained
 raw cost ledgers are under `/home/lsmft/.cache/issue43-artifacts`; compact audit
 and native evidence live on this remote study branch.
