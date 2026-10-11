@@ -71,7 +71,9 @@ class FormalTests(unittest.TestCase):
             self.assertTrue(events[-1]['recovered_orphan'])
             with self.assertRaises(ValueError): Completed(tmp,{'native':'changed'})
             with self.assertRaises(ValueError): store.publish(['invalid'],{'terminal':False,'problems':['cap']})
-            path=Path(tmp)/(digest(key)+'.json'); path.write_text(path.read_text().replace('9','8'))
+            path=Path(tmp)/(digest(key)+'.json')
+            changed=json.loads(path.read_text()); changed['terminal_floor']=8
+            path.write_text(json.dumps(changed))
             with self.assertRaises(ValueError): Completed(tmp,identity).get(key)
 
     def test_training_freeze_no_heldout_and_equal_targets(self):

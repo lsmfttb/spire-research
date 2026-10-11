@@ -14,6 +14,7 @@ import time
 from pilot import (PRIOR_CPU, PRIOR_WALL, PREP_RESERVE, FAMILY_MAX_CPU, SOURCE_MAX_CPU,
                    EXTENSION_SHA, branch_key, root_job, append, save, available, process_cpu)
 from stage0 import CONFIG, digest
+import slaythespire
 
 
 def batch(args):
@@ -27,6 +28,10 @@ def main():
     parser.add_argument('--previous',type=Path,required=True)
     parser.add_argument('--artifacts',type=Path,required=True)
     args=parser.parse_args(); args.artifacts.mkdir(parents=True,exist_ok=False)
+    if hashlib.sha256(Path(slaythespire.__file__).read_bytes()).hexdigest()!=EXTENSION_SHA:
+        raise RuntimeError('loaded native extension identity changed')
+    if available()<4*1024**2:
+        raise RuntimeError('RESOURCE_BLOCKED: available memory before recovery')
     scan=json.loads(args.scan.read_text()); roots=scan['roots']
     previous_events=[json.loads(s) for s in (args.previous/'pilot.jsonl').read_text().splitlines()]
     if scan['identity']['config_sha256']!=digest(CONFIG) or previous_events[0]['native_extension_sha256']!=EXTENSION_SHA:
