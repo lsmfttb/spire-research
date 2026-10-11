@@ -38,7 +38,7 @@ def runtime():
         raise ValueError('unreviewed loaded native extension')
     return {'python':sys.version,'platform':platform.platform(),'frozen_source_blobs':frozen,
         'adapter_git_blob':blob(HERE/'adapter.py'),'extension_sha256':extension,
-        'study_source_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(HERE.glob('*.py'))}}
+        'study_source_sha256':{p.name:hashlib.sha256(p.read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in sorted(HERE.glob('*.py'))}}
 
 
 def identity(producer_commit,synthetic):
@@ -101,7 +101,12 @@ class Pipeline:
         return immutable(self.requests/(digest(key)+'.json'),value)
     def run(self,requests):
         pending=[p for p in requests if self.jobs.get(json.loads(p.read_text())['key']) is None]
-        if pending: self.supervisor.run(pending,CONFIG['workers'])
+        if pending:
+            kind=json.loads(pending[0].read_text())['kind']
+            if any(json.loads(p.read_text())['kind']!=kind for p in pending): raise ValueError('mixed job lease classes')
+            self.supervisor.job_cpu=({'train':120,'heldout':60,'fresh_report':60}.get(kind,4) if self.ident['synthetic']
+                else {'source':600,'fresh':3000,'train':6000,'heldout':6000,'fresh_report':6000}.get(kind,6000))
+            self.supervisor.run(pending,CONFIG['workers'])
         return [self.jobs.get(json.loads(p.read_text())['key']) for p in requests]
     def boundary(self,name,**value):
         self.supervisor.tick(); self.jobs.event({'boundary':name,**value})
@@ -158,6 +163,7 @@ class Pipeline:
         self.boundary('stage1_complete')
         return self.complete({'identity':self.ident,'stage':'stage1','valid':True,
             'roots_sha256':sha(roots),'checkpoint_sha256':{a:c['checkpoint_sha256'] for a,c in checkpoints.items()},
+            'heldout_report_sha256':sha(report['report']),'heldout_job_key':report['key'],
             'scanned_sources':scans,'resource_cpu':self.supervisor.state['cpu'],'resource_wall':self.supervisor.state['wall']})
     def tables(self,roots):
         out=[]
@@ -175,10 +181,15 @@ class Pipeline:
         validate_splits(roots)
         if sha(roots)!=complete['roots_sha256']: raise ValueError('Stage1 cohort hash changed')
         # Recheck every original label checksum, not just the summary's boolean.
-        for split in roots: self.tables(roots[split])
+        for split in roots:
+            immutable(stage1/(split+'-targets.json'),self.tables(roots[split]))
         models=stage1/'models.json'; frozen=json.loads(models.read_text())
         if frozen['identity']!=self.ident or {a:c['checkpoint_sha256'] for a,c in frozen['checkpoints'].items()}!=complete['checkpoint_sha256']:
             raise ValueError('Stage1 model identity changed')
+        jobs=Completed(stage1/'jobs',self.ident)
+        training=jobs.get(frozen['training_job_key']); held=jobs.get(complete['heldout_job_key'])
+        if training is None or held is None or {a:m['checkpoint'] for a,m in training['models'].items()}!=frozen['checkpoints'] or sha(held['report'])!=complete['heldout_report_sha256']:
+            raise ValueError('Stage1 completed model/heldout result changed')
         plan=evaluation_plan(frozen['checkpoints']); self.freeze('evaluation-plan.json',{'identity':self.ident,'plan':plan})
         requests=[self.request('fresh',{'models':str(models),'plan':p,'eval_store':str(self.base/'evaluation'/p['key'])},
             ['fresh',p['key']]) for p in plan]

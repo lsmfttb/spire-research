@@ -12,6 +12,7 @@ import math
 import os
 from pathlib import Path
 import signal
+import resource
 import subprocess
 import sys
 import time
@@ -58,7 +59,7 @@ def processes(group):
             fields=path.read_text().split(') ',1)[1].split()
             if int(fields[2])!=group: continue
             rows.append({'pid':int(path.parent.name),'start':int(fields[19]),
-                'cpu':(int(fields[11])+int(fields[12])+int(fields[13])+int(fields[14]))/os.sysconf('SC_CLK_TCK'),
+            'cpu':(int(fields[11])+int(fields[12])+int(fields[13])+int(fields[14]))/os.sysconf('SC_CLK_TCK'),
                 'own_cpu':(int(fields[11])+int(fields[12]))/os.sysconf('SC_CLK_TCK'),
                 'rss':max(0,int(fields[21]))*os.sysconf('SC_PAGE_SIZE')})
         except (FileNotFoundError,ProcessLookupError): pass
@@ -102,6 +103,26 @@ class Supervisor:
         self.journal=Journal(directory,identity,limit); self.state=self.journal.state
         self.poll=poll; self.job_cpu=job_cpu; self.job_wall=job_wall; self.rss=rss; self.free=free
         self.live={}; self.boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+        self.parent_reserve=max(1,min(10,math.floor(self.state['limit']['cpu_seconds']*.01)))
+        # A kernel CPU soft limit closes the sampling gap for the supervisor
+        # itself. SIGXCPU's default termination applies even inside a C call.
+        # Hard limit stays unchanged so each sampled window can raise the soft
+        # limit. A crash debits the entire outstanding parent CPU window.
+        self.original_cpu_limit=resource.getrlimit(resource.RLIMIT_CPU)
+        self.original_alarm=signal.getitimer(signal.ITIMER_REAL)
+        self.original_cpu_signal=signal.getsignal(signal.SIGXCPU)
+        self.original_alarm_signal=signal.getsignal(signal.SIGALRM)
+        if self.state.get('attempt_open'):
+            self.state['cpu']+=self.state.get('parent_cpu_lease',self.parent_reserve)
+            previous=self.state.get('last_sample',{})
+            if previous.get('boot')==self.boot:
+                exposure=max(0,time.monotonic()-previous['monotonic'])
+            else:
+                exposure=time.time()-previous.get('utc',time.time())
+                if exposure<0: exposure=self.state['limit']['wall_seconds']
+            # Paused/crashed elapsed time counts conservatively against the
+            # same wall lineage, including intervals without active workers.
+            self.state['wall']+=exposure
         # Recover supervisor death conservatively. Leases cover the entire
         # unobserved job lifetime, including failed starts and native blockage.
         if self.state['leases']:
@@ -130,13 +151,28 @@ class Supervisor:
                                 except ProcessLookupError: pass
                 self.state['cpu']+=max(0,lease['cpu_cap']-lease['charged_cpu'])
                 wall_exposure=max(wall_exposure,max(0,lease['wall_cap']-lease['elapsed']))
-            self.state['wall']+=wall_exposure; self.state['leases']={}
+            # Crash clock already includes elapsed exposure. For a reboot or
+            # changed clock, the outstanding external timeout is a lower bound.
+            self.state['wall']+=max(0,wall_exposure-exposure) if self.state.get('attempt_open') else wall_exposure
+            self.state['leases']={}
             self.journal.record('abandoned_leases_charged')
         self.last=time.monotonic(); self.parent_cpu=time.process_time()
         self.state['attempts']+=1; self.journal.record('attempt_started')
         try: self.check()
         except BaseException:
             self.journal.close(); raise
+        self.state['attempt_open']=True
+        self.guard_parent(); self.journal.record('parent_guard_armed')
+
+    def guard_parent(self):
+        committed=sum(max(0,l['cpu_cap']-l['charged_cpu']) for l in self.state['leases'].values())
+        window=min(self.parent_reserve,math.floor(self.state['limit']['cpu_seconds']-self.state['cpu']-committed))
+        if window<1: raise RuntimeError('RESOURCE_BLOCKED: supervisor CPU reservation')
+        self.state['parent_cpu_lease']=window
+        self.state['last_sample']={'boot':self.boot,'monotonic':time.monotonic(),'utc':time.time()}
+        signal.signal(signal.SIGXCPU,signal.SIG_DFL); signal.signal(signal.SIGALRM,signal.SIG_DFL)
+        resource.setrlimit(resource.RLIMIT_CPU,(math.floor(time.process_time())+window,self.original_cpu_limit[1]))
+        signal.setitimer(signal.ITIMER_REAL,max(.001,self.state['limit']['wall_seconds']-self.state['wall']))
 
     @staticmethod
     def kill(group):
@@ -165,11 +201,12 @@ class Supervisor:
             if sum(r['rss'] for r in rows)>self.rss or measured>=lease['cpu_cap'] or lease['elapsed']>=lease['wall_cap']:
                 raise RuntimeError('RESOURCE_BLOCKED: job process-tree cap')
         self.journal.record('sampled'); self.check()
+        self.guard_parent()
 
     def launch(self,request):
         self.tick()
         committed=sum(max(0,l['cpu_cap']-l['charged_cpu']) for l in self.state['leases'].values())
-        reserve=min(10.,self.state['limit']['cpu_seconds']*.01)
+        reserve=self.parent_reserve
         remaining=self.state['limit']['cpu_seconds']-self.state['cpu']-committed-reserve
         cpu_cap=math.floor(min(self.job_cpu,remaining))
         wall_cap=min(self.job_wall,self.state['limit']['wall_seconds']-self.state['wall'])
@@ -243,4 +280,8 @@ class Supervisor:
             if self.live: self.abort()
             self.tick()
         finally:
+            resource.setrlimit(resource.RLIMIT_CPU,self.original_cpu_limit)
+            signal.setitimer(signal.ITIMER_REAL,*self.original_alarm)
+            signal.signal(signal.SIGXCPU,self.original_cpu_signal); signal.signal(signal.SIGALRM,self.original_alarm_signal)
+            self.state['attempt_open']=False; self.state['parent_cpu_lease']=0
             self.journal.record('attempt_closed'); self.journal.close()
