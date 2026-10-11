@@ -53,6 +53,20 @@ class StudentTests(unittest.TestCase):
         self.assertNotIn('SECRET_CARD',encoded)
         self.assertEqual(json.loads(encoded)['public_state']['history'][0]['resources'],{'hp':-3})
 
+    def test_general_location_retained_in_both_arms(self):
+        context={'current':{'location':{'act':1,'floor':4,'room_type':'MONSTER','map_node':{'room_symbol':'E'}}}}
+        encoded=with_public_history(json.dumps(fixture()),[],context)
+        for arm in ('visible','masked'):
+            state=treatment(encoded,arm)['public_state']
+            self.assertEqual(state['ordinary_location'],{'act':1,'floor':4,'room_type':'MONSTER'})
+            self.assertNotIn('map_node',state['ordinary_location'])
+
+    def test_graph_relations_not_only_marginals(self):
+        left=fixture('MAP_SCREEN');right=copy.deepcopy(left)
+        left['public_state']['map_graph']['edges']=[{'from_x':0,'to_x':1},{'from_x':1,'to_x':0}]
+        right['public_state']['map_graph']['edges']=[{'from_x':0,'to_x':0},{'from_x':1,'to_x':1}]
+        self.assertNotEqual(features(treatment(json.dumps(left),'visible'),0),features(treatment(json.dumps(right),'visible'),0))
+
 
 if __name__=='__main__':
     unittest.main()

@@ -9,7 +9,7 @@ DIM = 128
 HIDDEN = 16
 
 
-def with_public_history(serialized, history):
+def with_public_history(serialized, history, current_context=None):
     value = json.loads(serialized)
     # Retain past public resource changes and screen transitions. Omit prior
     # candidate labels/identities to prevent a masked choice-content side channel.
@@ -19,6 +19,8 @@ def with_public_history(serialized, history):
          'resources': entry.get('resource_change', {}),
          'chosen_ordinal': entry.get('selected_action', {}).get('index')}
         for entry in history]
+    location=(current_context or {}).get('current',{}).get('location',{})
+    value['public_state']['ordinary_location']={key:location.get(key) for key in ('act','floor','room_type')}
     return json.dumps(value, sort_keys=True, separators=(',',':'))
 
 

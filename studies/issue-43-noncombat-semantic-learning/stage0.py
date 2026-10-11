@@ -125,7 +125,7 @@ def main():
                         if original and original['public_sha256']!=digest(json.loads(p.serialized_input)):
                             raise RuntimeError('resume root public identity mismatch')
                         roots.append((seed,screen,index,cp,p,adapter.checkpoint_fingerprint(snapshot),
-                                      context.public_run_context.get('history',[])))
+                                      context.public_run_context.get('history',[]),context.public_run_context))
                         counts[screen]+=1
                         captured.add(screen)
                         ledger(log,{'boundary':'root_captured','seed':seed,'screen':screen,'step':index,
@@ -142,15 +142,15 @@ def main():
                 break
         if len(roots)!=4:
             raise RuntimeError('SOURCE_COVERAGE_INSUFFICIENT')
-        for root_index,(seed,screen,step,cp,p,fingerprint,history) in enumerate(roots):
+        for root_index,(seed,screen,step,cp,p,fingerprint,history,public_context) in enumerate(roots):
             restored=adapter.restore_checkpoint(cp)
             assert adapter.checkpoint_fingerprint(restored)==fingerprint
-            student_input=with_public_history(p.serialized_input,history)
+            student_input=with_public_history(p.serialized_input,history,public_context)
             smoke=synthetic_smoke(student_input)
             for arm,info in smoke.items():
                 adapter.restore_checkpoint(cp)
                 current=prepared(adapter)
-                selected=info['model'].choose(with_public_history(current.serialized_input,history),arm)
+                selected=info['model'].choose(with_public_history(current.serialized_input,history,public_context),arm)
                 action=resolve_native_action(current,selected,dict(adapter._sim.public_projection_v3()),list(adapter._sim.legal_actions()))
                 adapter._sim.step(action)
                 ledger(log,{'boundary':'trained_public_choice_executed','root':root_index,'arm':arm,
