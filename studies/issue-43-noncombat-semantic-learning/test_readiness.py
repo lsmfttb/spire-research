@@ -152,7 +152,7 @@ class ReadinessTests(unittest.TestCase):
                 steps=[SimpleNamespace(step_index=0,chosen_action_index=0,controller_role='non_combat_driver',screen_state='REWARDS'),
                        SimpleNamespace(step_index=1,chosen_action_index=1,controller_role='non_combat_driver',screen_state='REST_SCREEN')])
         with tempfile.TemporaryDirectory() as d, patch('formal.execute_controlled_run',side_effect=execute), patch('formal.prepared',
-            return_value=SimpleNamespace(serialized_input=json.dumps(fixture()))):
+            return_value=SimpleNamespace(serialized_input=json.dumps(fixture('REWARDS')))):
             row=evaluate_one(adapter,p,models,Completed(d,self.ident),lambda *args:None)
             self.assertEqual([c['family'] for c in row['choices']],['REWARDS','REST_SCREEN'])
             self.assertEqual(row['max_act'],4); self.assertTrue(row['heart_win'])

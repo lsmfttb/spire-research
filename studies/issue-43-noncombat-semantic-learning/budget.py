@@ -163,7 +163,10 @@ class Supervisor:
         except BaseException:
             self.journal.close(); raise
         self.state['attempt_open']=True
-        self.guard_parent(); self.journal.record('parent_guard_armed')
+        try:
+            self.guard_parent(); self.journal.record('parent_guard_armed')
+        except BaseException:
+            self.journal.close(); raise
 
     def guard_parent(self):
         committed=sum(max(0,l['cpu_cap']-l['charged_cpu']) for l in self.state['leases'].values())
