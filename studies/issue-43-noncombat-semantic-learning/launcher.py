@@ -103,10 +103,14 @@ class Pipeline:
         self.jobs=Completed(self.base/'jobs',ident)
         self.requests=self.base/'requests'; self.requests.mkdir(exist_ok=True)
     def request(self,kind,payload,key):
+        self.supervisor.tick()
         value={'identity':self.ident,'kind':kind,'payload':payload,'key':key,'store':str(self.base/'jobs')}
         return immutable(self.requests/(digest(key)+'.json'),value)
     def run(self,requests):
-        pending=[p for p in requests if self.jobs.get(json.loads(p.read_text())['key']) is None]
+        pending=[]
+        for index,p in enumerate(requests):
+            if index%8==0: self.supervisor.tick()
+            if self.jobs.get(json.loads(p.read_text())['key']) is None: pending.append(p)
         if pending:
             kind=json.loads(pending[0].read_text())['kind']
             if any(json.loads(p.read_text())['kind']!=kind for p in pending): raise ValueError('mixed job lease classes')

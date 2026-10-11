@@ -103,7 +103,7 @@ class Supervisor:
         self.journal=Journal(directory,identity,limit); self.state=self.journal.state
         self.poll=poll; self.job_cpu=job_cpu; self.job_wall=job_wall; self.rss=rss; self.free=free
         self.live={}; self.boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip()
-        self.parent_reserve=max(1,min(10,math.floor(self.state['limit']['cpu_seconds']*.01)))
+        self.parent_reserve=max(1,min(10,math.floor(self.state['limit']['cpu_seconds']*.1)))
         # A kernel CPU soft limit closes the sampling gap for the supervisor
         # itself. SIGXCPU's default termination applies even inside a C call.
         # Hard limit stays unchanged so each sampled window can raise the soft
