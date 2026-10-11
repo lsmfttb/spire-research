@@ -192,6 +192,23 @@ def process_cpu(pid):
         return 0.
 
 
+def schedule(roots):
+    bins = [[] for _ in range(8)]
+    costs = [0.] * 8
+    def bound(root):
+        return (root['legal_count']*2*FAMILY_MAX_CPU[root['family']]+SOURCE_MAX_CPU)*1.2
+    for root in sorted(roots, key=lambda r: (-bound(r), r['owner'], r['family'])):
+        worker = min(range(8), key=lambda i: (costs[i], i))
+        bins[worker].append(root); costs[worker] += bound(root)
+    return bins, costs
+
+
+def batch_job(args):
+    batch, directory, deadline = args
+    return [root_job((r, directory, deadline,
+             (r['legal_count']*2*FAMILY_MAX_CPU[r['family']]+SOURCE_MAX_CPU)*1.2)) for r in batch]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--artifacts', type=Path, required=True)
@@ -251,13 +268,17 @@ def main():
     continuation_bound = sum(jobs[f]*FAMILY_MAX_CPU[f] for f in FAMILIES)
     # Source-prefix regeneration charged at full source costs for every root.
     cpu_bound = (continuation_bound + len(roots)*SOURCE_MAX_CPU) * (1+RETRY_FRACTION)
-    # List-scheduling bound: total work/8 plus at most 7/8 of the largest job.
-    largest = max((r['legal_count']*2*FAMILY_MAX_CPU[r['family']]+SOURCE_MAX_CPU)*1.2 for r in roots)
-    wall_bound = cpu_bound/8 + largest*7/8 + 60
+    # Fixed worker bins, selected using only original legal counts and PRIOR
+    # family maximum costs. Each bin runs sequentially in one process, so its
+    # sum (plus explicit 60s startup/serialization reserve) bounds that schedule.
+    bins, bin_costs = schedule(roots)
+    wall_bound = max(bin_costs) + 60
     preflight = {'jobs': jobs, 'family_observed_max_cpu': FAMILY_MAX_CPU,
                  'cpu_bound': cpu_bound, 'wall_bound': wall_bound,
                  'remaining_cpu': remaining_cpu, 'remaining_wall': remaining_wall,
                  'retry_reserve_fraction': RETRY_FRACTION,
+                 'fixed_worker_cpu_bounds': bin_costs,
+                 'worker_root_assignment': [[[r['owner'],r['family']] for r in batch] for batch in bins],
                  'interpretation': 'Observed worst feasible sensitivity, not a guaranteed future runtime bound.',
                  'decision': 'PILOT_BUDGET_PREFLIGHT_PASS' if cpu_bound<=remaining_cpu and wall_bound<=remaining_wall else 'RESOURCE_BLOCKED'}
     save(args.artifacts/'preflight.json', preflight)
@@ -269,8 +290,7 @@ def main():
     branch_start = time.monotonic(); seen_cpu = {}; results = []
     deadline = branch_start+remaining_wall
     executor = ProcessPoolExecutor(max_workers=8)
-    futures = [executor.submit(root_job, (r, str(args.artifacts), deadline,
-                 (r['legal_count']*2*FAMILY_MAX_CPU[r['family']]+SOURCE_MAX_CPU)*1.2)) for r in roots]
+    futures = [executor.submit(batch_job, (batch, str(args.artifacts), deadline)) for batch in bins]
     pending = set(futures)
     try:
         while pending:
@@ -280,9 +300,10 @@ def main():
             if sum(seen_cpu.values())+time.process_time()-cpu > remaining_cpu or time.monotonic()>=deadline or available()<4*1024**2:
                 raise RuntimeError('RESOURCE_BLOCKED: pilot process-tree budget/memory')
             for future in done:
-                results.append(future.result())
-                append(log, {'boundary': 'root_completed', 'owner': results[-1]['root']['owner'],
-                             'family': results[-1]['root']['family'], 'job_cpu': results[-1]['job_cpu']})
+                for result in future.result():
+                    results.append(result)
+                    append(log, {'boundary': 'root_completed', 'owner': result['root']['owner'],
+                                 'family': result['root']['family'], 'job_cpu': result['job_cpu']})
     except BaseException as exc:
         append(log, {'boundary': 'failed', 'message': str(exc), 'observed_worker_cpu': sum(seen_cpu.values()),
                      'wall': time.monotonic()-start})
