@@ -5,7 +5,14 @@
 Synthetic gradient smoke targets are explicitly unrelated to simulator outcomes.
 Formal Stage 1/2 must remain closed until every Stage 0 gate passes.
 
-## Current admission follow-up
+## Current formal readiness
+
+The later Planner overlay raises only Stage1 to **180000 CPU /27000 wall**;
+Stage2 remains 36000/12000 and the original scientific config is unchanged.
+See [LAUNCH.md](LAUNCH.md) for complete scheduling, recovery, reporting and
+current commands. **No formal launch is authorized yet.**
+
+## Accepted earlier admission follow-up
 
 `followup-admission.json`: **RESOURCE_BLOCKED**, readiness only. The Planner's
 2026-10-11 amendment retained every original cap and authorized a fixed cost

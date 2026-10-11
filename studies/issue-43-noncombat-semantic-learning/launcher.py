@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import platform
 import sys
+import time
 import urllib.request
 from budget import Supervisor,overlay,caps,sha
 from formal import CONFIG,Completed,atomic,cohort,validate_splits,keys,targets,evaluation_plan,digest
@@ -56,7 +57,7 @@ def validate_runtime(expected):
         if expected[name]!=value: raise ValueError('runtime/code identity drift: '+name)
 
 
-def authorize(stage,ident,url):
+def authorize(stage,ident,url,directory=None):
     """Require a real Issue43 comment containing a stage-specific exact-head grant.
 
     The current readiness amendment contains no launch grant. The future Planner
@@ -71,6 +72,8 @@ def authorize(stage,ident,url):
         comment=json.load(response)
     if comment['html_url']!=url or comment['user']['login']!='lsmfttb' or stage.upper()+'_LAUNCH_AUTHORIZED' not in comment['body'] or ident['producer_commit'] not in comment['body']:
         raise ValueError('FORMAL_LAUNCH_NOT_AUTHORIZED: no exact-head Planner grant')
+    if directory is None or 'LINEAGE_DIRECTORY='+str(Path(directory).resolve()) not in comment['body'].splitlines():
+        raise ValueError('FORMAL_LAUNCH_NOT_AUTHORIZED: resource lineage directory must match the grant')
     return {'url':url,'comment_body_sha256':sha(comment['body']),'producer_commit':ident['producer_commit'],'stage':stage}
 
 
@@ -82,6 +85,7 @@ def immutable(path,value):
 
 
 class Pipeline:
+    cost_cursor=None
     def __init__(self,directory,ident,stage,authorization=None):
         self.directory=Path(directory).resolve(); self.ident=ident; self.stage=stage
         if self.directory.is_relative_to(HERE.parents[1]): raise ValueError('artifacts must be outside worktree')
@@ -91,9 +95,11 @@ class Pipeline:
         self.base=self.directory/stage; self.base.mkdir(exist_ok=True)
         # Synthetic implementation checks have independently bounded readiness
         # caps. They do not consume/reset/stand in for an authentic formal stage.
-        limit=({'cpu_seconds':350,'wall_seconds':450} if stage=='stage1' else {'cpu_seconds':100,'wall_seconds':120}) if ident['synthetic'] else caps(stage)
+        limit=({'cpu_seconds':250,'wall_seconds':450} if stage=='stage1' else {'cpu_seconds':160,'wall_seconds':120}) if ident['synthetic'] else caps(stage)
+        cpu_cursor,wall_cursor=Pipeline.cost_cursor or (0.,int(Path('/proc/self/stat').read_text().split(') ',1)[1].split()[19])/__import__('os').sysconf('SC_CLK_TCK'))
         self.supervisor=Supervisor(self.base/'resources',ident,limit,
-            job_cpu=120 if ident['synthetic'] else 6000,job_wall=180 if ident['synthetic'] else 3600)
+            job_cpu=120 if ident['synthetic'] else 6000,job_wall=180 if ident['synthetic'] else 3600,
+            startup_cpu=time.process_time()-cpu_cursor+1, startup_wall=time.monotonic()-wall_cursor+1)
         self.jobs=Completed(self.base/'jobs',ident)
         self.requests=self.base/'requests'; self.requests.mkdir(exist_ok=True)
     def request(self,kind,payload,key):
@@ -205,7 +211,9 @@ class Pipeline:
         self.boundary('stage2_complete')
         return self.complete({'identity':self.ident,'stage':'stage2','valid':True,'report_sha256':sha(report['report']),
             'resource_cpu':self.supervisor.state['cpu'],'resource_wall':self.supervisor.state['wall']})
-    def close(self): self.supervisor.close()
+    def close(self):
+        try: self.supervisor.close()
+        finally: Pipeline.cost_cursor=(time.process_time(),time.monotonic())
 
 
 def main():
@@ -215,7 +223,7 @@ def main():
     parser.add_argument('--planner-comment'); args=parser.parse_args()
     synthetic=args.stage=='synthetic'; ident=identity(args.producer_commit,synthetic)
     for stage in ('stage1','stage2') if synthetic else (args.stage,):
-        auth=None if synthetic else authorize(stage,ident,args.planner_comment)
+        auth=None if synthetic else authorize(stage,ident,args.planner_comment,args.directory)
         pipeline=Pipeline(args.directory,ident,stage,auth)
         try: getattr(pipeline,stage)()
         except BaseException as error:

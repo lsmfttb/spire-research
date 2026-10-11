@@ -99,7 +99,7 @@ class Journal:
 
 
 class Supervisor:
-    def __init__(self,directory,identity,limit,poll=.1,job_cpu=6000.,job_wall=3600.,rss=8*1024**3,free=4*1024**3):
+    def __init__(self,directory,identity,limit,poll=.1,job_cpu=6000.,job_wall=3600.,rss=8*1024**3,free=4*1024**3,startup_cpu=0.,startup_wall=0.):
         self.journal=Journal(directory,identity,limit); self.state=self.journal.state
         self.poll=poll; self.job_cpu=job_cpu; self.job_wall=job_wall; self.rss=rss; self.free=free
         self.live={}; self.boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip()
@@ -157,6 +157,7 @@ class Supervisor:
             self.state['leases']={}
             self.journal.record('abandoned_leases_charged')
         self.last=time.monotonic(); self.parent_cpu=time.process_time()
+        self.state['cpu']+=startup_cpu; self.state['wall']+=startup_wall
         self.state['attempts']+=1; self.journal.record('attempt_started')
         try: self.check()
         except BaseException:
