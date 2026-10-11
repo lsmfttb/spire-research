@@ -9,9 +9,11 @@ import sys
 import tempfile
 import time
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 from budget import Journal,Supervisor,caps,overlay,sha,processes
 from formal import CONFIG,Completed,digest,evaluation_plan,keys
+from formal import evaluate_one
 from launcher import identity,authorize,Pipeline,immutable
 from student import Scorer
 from reporting import fresh,heldout
@@ -137,6 +139,21 @@ class ReadinessTests(unittest.TestCase):
         with self.assertRaises(ValueError): fresh(original[:-1],models,[])
         bad=copy.deepcopy(original); bad[0]['terminal']=False
         with self.assertRaises(ValueError): fresh(bad,models,[])
+
+    def test_expert_other_choices_are_reported_from_native_executor_role(self):
+        models=checkpoints(); p=next(p for p in evaluation_plan(models) if p['arm']=='expert_source')
+        adapter=SimpleNamespace()
+        def execute(adapter,selected,**kwargs):
+            kwargs['before_decision'](SimpleNamespace(raw={'act':2,'encounter_id':'THE_HEART'}),[],
+                SimpleNamespace(screen_state='REWARDS',public_run_context={}),0)
+            return SimpleNamespace(terminal=True,problems=[],outcome='PLAYER_VICTORY',final_raw={'floor_num':55,'act':4},
+                steps=[SimpleNamespace(step_index=0,chosen_action_index=0,controller_role='non_combat_driver',screen_state='REWARDS'),
+                       SimpleNamespace(step_index=1,chosen_action_index=1,controller_role='non_combat_driver',screen_state='REST_SCREEN')])
+        with tempfile.TemporaryDirectory() as d, patch('formal.execute_controlled_run',side_effect=execute), patch('formal.prepared',
+            return_value=SimpleNamespace(serialized_input=json.dumps(fixture()))):
+            row=evaluate_one(adapter,p,models,Completed(d,self.ident),lambda *args:None)
+            self.assertEqual([c['family'] for c in row['choices']],['REWARDS','REST_SCREEN'])
+            self.assertEqual(row['max_act'],4); self.assertTrue(row['heart_win'])
         bad=copy.deepcopy(original); bad[0]['choices'][0]['route']='fallback'
         with self.assertRaises(ValueError): fresh(bad,models,[])
 

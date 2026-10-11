@@ -337,7 +337,7 @@ def evaluate_one(adapter, plan_row, checkpoints, store, progress):
         for choice in choices:
             choice['ordinal']=selected_by_step[choice['step']]; choice['route']='expert'
         choices.extend({'family':step.screen_state,'route':'expert','ordinal':step.chosen_action_index,'step':step.step_index}
-            for step in run.steps if step.controller_role=='non_combat' and step.screen_state not in ('MAP_SCREEN','REWARDS'))
+            for step in run.steps if step.controller_role=='non_combat_driver' and step.screen_state not in ('MAP_SCREEN','REWARDS'))
     return store.publish(key,{'terminal':True,'problems':[], 'seed':plan_row['seed'],'arm':plan_row['arm'],
         'floor':run.final_raw['floor_num'],'outcome':run.outcome,'final_raw_privileged':run.final_raw,
         'steps':len(run.steps),'choices':choices,**observed,'cpu':time.process_time()-cpu,'wall':time.monotonic()-begin,
