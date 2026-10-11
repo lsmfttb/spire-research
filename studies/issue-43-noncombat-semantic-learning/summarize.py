@@ -78,6 +78,7 @@ def main():
             'build_cpu_upper_bound_seconds':1089.3609968,
             'build_bound_method':'Four compiler workers times complete launcher-write to last-target-link interval; not measured CPU.',
             'measured_study_cpu_seconds':sum(json.loads(path.read_text().splitlines()[-1])['cpu_seconds'] for path in root.glob('stage0-attempt*/stage0.jsonl'))+sum(mode['aggregate_worker_cpu'] for mode in modes),
+            'measured_study_wall_seconds':sum(json.loads(path.read_text().splitlines()[-1])['wall_seconds'] for path in root.glob('stage0-attempt*/stage0.jsonl'))+sum(mode['wall'] for mode in modes),
             'native_launcher_and_unit_smoke_unmeasured_cpu_reserve_seconds':100,
             'cap_cpu_seconds':14400,'cap_wall_seconds':3600},
         'artifact_manifest':[{'path':str(path.relative_to(root)),'bytes':path.stat().st_size,

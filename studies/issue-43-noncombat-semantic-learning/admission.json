@@ -1,0 +1,689 @@
+{
+  "artifact_consumer": "Issue43 independent Reviewer",
+  "artifact_manifest": [
+    {
+      "bytes": 4419,
+      "path": "concurrency4.json",
+      "sha256": "03968aecbba3ace13e076348fca4c1ed6485e7d142aaf9f055767ea51f0b4252"
+    },
+    {
+      "bytes": 2956,
+      "path": "concurrency4.jsonl",
+      "sha256": "7921f778f4e0df548d8f563d263f0e22b8321bd1cabb471ade9078d29838e4fc"
+    },
+    {
+      "bytes": 4415,
+      "path": "concurrency8.json",
+      "sha256": "9a7aca62553f7499225479d97b01fce13797848c204996367b2f31df0d9d604c"
+    },
+    {
+      "bytes": 2949,
+      "path": "concurrency8.jsonl",
+      "sha256": "b1214d670d0b44a7f7f128f080e4392cabf9f7b5c09c1032728336e3922feadb"
+    },
+    {
+      "bytes": 95580,
+      "path": "native-regression.json",
+      "sha256": "1b6781f2b528ddfa867c5519f2844431bca24b3f33cda5744139fa35c02d01ec"
+    },
+    {
+      "bytes": 0,
+      "path": "previous-regression.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 51272,
+      "path": "public-roots.json",
+      "sha256": "f617d21d13958e15b9876e56457b786903fbe72e34cc56efa6a0d5ec24f528da"
+    },
+    {
+      "bytes": 1013,
+      "path": "stage0-attempt01/stage0.jsonl",
+      "sha256": "1aa2c8eac126ab15e4b7c3bf4f149fb3c56d79ca89cee45e7b1df8fa97174730"
+    },
+    {
+      "bytes": 1520,
+      "path": "stage0-attempt02/stage0.jsonl",
+      "sha256": "a90f745841cbe4367b20fa2467c823414d839dc2ba19dc14f5cc4126b2cd620c"
+    },
+    {
+      "bytes": 12302,
+      "path": "stage0-attempt03/stage0.jsonl",
+      "sha256": "e3779b13b5d94c662234fa1beb185b46b2e37c7d04c62e23dd61180cadd27ec2"
+    },
+    {
+      "bytes": 12628,
+      "path": "stage0-attempt04/stage0.jsonl",
+      "sha256": "806e578d2a6898efc26064afae9e4cc7a7468456bf7d33a9d0032b96b077156f"
+    },
+    {
+      "bytes": 12751,
+      "path": "stage0-attempt05/stage0.jsonl",
+      "sha256": "8f7b86c451a029b4981b3201e6db1c4f4a93ef3ed92fc4b1e448d25cf319ef76"
+    }
+  ],
+  "canary": {
+    "branches": [
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 92.554332244,
+        "branch_wall": 92.570214942,
+        "cpu_seconds": 130.670320381,
+        "floor": 20,
+        "key": [
+          0,
+          0,
+          430071
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 229,
+        "terminal": true,
+        "wall_seconds": 130.58357298499993
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 28.42038532000001,
+        "branch_wall": 28.427155802000016,
+        "cpu_seconds": 160.183237512,
+        "floor": 11,
+        "key": [
+          0,
+          0,
+          430072
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 122,
+        "terminal": true,
+        "wall_seconds": 160.14471709500003
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 22.851047551999983,
+        "branch_wall": 22.85667776899993,
+        "cpu_seconds": 183.386133057,
+        "floor": 6,
+        "key": [
+          0,
+          1,
+          430071
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 102,
+        "terminal": true,
+        "wall_seconds": 183.409081958
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 60.18661955799999,
+        "branch_wall": 60.19267892899995,
+        "cpu_seconds": 243.867051481,
+        "floor": 13,
+        "key": [
+          0,
+          1,
+          430072
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 168,
+        "terminal": true,
+        "wall_seconds": 243.92320667699994
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 20.615444069999995,
+        "branch_wall": 20.621254469000064,
+        "cpu_seconds": 265.245693306,
+        "floor": 6,
+        "key": [
+          1,
+          0,
+          430071
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 87,
+        "terminal": true,
+        "wall_seconds": 265.38843216099997
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 16.428248101999998,
+        "branch_wall": 16.434464047999995,
+        "cpu_seconds": 281.910516803,
+        "floor": 6,
+        "key": [
+          1,
+          0,
+          430072
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 87,
+        "terminal": true,
+        "wall_seconds": 282.100470741
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 20.340234936,
+        "branch_wall": 20.34174766800004,
+        "cpu_seconds": 302.461210192,
+        "floor": 6,
+        "key": [
+          1,
+          1,
+          430071
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 87,
+        "terminal": true,
+        "wall_seconds": 302.66007281199995
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 14.008638814999983,
+        "branch_wall": 14.012634907000006,
+        "cpu_seconds": 316.715189075,
+        "floor": 6,
+        "key": [
+          1,
+          1,
+          430072
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 87,
+        "terminal": true,
+        "wall_seconds": 316.99460924799996
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 11.532709925999995,
+        "branch_wall": 11.538211503999946,
+        "cpu_seconds": 328.476159067,
+        "floor": 8,
+        "key": [
+          2,
+          0,
+          430071
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 88,
+        "terminal": true,
+        "wall_seconds": 328.844035601
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 22.681251369999984,
+        "branch_wall": 22.683485331000043,
+        "cpu_seconds": 351.291300431,
+        "floor": 7,
+        "key": [
+          2,
+          0,
+          430072
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 102,
+        "terminal": true,
+        "wall_seconds": 351.702513318
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 10.871017526000003,
+        "branch_wall": 10.871922172999916,
+        "cpu_seconds": 362.429810318,
+        "floor": 8,
+        "key": [
+          2,
+          1,
+          430071
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 87,
+        "terminal": true,
+        "wall_seconds": 362.922748974
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 11.273006535999968,
+        "branch_wall": 11.273922720000087,
+        "cpu_seconds": 373.839477131,
+        "floor": 6,
+        "key": [
+          2,
+          1,
+          430072
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 81,
+        "terminal": true,
+        "wall_seconds": 374.338518336
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 17.99979472299998,
+        "branch_wall": 18.005306489000077,
+        "cpu_seconds": 392.086668599,
+        "floor": 7,
+        "key": [
+          3,
+          0,
+          430071
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 91,
+        "terminal": true,
+        "wall_seconds": 392.63714510700004
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 10.133265956000002,
+        "branch_wall": 10.13716504499996,
+        "cpu_seconds": 402.413806456,
+        "floor": 6,
+        "key": [
+          3,
+          0,
+          430072
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 70,
+        "terminal": true,
+        "wall_seconds": 403.010345346
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 17.768548355999997,
+        "branch_wall": 17.769872856999996,
+        "cpu_seconds": 420.31659066,
+        "floor": 7,
+        "key": [
+          3,
+          1,
+          430071
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 92,
+        "terminal": true,
+        "wall_seconds": 420.958143019
+      },
+      {
+        "boundary": "branch_completed",
+        "branch_cpu": 10.339748287999953,
+        "branch_wall": 10.340739404000033,
+        "cpu_seconds": 430.867369511,
+        "floor": 6,
+        "key": [
+          3,
+          1,
+          430072
+        ],
+        "outcome": "PLAYER_LOSS",
+        "peak_rss_kib": 477352,
+        "problems": [],
+        "steps": 70,
+        "terminal": true,
+        "wall_seconds": 431.51548441499995
+      }
+    ],
+    "cpu": 430.991004913,
+    "current_code_resume_start": {
+      "attempt": "stage0-attempt05",
+      "boundary": "start",
+      "config_sha256": "d069965e85880dd6af83e70de7c8b4c44111cb1b42ee887cf09f957384f99b7b",
+      "cpu_seconds": 0.283127807,
+      "frozen_stsrl_commit": "95abc8b1afe7d84e567aa70fb7225eba09fdff25",
+      "native_commit": "7fef4e19c7ee13f049ee0fb45c9967e7e349fcfb",
+      "native_extension": "/home/lsmft/.cache/issue43-native-7fef4e19/slaythespire.cpython-314-x86_64-linux-gnu.so",
+      "native_extension_sha256": "ced9941eb1cd042630b27ed3b9b0be700cd8cbcc143156d52bdabf7bf07234cd",
+      "peak_rss_kib": 29144,
+      "pid": 454,
+      "producer_commit": "8103ed57000ae542b925aed99bfa47f48e8a12a5",
+      "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+      "resume_ledger_sha256": "e3779b13b5d94c662234fa1beb185b46b2e37c7d04c62e23dd61180cadd27ec2",
+      "source_sha256": "0b38496585e1c821d4244c5b12891f864c4750b08e5b18fa5993d662f5028909",
+      "wall_seconds": 0.07262933599997723
+    },
+    "current_code_smoke": [
+      {
+        "arm": "visible",
+        "boundary": "trained_public_choice_executed",
+        "cpu_seconds": 37.094804346,
+        "gradient_min": 102.30151428785591,
+        "peak_rss_kib": 176188,
+        "root": 0,
+        "scores": [
+          0.2524341938363578,
+          0.2575323236311219,
+          0.25769114155177597,
+          0.25781516226785345
+        ],
+        "selected": 3,
+        "synthetic_only": true,
+        "wall_seconds": 36.99032685499998
+      },
+      {
+        "arm": "masked",
+        "boundary": "trained_public_choice_executed",
+        "cpu_seconds": 37.101705599,
+        "gradient_min": 62.54997620556359,
+        "peak_rss_kib": 176188,
+        "root": 0,
+        "scores": [
+          0.19335132335798036,
+          0.19441921173828064,
+          0.20015208707485638,
+          0.1959904435281315
+        ],
+        "selected": 2,
+        "synthetic_only": true,
+        "wall_seconds": 37.03557728599998
+      },
+      {
+        "arm": "visible",
+        "boundary": "trained_public_choice_executed",
+        "cpu_seconds": 37.215779237,
+        "gradient_min": 130.47842482828355,
+        "peak_rss_kib": 176188,
+        "root": 1,
+        "scores": [
+          0.24925428277568537,
+          0.25121325758853397,
+          0.25633089417570376,
+          0.25340506955591635,
+          0.2475123126818432,
+          0.2513442762071782
+        ],
+        "selected": 2,
+        "synthetic_only": true,
+        "wall_seconds": 37.16294027099997
+      },
+      {
+        "arm": "masked",
+        "boundary": "trained_public_choice_executed",
+        "cpu_seconds": 37.226470998,
+        "gradient_min": 105.70128532122114,
+        "peak_rss_kib": 176188,
+        "root": 1,
+        "scores": [
+          0.20761913375281854,
+          0.20804149570624106,
+          0.21294538002718352,
+          0.2087876924763907,
+          0.21006338868517482,
+          0.20977215599685967
+        ],
+        "selected": 2,
+        "synthetic_only": true,
+        "wall_seconds": 37.17700594899998
+      },
+      {
+        "arm": "visible",
+        "boundary": "trained_public_choice_executed",
+        "cpu_seconds": 37.292693394,
+        "gradient_min": 49.11262184932193,
+        "peak_rss_kib": 176188,
+        "root": 2,
+        "scores": [
+          0.14810010174607668,
+          0.15163438387704592,
+          0.15164510249863244
+        ],
+        "selected": 2,
+        "synthetic_only": true,
+        "wall_seconds": 37.253259759
+      },
+      {
+        "arm": "masked",
+        "boundary": "trained_public_choice_executed",
+        "cpu_seconds": 37.299292917,
+        "gradient_min": 27.504120343903814,
+        "peak_rss_kib": 176188,
+        "root": 2,
+        "scores": [
+          0.11215426298554892,
+          0.11323861244486139,
+          0.11774402604015383
+        ],
+        "selected": 2,
+        "synthetic_only": true,
+        "wall_seconds": 37.262698633000014
+      },
+      {
+        "arm": "visible",
+        "boundary": "trained_public_choice_executed",
+        "cpu_seconds": 37.42695349,
+        "gradient_min": 136.74094396598525,
+        "peak_rss_kib": 176188,
+        "root": 3,
+        "scores": [
+          0.24632643264592627,
+          0.24577128263602283,
+          0.24514631000388626,
+          0.24874135974444267,
+          0.2460965982974043,
+          0.24701588454145554
+        ],
+        "selected": 3,
+        "synthetic_only": true,
+        "wall_seconds": 37.39959134399999
+      },
+      {
+        "arm": "masked",
+        "boundary": "trained_public_choice_executed",
+        "cpu_seconds": 37.439793582,
+        "gradient_min": 104.63552370654646,
+        "peak_rss_kib": 176188,
+        "root": 3,
+        "scores": [
+          0.18932390504208252,
+          0.19051595307983488,
+          0.19450773810526925,
+          0.19169752770691925,
+          0.19242674053651915,
+          0.19189919246337753
+        ],
+        "selected": 2,
+        "synthetic_only": true,
+        "wall_seconds": 37.41491517700001
+      }
+    ],
+    "current_roots_with_public_inputs": {
+      "all_hashes_match_original_canary": true,
+      "producer_commit": "34b8e70f9c40af91ccf886a7dc2d1fbacc099e6e",
+      "rows": [
+        {
+          "legal_count": 4,
+          "public_sha256": "2bd57cbb173f1eee4e9bb329d3ac4db856790c41728c2b3478a56bc3e3d11afd",
+          "screen": "MAP_SCREEN",
+          "seed": 430001,
+          "serialized_public_input": "{\"availability\":{\"candidate_actions\":\"available\",\"current_map_node\":\"available\",\"immediately_legal_routes\":\"available\",\"persistent_resources\":\"available\",\"screen_identity\":\"available\",\"screen_payload\":\"available\",\"visible_act_boss\":\"available\",\"visible_map_graph\":\"available\"},\"legal_options\":[{\"action\":{\"idx1\":1,\"idx2\":0,\"idx3\":0,\"kind\":\"map\",\"label\":\"game.map idx1=1 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":0,\"semantics\":{\"choice_type\":\"map_route\",\"destination\":{\"location\":\"map_node\",\"room_symbol\":\"M\",\"x\":1,\"y\":0}}},{\"action\":{\"idx1\":4,\"idx2\":0,\"idx3\":0,\"kind\":\"map\",\"label\":\"game.map idx1=4 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":1,\"semantics\":{\"choice_type\":\"map_route\",\"destination\":{\"location\":\"map_node\",\"room_symbol\":\"M\",\"x\":4,\"y\":0}}},{\"action\":{\"idx1\":5,\"idx2\":0,\"idx3\":0,\"kind\":\"map\",\"label\":\"game.map idx1=5 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":2,\"semantics\":{\"choice_type\":\"map_route\",\"destination\":{\"location\":\"map_node\",\"room_symbol\":\"M\",\"x\":5,\"y\":0}}},{\"action\":{\"idx1\":6,\"idx2\":0,\"idx3\":0,\"kind\":\"map\",\"label\":\"game.map idx1=6 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":3,\"semantics\":{\"choice_type\":\"map_route\",\"destination\":{\"location\":\"map_node\",\"room_symbol\":\"M\",\"x\":6,\"y\":0}}}],\"public_state\":{\"current_map_node\":{\"location\":\"before_first_route\"},\"map_graph\":[{\"outgoing_edges\":[{\"x\":0,\"y\":1}],\"room_symbol\":\"M\",\"x\":1,\"y\":0},{\"outgoing_edges\":[{\"x\":3,\"y\":1}],\"room_symbol\":\"M\",\"x\":4,\"y\":0},{\"outgoing_edges\":[{\"x\":5,\"y\":1}],\"room_symbol\":\"M\",\"x\":5,\"y\":0},{\"outgoing_edges\":[{\"x\":6,\"y\":1}],\"room_symbol\":\"M\",\"x\":6,\"y\":0},{\"outgoing_edges\":[{\"x\":1,\"y\":2}],\"room_symbol\":\"?\",\"x\":0,\"y\":1},{\"outgoing_edges\":[{\"x\":4,\"y\":2}],\"room_symbol\":\"M\",\"x\":3,\"y\":1},{\"outgoing_edges\":[{\"x\":5,\"y\":2}],\"room_symbol\":\"M\",\"x\":5,\"y\":1},{\"outgoing_edges\":[{\"x\":5,\"y\":2},{\"x\":6,\"y\":2}],\"room_symbol\":\"$\",\"x\":6,\"y\":1},{\"outgoing_edges\":[{\"x\":2,\"y\":3}],\"room_symbol\":\"?\",\"x\":1,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"M\",\"x\":4,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3},{\"x\":6,\"y\":3}],\"room_symbol\":\"?\",\"x\":5,\"y\":2},{\"outgoing_edges\":[{\"x\":6,\"y\":3}],\"room_symbol\":\"M\",\"x\":6,\"y\":2},{\"outgoing_edges\":[{\"x\":3,\"y\":4}],\"room_symbol\":\"$\",\"x\":2,\"y\":3},{\"outgoing_edges\":[{\"x\":4,\"y\":4},{\"x\":5,\"y\":4}],\"room_symbol\":\"M\",\"x\":4,\"y\":3},{\"outgoing_edges\":[{\"x\":5,\"y\":4},{\"x\":6,\"y\":4}],\"room_symbol\":\"?\",\"x\":6,\"y\":3},{\"outgoing_edges\":[{\"x\":3,\"y\":5}],\"room_symbol\":\"M\",\"x\":3,\"y\":4},{\"outgoing_edges\":[{\"x\":3,\"y\":5}],\"room_symbol\":\"M\",\"x\":4,\"y\":4},{\"outgoing_edges\":[{\"x\":4,\"y\":5},{\"x\":5,\"y\":5}],\"room_symbol\":\"?\",\"x\":5,\"y\":4},{\"outgoing_edges\":[{\"x\":6,\"y\":5}],\"room_symbol\":\"$\",\"x\":6,\"y\":4},{\"outgoing_edges\":[{\"x\":4,\"y\":6}],\"room_symbol\":\"E\",\"x\":3,\"y\":5},{\"outgoing_edges\":[{\"x\":4,\"y\":6}],\"room_symbol\":\"R\",\"x\":4,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"E\",\"x\":5,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"R\",\"x\":6,\"y\":5},{\"outgoing_edges\":[{\"x\":3,\"y\":7},{\"x\":4,\"y\":7}],\"room_symbol\":\"?\",\"x\":4,\"y\":6},{\"outgoing_edges\":[{\"x\":4,\"y\":7},{\"x\":6,\"y\":7}],\"room_symbol\":\"?\",\"x\":5,\"y\":6},{\"outgoing_edges\":[{\"x\":2,\"y\":8}],\"room_symbol\":\"E\",\"x\":3,\"y\":7},{\"outgoing_edges\":[{\"x\":3,\"y\":8},{\"x\":4,\"y\":8},{\"x\":5,\"y\":8}],\"room_symbol\":\"M\",\"x\":4,\"y\":7},{\"outgoing_edges\":[{\"x\":6,\"y\":8}],\"room_symbol\":\"E\",\"x\":6,\"y\":7},{\"outgoing_edges\":[{\"x\":2,\"y\":9}],\"room_symbol\":\"T\",\"x\":2,\"y\":8},{\"outgoing_edges\":[{\"x\":2,\"y\":9}],\"room_symbol\":\"T\",\"x\":3,\"y\":8},{\"outgoing_edges\":[{\"x\":4,\"y\":9}],\"room_symbol\":\"T\",\"x\":4,\"y\":8},{\"outgoing_edges\":[{\"x\":5,\"y\":9}],\"room_symbol\":\"T\",\"x\":5,\"y\":8},{\"outgoing_edges\":[{\"x\":5,\"y\":9}],\"room_symbol\":\"T\",\"x\":6,\"y\":8},{\"outgoing_edges\":[{\"x\":2,\"y\":10},{\"x\":3,\"y\":10}],\"room_symbol\":\"M\",\"x\":2,\"y\":9},{\"outgoing_edges\":[{\"x\":3,\"y\":10}],\"room_symbol\":\"R\",\"x\":4,\"y\":9},{\"outgoing_edges\":[{\"x\":5,\"y\":10},{\"x\":6,\"y\":10}],\"room_symbol\":\"M\",\"x\":5,\"y\":9},{\"outgoing_edges\":[{\"x\":1,\"y\":11}],\"room_symbol\":\"R\",\"x\":2,\"y\":10},{\"outgoing_edges\":[{\"x\":3,\"y\":11},{\"x\":4,\"y\":11}],\"room_symbol\":\"M\",\"x\":3,\"y\":10},{\"outgoing_edges\":[{\"x\":4,\"y\":11}],\"room_symbol\":\"?\",\"x\":5,\"y\":10},{\"outgoing_edges\":[{\"x\":6,\"y\":11}],\"room_symbol\":\"M\",\"x\":6,\"y\":10},{\"outgoing_edges\":[{\"x\":0,\"y\":12}],\"room_symbol\":\"E\",\"x\":1,\"y\":11},{\"outgoing_edges\":[{\"x\":4,\"y\":12}],\"room_symbol\":\"R\",\"x\":3,\"y\":11},{\"outgoing_edges\":[{\"x\":5,\"y\":12}],\"room_symbol\":\"?\",\"x\":4,\"y\":11},{\"outgoing_edges\":[{\"x\":6,\"y\":12}],\"room_symbol\":\"E\",\"x\":6,\"y\":11},{\"outgoing_edges\":[{\"x\":1,\"y\":13}],\"room_symbol\":\"M\",\"x\":0,\"y\":12},{\"outgoing_edges\":[{\"x\":4,\"y\":13}],\"room_symbol\":\"M\",\"x\":4,\"y\":12},{\"outgoing_edges\":[{\"x\":5,\"y\":13},{\"x\":6,\"y\":13}],\"room_symbol\":\"?\",\"x\":5,\"y\":12},{\"outgoing_edges\":[{\"x\":6,\"y\":13}],\"room_symbol\":\"?\",\"x\":6,\"y\":12},{\"outgoing_edges\":[{\"x\":2,\"y\":14}],\"room_symbol\":\"E\",\"x\":1,\"y\":13},{\"outgoing_edges\":[{\"x\":5,\"y\":14}],\"room_symbol\":\"M\",\"x\":4,\"y\":13},{\"outgoing_edges\":[{\"x\":5,\"y\":14}],\"room_symbol\":\"M\",\"x\":5,\"y\":13},{\"outgoing_edges\":[{\"x\":6,\"y\":14}],\"room_symbol\":\"M\",\"x\":6,\"y\":13},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":2,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":5,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":6,\"y\":14}],\"persistent_resources\":{\"current_hp\":{\"availability\":\"available\",\"source\":\"GameContext::curHp\",\"value\":68},\"deck\":{\"availability\":\"available\",\"source\":\"GameContext::deck\",\"value\":[{\"deck_index\":0,\"id\":15,\"id_label\":\"ASCENDERS_BANE\",\"misc\":0,\"name\":\"Ascender's Bane\",\"rarity\":\"SPECIAL\",\"type\":\"CURSE\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":1,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":2,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":3,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":4,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":5,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":6,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":7,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":8,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":9,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":10,\"id\":25,\"id_label\":\"BASH\",\"misc\":0,\"name\":\"Bash\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":11,\"id\":194,\"id_label\":\"INJURY\",\"misc\":0,\"name\":\"Injury\",\"rarity\":\"CURSE\",\"type\":\"CURSE\",\"upgrade_count\":0,\"upgraded\":false}]},\"gold\":{\"availability\":\"available\",\"source\":\"GameContext::gold\",\"value\":99},\"keys\":{\"availability\":\"available\",\"source\":\"GameContext::keyFlags\",\"value\":{\"blue_key\":false,\"green_key\":false,\"red_key\":false}},\"max_hp\":{\"availability\":\"available\",\"source\":\"GameContext::maxHp\",\"value\":75},\"potion_capacity\":{\"availability\":\"available\",\"source\":\"GameContext::potionCapacity\",\"value\":2},\"potion_count\":{\"availability\":\"available\",\"source\":\"GameContext::potionCount\",\"value\":0},\"potion_identities\":{\"availability\":\"available\",\"source\":\"GameContext::potions\",\"value\":[{\"id\":1,\"id_label\":\"EMPTY_POTION_ID\",\"name\":\"EMPTY_POTION_SLOT\",\"potion_index\":0},{\"id\":1,\"id_label\":\"EMPTY_POTION_ID\",\"name\":\"EMPTY_POTION_SLOT\",\"potion_index\":1}]},\"relics\":{\"availability\":\"available\",\"source\":\"GameContext::relics\",\"value\":[{\"counter\":0,\"id\":86,\"id_label\":\"Burning Blood\",\"name\":\"Burning Blood\",\"relic_index\":0},{\"counter\":0,\"id\":15,\"id_label\":\"Dead Branch\",\"name\":\"Dead Branch\",\"relic_index\":1}]}},\"screen\":\"MAP_SCREEN\",\"screen_context\":{\"coverage_status\":\"supported\",\"current_map_node\":{\"location\":\"before_first_route\"},\"map_graph\":[{\"outgoing_edges\":[{\"x\":0,\"y\":1}],\"room_symbol\":\"M\",\"x\":1,\"y\":0},{\"outgoing_edges\":[{\"x\":3,\"y\":1}],\"room_symbol\":\"M\",\"x\":4,\"y\":0},{\"outgoing_edges\":[{\"x\":5,\"y\":1}],\"room_symbol\":\"M\",\"x\":5,\"y\":0},{\"outgoing_edges\":[{\"x\":6,\"y\":1}],\"room_symbol\":\"M\",\"x\":6,\"y\":0},{\"outgoing_edges\":[{\"x\":1,\"y\":2}],\"room_symbol\":\"?\",\"x\":0,\"y\":1},{\"outgoing_edges\":[{\"x\":4,\"y\":2}],\"room_symbol\":\"M\",\"x\":3,\"y\":1},{\"outgoing_edges\":[{\"x\":5,\"y\":2}],\"room_symbol\":\"M\",\"x\":5,\"y\":1},{\"outgoing_edges\":[{\"x\":5,\"y\":2},{\"x\":6,\"y\":2}],\"room_symbol\":\"$\",\"x\":6,\"y\":1},{\"outgoing_edges\":[{\"x\":2,\"y\":3}],\"room_symbol\":\"?\",\"x\":1,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"M\",\"x\":4,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3},{\"x\":6,\"y\":3}],\"room_symbol\":\"?\",\"x\":5,\"y\":2},{\"outgoing_edges\":[{\"x\":6,\"y\":3}],\"room_symbol\":\"M\",\"x\":6,\"y\":2},{\"outgoing_edges\":[{\"x\":3,\"y\":4}],\"room_symbol\":\"$\",\"x\":2,\"y\":3},{\"outgoing_edges\":[{\"x\":4,\"y\":4},{\"x\":5,\"y\":4}],\"room_symbol\":\"M\",\"x\":4,\"y\":3},{\"outgoing_edges\":[{\"x\":5,\"y\":4},{\"x\":6,\"y\":4}],\"room_symbol\":\"?\",\"x\":6,\"y\":3},{\"outgoing_edges\":[{\"x\":3,\"y\":5}],\"room_symbol\":\"M\",\"x\":3,\"y\":4},{\"outgoing_edges\":[{\"x\":3,\"y\":5}],\"room_symbol\":\"M\",\"x\":4,\"y\":4},{\"outgoing_edges\":[{\"x\":4,\"y\":5},{\"x\":5,\"y\":5}],\"room_symbol\":\"?\",\"x\":5,\"y\":4},{\"outgoing_edges\":[{\"x\":6,\"y\":5}],\"room_symbol\":\"$\",\"x\":6,\"y\":4},{\"outgoing_edges\":[{\"x\":4,\"y\":6}],\"room_symbol\":\"E\",\"x\":3,\"y\":5},{\"outgoing_edges\":[{\"x\":4,\"y\":6}],\"room_symbol\":\"R\",\"x\":4,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"E\",\"x\":5,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"R\",\"x\":6,\"y\":5},{\"outgoing_edges\":[{\"x\":3,\"y\":7},{\"x\":4,\"y\":7}],\"room_symbol\":\"?\",\"x\":4,\"y\":6},{\"outgoing_edges\":[{\"x\":4,\"y\":7},{\"x\":6,\"y\":7}],\"room_symbol\":\"?\",\"x\":5,\"y\":6},{\"outgoing_edges\":[{\"x\":2,\"y\":8}],\"room_symbol\":\"E\",\"x\":3,\"y\":7},{\"outgoing_edges\":[{\"x\":3,\"y\":8},{\"x\":4,\"y\":8},{\"x\":5,\"y\":8}],\"room_symbol\":\"M\",\"x\":4,\"y\":7},{\"outgoing_edges\":[{\"x\":6,\"y\":8}],\"room_symbol\":\"E\",\"x\":6,\"y\":7},{\"outgoing_edges\":[{\"x\":2,\"y\":9}],\"room_symbol\":\"T\",\"x\":2,\"y\":8},{\"outgoing_edges\":[{\"x\":2,\"y\":9}],\"room_symbol\":\"T\",\"x\":3,\"y\":8},{\"outgoing_edges\":[{\"x\":4,\"y\":9}],\"room_symbol\":\"T\",\"x\":4,\"y\":8},{\"outgoing_edges\":[{\"x\":5,\"y\":9}],\"room_symbol\":\"T\",\"x\":5,\"y\":8},{\"outgoing_edges\":[{\"x\":5,\"y\":9}],\"room_symbol\":\"T\",\"x\":6,\"y\":8},{\"outgoing_edges\":[{\"x\":2,\"y\":10},{\"x\":3,\"y\":10}],\"room_symbol\":\"M\",\"x\":2,\"y\":9},{\"outgoing_edges\":[{\"x\":3,\"y\":10}],\"room_symbol\":\"R\",\"x\":4,\"y\":9},{\"outgoing_edges\":[{\"x\":5,\"y\":10},{\"x\":6,\"y\":10}],\"room_symbol\":\"M\",\"x\":5,\"y\":9},{\"outgoing_edges\":[{\"x\":1,\"y\":11}],\"room_symbol\":\"R\",\"x\":2,\"y\":10},{\"outgoing_edges\":[{\"x\":3,\"y\":11},{\"x\":4,\"y\":11}],\"room_symbol\":\"M\",\"x\":3,\"y\":10},{\"outgoing_edges\":[{\"x\":4,\"y\":11}],\"room_symbol\":\"?\",\"x\":5,\"y\":10},{\"outgoing_edges\":[{\"x\":6,\"y\":11}],\"room_symbol\":\"M\",\"x\":6,\"y\":10},{\"outgoing_edges\":[{\"x\":0,\"y\":12}],\"room_symbol\":\"E\",\"x\":1,\"y\":11},{\"outgoing_edges\":[{\"x\":4,\"y\":12}],\"room_symbol\":\"R\",\"x\":3,\"y\":11},{\"outgoing_edges\":[{\"x\":5,\"y\":12}],\"room_symbol\":\"?\",\"x\":4,\"y\":11},{\"outgoing_edges\":[{\"x\":6,\"y\":12}],\"room_symbol\":\"E\",\"x\":6,\"y\":11},{\"outgoing_edges\":[{\"x\":1,\"y\":13}],\"room_symbol\":\"M\",\"x\":0,\"y\":12},{\"outgoing_edges\":[{\"x\":4,\"y\":13}],\"room_symbol\":\"M\",\"x\":4,\"y\":12},{\"outgoing_edges\":[{\"x\":5,\"y\":13},{\"x\":6,\"y\":13}],\"room_symbol\":\"?\",\"x\":5,\"y\":12},{\"outgoing_edges\":[{\"x\":6,\"y\":13}],\"room_symbol\":\"?\",\"x\":6,\"y\":12},{\"outgoing_edges\":[{\"x\":2,\"y\":14}],\"room_symbol\":\"E\",\"x\":1,\"y\":13},{\"outgoing_edges\":[{\"x\":5,\"y\":14}],\"room_symbol\":\"M\",\"x\":4,\"y\":13},{\"outgoing_edges\":[{\"x\":5,\"y\":14}],\"room_symbol\":\"M\",\"x\":5,\"y\":13},{\"outgoing_edges\":[{\"x\":6,\"y\":14}],\"room_symbol\":\"M\",\"x\":6,\"y\":13},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":2,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":5,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":6,\"y\":14}],\"source\":\"GameContext::map, GameContext::potions, and StepSimulator::legalActions\"},\"visible_act_boss\":\"Hexaghost\"},\"schema_id\":\"noncombat-visible-choice-input-v1\"}",
+          "step": 1
+        },
+        {
+          "legal_count": 6,
+          "public_sha256": "03cf4c98d0337d5e096d9ee5decc895866de8597af2318ad3247c7883f37e0db",
+          "screen": "REWARDS",
+          "seed": 430001,
+          "serialized_public_input": "{\"availability\":{\"candidate_actions\":\"available\",\"current_map_node\":\"available\",\"immediately_legal_routes\":\"unavailable\",\"persistent_resources\":\"available\",\"screen_identity\":\"available\",\"screen_payload\":\"available\",\"visible_act_boss\":\"available\",\"visible_map_graph\":\"available\"},\"legal_options\":[{\"action\":{\"idx1\":0,\"idx2\":0,\"idx3\":0,\"kind\":\"reward_gold\",\"label\":\"game.reward_gold idx1=0 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":0,\"semantics\":{\"choice_type\":\"gold\",\"gold\":16}},{\"action\":{\"idx1\":0,\"idx2\":0,\"idx3\":0,\"kind\":\"reward_card\",\"label\":\"game.reward_card idx1=0 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":1,\"semantics\":{\"card\":{\"id\":355,\"id_label\":\"WARCRY\",\"name\":\"Warcry\",\"rarity\":\"COMMON\",\"type\":\"SKILL\",\"upgraded\":false},\"choice_type\":\"card\"}},{\"action\":{\"idx1\":0,\"idx2\":1,\"idx3\":0,\"kind\":\"reward_card\",\"label\":\"game.reward_card idx1=0 idx2=1 idx3=0\",\"scope\":\"game\"},\"candidate_index\":2,\"semantics\":{\"card\":{\"id\":42,\"id_label\":\"BODY_SLAM\",\"name\":\"Body Slam\",\"rarity\":\"COMMON\",\"type\":\"ATTACK\",\"upgraded\":false},\"choice_type\":\"card\"}},{\"action\":{\"idx1\":0,\"idx2\":2,\"idx3\":0,\"kind\":\"reward_card\",\"label\":\"game.reward_card idx1=0 idx2=2 idx3=0\",\"scope\":\"game\"},\"candidate_index\":3,\"semantics\":{\"card\":{\"id\":311,\"id_label\":\"SPOT_WEAKNESS\",\"name\":\"Spot Weakness\",\"rarity\":\"UNCOMMON\",\"type\":\"SKILL\",\"upgraded\":false},\"choice_type\":\"card\"}},{\"action\":{\"idx1\":0,\"idx2\":0,\"idx3\":0,\"kind\":\"reward_potion\",\"label\":\"game.reward_potion idx1=0 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":4,\"semantics\":{\"choice_type\":\"potion\",\"potion\":{\"id\":34,\"id_label\":\"PowerPotion\",\"name\":\"Power Potion\"}}},{\"action\":{\"idx1\":0,\"idx2\":0,\"idx3\":0,\"kind\":\"skip\",\"label\":\"game.skip idx1=0 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":5,\"semantics\":{\"choice_type\":\"skip\",\"description\":\"Skip the remaining reward screen choices\"}}],\"public_state\":{\"current_map_node\":{\"location\":\"map_node\",\"room_symbol\":\"M\",\"x\":4,\"y\":0},\"map_graph\":[{\"outgoing_edges\":[{\"x\":0,\"y\":1}],\"room_symbol\":\"M\",\"x\":1,\"y\":0},{\"outgoing_edges\":[{\"x\":3,\"y\":1}],\"room_symbol\":\"M\",\"x\":4,\"y\":0},{\"outgoing_edges\":[{\"x\":5,\"y\":1}],\"room_symbol\":\"M\",\"x\":5,\"y\":0},{\"outgoing_edges\":[{\"x\":6,\"y\":1}],\"room_symbol\":\"M\",\"x\":6,\"y\":0},{\"outgoing_edges\":[{\"x\":1,\"y\":2}],\"room_symbol\":\"?\",\"x\":0,\"y\":1},{\"outgoing_edges\":[{\"x\":4,\"y\":2}],\"room_symbol\":\"M\",\"x\":3,\"y\":1},{\"outgoing_edges\":[{\"x\":5,\"y\":2}],\"room_symbol\":\"M\",\"x\":5,\"y\":1},{\"outgoing_edges\":[{\"x\":5,\"y\":2},{\"x\":6,\"y\":2}],\"room_symbol\":\"$\",\"x\":6,\"y\":1},{\"outgoing_edges\":[{\"x\":2,\"y\":3}],\"room_symbol\":\"?\",\"x\":1,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"M\",\"x\":4,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3},{\"x\":6,\"y\":3}],\"room_symbol\":\"?\",\"x\":5,\"y\":2},{\"outgoing_edges\":[{\"x\":6,\"y\":3}],\"room_symbol\":\"M\",\"x\":6,\"y\":2},{\"outgoing_edges\":[{\"x\":3,\"y\":4}],\"room_symbol\":\"$\",\"x\":2,\"y\":3},{\"outgoing_edges\":[{\"x\":4,\"y\":4},{\"x\":5,\"y\":4}],\"room_symbol\":\"M\",\"x\":4,\"y\":3},{\"outgoing_edges\":[{\"x\":5,\"y\":4},{\"x\":6,\"y\":4}],\"room_symbol\":\"?\",\"x\":6,\"y\":3},{\"outgoing_edges\":[{\"x\":3,\"y\":5}],\"room_symbol\":\"M\",\"x\":3,\"y\":4},{\"outgoing_edges\":[{\"x\":3,\"y\":5}],\"room_symbol\":\"M\",\"x\":4,\"y\":4},{\"outgoing_edges\":[{\"x\":4,\"y\":5},{\"x\":5,\"y\":5}],\"room_symbol\":\"?\",\"x\":5,\"y\":4},{\"outgoing_edges\":[{\"x\":6,\"y\":5}],\"room_symbol\":\"$\",\"x\":6,\"y\":4},{\"outgoing_edges\":[{\"x\":4,\"y\":6}],\"room_symbol\":\"E\",\"x\":3,\"y\":5},{\"outgoing_edges\":[{\"x\":4,\"y\":6}],\"room_symbol\":\"R\",\"x\":4,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"E\",\"x\":5,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"R\",\"x\":6,\"y\":5},{\"outgoing_edges\":[{\"x\":3,\"y\":7},{\"x\":4,\"y\":7}],\"room_symbol\":\"?\",\"x\":4,\"y\":6},{\"outgoing_edges\":[{\"x\":4,\"y\":7},{\"x\":6,\"y\":7}],\"room_symbol\":\"?\",\"x\":5,\"y\":6},{\"outgoing_edges\":[{\"x\":2,\"y\":8}],\"room_symbol\":\"E\",\"x\":3,\"y\":7},{\"outgoing_edges\":[{\"x\":3,\"y\":8},{\"x\":4,\"y\":8},{\"x\":5,\"y\":8}],\"room_symbol\":\"M\",\"x\":4,\"y\":7},{\"outgoing_edges\":[{\"x\":6,\"y\":8}],\"room_symbol\":\"E\",\"x\":6,\"y\":7},{\"outgoing_edges\":[{\"x\":2,\"y\":9}],\"room_symbol\":\"T\",\"x\":2,\"y\":8},{\"outgoing_edges\":[{\"x\":2,\"y\":9}],\"room_symbol\":\"T\",\"x\":3,\"y\":8},{\"outgoing_edges\":[{\"x\":4,\"y\":9}],\"room_symbol\":\"T\",\"x\":4,\"y\":8},{\"outgoing_edges\":[{\"x\":5,\"y\":9}],\"room_symbol\":\"T\",\"x\":5,\"y\":8},{\"outgoing_edges\":[{\"x\":5,\"y\":9}],\"room_symbol\":\"T\",\"x\":6,\"y\":8},{\"outgoing_edges\":[{\"x\":2,\"y\":10},{\"x\":3,\"y\":10}],\"room_symbol\":\"M\",\"x\":2,\"y\":9},{\"outgoing_edges\":[{\"x\":3,\"y\":10}],\"room_symbol\":\"R\",\"x\":4,\"y\":9},{\"outgoing_edges\":[{\"x\":5,\"y\":10},{\"x\":6,\"y\":10}],\"room_symbol\":\"M\",\"x\":5,\"y\":9},{\"outgoing_edges\":[{\"x\":1,\"y\":11}],\"room_symbol\":\"R\",\"x\":2,\"y\":10},{\"outgoing_edges\":[{\"x\":3,\"y\":11},{\"x\":4,\"y\":11}],\"room_symbol\":\"M\",\"x\":3,\"y\":10},{\"outgoing_edges\":[{\"x\":4,\"y\":11}],\"room_symbol\":\"?\",\"x\":5,\"y\":10},{\"outgoing_edges\":[{\"x\":6,\"y\":11}],\"room_symbol\":\"M\",\"x\":6,\"y\":10},{\"outgoing_edges\":[{\"x\":0,\"y\":12}],\"room_symbol\":\"E\",\"x\":1,\"y\":11},{\"outgoing_edges\":[{\"x\":4,\"y\":12}],\"room_symbol\":\"R\",\"x\":3,\"y\":11},{\"outgoing_edges\":[{\"x\":5,\"y\":12}],\"room_symbol\":\"?\",\"x\":4,\"y\":11},{\"outgoing_edges\":[{\"x\":6,\"y\":12}],\"room_symbol\":\"E\",\"x\":6,\"y\":11},{\"outgoing_edges\":[{\"x\":1,\"y\":13}],\"room_symbol\":\"M\",\"x\":0,\"y\":12},{\"outgoing_edges\":[{\"x\":4,\"y\":13}],\"room_symbol\":\"M\",\"x\":4,\"y\":12},{\"outgoing_edges\":[{\"x\":5,\"y\":13},{\"x\":6,\"y\":13}],\"room_symbol\":\"?\",\"x\":5,\"y\":12},{\"outgoing_edges\":[{\"x\":6,\"y\":13}],\"room_symbol\":\"?\",\"x\":6,\"y\":12},{\"outgoing_edges\":[{\"x\":2,\"y\":14}],\"room_symbol\":\"E\",\"x\":1,\"y\":13},{\"outgoing_edges\":[{\"x\":5,\"y\":14}],\"room_symbol\":\"M\",\"x\":4,\"y\":13},{\"outgoing_edges\":[{\"x\":5,\"y\":14}],\"room_symbol\":\"M\",\"x\":5,\"y\":13},{\"outgoing_edges\":[{\"x\":6,\"y\":14}],\"room_symbol\":\"M\",\"x\":6,\"y\":13},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":2,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":5,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":6,\"y\":14}],\"persistent_resources\":{\"current_hp\":{\"availability\":\"available\",\"source\":\"GameContext::curHp\",\"value\":74},\"deck\":{\"availability\":\"available\",\"source\":\"GameContext::deck\",\"value\":[{\"deck_index\":0,\"id\":15,\"id_label\":\"ASCENDERS_BANE\",\"misc\":0,\"name\":\"Ascender's Bane\",\"rarity\":\"SPECIAL\",\"type\":\"CURSE\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":1,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":2,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":3,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":4,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":5,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":6,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":7,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":8,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":9,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":10,\"id\":25,\"id_label\":\"BASH\",\"misc\":0,\"name\":\"Bash\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":11,\"id\":194,\"id_label\":\"INJURY\",\"misc\":0,\"name\":\"Injury\",\"rarity\":\"CURSE\",\"type\":\"CURSE\",\"upgrade_count\":0,\"upgraded\":false}]},\"gold\":{\"availability\":\"available\",\"source\":\"GameContext::gold\",\"value\":99},\"keys\":{\"availability\":\"available\",\"source\":\"GameContext::keyFlags\",\"value\":{\"blue_key\":false,\"green_key\":false,\"red_key\":false}},\"max_hp\":{\"availability\":\"available\",\"source\":\"GameContext::maxHp\",\"value\":75},\"potion_capacity\":{\"availability\":\"available\",\"source\":\"GameContext::potionCapacity\",\"value\":2},\"potion_count\":{\"availability\":\"available\",\"source\":\"GameContext::potionCount\",\"value\":0},\"potion_identities\":{\"availability\":\"available\",\"source\":\"GameContext::potions\",\"value\":[{\"id\":1,\"id_label\":\"EMPTY_POTION_ID\",\"name\":\"EMPTY_POTION_SLOT\",\"potion_index\":0},{\"id\":1,\"id_label\":\"EMPTY_POTION_ID\",\"name\":\"EMPTY_POTION_SLOT\",\"potion_index\":1}]},\"relics\":{\"availability\":\"available\",\"source\":\"GameContext::relics\",\"value\":[{\"counter\":0,\"id\":86,\"id_label\":\"Burning Blood\",\"name\":\"Burning Blood\",\"relic_index\":0},{\"counter\":0,\"id\":15,\"id_label\":\"Dead Branch\",\"name\":\"Dead Branch\",\"relic_index\":1}]}},\"screen\":\"REWARDS\",\"screen_context\":{\"coverage_status\":\"supported\",\"source\":\"GameContext::info.rewardsContainer and StepSimulator::legalActions\"},\"visible_act_boss\":\"Hexaghost\"},\"schema_id\":\"noncombat-visible-choice-input-v1\"}",
+          "step": 7
+        },
+        {
+          "legal_count": 3,
+          "public_sha256": "1eb97c09e0a1f11d0e118e0d418bdca1d47564fbfe23f6e4cb52d943530f5b8d",
+          "screen": "MAP_SCREEN",
+          "seed": 430002,
+          "serialized_public_input": "{\"availability\":{\"candidate_actions\":\"available\",\"current_map_node\":\"available\",\"immediately_legal_routes\":\"available\",\"persistent_resources\":\"available\",\"screen_identity\":\"available\",\"screen_payload\":\"available\",\"visible_act_boss\":\"available\",\"visible_map_graph\":\"available\"},\"legal_options\":[{\"action\":{\"idx1\":2,\"idx2\":0,\"idx3\":0,\"kind\":\"map\",\"label\":\"game.map idx1=2 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":0,\"semantics\":{\"choice_type\":\"map_route\",\"destination\":{\"location\":\"map_node\",\"room_symbol\":\"M\",\"x\":2,\"y\":0}}},{\"action\":{\"idx1\":4,\"idx2\":0,\"idx3\":0,\"kind\":\"map\",\"label\":\"game.map idx1=4 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":1,\"semantics\":{\"choice_type\":\"map_route\",\"destination\":{\"location\":\"map_node\",\"room_symbol\":\"M\",\"x\":4,\"y\":0}}},{\"action\":{\"idx1\":5,\"idx2\":0,\"idx3\":0,\"kind\":\"map\",\"label\":\"game.map idx1=5 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":2,\"semantics\":{\"choice_type\":\"map_route\",\"destination\":{\"location\":\"map_node\",\"room_symbol\":\"M\",\"x\":5,\"y\":0}}}],\"public_state\":{\"current_map_node\":{\"location\":\"before_first_route\"},\"map_graph\":[{\"outgoing_edges\":[{\"x\":3,\"y\":1}],\"room_symbol\":\"M\",\"x\":2,\"y\":0},{\"outgoing_edges\":[{\"x\":4,\"y\":1},{\"x\":5,\"y\":1}],\"room_symbol\":\"M\",\"x\":4,\"y\":0},{\"outgoing_edges\":[{\"x\":6,\"y\":1}],\"room_symbol\":\"M\",\"x\":5,\"y\":0},{\"outgoing_edges\":[{\"x\":3,\"y\":2},{\"x\":4,\"y\":2}],\"room_symbol\":\"M\",\"x\":3,\"y\":1},{\"outgoing_edges\":[{\"x\":5,\"y\":2}],\"room_symbol\":\"M\",\"x\":4,\"y\":1},{\"outgoing_edges\":[{\"x\":6,\"y\":2}],\"room_symbol\":\"?\",\"x\":5,\"y\":1},{\"outgoing_edges\":[{\"x\":6,\"y\":2}],\"room_symbol\":\"M\",\"x\":6,\"y\":1},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"M\",\"x\":3,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"?\",\"x\":4,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"$\",\"x\":5,\"y\":2},{\"outgoing_edges\":[{\"x\":5,\"y\":3}],\"room_symbol\":\"M\",\"x\":6,\"y\":2},{\"outgoing_edges\":[{\"x\":3,\"y\":4},{\"x\":4,\"y\":4}],\"room_symbol\":\"M\",\"x\":4,\"y\":3},{\"outgoing_edges\":[{\"x\":4,\"y\":4},{\"x\":6,\"y\":4}],\"room_symbol\":\"M\",\"x\":5,\"y\":3},{\"outgoing_edges\":[{\"x\":3,\"y\":5}],\"room_symbol\":\"M\",\"x\":3,\"y\":4},{\"outgoing_edges\":[{\"x\":3,\"y\":5},{\"x\":4,\"y\":5}],\"room_symbol\":\"$\",\"x\":4,\"y\":4},{\"outgoing_edges\":[{\"x\":5,\"y\":5}],\"room_symbol\":\"M\",\"x\":6,\"y\":4},{\"outgoing_edges\":[{\"x\":2,\"y\":6},{\"x\":4,\"y\":6}],\"room_symbol\":\"R\",\"x\":3,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"E\",\"x\":4,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"E\",\"x\":5,\"y\":5},{\"outgoing_edges\":[{\"x\":1,\"y\":7}],\"room_symbol\":\"E\",\"x\":2,\"y\":6},{\"outgoing_edges\":[{\"x\":3,\"y\":7}],\"room_symbol\":\"?\",\"x\":4,\"y\":6},{\"outgoing_edges\":[{\"x\":4,\"y\":7},{\"x\":5,\"y\":7},{\"x\":6,\"y\":7}],\"room_symbol\":\"M\",\"x\":5,\"y\":6},{\"outgoing_edges\":[{\"x\":1,\"y\":8}],\"room_symbol\":\"?\",\"x\":1,\"y\":7},{\"outgoing_edges\":[{\"x\":4,\"y\":8}],\"room_symbol\":\"E\",\"x\":3,\"y\":7},{\"outgoing_edges\":[{\"x\":4,\"y\":8}],\"room_symbol\":\"E\",\"x\":4,\"y\":7},{\"outgoing_edges\":[{\"x\":5,\"y\":8}],\"room_symbol\":\"M\",\"x\":5,\"y\":7},{\"outgoing_edges\":[{\"x\":5,\"y\":8}],\"room_symbol\":\"R\",\"x\":6,\"y\":7},{\"outgoing_edges\":[{\"x\":1,\"y\":9}],\"room_symbol\":\"T\",\"x\":1,\"y\":8},{\"outgoing_edges\":[{\"x\":3,\"y\":9},{\"x\":4,\"y\":9},{\"x\":5,\"y\":9}],\"room_symbol\":\"T\",\"x\":4,\"y\":8},{\"outgoing_edges\":[{\"x\":5,\"y\":9},{\"x\":6,\"y\":9}],\"room_symbol\":\"T\",\"x\":5,\"y\":8},{\"outgoing_edges\":[{\"x\":1,\"y\":10}],\"room_symbol\":\"M\",\"x\":1,\"y\":9},{\"outgoing_edges\":[{\"x\":3,\"y\":10}],\"room_symbol\":\"?\",\"x\":3,\"y\":9},{\"outgoing_edges\":[{\"x\":4,\"y\":10}],\"room_symbol\":\"M\",\"x\":4,\"y\":9},{\"outgoing_edges\":[{\"x\":4,\"y\":10},{\"x\":5,\"y\":10}],\"room_symbol\":\"R\",\"x\":5,\"y\":9},{\"outgoing_edges\":[{\"x\":5,\"y\":10}],\"room_symbol\":\"?\",\"x\":6,\"y\":9},{\"outgoing_edges\":[{\"x\":1,\"y\":11}],\"room_symbol\":\"M\",\"x\":1,\"y\":10},{\"outgoing_edges\":[{\"x\":2,\"y\":11}],\"room_symbol\":\"R\",\"x\":3,\"y\":10},{\"outgoing_edges\":[{\"x\":3,\"y\":11},{\"x\":4,\"y\":11}],\"room_symbol\":\"?\",\"x\":4,\"y\":10},{\"outgoing_edges\":[{\"x\":5,\"y\":11},{\"x\":6,\"y\":11}],\"room_symbol\":\"$\",\"x\":5,\"y\":10},{\"outgoing_edges\":[{\"x\":0,\"y\":12}],\"room_symbol\":\"?\",\"x\":1,\"y\":11},{\"outgoing_edges\":[{\"x\":2,\"y\":12}],\"room_symbol\":\"?\",\"x\":2,\"y\":11},{\"outgoing_edges\":[{\"x\":2,\"y\":12}],\"room_symbol\":\"M\",\"x\":3,\"y\":11},{\"outgoing_edges\":[{\"x\":4,\"y\":12}],\"room_symbol\":\"?\",\"x\":4,\"y\":11},{\"outgoing_edges\":[{\"x\":4,\"y\":12}],\"room_symbol\":\"M\",\"x\":5,\"y\":11},{\"outgoing_edges\":[{\"x\":6,\"y\":12}],\"room_symbol\":\"R\",\"x\":6,\"y\":11},{\"outgoing_edges\":[{\"x\":1,\"y\":13}],\"room_symbol\":\"M\",\"x\":0,\"y\":12},{\"outgoing_edges\":[{\"x\":2,\"y\":13}],\"room_symbol\":\"M\",\"x\":2,\"y\":12},{\"outgoing_edges\":[{\"x\":3,\"y\":13},{\"x\":4,\"y\":13}],\"room_symbol\":\"E\",\"x\":4,\"y\":12},{\"outgoing_edges\":[{\"x\":6,\"y\":13}],\"room_symbol\":\"E\",\"x\":6,\"y\":12},{\"outgoing_edges\":[{\"x\":0,\"y\":14}],\"room_symbol\":\"?\",\"x\":1,\"y\":13},{\"outgoing_edges\":[{\"x\":1,\"y\":14},{\"x\":3,\"y\":14}],\"room_symbol\":\"M\",\"x\":2,\"y\":13},{\"outgoing_edges\":[{\"x\":3,\"y\":14}],\"room_symbol\":\"?\",\"x\":3,\"y\":13},{\"outgoing_edges\":[{\"x\":4,\"y\":14}],\"room_symbol\":\"M\",\"x\":4,\"y\":13},{\"outgoing_edges\":[{\"x\":5,\"y\":14}],\"room_symbol\":\"M\",\"x\":6,\"y\":13},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":0,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":1,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":3,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":4,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":5,\"y\":14}],\"persistent_resources\":{\"current_hp\":{\"availability\":\"available\",\"source\":\"GameContext::curHp\",\"value\":68},\"deck\":{\"availability\":\"available\",\"source\":\"GameContext::deck\",\"value\":[{\"deck_index\":0,\"id\":15,\"id_label\":\"ASCENDERS_BANE\",\"misc\":0,\"name\":\"Ascender's Bane\",\"rarity\":\"SPECIAL\",\"type\":\"CURSE\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":1,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":2,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":3,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":4,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":5,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":6,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":7,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":8,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":9,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":10,\"id\":25,\"id_label\":\"BASH\",\"misc\":0,\"name\":\"Bash\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false}]},\"gold\":{\"availability\":\"available\",\"source\":\"GameContext::gold\",\"value\":99},\"keys\":{\"availability\":\"available\",\"source\":\"GameContext::keyFlags\",\"value\":{\"blue_key\":false,\"green_key\":false,\"red_key\":false}},\"max_hp\":{\"availability\":\"available\",\"source\":\"GameContext::maxHp\",\"value\":82},\"potion_capacity\":{\"availability\":\"available\",\"source\":\"GameContext::potionCapacity\",\"value\":2},\"potion_count\":{\"availability\":\"available\",\"source\":\"GameContext::potionCount\",\"value\":0},\"potion_identities\":{\"availability\":\"available\",\"source\":\"GameContext::potions\",\"value\":[{\"id\":1,\"id_label\":\"EMPTY_POTION_ID\",\"name\":\"EMPTY_POTION_SLOT\",\"potion_index\":0},{\"id\":1,\"id_label\":\"EMPTY_POTION_ID\",\"name\":\"EMPTY_POTION_SLOT\",\"potion_index\":1}]},\"relics\":{\"availability\":\"available\",\"source\":\"GameContext::relics\",\"value\":[{\"counter\":0,\"id\":86,\"id_label\":\"Burning Blood\",\"name\":\"Burning Blood\",\"relic_index\":0}]}},\"screen\":\"MAP_SCREEN\",\"screen_context\":{\"coverage_status\":\"supported\",\"current_map_node\":{\"location\":\"before_first_route\"},\"map_graph\":[{\"outgoing_edges\":[{\"x\":3,\"y\":1}],\"room_symbol\":\"M\",\"x\":2,\"y\":0},{\"outgoing_edges\":[{\"x\":4,\"y\":1},{\"x\":5,\"y\":1}],\"room_symbol\":\"M\",\"x\":4,\"y\":0},{\"outgoing_edges\":[{\"x\":6,\"y\":1}],\"room_symbol\":\"M\",\"x\":5,\"y\":0},{\"outgoing_edges\":[{\"x\":3,\"y\":2},{\"x\":4,\"y\":2}],\"room_symbol\":\"M\",\"x\":3,\"y\":1},{\"outgoing_edges\":[{\"x\":5,\"y\":2}],\"room_symbol\":\"M\",\"x\":4,\"y\":1},{\"outgoing_edges\":[{\"x\":6,\"y\":2}],\"room_symbol\":\"?\",\"x\":5,\"y\":1},{\"outgoing_edges\":[{\"x\":6,\"y\":2}],\"room_symbol\":\"M\",\"x\":6,\"y\":1},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"M\",\"x\":3,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"?\",\"x\":4,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"$\",\"x\":5,\"y\":2},{\"outgoing_edges\":[{\"x\":5,\"y\":3}],\"room_symbol\":\"M\",\"x\":6,\"y\":2},{\"outgoing_edges\":[{\"x\":3,\"y\":4},{\"x\":4,\"y\":4}],\"room_symbol\":\"M\",\"x\":4,\"y\":3},{\"outgoing_edges\":[{\"x\":4,\"y\":4},{\"x\":6,\"y\":4}],\"room_symbol\":\"M\",\"x\":5,\"y\":3},{\"outgoing_edges\":[{\"x\":3,\"y\":5}],\"room_symbol\":\"M\",\"x\":3,\"y\":4},{\"outgoing_edges\":[{\"x\":3,\"y\":5},{\"x\":4,\"y\":5}],\"room_symbol\":\"$\",\"x\":4,\"y\":4},{\"outgoing_edges\":[{\"x\":5,\"y\":5}],\"room_symbol\":\"M\",\"x\":6,\"y\":4},{\"outgoing_edges\":[{\"x\":2,\"y\":6},{\"x\":4,\"y\":6}],\"room_symbol\":\"R\",\"x\":3,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"E\",\"x\":4,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"E\",\"x\":5,\"y\":5},{\"outgoing_edges\":[{\"x\":1,\"y\":7}],\"room_symbol\":\"E\",\"x\":2,\"y\":6},{\"outgoing_edges\":[{\"x\":3,\"y\":7}],\"room_symbol\":\"?\",\"x\":4,\"y\":6},{\"outgoing_edges\":[{\"x\":4,\"y\":7},{\"x\":5,\"y\":7},{\"x\":6,\"y\":7}],\"room_symbol\":\"M\",\"x\":5,\"y\":6},{\"outgoing_edges\":[{\"x\":1,\"y\":8}],\"room_symbol\":\"?\",\"x\":1,\"y\":7},{\"outgoing_edges\":[{\"x\":4,\"y\":8}],\"room_symbol\":\"E\",\"x\":3,\"y\":7},{\"outgoing_edges\":[{\"x\":4,\"y\":8}],\"room_symbol\":\"E\",\"x\":4,\"y\":7},{\"outgoing_edges\":[{\"x\":5,\"y\":8}],\"room_symbol\":\"M\",\"x\":5,\"y\":7},{\"outgoing_edges\":[{\"x\":5,\"y\":8}],\"room_symbol\":\"R\",\"x\":6,\"y\":7},{\"outgoing_edges\":[{\"x\":1,\"y\":9}],\"room_symbol\":\"T\",\"x\":1,\"y\":8},{\"outgoing_edges\":[{\"x\":3,\"y\":9},{\"x\":4,\"y\":9},{\"x\":5,\"y\":9}],\"room_symbol\":\"T\",\"x\":4,\"y\":8},{\"outgoing_edges\":[{\"x\":5,\"y\":9},{\"x\":6,\"y\":9}],\"room_symbol\":\"T\",\"x\":5,\"y\":8},{\"outgoing_edges\":[{\"x\":1,\"y\":10}],\"room_symbol\":\"M\",\"x\":1,\"y\":9},{\"outgoing_edges\":[{\"x\":3,\"y\":10}],\"room_symbol\":\"?\",\"x\":3,\"y\":9},{\"outgoing_edges\":[{\"x\":4,\"y\":10}],\"room_symbol\":\"M\",\"x\":4,\"y\":9},{\"outgoing_edges\":[{\"x\":4,\"y\":10},{\"x\":5,\"y\":10}],\"room_symbol\":\"R\",\"x\":5,\"y\":9},{\"outgoing_edges\":[{\"x\":5,\"y\":10}],\"room_symbol\":\"?\",\"x\":6,\"y\":9},{\"outgoing_edges\":[{\"x\":1,\"y\":11}],\"room_symbol\":\"M\",\"x\":1,\"y\":10},{\"outgoing_edges\":[{\"x\":2,\"y\":11}],\"room_symbol\":\"R\",\"x\":3,\"y\":10},{\"outgoing_edges\":[{\"x\":3,\"y\":11},{\"x\":4,\"y\":11}],\"room_symbol\":\"?\",\"x\":4,\"y\":10},{\"outgoing_edges\":[{\"x\":5,\"y\":11},{\"x\":6,\"y\":11}],\"room_symbol\":\"$\",\"x\":5,\"y\":10},{\"outgoing_edges\":[{\"x\":0,\"y\":12}],\"room_symbol\":\"?\",\"x\":1,\"y\":11},{\"outgoing_edges\":[{\"x\":2,\"y\":12}],\"room_symbol\":\"?\",\"x\":2,\"y\":11},{\"outgoing_edges\":[{\"x\":2,\"y\":12}],\"room_symbol\":\"M\",\"x\":3,\"y\":11},{\"outgoing_edges\":[{\"x\":4,\"y\":12}],\"room_symbol\":\"?\",\"x\":4,\"y\":11},{\"outgoing_edges\":[{\"x\":4,\"y\":12}],\"room_symbol\":\"M\",\"x\":5,\"y\":11},{\"outgoing_edges\":[{\"x\":6,\"y\":12}],\"room_symbol\":\"R\",\"x\":6,\"y\":11},{\"outgoing_edges\":[{\"x\":1,\"y\":13}],\"room_symbol\":\"M\",\"x\":0,\"y\":12},{\"outgoing_edges\":[{\"x\":2,\"y\":13}],\"room_symbol\":\"M\",\"x\":2,\"y\":12},{\"outgoing_edges\":[{\"x\":3,\"y\":13},{\"x\":4,\"y\":13}],\"room_symbol\":\"E\",\"x\":4,\"y\":12},{\"outgoing_edges\":[{\"x\":6,\"y\":13}],\"room_symbol\":\"E\",\"x\":6,\"y\":12},{\"outgoing_edges\":[{\"x\":0,\"y\":14}],\"room_symbol\":\"?\",\"x\":1,\"y\":13},{\"outgoing_edges\":[{\"x\":1,\"y\":14},{\"x\":3,\"y\":14}],\"room_symbol\":\"M\",\"x\":2,\"y\":13},{\"outgoing_edges\":[{\"x\":3,\"y\":14}],\"room_symbol\":\"?\",\"x\":3,\"y\":13},{\"outgoing_edges\":[{\"x\":4,\"y\":14}],\"room_symbol\":\"M\",\"x\":4,\"y\":13},{\"outgoing_edges\":[{\"x\":5,\"y\":14}],\"room_symbol\":\"M\",\"x\":6,\"y\":13},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":0,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":1,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":3,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":4,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":5,\"y\":14}],\"source\":\"GameContext::map, GameContext::potions, and StepSimulator::legalActions\"},\"visible_act_boss\":\"The Guardian\"},\"schema_id\":\"noncombat-visible-choice-input-v1\"}",
+          "step": 1
+        },
+        {
+          "legal_count": 6,
+          "public_sha256": "1a9ddaceeb69927341c633c05546a0a9d4a2a042f4d5c056abd1654fc86ab099",
+          "screen": "REWARDS",
+          "seed": 430002,
+          "serialized_public_input": "{\"availability\":{\"candidate_actions\":\"available\",\"current_map_node\":\"available\",\"immediately_legal_routes\":\"unavailable\",\"persistent_resources\":\"available\",\"screen_identity\":\"available\",\"screen_payload\":\"available\",\"visible_act_boss\":\"available\",\"visible_map_graph\":\"available\"},\"legal_options\":[{\"action\":{\"idx1\":0,\"idx2\":0,\"idx3\":0,\"kind\":\"reward_gold\",\"label\":\"game.reward_gold idx1=0 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":0,\"semantics\":{\"choice_type\":\"gold\",\"gold\":10}},{\"action\":{\"idx1\":0,\"idx2\":0,\"idx3\":0,\"kind\":\"reward_card\",\"label\":\"game.reward_card idx1=0 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":1,\"semantics\":{\"card\":{\"id\":289,\"id_label\":\"SECOND_WIND\",\"name\":\"Second Wind\",\"rarity\":\"UNCOMMON\",\"type\":\"SKILL\",\"upgraded\":false},\"choice_type\":\"card\"}},{\"action\":{\"idx1\":0,\"idx2\":1,\"idx3\":0,\"kind\":\"reward_card\",\"label\":\"game.reward_card idx1=0 idx2=1 idx3=0\",\"scope\":\"game\"},\"candidate_index\":2,\"semantics\":{\"card\":{\"id\":355,\"id_label\":\"WARCRY\",\"name\":\"Warcry\",\"rarity\":\"COMMON\",\"type\":\"SKILL\",\"upgraded\":false},\"choice_type\":\"card\"}},{\"action\":{\"idx1\":0,\"idx2\":2,\"idx3\":0,\"kind\":\"reward_card\",\"label\":\"game.reward_card idx1=0 idx2=2 idx3=0\",\"scope\":\"game\"},\"candidate_index\":3,\"semantics\":{\"card\":{\"id\":42,\"id_label\":\"BODY_SLAM\",\"name\":\"Body Slam\",\"rarity\":\"COMMON\",\"type\":\"ATTACK\",\"upgraded\":false},\"choice_type\":\"card\"}},{\"action\":{\"idx1\":0,\"idx2\":0,\"idx3\":0,\"kind\":\"reward_potion\",\"label\":\"game.reward_potion idx1=0 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":4,\"semantics\":{\"choice_type\":\"potion\",\"potion\":{\"id\":13,\"id_label\":\"DistilledChaos\",\"name\":\"Distilled Chaos\"}}},{\"action\":{\"idx1\":0,\"idx2\":0,\"idx3\":0,\"kind\":\"skip\",\"label\":\"game.skip idx1=0 idx2=0 idx3=0\",\"scope\":\"game\"},\"candidate_index\":5,\"semantics\":{\"choice_type\":\"skip\",\"description\":\"Skip the remaining reward screen choices\"}}],\"public_state\":{\"current_map_node\":{\"location\":\"map_node\",\"room_symbol\":\"M\",\"x\":4,\"y\":0},\"map_graph\":[{\"outgoing_edges\":[{\"x\":3,\"y\":1}],\"room_symbol\":\"M\",\"x\":2,\"y\":0},{\"outgoing_edges\":[{\"x\":4,\"y\":1},{\"x\":5,\"y\":1}],\"room_symbol\":\"M\",\"x\":4,\"y\":0},{\"outgoing_edges\":[{\"x\":6,\"y\":1}],\"room_symbol\":\"M\",\"x\":5,\"y\":0},{\"outgoing_edges\":[{\"x\":3,\"y\":2},{\"x\":4,\"y\":2}],\"room_symbol\":\"M\",\"x\":3,\"y\":1},{\"outgoing_edges\":[{\"x\":5,\"y\":2}],\"room_symbol\":\"M\",\"x\":4,\"y\":1},{\"outgoing_edges\":[{\"x\":6,\"y\":2}],\"room_symbol\":\"?\",\"x\":5,\"y\":1},{\"outgoing_edges\":[{\"x\":6,\"y\":2}],\"room_symbol\":\"M\",\"x\":6,\"y\":1},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"M\",\"x\":3,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"?\",\"x\":4,\"y\":2},{\"outgoing_edges\":[{\"x\":4,\"y\":3}],\"room_symbol\":\"$\",\"x\":5,\"y\":2},{\"outgoing_edges\":[{\"x\":5,\"y\":3}],\"room_symbol\":\"M\",\"x\":6,\"y\":2},{\"outgoing_edges\":[{\"x\":3,\"y\":4},{\"x\":4,\"y\":4}],\"room_symbol\":\"M\",\"x\":4,\"y\":3},{\"outgoing_edges\":[{\"x\":4,\"y\":4},{\"x\":6,\"y\":4}],\"room_symbol\":\"M\",\"x\":5,\"y\":3},{\"outgoing_edges\":[{\"x\":3,\"y\":5}],\"room_symbol\":\"M\",\"x\":3,\"y\":4},{\"outgoing_edges\":[{\"x\":3,\"y\":5},{\"x\":4,\"y\":5}],\"room_symbol\":\"$\",\"x\":4,\"y\":4},{\"outgoing_edges\":[{\"x\":5,\"y\":5}],\"room_symbol\":\"M\",\"x\":6,\"y\":4},{\"outgoing_edges\":[{\"x\":2,\"y\":6},{\"x\":4,\"y\":6}],\"room_symbol\":\"R\",\"x\":3,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"E\",\"x\":4,\"y\":5},{\"outgoing_edges\":[{\"x\":5,\"y\":6}],\"room_symbol\":\"E\",\"x\":5,\"y\":5},{\"outgoing_edges\":[{\"x\":1,\"y\":7}],\"room_symbol\":\"E\",\"x\":2,\"y\":6},{\"outgoing_edges\":[{\"x\":3,\"y\":7}],\"room_symbol\":\"?\",\"x\":4,\"y\":6},{\"outgoing_edges\":[{\"x\":4,\"y\":7},{\"x\":5,\"y\":7},{\"x\":6,\"y\":7}],\"room_symbol\":\"M\",\"x\":5,\"y\":6},{\"outgoing_edges\":[{\"x\":1,\"y\":8}],\"room_symbol\":\"?\",\"x\":1,\"y\":7},{\"outgoing_edges\":[{\"x\":4,\"y\":8}],\"room_symbol\":\"E\",\"x\":3,\"y\":7},{\"outgoing_edges\":[{\"x\":4,\"y\":8}],\"room_symbol\":\"E\",\"x\":4,\"y\":7},{\"outgoing_edges\":[{\"x\":5,\"y\":8}],\"room_symbol\":\"M\",\"x\":5,\"y\":7},{\"outgoing_edges\":[{\"x\":5,\"y\":8}],\"room_symbol\":\"R\",\"x\":6,\"y\":7},{\"outgoing_edges\":[{\"x\":1,\"y\":9}],\"room_symbol\":\"T\",\"x\":1,\"y\":8},{\"outgoing_edges\":[{\"x\":3,\"y\":9},{\"x\":4,\"y\":9},{\"x\":5,\"y\":9}],\"room_symbol\":\"T\",\"x\":4,\"y\":8},{\"outgoing_edges\":[{\"x\":5,\"y\":9},{\"x\":6,\"y\":9}],\"room_symbol\":\"T\",\"x\":5,\"y\":8},{\"outgoing_edges\":[{\"x\":1,\"y\":10}],\"room_symbol\":\"M\",\"x\":1,\"y\":9},{\"outgoing_edges\":[{\"x\":3,\"y\":10}],\"room_symbol\":\"?\",\"x\":3,\"y\":9},{\"outgoing_edges\":[{\"x\":4,\"y\":10}],\"room_symbol\":\"M\",\"x\":4,\"y\":9},{\"outgoing_edges\":[{\"x\":4,\"y\":10},{\"x\":5,\"y\":10}],\"room_symbol\":\"R\",\"x\":5,\"y\":9},{\"outgoing_edges\":[{\"x\":5,\"y\":10}],\"room_symbol\":\"?\",\"x\":6,\"y\":9},{\"outgoing_edges\":[{\"x\":1,\"y\":11}],\"room_symbol\":\"M\",\"x\":1,\"y\":10},{\"outgoing_edges\":[{\"x\":2,\"y\":11}],\"room_symbol\":\"R\",\"x\":3,\"y\":10},{\"outgoing_edges\":[{\"x\":3,\"y\":11},{\"x\":4,\"y\":11}],\"room_symbol\":\"?\",\"x\":4,\"y\":10},{\"outgoing_edges\":[{\"x\":5,\"y\":11},{\"x\":6,\"y\":11}],\"room_symbol\":\"$\",\"x\":5,\"y\":10},{\"outgoing_edges\":[{\"x\":0,\"y\":12}],\"room_symbol\":\"?\",\"x\":1,\"y\":11},{\"outgoing_edges\":[{\"x\":2,\"y\":12}],\"room_symbol\":\"?\",\"x\":2,\"y\":11},{\"outgoing_edges\":[{\"x\":2,\"y\":12}],\"room_symbol\":\"M\",\"x\":3,\"y\":11},{\"outgoing_edges\":[{\"x\":4,\"y\":12}],\"room_symbol\":\"?\",\"x\":4,\"y\":11},{\"outgoing_edges\":[{\"x\":4,\"y\":12}],\"room_symbol\":\"M\",\"x\":5,\"y\":11},{\"outgoing_edges\":[{\"x\":6,\"y\":12}],\"room_symbol\":\"R\",\"x\":6,\"y\":11},{\"outgoing_edges\":[{\"x\":1,\"y\":13}],\"room_symbol\":\"M\",\"x\":0,\"y\":12},{\"outgoing_edges\":[{\"x\":2,\"y\":13}],\"room_symbol\":\"M\",\"x\":2,\"y\":12},{\"outgoing_edges\":[{\"x\":3,\"y\":13},{\"x\":4,\"y\":13}],\"room_symbol\":\"E\",\"x\":4,\"y\":12},{\"outgoing_edges\":[{\"x\":6,\"y\":13}],\"room_symbol\":\"E\",\"x\":6,\"y\":12},{\"outgoing_edges\":[{\"x\":0,\"y\":14}],\"room_symbol\":\"?\",\"x\":1,\"y\":13},{\"outgoing_edges\":[{\"x\":1,\"y\":14},{\"x\":3,\"y\":14}],\"room_symbol\":\"M\",\"x\":2,\"y\":13},{\"outgoing_edges\":[{\"x\":3,\"y\":14}],\"room_symbol\":\"?\",\"x\":3,\"y\":13},{\"outgoing_edges\":[{\"x\":4,\"y\":14}],\"room_symbol\":\"M\",\"x\":4,\"y\":13},{\"outgoing_edges\":[{\"x\":5,\"y\":14}],\"room_symbol\":\"M\",\"x\":6,\"y\":13},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":0,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":1,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":3,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":4,\"y\":14},{\"outgoing_edges\":[{\"x\":3,\"y\":15}],\"room_symbol\":\"R\",\"x\":5,\"y\":14}],\"persistent_resources\":{\"current_hp\":{\"availability\":\"available\",\"source\":\"GameContext::curHp\",\"value\":68},\"deck\":{\"availability\":\"available\",\"source\":\"GameContext::deck\",\"value\":[{\"deck_index\":0,\"id\":15,\"id_label\":\"ASCENDERS_BANE\",\"misc\":0,\"name\":\"Ascender's Bane\",\"rarity\":\"SPECIAL\",\"type\":\"CURSE\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":1,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":2,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":3,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":4,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":5,\"id\":321,\"id_label\":\"STRIKE_RED\",\"misc\":0,\"name\":\"Strike\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":6,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":7,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":8,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":9,\"id\":104,\"id_label\":\"DEFEND_RED\",\"misc\":0,\"name\":\"Defend\",\"rarity\":\"BASIC\",\"type\":\"SKILL\",\"upgrade_count\":0,\"upgraded\":false},{\"deck_index\":10,\"id\":25,\"id_label\":\"BASH\",\"misc\":0,\"name\":\"Bash\",\"rarity\":\"BASIC\",\"type\":\"ATTACK\",\"upgrade_count\":0,\"upgraded\":false}]},\"gold\":{\"availability\":\"available\",\"source\":\"GameContext::gold\",\"value\":99},\"keys\":{\"availability\":\"available\",\"source\":\"GameContext::keyFlags\",\"value\":{\"blue_key\":false,\"green_key\":false,\"red_key\":false}},\"max_hp\":{\"availability\":\"available\",\"source\":\"GameContext::maxHp\",\"value\":82},\"potion_capacity\":{\"availability\":\"available\",\"source\":\"GameContext::potionCapacity\",\"value\":2},\"potion_count\":{\"availability\":\"available\",\"source\":\"GameContext::potionCount\",\"value\":0},\"potion_identities\":{\"availability\":\"available\",\"source\":\"GameContext::potions\",\"value\":[{\"id\":1,\"id_label\":\"EMPTY_POTION_ID\",\"name\":\"EMPTY_POTION_SLOT\",\"potion_index\":0},{\"id\":1,\"id_label\":\"EMPTY_POTION_ID\",\"name\":\"EMPTY_POTION_SLOT\",\"potion_index\":1}]},\"relics\":{\"availability\":\"available\",\"source\":\"GameContext::relics\",\"value\":[{\"counter\":0,\"id\":86,\"id_label\":\"Burning Blood\",\"name\":\"Burning Blood\",\"relic_index\":0}]}},\"screen\":\"REWARDS\",\"screen_context\":{\"coverage_status\":\"supported\",\"source\":\"GameContext::info.rewardsContainer and StepSimulator::legalActions\"},\"visible_act_boss\":\"The Guardian\"},\"schema_id\":\"noncombat-visible-choice-input-v1\"}",
+          "step": 11
+        }
+      ]
+    },
+    "peak_rss_kib": 477352,
+    "roots": [
+      {
+        "actions": 4,
+        "boundary": "root_captured",
+        "cpu_seconds": 0.358396241,
+        "peak_rss_kib": 29056,
+        "public_sha256": "2bd57cbb173f1eee4e9bb329d3ac4db856790c41728c2b3478a56bc3e3d11afd",
+        "screen": "MAP_SCREEN",
+        "seed": 430001,
+        "step": 1,
+        "wall_seconds": 0.11335642699998516
+      },
+      {
+        "actions": 6,
+        "boundary": "root_captured",
+        "cpu_seconds": 0.47587554,
+        "peak_rss_kib": 29792,
+        "public_sha256": "03cf4c98d0337d5e096d9ee5decc895866de8597af2318ad3247c7883f37e0db",
+        "screen": "REWARDS",
+        "seed": 430001,
+        "step": 7,
+        "wall_seconds": 0.23293379699998695
+      },
+      {
+        "actions": 3,
+        "boundary": "root_captured",
+        "cpu_seconds": 11.357072243,
+        "peak_rss_kib": 89696,
+        "public_sha256": "1eb97c09e0a1f11d0e118e0d418bdca1d47564fbfe23f6e4cb52d943530f5b8d",
+        "screen": "MAP_SCREEN",
+        "seed": 430002,
+        "step": 1,
+        "wall_seconds": 11.160059058000002
+      },
+      {
+        "actions": 6,
+        "boundary": "root_captured",
+        "cpu_seconds": 11.587894381,
+        "peak_rss_kib": 89696,
+        "public_sha256": "1a9ddaceeb69927341c633c05546a0a9d4a2a042f4d5c056abd1654fc86ab099",
+        "screen": "REWARDS",
+        "seed": 430002,
+        "step": 11,
+        "wall_seconds": 11.393110318999959
+      }
+    ],
+    "wall": 431.67716868699995
+  },
+  "concurrency": [
+    {
+      "aggregate_cpu": 302.164853216,
+      "available_memory_kib_before": 23652496,
+      "peak_worker_rss_kib": 473584,
+      "sum_worker_peak_rss_kib_upper_bound": 1751436,
+      "wall": 101.281736505,
+      "workers": 4
+    },
+    {
+      "aggregate_cpu": 265.88164016,
+      "available_memory_kib_before": 23654628,
+      "peak_worker_rss_kib": 473608,
+      "sum_worker_peak_rss_kib_upper_bound": 1611092,
+      "wall": 83.65051719499999,
+      "workers": 8
+    }
+  ],
+  "concurrency_checkpoint_terminal_identity_equal": true,
+  "config_sha256": "d069965e85880dd6af83e70de7c8b4c44111cb1b42ee887cf09f957384f99b7b",
+  "disposition": "STUDY_ONLY",
+  "formal_models_fitted": 0,
+  "formal_targets_collected": 0,
+  "fresh_runs": 0,
+  "frozen_stsrl_commit": "95abc8b1afe7d84e567aa70fb7225eba09fdff25",
+  "limitations": [
+    "No formal source cohort, target table, trained scientific checkpoints, heldout Q estimates or 128x3 comparison.",
+    "Early launcher/code smoke attempts failed and are retained; original cost attempt did not record a producer commit. Final public smoke/replay and concurrency have committed source and exact native/config identity.",
+    "Compilation CPU was not directly timed; admission accounting must disclose a conservative upper bound instead of inventing measured CPU."
+  ],
+  "native_checks": {
+    "adapter_and_student_tests": 13,
+    "indexed_gold_regression": "PASS",
+    "limitation": "Constructed Sapphire/multi-gold fixtures execute in same-source embedded binding regression, not through Python StepSimulator mutation API (which exposes no reward-container mutator).",
+    "loaded_native_source": "Release module ced9941e; natural MAP/REWARDS callbacks and restore/step executed",
+    "public_choice_regression": "PASS, exact 7fef4e19 including 9 Sapphire and indexed-gold fixtures; adapter PYTHONPATH required"
+  },
+  "native_commit": "7fef4e19c7ee13f049ee0fb45c9967e7e349fcfb",
+  "native_extension_sha256": "ced9941eb1cd042630b27ed3b9b0be700cd8cbcc143156d52bdabf7bf07234cd",
+  "next_scientific_choice": "Planner may amend Stage1 aggregate CPU cap to 144000 seconds while retaining all sample/teacher/information contracts, or redesign the causal study budget explicitly; this handoff does not authorize either change.",
+  "projection": {
+    "continuation_cpu_seconds": 91880.69215802394,
+    "limitations": "Four roots/two source owners, first two actions only; uncertain extrapolation, not a bound. Fresh learned trajectories may differ. No outcome-selected replacement. Eight-worker timing is admission-only repeated first eight keys.",
+    "mean_cpu_per_branch": {
+      "MAP_SCREEN": 32.54629625399999,
+      "REWARDS": 15.954240405749989
+    },
+    "mean_legal_actions": {
+      "MAP_SCREEN": 3.5,
+      "REWARDS": 6
+    },
+    "mean_source_cpu": 18.632293978499998,
+    "minimum_source_cpu_seconds": 4471.7505548399995,
+    "minimum_source_runs_at_observed_occupancy": 240,
+    "root_action_seed_jobs": {
+      "MAP_SCREEN": 1176.0,
+      "REWARDS": 3360
+    },
+    "stage1_cpu_cap": 72000,
+    "stage1_cpu_excluding_training_and_retries": 96352.44271286394,
+    "stage2_384_run_source_baseline_cpu": 7154.800887743999
+  },
+  "read_only_source_blobs": {
+    "action_space.py": "817db4e621b0a12e15f29c24e1dc3378da957bfc",
+    "controlled_run.py": "3ad3b57bb6fd433e5cb9ef7d41245d9ba75b4fd8",
+    "lightspeed.py": "8a95863fe26506b55ee43bca4196c1af73abc888",
+    "non_combat_policy.py": "8079fe274a49a39201e8270a2ddc2a7d2b618568",
+    "oracle_search.py": "32926eb70e7c9648046851c5616bea4ff1e8e793"
+  },
+  "review_or_delete_date": "2026-10-18",
+  "scientific_claim": "none",
+  "stage0_budget_accounting": {
+    "build_bound_method": "Four compiler workers times complete launcher-write to last-target-link interval; not measured CPU.",
+    "build_cpu_upper_bound_seconds": 1089.3609968,
+    "build_start_utc": "2026-10-11T09:15:53.6334588Z",
+    "build_wall_upper_bound_seconds": 272.3402492,
+    "cap_cpu_seconds": 14400,
+    "cap_wall_seconds": 3600,
+    "last_native_target_link_utc": "2026-10-11T09:20:25.973708Z",
+    "measured_study_cpu_seconds": 1084.41165868,
+    "measured_study_wall_seconds": 701.411470218,
+    "native_launcher_and_unit_smoke_unmeasured_cpu_reserve_seconds": 100
+  },
+  "status": "RESOURCE_BLOCKED"
+}

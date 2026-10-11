@@ -44,9 +44,11 @@ PYTHONPATH=/home/lsmft/.cache/issue43-native-7fef4e19:/mnt/d/DeadlycatCoding/STS
 Attempt directories are immutable. The append-only ledger identifies source
 seed, family, root, action, continuation seed, start/completion/failure boundary,
 extension/config hashes, CPU/wall and RSS. Never overwrite a failed attempt.
-Current admission runner cannot resume opaque native checkpoints across process
-termination: a new attempt must replay the same two source seeds and account
-all prior work. Formal generation needs a separate completed-key manifest and
+For an interrupted attempt, add `--resume-ledger /absolute/path/stage0.jsonl`.
+The runner replays the same source seeds, checks config/native/public identity,
+and skips completed exact `(root, ordinal, continuation seed)` keys. Opaque
+checkpoints remain process-local; failed attempts and replay cost are retained.
+Formal generation needs a separate completed-key manifest and
 fidelity-checked checkpoint persistence before it is admitted; no formal runner
 is claimed here. Raw/evidence retention consumer: independent Reviewer for
 Issue 43; delete/review by 2026-10-18 unless another consumer is named.
@@ -72,3 +74,30 @@ that path its exception teardown can segfault; do not interpret a pathless
 launcher crash as a completed native regression. Artifact reports must identify
 which exact commands passed and which failed. No learning claim follows from
 synthetic gradients or Stage 0 continuation costs.
+
+## Admission result
+
+`admission.json`: **RESOURCE_BLOCKED**. All 16 canary branches reached true
+terminal with identical restore/action mappings. Thirteen focused Python tests
+pass. Both current students execute nonconstant scored choices after synthetic
+gradient updates, retaining ordinary public act/floor/resources/history.
+Four/eight-worker repeated keys have identical checkpoints and terminal results.
+Eight workers take 83.65 s versus 101.28 s for four; worker peak RSS is below
+0.46 GiB and available memory exceeds 22 GiB.
+
+Observed MAP/REWARDS branch CPU means are 32.55/15.95 s and legal option means
+3.5/6. The fixed root/action/seed quotas project to 91,880.69 continuation CPU
+seconds, or 96,352.44 including the minimum source collection at observed
+occupancy, **before training/retries**, versus the 72,000-second Stage1 cap.
+This is a four-root cost extrapolation, not a proven lower bound. The Stage2
+Expert-source baseline projects to 7,154.80 CPU seconds for 384 runs; learned
+trajectory costs/support cannot be certified without Stage1.
+
+Formal labels, fitted scientific model checkpoints, heldout estimation and
+fresh 128x3 runs were not opened. No inference about learning gain or harm is
+made. Planner's next explicit choice is to increase Stage1 aggregate CPU to
+144,000 s with the scientific contracts unchanged, or redesign budget/sample
+under a separate amendment. The study does not authorize either change.
+The reports record early failures and producer/accounting limitations. Retained
+raw cost ledgers are under `/home/lsmft/.cache/issue43-artifacts`; compact audit
+and native evidence live on this remote study branch.
