@@ -122,7 +122,9 @@ def source_job(args):
 
 
 def root_job(args):
-    meta, directory, deadline, cpu_limit = args
+    meta, directory, deadline, cpu_limit, *recovery = args
+    assigned = {digest(k) for k in recovery[0]} if recovery else None
+    previous_directory = Path(recovery[1]) if recovery else None
     resource.setrlimit(resource.RLIMIT_AS, (8*1024**3, 8*1024**3))
     folder = Path(directory); log = folder / ('owner%d-%s.jsonl' % (meta['owner'], meta['family']))
     started = time.monotonic(); cpu = time.process_time()
@@ -136,7 +138,11 @@ def root_job(args):
         for ordinal in range(meta['legal_count']):
             for driver in CONFIG['continuation_seeds']['canary']:
                 key = branch_key(meta, ordinal, driver)
+                if assigned is not None and digest(key) not in assigned:
+                    continue
                 result_path = folder / (digest(key) + '.json')
+                if previous_directory and (previous_directory/result_path.name).exists():
+                    raise RuntimeError('resume dispatched an already completed key')
                 if result_path.exists():
                     previous = json.loads(result_path.read_text())
                     if previous['key'] != key or not previous['terminal'] or previous['problems']:
