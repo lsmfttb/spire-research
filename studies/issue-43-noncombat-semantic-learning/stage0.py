@@ -129,7 +129,8 @@ def main():
                         counts[screen]+=1
                         captured.add(screen)
                         ledger(log,{'boundary':'root_captured','seed':seed,'screen':screen,'step':index,
-                                    'public_sha256':digest(json.loads(p.serialized_input)),'actions':len(actions)})
+                                    'public_sha256':digest(json.loads(p.serialized_input)),'actions':len(actions),
+                                    'serialized_public_input':p.serialized_input})
             ledger(log,{'boundary':'source_started','seed':seed})
             run=execute_controlled_run(adapter,controller(CONFIG['source_driver_seed']),seed=seed,
                 max_steps=CONFIG['max_steps'],action_space=ActionSpaceConfig.initial_no_potions(),before_decision=observe)
