@@ -1,0 +1,202 @@
+{
+  "cohorts": {
+    "heldout": {
+      "branches": 512,
+      "families": {
+        "MAP_SCREEN": 24,
+        "REWARDS": 40
+      },
+      "owners": 40,
+      "roots": 64
+    },
+    "train": {
+      "branches": 1024,
+      "families": {
+        "MAP_SCREEN": 96,
+        "REWARDS": 160
+      },
+      "owners": 160,
+      "roots": 256
+    },
+    "validation": {
+      "branches": 256,
+      "families": {
+        "MAP_SCREEN": 24,
+        "REWARDS": 40
+      },
+      "owners": 40,
+      "roots": 64
+    }
+  },
+  "consumer": "Issue43 independent Reviewer",
+  "fixed_bootstrap_replicates": 10000,
+  "fresh_claims": [],
+  "fresh_keys": 384,
+  "identity": {
+    "adapter_git_blob": "3d0c4104043456a3ade4baf739c18704c1b80b7c",
+    "budget_overlay": {
+      "authority": "https://github.com/lsmfttb/spire-research/issues/43#issuecomment-6108594676",
+      "native_commit": "7fef4e19c7ee13f049ee0fb45c9967e7e349fcfb",
+      "original_config_git_blob": "12a1119933beecb72e52922444b387c9d9eaa0c2",
+      "original_config_sha256": "d069965e85880dd6af83e70de7c8b4c44111cb1b42ee887cf09f957384f99b7b",
+      "schema": "issue43-planner-budget-amendment-v1",
+      "stage1": {
+        "cpu_seconds": 180000,
+        "wall_seconds": 27000
+      }
+    },
+    "budget_overlay_sha256": "2235106a447a27db30e099ad22d3745ed954d7fdfce555929bb2fdfc6501bf96",
+    "config_sha256": "d069965e85880dd6af83e70de7c8b4c44111cb1b42ee887cf09f957384f99b7b",
+    "extension_sha256": "ced9941eb1cd042630b27ed3b9b0be700cd8cbcc143156d52bdabf7bf07234cd",
+    "frozen_source_blobs": {
+      "action_space.py": "817db4e621b0a12e15f29c24e1dc3378da957bfc",
+      "controlled_run.py": "3ad3b57bb6fd433e5cb9ef7d41245d9ba75b4fd8",
+      "lightspeed.py": "8a95863fe26506b55ee43bca4196c1af73abc888",
+      "non_combat_policy.py": "8079fe274a49a39201e8270a2ddc2a7d2b618568",
+      "oracle_search.py": "32926eb70e7c9648046851c5616bea4ff1e8e793"
+    },
+    "frozen_stsrl_commit": "95abc8b1afe7d84e567aa70fb7225eba09fdff25",
+    "native_commit": "7fef4e19c7ee13f049ee0fb45c9967e7e349fcfb",
+    "original_config_git_blob": "12a1119933beecb72e52922444b387c9d9eaa0c2",
+    "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "producer_commit": "f77b87270507ee75d61f961b60560716cd46164c",
+    "purpose": "SYNTHETIC_READINESS_ONLY",
+    "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+    "schema": "issue43-formal-lineage-v1",
+    "study_source_sha256": {
+      "adapter.py": "06a6f3edaec30ba2920093337cecedacbd02631b5091fb662e157de7ae2f9433",
+      "budget.py": "f8e8a7d6ac4adc282d9a2c87087a975c99fbf20b7121a7d5808d35399065aa89",
+      "capture_public_roots.py": "3cd2c626689be4c8f407b20331cec1a32d42e888cce50a7372a3a2974a07ec46",
+      "concurrency.py": "c7120c80cf8beed1c6f40088b949481dd1652dc541993b642b7bc88e4712733a",
+      "formal.py": "8091e53c03eb01fae085f50a6a968458d723c81984e044b41fd7f1db773f1044",
+      "launcher.py": "bf4709cc46610f88338b0a1694d8c398edc351919c9c524c9e72bd547a76dbad",
+      "learning.py": "d0ff72e4b2eb9ef2cab55987a6daa1026d8995ca5679eb5a5b73f5f4ffc5aa07",
+      "pilot.py": "ebf6a1f4c42276d1b73b80616819874b565896da93fdbd5d560543af83e6a08e",
+      "readiness_smoke.py": "5328a7c4c97bbbd8380b7b58c7b86c93e121d3d5dd2cffa9cb07880cc0d6a03e",
+      "reporting.py": "e3ac7183c8da45187b62fb4582428463b4817c9a4b65afaaf715de7a52aba988",
+      "resume_pilot.py": "4a87df95a79fda513f27b591f3b4751c9fb1be5202c8491ddc7e4a1aa3a9246d",
+      "stage0.py": "5659e7808a73694cd4c0f7bbba0741ad2e6aaddc1f3833e11ff1c3beef463209",
+      "student.py": "c3a8108c0f057c68b735a8decc3c8e73cb3edc422f9be7d78003a7dec6bd4ed8",
+      "summarize.py": "f3a6e2df7dc8097a0cd92bdf2b399d48636af503369a91de8c2e76dee1e8395d",
+      "summarize_followup.py": "d7e9a5bc63f72644c92c88da784d05be8e75fe0ea0a28ac9cbac017a1ca07133",
+      "test_adapter.py": "461145d520bc96076afd23c30477035838eb30a407b99c62917f1961934ff916",
+      "test_formal.py": "312295d9ca1cf8e479cfa531c68a7b85a55886a01657b347234d94c37528163e",
+      "test_readiness.py": "db2768aa0cda673b8378455a331bec75f7edfe76f71732fa2752d6f47364b970",
+      "test_student.py": "d3adaac51bb09febdb7206c5a30a3230c645a9315b9d022fb33745d8e071ab03",
+      "worker.py": "a70614fbf27946bbf11f5d1cfa6fdc0213cc5cfc15ac4b6053df75f7c2360ec7"
+    },
+    "synthetic": true
+  },
+  "limitations": [
+    "No formal simulator labels or fresh 433xxx episode execution.",
+    "Whole synthetic Stage1 was executed at predecessor 4b4d7d2/5807456; current full conditional checks derive hash-verified synthetic fixtures with explicit origins.",
+    "Two test cap stops, one interrupted scheduler, one supervisor CPU-window failure, and failed test fixtures are retained and charged.",
+    "No new native administrative regression rerun; reviewed extension and reused source identities reverified."
+  ],
+  "model_sha256": {
+    "masked": "6cadd3e4853f899f28dd0b1db92964e07decdd8170b2fd7c50dd2a1c98d12cb2",
+    "visible": "7e04bf190d2f80f50b086dd946f3523267b920553d7964f8075a9bec6898ae23"
+  },
+  "preparation_reserve": {
+    "cpu": 15,
+    "wall": 60
+  },
+  "prior_stage0": {
+    "cpu_upper": 6379.83,
+    "wall_upper": 2360.61
+  },
+  "producer_commit": "f77b87270507ee75d61f961b60560716cd46164c",
+  "purpose": "SYNTHETIC_READINESS_ONLY",
+  "readiness_cpu_upper": 992.1924419150054,
+  "readiness_wall_upper": 816.118814949,
+  "resource_charges": [
+    {
+      "attempts": 1,
+      "cpu_upper": 144.34823689300163,
+      "directory": "synthetic",
+      "last_record_sha256": "0afcb5d9c0fbe6e0d0512d03532fbdfba68841319ea8b1b2c0b6763d6b1225c7",
+      "open_crashed_attempt": false,
+      "stage": "stage1",
+      "wall_upper": 160.98971926899998
+    },
+    {
+      "attempts": 1,
+      "cpu_upper": 98.565049482,
+      "directory": "synthetic",
+      "last_record_sha256": "04eb692a4eb5561e60ce6ce4c467c251c7a9466fd7d7f0548ea5f582f3abbb0a",
+      "open_crashed_attempt": false,
+      "stage": "stage2",
+      "wall_upper": 112.19791092700001
+    },
+    {
+      "attempts": 1,
+      "cpu_upper": 165.94890736200168,
+      "directory": "synthetic-repaired",
+      "last_record_sha256": "c2bb1c8eb61784617eff261dfd00ee32f4148811b231f4006d0a34ee46e1bd7f",
+      "open_crashed_attempt": false,
+      "stage": "stage1",
+      "wall_upper": 91.41780799600002
+    },
+    {
+      "attempts": 1,
+      "cpu_upper": 99.01105506700027,
+      "directory": "synthetic-repaired",
+      "last_record_sha256": "d43d5fe827d10d2beca425da0e64201d3063b563f786d0647de1aa2426eb5ee6",
+      "open_crashed_attempt": false,
+      "stage": "stage2",
+      "wall_upper": 33.36083771599999
+    },
+    {
+      "attempts": 1,
+      "cpu_upper": 247.0833504160018,
+      "directory": "synthetic-final",
+      "last_record_sha256": "18660207827f1da895f8449abced96cc127773766562532e252806f58578e004",
+      "open_crashed_attempt": false,
+      "stage": "stage1",
+      "wall_upper": 79.89979387300001
+    },
+    {
+      "attempts": 2,
+      "cpu_upper": 17.163022377,
+      "directory": "synthetic-derived",
+      "last_record_sha256": "0916817a486608b113bd9cf489f9763ea00e7694ee68f1d75a30e8b8bbd45fd1",
+      "open_crashed_attempt": false,
+      "stage": "stage1",
+      "wall_upper": 37.408713221
+    },
+    {
+      "attempts": 2,
+      "cpu_upper": 47.891785192999976,
+      "directory": "synthetic-derived",
+      "last_record_sha256": "cb4390ded8595c084223287f513d5b85ec439324931efac68b25b15ce04ae0b8",
+      "open_crashed_attempt": true,
+      "stage": "stage2",
+      "wall_upper": 120
+    },
+    {
+      "attempts": 2,
+      "cpu_upper": 11.500045623999974,
+      "directory": "synthetic-verified",
+      "last_record_sha256": "545905b89583b5d1582b8c289a2a8e6c2b57e9b9cc39b2c8af961c76b70670ad",
+      "open_crashed_attempt": false,
+      "stage": "stage1",
+      "wall_upper": 27.798594164000008
+    },
+    {
+      "attempts": 2,
+      "cpu_upper": 5.680989500999999,
+      "directory": "synthetic-verified",
+      "last_record_sha256": "90051e58aadf560e18ceefdea1963e5da5555b243c50b2b672657a84549e5f55",
+      "open_crashed_attempt": false,
+      "stage": "stage2",
+      "wall_upper": 9.045437783000011
+    }
+  ],
+  "review_or_delete_date": "2026-10-18",
+  "tests": {
+    "cpu_upper_per_attempt": 20,
+    "execution_attempts": 7,
+    "passed": 29,
+    "wall_upper_per_attempt": 12
+  }
+}

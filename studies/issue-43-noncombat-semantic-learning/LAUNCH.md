@@ -20,7 +20,7 @@ Python source hashes. Artifact directories must be outside the worktree.
 ```bash
 export PYTHONPATH=/home/lsmft/.cache/issue43-native-7fef4e19:/mnt/d/DeadlycatCoding/STSRL-issue43-frozen/src:/mnt/d/DeadlycatCoding/spire-issue43-builder/studies/issue-43-noncombat-semantic-learning
 python3 -m unittest test_adapter test_student test_formal test_readiness -v
-python3 launcher.py synthetic --directory /home/lsmft/.cache/issue43-formal-readiness/synthetic-repaired --producer-commit EXACT_PRODUCER_SHA
+python3 launcher.py synthetic --directory /home/lsmft/.cache/issue43-formal-readiness/synthetic-verified --producer-commit f77b87270507ee75d61f961b60560716cd46164c
 ```
 
 Synthetic execution uses literal prospective owner/seed keys, full 384 roots,
@@ -112,3 +112,30 @@ first schedule, to 1000 CPU / 1000 wall. Prior accepted Stage0 upper charges
 `evidence.json` and the file manifest retain actual charges, producers, source
 hashes and completion counts. Independent Reviewer must inspect exact remote
 head and real native path before any subsequent Planner launch decision.
+
+## Completed readiness findings
+
+29 current-code focused tests PASS. Full synthetic optimization/heldout scheduling
+was exercised at predecessor heads; current-code complete conditional validation
+and repeated resumption use checksum-verified synthetic fixtures with explicit
+origin hashes (`derivation-verified.json`), avoiding repeated synthetic training.
+This fixture derivation is a readiness test only and is not an authentic formal
+attempt migration. All 384 roots, 1792 fixture continuation keys and 384 fresh keys
+are complete, with owners 160/40/40 and original 96/160,24/40,24/40 family quotas.
+Both stages append two resource attempts while preserving completed jobs.
+
+Retained failures include the interrupted first schedule, two synthetic CPU-cap
+stops, a supervisor CPU-window termination during manifest validation and failed
+test fixtures. The window/validation checkpoint repair passes current tests and
+resumption. One failed test's stderr was overwritten; its exact coarse failure,
+producer and cost are retained in `tests-attempt5-failure.json`.
+
+Conservative new charges: **992.19 CPU /816.12 wall** including 20 CPU/12 wall for
+each of seven test attempts and 15 CPU/60 wall preparation reserve. Combined
+accepted Stage0 upper charges: **7372.02 CPU /3176.73 wall**, below 14400/3600.
+`formal-readiness.json` records producer `f77b87270507ee75d61f961b60560716cd46164c`,
+source hashes, resource chains, synthetic checkpoint identities and exact counts.
+Retained manifest: 23427 files, SHA256
+`11bf9dfe4c17ec0db004a11c4b52d9bc3c85f51a35d18abf81d36af064cc3bee`.
+Proposed disposition: retain disposable study branch for independent readiness
+review; no merge, scientific claim or formal launch.

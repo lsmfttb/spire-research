@@ -1,4 +1,8 @@
-# Readiness-only follow-up to Issue43
+# Accepted earlier admission follow-up to Issue43
+
+Current launcher/watchdog/reporting readiness is in [LAUNCH.md](LAUNCH.md) and
+`formal-readiness.json`. The later Planner overlay raises only Stage1 to
+180000/27000; the account below describes the earlier accepted cost pilot.
 
 The 2026-10-11 Planner amendment retains the original config Git blob
 `12a1119933beecb72e52922444b387c9d9eaa0c2`. Only admission execution and
