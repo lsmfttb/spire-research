@@ -1,0 +1,43 @@
+{
+  "schema": "issue43-readiness-repair-v1",
+  "tested_python_producer": "ead177f8b7a75bd7060e932a75eeb55ff34c3a94",
+  "tests": 31,
+  "test_exit": 0,
+  "repairs": [
+    "parent lease persisted before arming renewed window",
+    "formal executed source/config/overlay bound to declared Git tree"
+  ],
+  "measured_cpu": 5.264315551999999,
+  "measured_wall": 11.044623747000001,
+  "preparation_upper_cpu": 20,
+  "preparation_upper_wall": 60,
+  "combined_stage0_upper_cpu": 7471.144315552,
+  "combined_stage0_upper_wall": 3501.504623747,
+  "formal_launch": "CLOSED",
+  "disposition": "STUDY_ONLY",
+  "consumer": "Issue43 independent Reviewer",
+  "review_delete": "2026-10-18",
+  "source_sha256": {
+    "adapter.py": "06a6f3edaec30ba2920093337cecedacbd02631b5091fb662e157de7ae2f9433",
+    "budget.py": "250dfd4e2763cc2caf370fa9b41a32b2996029cb37a32fece721c909214f1ce3",
+    "capture_public_roots.py": "3cd2c626689be4c8f407b20331cec1a32d42e888cce50a7372a3a2974a07ec46",
+    "concurrency.py": "c7120c80cf8beed1c6f40088b949481dd1652dc541993b642b7bc88e4712733a",
+    "formal.py": "8091e53c03eb01fae085f50a6a968458d723c81984e044b41fd7f1db773f1044",
+    "launcher.py": "2a809993c920b18b95a8afe0cb747771775e0b36da1df8dc8cfe991af222d862",
+    "learning.py": "d0ff72e4b2eb9ef2cab55987a6daa1026d8995ca5679eb5a5b73f5f4ffc5aa07",
+    "pilot.py": "ebf6a1f4c42276d1b73b80616819874b565896da93fdbd5d560543af83e6a08e",
+    "readiness_smoke.py": "5328a7c4c97bbbd8380b7b58c7b86c93e121d3d5dd2cffa9cb07880cc0d6a03e",
+    "reporting.py": "e3ac7183c8da45187b62fb4582428463b4817c9a4b65afaaf715de7a52aba988",
+    "resume_pilot.py": "4a87df95a79fda513f27b591f3b4751c9fb1be5202c8491ddc7e4a1aa3a9246d",
+    "stage0.py": "5659e7808a73694cd4c0f7bbba0741ad2e6aaddc1f3833e11ff1c3beef463209",
+    "student.py": "c3a8108c0f057c68b735a8decc3c8e73cb3edc422f9be7d78003a7dec6bd4ed8",
+    "summarize.py": "f3a6e2df7dc8097a0cd92bdf2b399d48636af503369a91de8c2e76dee1e8395d",
+    "summarize_followup.py": "d7e9a5bc63f72644c92c88da784d05be8e75fe0ea0a28ac9cbac017a1ca07133",
+    "test_adapter.py": "461145d520bc96076afd23c30477035838eb30a407b99c62917f1961934ff916",
+    "test_formal.py": "312295d9ca1cf8e479cfa531c68a7b85a55886a01657b347234d94c37528163e",
+    "test_readiness.py": "db2768aa0cda673b8378455a331bec75f7edfe76f71732fa2752d6f47364b970",
+    "test_repair.py": "83be3f843ec121462e6cfdc9cd820165172cc4bda771db32ba597f68a7403aa5",
+    "test_student.py": "d3adaac51bb09febdb7206c5a30a3230c645a9315b9d022fb33745d8e071ab03",
+    "worker.py": "a70614fbf27946bbf11f5d1cfa6fdc0213cc5cfc15ac4b6053df75f7c2360ec7"
+  }
+}
