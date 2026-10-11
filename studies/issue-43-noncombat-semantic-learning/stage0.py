@@ -39,9 +39,14 @@ def ledger(path, event):
 class Battle:
     provenance = ControllerProvenance(kind='native_search',name='issue43_unguided_search_v2_400',config=CONFIG['battle'])
 
+    def __init__(self):
+        self.search_cpu=0.; self.search_wall=0.; self.search_calls=0
+
     def select_action(self,adapter,snapshot,actions,context,step_index):
+        begin=time.monotonic(); cpu=time.process_time()
         raw = adapter.battle_search_v2(snapshot,simulations=400,include_potions=False,
                                       policy_prior_callback=None,leaf_value_callback=None)
+        self.search_cpu+=time.process_time()-cpu; self.search_wall+=time.monotonic()-begin; self.search_calls+=1
         report = build_oracle_search_report(raw,actions,context,
             expected_native_api='StepSimulator.battle_search_v2.v1',
             expected_patch_identity='sts_lightspeed_battle_search_v2_tree_internal_v1')

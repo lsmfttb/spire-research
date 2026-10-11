@@ -28,6 +28,9 @@ def atomic(path, value):
     with temp.open('w') as stream:
         json.dump(value,stream,sort_keys=True,allow_nan=False); stream.flush(); os.fsync(stream.fileno())
     os.replace(temp,path)
+    descriptor=os.open(path.parent,os.O_DIRECTORY)
+    try: os.fsync(descriptor)
+    finally: os.close(descriptor)
 
 
 class Completed:
@@ -51,6 +54,8 @@ class Completed:
             for line in self.log.read_text().splitlines():
                 event = json.loads(line)
                 if event['boundary']=='completed':
+                    if event['id'] in self.completed and self.completed[event['id']]!=event['sha256']:
+                        raise ValueError('conflicting completion manifest entries')
                     self.completed[event['id']] = event['sha256']
 
     def event(self, event):
@@ -58,6 +63,15 @@ class Completed:
             stream.write(json.dumps(event,sort_keys=True)+'\n'); stream.flush(); os.fsync(stream.fileno())
 
     def get(self, key):
+        # Other independent workers append to the shared job manifest. Refresh
+        # completion checksums before adopting a result as a crash orphan.
+        if self.log.exists():
+            for line in self.log.read_text().splitlines():
+                event=json.loads(line)
+                if event['boundary']=='completed':
+                    if event['id'] in self.completed and self.completed[event['id']]!=event['sha256']:
+                        raise ValueError('conflicting completion manifest entries')
+                    self.completed[event['id']]=event['sha256']
         ident = digest(key); path = self.directory/(ident+'.json')
         if not path.exists():
             if ident in self.completed:
@@ -132,12 +146,24 @@ def force(adapter, checkpoint, fingerprint, public, ordinal, owner, driver, prog
     if actions[ordinal].raw['native'].bits!=native.bits:
         raise ValueError('fresh native legal identity mismatch')
     transition=adapter.step(actions[ordinal]); post=adapter.capture_checkpoint(transition.snapshot)
-    run=execute_controlled_run(Restored(adapter,post),controller(driver),seed=owner,
-        max_steps=CONFIG['max_steps'],action_space=ActionSpaceConfig.initial_no_potions(),before_decision=progress)
+    selected=controller(driver); observation={'max_act':int(transition.snapshot.raw.get('act',0)),
+        'heart_encountered':False}
+    def observe(snapshot,actions,context,index):
+        progress(snapshot,actions,context,index)
+        observation['max_act']=max(observation['max_act'],int(snapshot.raw.get('act',0)))
+        observation['heart_encountered'] |= snapshot.raw.get('encounter_id')=='THE_HEART'
+    def after(step):
+        observation['max_act']=max(observation['max_act'],int(step.next_snapshot_raw.get('act',0)))
+        observation['heart_encountered'] |= step.next_snapshot_raw.get('encounter_id')=='THE_HEART'
+    run=execute_controlled_run(Restored(adapter,post),selected,seed=owner,
+        max_steps=CONFIG['max_steps'],action_space=ActionSpaceConfig.initial_no_potions(),before_decision=observe,after_transition=after)
     if not run.terminal or run.problems:
         raise ValueError('INCOMPLETE: never convert a cap/problem into loss')
     return {'terminal':True,'problems':[], 'terminal_floor':run.final_raw['floor_num'],
-            'final_raw_privileged':run.final_raw,'outcome':run.outcome,'steps':len(run.steps)}
+            'final_raw_privileged':run.final_raw,'outcome':run.outcome,'steps':len(run.steps),**observation,
+            'heart_win':observation['heart_encountered'] and run.outcome=='PLAYER_VICTORY',
+            'battle_search_cpu':selected.battle.search_cpu,'battle_search_wall':selected.battle.search_wall,
+            'battle_search_calls':selected.battle.search_calls}
 
 
 def capture_owner(adapter, owner, split, progress):
@@ -168,13 +194,16 @@ def capture_owner(adapter, owner, split, progress):
             'privileged_checkpoint_fingerprint_sha256':digest(fingerprint),
             'source_driver_seed':CONFIG['source_driver_seed']}
         native[family]=(adapter.capture_checkpoint(snapshot),fingerprint,p)
-    run=execute_controlled_run(adapter,controller(CONFIG['source_driver_seed']),seed=owner,
+    selected=controller(CONFIG['source_driver_seed'])
+    run=execute_controlled_run(adapter,selected,seed=owner,
         max_steps=CONFIG['max_steps'],action_space=ActionSpaceConfig.initial_no_potions(),before_decision=observe)
     if not run.terminal or run.problems:
         raise ValueError('INCOMPLETE_SOURCE')
     return roots,native,{'owner':owner,'cpu':time.process_time()-cpu,'wall':time.monotonic()-begin,
         'terminal':True,'problems':[], 'screen_counts':counts,
-        'peak_rss_kib':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss}
+        'peak_rss_kib':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+        'battle_search_cpu':selected.battle.search_cpu,'battle_search_wall':selected.battle.search_wall,
+        'battle_search_calls':selected.battle.search_calls}
 
 
 def execute_owner(adapter, selected, store, progress):
@@ -252,7 +281,7 @@ class LearnedNonCombat:
         if ordinal>=len(actions) or actions[ordinal].raw['native'].bits!=native.bits:
             raise ValueError('PUBLIC_INPUT_INVALID: legal execution mapping')
         self.choices.append({'family':context.screen_state,'route':'learned','public_sha256':digest(json.loads(serialized)),
-                             'ordinal':ordinal,'step':step_index})
+                             'ordinal':ordinal,'step':step_index,'serialized_public_input':serialized})
         return ControllerDecision(selected_index=ordinal,provenance=self.provenance,reason='frozen_scorer')
 
 
@@ -284,15 +313,35 @@ def evaluate_one(adapter, plan_row, checkpoints, store, progress):
     selected=evaluation_controller(plan_row['arm'],checkpoints)
     store.event({'boundary':'fresh_started','key':key})
     begin=time.monotonic(); cpu=time.process_time()
+    observed={'max_act':0,'heart_encountered':False,'battle_decisions':0,'public_choices':[]}
+    def observe(snapshot,actions,context,index):
+        progress(snapshot,actions,context,index)
+        observed['max_act']=max(observed['max_act'],int(snapshot.raw.get('act',0)))
+        observed['heart_encountered'] |= snapshot.raw.get('encounter_id')=='THE_HEART'
+        if snapshot.raw.get('battle_active'): observed['battle_decisions']+=1
+        if plan_row['arm']=='expert_source' and context.screen_state in ('MAP_SCREEN','REWARDS'):
+            p=prepared(adapter)
+            serialized=with_public_history(p.serialized_input,context.public_run_context.get('history',[]),context.public_run_context)
+            observed['public_choices'].append({'family':context.screen_state,'step':index,
+                'public_sha256':digest(json.loads(serialized)),'serialized_public_input':serialized})
     run=execute_controlled_run(adapter,selected,seed=plan_row['seed'],max_steps=CONFIG['max_steps'],
-        action_space=ActionSpaceConfig.initial_no_potions(),before_decision=progress)
+        action_space=ActionSpaceConfig.initial_no_potions(),before_decision=observe)
     if not run.terminal or run.problems:
         raise ValueError('INCOMPLETE_FRESH: no death substitution')
-    choices=selected.non_combat.choices if plan_row['arm']!='expert_source' else []
+    choices=selected.non_combat.choices if plan_row['arm']!='expert_source' else observed.pop('public_choices')
+    observed.pop('public_choices',None)
+    observed['max_act']=max(observed['max_act'],int(run.final_raw.get('act',0)))
+    observed['heart_win']=observed['heart_encountered'] and run.outcome=='PLAYER_VICTORY'
+    if plan_row['arm']=='expert_source':
+        selected_by_step={step.step_index:step.chosen_action_index for step in run.steps}
+        for choice in choices:
+            choice['ordinal']=selected_by_step[choice['step']]; choice['route']='expert'
     return store.publish(key,{'terminal':True,'problems':[], 'seed':plan_row['seed'],'arm':plan_row['arm'],
         'floor':run.final_raw['floor_num'],'outcome':run.outcome,'final_raw_privileged':run.final_raw,
-        'steps':len(run.steps),'choices':choices,'cpu':time.process_time()-cpu,'wall':time.monotonic()-begin,
-        'peak_rss_kib':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss})
+        'steps':len(run.steps),'choices':choices,**observed,'cpu':time.process_time()-cpu,'wall':time.monotonic()-begin,
+        'peak_rss_kib':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+        'battle_search_cpu':selected.battle.search_cpu,'battle_search_wall':selected.battle.search_wall,
+        'battle_search_calls':selected.battle.search_calls})
 
 
 def clustered_interval(values, seed, replicates=10000):
