@@ -8,6 +8,8 @@ import hashlib
 import json
 from pathlib import Path
 import platform
+import os
+import subprocess
 import sys
 import time
 import urllib.request
@@ -42,10 +44,42 @@ def runtime():
         'study_source_sha256':{p.name:hashlib.sha256(p.read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in sorted(HERE.glob('*.py'))}}
 
 
+def producer_sources(producer_commit):
+    """Bind all executable study files and both contracts to a real Git tree."""
+    root=HERE.parents[1]; gitdir=root/'.git'
+    if gitdir.is_file():
+        target=gitdir.read_text().strip().removeprefix('gitdir: ')
+        # Windows-managed disposable worktrees are also executed under WSL.
+        if os.name!='nt' and len(target)>2 and target[1:3]==':/':
+            target='/mnt/'+target[0].lower()+target[2:]
+        gitdir=Path(target)
+        if not gitdir.is_absolute(): gitdir=root/gitdir
+    prefix=HERE.relative_to(root).as_posix()+'/'
+    try:
+        result=subprocess.run(['git','--git-dir='+str(gitdir),'ls-tree','-r',producer_commit+'^{commit}',
+                               '--',prefix],check=True,capture_output=True,text=True)
+    except (OSError,subprocess.CalledProcessError) as exc:
+        raise ValueError('producer Git tree unavailable') from exc
+    expected={}
+    for line in result.stdout.splitlines():
+        metadata,path=line.split('\t',1); mode,kind,oid=metadata.split()
+        name=path.removeprefix(prefix)
+        if name.endswith('.py') or name in ('config.json','planner_budget_amendment.json'):
+            if kind!='blob' or '/' in name: raise ValueError('unexpected executable study tree')
+            expected[name]=oid
+    actual={p.name:blob(p) for p in HERE.glob('*.py')}
+    actual.update({name:blob(HERE/name) for name in ('config.json','planner_budget_amendment.json')})
+    if not expected or actual!=expected:
+        raise ValueError('executed study sources differ from declared producer Git tree')
+    return expected
+
+
 def identity(producer_commit,synthetic):
     if len(producer_commit)!=40 or any(c not in '0123456789abcdef' for c in producer_commit):
         raise ValueError('exact producer SHA required')
-    return {'schema':'issue43-formal-lineage-v1','producer_commit':producer_commit,
+    binding=({'mode':'SYNTHETIC_UNBOUND_SOURCE_SNAPSHOT'} if synthetic else
+             {'mode':'EXACT_GIT_TREE','git_blobs':producer_sources(producer_commit)})
+    return {'schema':'issue43-formal-lineage-v1','producer_commit':producer_commit,'producer_source_binding':binding,
         'synthetic':synthetic,'purpose':'SYNTHETIC_READINESS_ONLY' if synthetic else 'STUDY_ONLY',
         'native_commit':CONFIG['native_commit'],'frozen_stsrl_commit':CONFIG['frozen_stsrl_commit'],
         'config_sha256':sha(CONFIG),'original_config_git_blob':overlay()['original_config_git_blob'],
@@ -53,6 +87,9 @@ def identity(producer_commit,synthetic):
 
 
 def validate_runtime(expected):
+    if not expected['synthetic']:
+        binding={'mode':'EXACT_GIT_TREE','git_blobs':producer_sources(expected['producer_commit'])}
+        if expected.get('producer_source_binding')!=binding: raise ValueError('producer source binding changed')
     for name,value in runtime().items():
         if expected[name]!=value: raise ValueError('runtime/code identity drift: '+name)
 
@@ -87,6 +124,7 @@ def immutable(path,value):
 class Pipeline:
     cost_cursor=None
     def __init__(self,directory,ident,stage,authorization=None):
+        validate_runtime(ident)
         self.directory=Path(directory).resolve(); self.ident=ident; self.stage=stage
         if self.directory.is_relative_to(HERE.parents[1]): raise ValueError('artifacts must be outside worktree')
         self.directory.mkdir(parents=True,exist_ok=True)

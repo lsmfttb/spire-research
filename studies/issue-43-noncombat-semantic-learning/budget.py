@@ -174,6 +174,9 @@ class Supervisor:
         if window<1: raise RuntimeError('RESOURCE_BLOCKED: supervisor CPU reservation')
         self.state['parent_cpu_lease']=window
         self.state['last_sample']={'boot':self.boot,'monotonic':time.monotonic(),'utc':time.time()}
+        # Recovery must see the full renewed window before the kernel allows
+        # its use, especially after successful workers release reservations.
+        self.journal.record('parent_lease_reserved_before_arm')
         signal.signal(signal.SIGXCPU,signal.SIG_DFL); signal.signal(signal.SIGALRM,signal.SIG_DFL)
         resource.setrlimit(resource.RLIMIT_CPU,(math.floor(time.process_time())+window,self.original_cpu_limit[1]))
         signal.setitimer(signal.ITIMER_REAL,max(.001,self.state['limit']['wall_seconds']-self.state['wall']))

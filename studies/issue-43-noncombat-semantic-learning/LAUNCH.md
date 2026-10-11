@@ -7,6 +7,27 @@ Stage2 remains 36000/12000. Original `config.json` Git blob
 included in every artifact identity. No formal labels, scientific fitted models
 or actual fresh 433xxx simulator runs were produced in readiness.
 
+## Independent review repair — 2026-10-12
+
+The prior exact-head review failed two operational checks. Each renewed parent
+CPU window is now fsynced into the resource hash chain before its kernel limit
+is armed. Successful worker settlement/window growth followed by abrupt
+supervisor exit must recover the renewed full lease.
+
+Formal identities now require Git's declared commit tree to match every study
+Python file plus config and budget overlay, including the complete filename set.
+Uncommitted edits, injected Python files and unavailable/wrong source trees fail
+before a formal lineage directory is created. Worker/runtime validation repeats
+this binding. Windows-managed worktree Git pointers are resolved under WSL.
+Synthetic snapshots explicitly carry `SYNTHETIC_UNBOUND_SOURCE_SNAPSHOT`; they
+cannot stand in for a formally bound producer. Historical synthetic artifacts
+remain predecessor evidence and were not migrated or regenerated for this repair.
+
+31 focused tests pass, including both new negative regressions. Repair evidence
+is outside worktrees at `/home/lsmft/.cache/issue43-repair-readiness`, for Issue43
+independent Reviewer; review/delete 2026-10-18. No simulator canary, formal labels,
+scientific training, fresh 433xxx episode, native/STSRL change or merge occurred.
+
 ## Commands
 
 Python 3.14.4/Linux, GNU timeout, /proc, flock and POSIX groups are required.
