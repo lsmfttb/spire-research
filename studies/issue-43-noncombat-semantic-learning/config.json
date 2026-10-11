@@ -1,0 +1,21 @@
+{
+  "disposition": "STUDY_ONLY",
+  "native_commit": "7fef4e19c7ee13f049ee0fb45c9967e7e349fcfb",
+  "frozen_stsrl_commit": "95abc8b1afe7d84e567aa70fb7225eba09fdff25",
+  "adapter_commit": "c90e6e9e27af80805f098679b23ea75abdd8bc5c",
+  "battle": {"api": "battle_search_v2", "simulations": 400, "include_potions": false, "callbacks": null, "selection": "highest_mean"},
+  "source_driver_seed": 430042,
+  "continuation_seeds": {"train": [430071, 430072], "validation": [431071, 431072], "heldout": [432071, 432072, 432073, 432074], "canary": [430071, 430072]},
+  "model_seeds": [430081, 430082],
+  "fresh_driver_seed": 433042,
+  "bootstrap_seeds": {"heldout": 432091, "visible_minus_masked": 433091, "visible_minus_expert": 433092},
+  "bootstrap_replicates": 10000,
+  "source_ranges": {"train": [430001,430512], "validation": [431001,431256], "heldout": [432001,432256]},
+  "quotas": {"train": {"MAP_SCREEN":96,"REWARDS":160,"owners":128}, "validation":{"MAP_SCREEN":24,"REWARDS":40,"owners":32}, "heldout":{"MAP_SCREEN":24,"REWARDS":40,"owners":32}},
+  "fresh_seeds": [433001,433128],
+  "model": {"encoding":"typed JSON set of path/value tokens, public map node/edge relations; signed SHA256 feature hashing", "inputs":128,"hidden":16,"parameters":2081,"activation":"tanh","optimizer":"full batch SGD","learning_rate":0.01,"updates":100,"validation_selection":"lowest mean per-root all-action squared error; ties first update then smaller model seed","normalizer":"fixed numeric sign*log1p(abs(value))/10; no fitted state; target divide by 60","tie_break":"first legal ordinal"},
+  "max_steps": 20000,
+  "workers": 8,
+  "resource_caps": {"stage0":{"wall_seconds":3600,"cpu_seconds":14400},"stage1":{"wall_seconds":18000,"cpu_seconds":72000},"stage2":{"wall_seconds":12000,"cpu_seconds":36000},"rss_per_job_gib":8,"minimum_available_memory_gib":4},
+  "canary": {"roots":4,"families":{"MAP_SCREEN":2,"REWARDS":2},"forced_ordinals":[0,1],"selection":"first qualifying family per source run, ascending train source seeds; no outcome selection"}
+}
