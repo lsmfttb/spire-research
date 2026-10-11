@@ -139,6 +139,8 @@ class ReadinessTests(unittest.TestCase):
         with self.assertRaises(ValueError): fresh(original[:-1],models,[])
         bad=copy.deepcopy(original); bad[0]['terminal']=False
         with self.assertRaises(ValueError): fresh(bad,models,[])
+        bad=copy.deepcopy(original); bad[0]['choices'][0]['route']='fallback'
+        with self.assertRaises(ValueError): fresh(bad,models,[])
 
     def test_expert_other_choices_are_reported_from_native_executor_role(self):
         models=checkpoints(); p=next(p for p in evaluation_plan(models) if p['arm']=='expert_source')
@@ -154,8 +156,6 @@ class ReadinessTests(unittest.TestCase):
             row=evaluate_one(adapter,p,models,Completed(d,self.ident),lambda *args:None)
             self.assertEqual([c['family'] for c in row['choices']],['REWARDS','REST_SCREEN'])
             self.assertEqual(row['max_act'],4); self.assertTrue(row['heart_win'])
-        bad=copy.deepcopy(original); bad[0]['choices'][0]['route']='fallback'
-        with self.assertRaises(ValueError): fresh(bad,models,[])
 
 
 if __name__=='__main__': unittest.main()
