@@ -34,16 +34,44 @@ def projection(screen: str, options: list[dict], actions: list[NativeAction]) ->
         identity = adapter._public_identity(native)
         candidates.append(identity)
     if screen == "MAP_SCREEN":
-        choices = [
-            {
+        choices = []
+        legal_routes = []
+        for i, native in enumerate(actions):
+            association = {
                 "candidate_index": i,
                 "candidate_action": candidates[i],
-                "destination": {"location": "map_node", "x": i, "y": 0, "room_symbol": "M"},
             }
-            for i in range(len(candidates))
-        ]
-        payload = {"coverage_status": "supported", "source": "test fixture", "legal_routes": choices}
-        routes = {"availability": "available", "source": "test fixture", "value": choices}
+            if native.kind == "map":
+                choice = {
+                    **association,
+                    "choice_type": "map_route",
+                    "destination": {
+                        "location": "map_node", "x": i, "y": 0, "room_symbol": "M"
+                    },
+                }
+                legal_routes.append(choice)
+            elif native.kind in {"game_potion_use", "game_potion_discard"}:
+                choice = {
+                    **association,
+                    "choice_type": (
+                        "potion_use" if native.kind == "game_potion_use"
+                        else "potion_discard"
+                    ),
+                    "potion": {
+                        "potion_index": native.idx1,
+                        "id": i + 1,
+                        "id_label": f"TEST_POTION_{i}",
+                        "name": f"Test Potion {i}",
+                    },
+                }
+            else:
+                raise AssertionError(f"unexpected map fixture action: {native.kind}")
+            choices.append(choice)
+        payload = {
+            "coverage_status": "supported", "source": "test fixture",
+            "choices": choices, "legal_routes": legal_routes,
+        }
+        routes = {"availability": "available", "source": "test fixture", "value": legal_routes}
     else:
         choices = [
             {
@@ -150,6 +178,43 @@ class AdapterTests(unittest.TestCase):
             [0, 1],
         )
         self.assertEqual(parsed["availability"]["visible_map_graph"], "available")
+
+    def test_map_potion_actions_are_complete_and_routes_stay_route_only(self) -> None:
+        map_actions = [
+            action(0, "map"),
+            action(1, "game_potion_use"),
+            action(2, "game_potion_discard"),
+        ]
+        map_projection = projection("MAP_SCREEN", [], map_actions)
+        prepared = adapter.prepare_policy_input(map_projection, map_actions)
+        parsed = json.loads(prepared.serialized_input)
+        options = parsed["legal_options"]
+        self.assertEqual(
+            [option["semantics"]["choice_type"] for option in options],
+            ["map_route", "potion_use", "potion_discard"],
+        )
+        self.assertEqual(
+            [option["action"]["kind"] for option in options],
+            ["map", "game_potion_use", "game_potion_discard"],
+        )
+        self.assertEqual(
+            len(map_projection["immediately_legal_routes"]["value"]), 1
+        )
+        self.assertEqual(
+            [route["candidate_index"]
+             for route in map_projection["screen_payload"]["value"]["legal_routes"]],
+            [0],
+        )
+
+        incomplete = json.loads(json.dumps(map_projection))
+        incomplete["screen_payload"]["value"]["choices"].pop(1)
+        with self.assertRaisesRegex(adapter.ChoiceSurfaceError, "incomplete"):
+            adapter.prepare_policy_input(incomplete, map_actions)
+
+        mismatched_routes = json.loads(json.dumps(map_projection))
+        mismatched_routes["screen_payload"]["value"]["legal_routes"].clear()
+        with self.assertRaisesRegex(adapter.ChoiceSurfaceError, "route lists disagree"):
+            adapter.prepare_policy_input(mismatched_routes, map_actions)
 
 
 if __name__ == "__main__":

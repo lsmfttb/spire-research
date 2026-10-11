@@ -144,12 +144,23 @@ def _choices_for_screen(
     if screen == "REWARDS":
         choices = payload.get("choices")
     else:
-        choices = payload.get("legal_routes")
+        choices = payload.get("choices")
         route_state, route_value = _availability(projection, "immediately_legal_routes")
         if route_state != "available" or not isinstance(route_value, list):
             raise UnsupportedChoiceSurface("MAP_SCREEN legal routes are not available")
-        if _json(choices) != _json(route_value):
+        payload_routes = payload.get("legal_routes")
+        if not isinstance(payload_routes, list):
+            raise ChoiceSurfaceError("MAP_SCREEN is missing its route-only candidate list")
+        if _json(payload_routes) != _json(route_value):
             raise ChoiceSurfaceError("MAP_SCREEN route lists disagree across native fields")
+        if not isinstance(choices, list):
+            raise UnsupportedChoiceSurface("MAP_SCREEN does not provide ordered legal choices")
+        choice_routes = [
+            choice for choice in choices
+            if isinstance(choice, Mapping) and choice.get("choice_type") == "map_route"
+        ]
+        if _json(choice_routes) != _json(payload_routes):
+            raise ChoiceSurfaceError("MAP_SCREEN choices disagree with the route-only list")
     if not isinstance(choices, list):
         raise UnsupportedChoiceSurface(f"{screen} does not provide a choice list")
     return choices
@@ -218,6 +229,56 @@ def _prepare_parts(
             raise ChoiceSurfaceError(
                 f"choice {choice_index} candidate association is malformed or stale"
             )
+        if screen == "MAP_SCREEN":
+            choice_type = choice.get("choice_type")
+            if choice_type == "map_route":
+                candidate = candidates[candidate_index]
+                destination = _required_mapping(
+                    choice.get("destination"), f"choices[{choice_index}].destination"
+                )
+                if candidate["scope"] != "game" or candidate["kind"] != "map":
+                    raise ChoiceSurfaceError(
+                        f"choice {choice_index} route does not identify a native map action"
+                    )
+                location = destination.get("location")
+                if location == "map_node":
+                    if (
+                        type(destination.get("x")) is not int
+                        or type(destination.get("y")) is not int
+                        or not isinstance(destination.get("room_symbol"), str)
+                    ):
+                        raise ChoiceSurfaceError(
+                            f"choice {choice_index} has an incomplete map destination"
+                        )
+                elif location != "boss_entry":
+                    raise ChoiceSurfaceError(
+                        f"choice {choice_index} has an unknown map destination"
+                    )
+            elif choice_type in {"potion_use", "potion_discard"}:
+                candidate = candidates[candidate_index]
+                expected_kind = {
+                    "potion_use": "game_potion_use",
+                    "potion_discard": "game_potion_discard",
+                }[choice_type]
+                potion = _required_mapping(
+                    choice.get("potion"), f"choices[{choice_index}].potion"
+                )
+                if (
+                    candidate["scope"] != "game"
+                    or candidate["kind"] != expected_kind
+                    or type(potion.get("potion_index")) is not int
+                    or potion["potion_index"] != candidate["idx1"]
+                    or type(potion.get("id")) is not int
+                    or not isinstance(potion.get("id_label"), str)
+                    or not isinstance(potion.get("name"), str)
+                ):
+                    raise ChoiceSurfaceError(
+                        f"choice {choice_index} does not describe its native potion action"
+                    )
+            else:
+                raise UnsupportedChoiceSurface(
+                    f"MAP_SCREEN choice {choice_index} has unsupported semantics"
+                )
         semantics = {
             key: value for key, value in choice.items()
             if key not in {"candidate_index", "candidate_action"}
