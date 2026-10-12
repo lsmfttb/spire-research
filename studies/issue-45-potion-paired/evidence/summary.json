@@ -1,0 +1,43 @@
+{
+  "affected_original_implementation": [
+    "native src/sim/search/BattleScumSearcher2.cpp enumeratePotionActions Fairy branch",
+    "native bindings/slaythespire.cpp battleSearchV2Impl/buildBattleSearchReport bit-equality mapping"
+  ],
+  "audit_cpu": 0.11715083,
+  "caps": {
+    "cpu": 12000,
+    "wall": 3600
+  },
+  "classification": "POTION_ACTION_MAPPING_INVALID",
+  "cleanup_handoff_cpu_allowance": 30,
+  "completed_native_runs": 25,
+  "consumer": "Issue45 independent Reviewer and Planner",
+  "counterexample": "437016-on step27 floor2 TWO_LOUSE PLAYER_NORMAL energy0 FairyPotion slot0. Legal discard idx2=6 bits537264128. Search enum Fairy idx2=-1;400 visits on unmapped edge,all legal root rows0. Same-state off end_turn400.",
+  "diagnostic": {
+    "cpu_charge": 1.880924345,
+    "seed": 437016,
+    "wall": 1.1729488230002971
+  },
+  "executed_producer": "78122615193ac00600205805fcfa491d6186fc98",
+  "fixture_cpu_charge": 1,
+  "key_counts": {
+    "INTERRUPTED_NO_TERMINAL": 6,
+    "NOT_STARTED": 160,
+    "POTION_ACTION_MAPPING_INVALID": 1,
+    "VALID_NATIVE_TERMINAL": 25
+  },
+  "preparation_cpu_allowance": 100,
+  "primary": "Not estimated: incomplete192-run grid. Partial floors do not establish gain/harm.",
+  "purpose": "STUDY_ONLY",
+  "repair_boundary": "No controller-side recovery: native report omits unmatched edge visits/value/action. Native canonical discard mapping/source repair needed; no invented values, alternate search, action thresholds or game rules added.",
+  "review_delete": "2026-11-09",
+  "source": {
+    "native_commit": "7fef4e19c7ee13f049ee0fb45c9967e7e349fcfb",
+    "native_extension_sha256": "ced9941eb1cd042630b27ed3b9b0be700cd8cbcc143156d52bdabf7bf07234cd",
+    "native_source": "/mnt/d/DeadlycatCoding/native-issue45-source",
+    "stsrl_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsrl_source": "/mnt/d/DeadlycatCoding/STSRL-issue45-source"
+  },
+  "task_cpu_charged": 686.105714014,
+  "task_wall_elapsed": 1241.4353368282318
+}
