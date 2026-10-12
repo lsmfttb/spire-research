@@ -1,5 +1,6 @@
 """Single-task bounded source/label sharding, settled plus live CPU accounting."""
 import hashlib
+from copy import deepcopy
 import json
 import os
 from pathlib import Path
@@ -43,7 +44,7 @@ def main():
             except (FileNotFoundError,PermissionError,ProcessLookupError): continue
             if b'issue-46-source-capacity/collect.py' in command or b'issue-46-source-capacity/finish.py' in command or b'issue-46-source-capacity/launch_collect.py' in command: raise ValueError('old task process still active')
         stamp=time.strftime('%Y%m%dT%H%M%SZ',time.gmtime())
-        receipt={'previous_ledger':ledger,'resume_producer':os.environ['ISSUE46_LAUNCHER_PRODUCER'],'interrupted':[],'reason':'WSL restarted; previous worker and supervisors absent; observed new /proc uptime'}
+        receipt={'previous_ledger':deepcopy(ledger),'resume_producer':os.environ['ISSUE46_LAUNCHER_PRODUCER'],'interrupted':[],'reason':'WSL restarted; previous worker and supervisors absent; observed new /proc uptime'}
         archive=STORE/'interrupted-attempts'/stamp; archive.mkdir(parents=True)
         completed=set(ledger['completed'])
         for owner in completed:
