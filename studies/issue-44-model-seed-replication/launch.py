@@ -82,6 +82,13 @@ def frozen_requests(plan,models_path,freeze_sha):
     # The 1.4MB model/curve manifest is hashed once, never once per fresh key.
     return [{'plan':p,'models':str(models_path),'model_freeze_sha256':freeze_sha} for p in plan]
 
+def frozen_models(ident,results):
+    # JSON object keys are strings. Reconstruct the exact on-disk representation
+    # so the original immutable writer can compare a resumed freeze directly.
+    return {'identity':ident,
+            'blocks':{str(b):{a:r['models'][a]['checkpoint'] for a in ('visible','masked')} for b,r in enumerate(results)},
+            'optimization':{str(b):r['models'] for b,r in enumerate(results)}}
+
 def prepare_requests(kind,payloads,ident,execution,base,jobs,supervisor,immutable):
     requests=[]; keys=[]
     for payload in payloads:
@@ -148,7 +155,7 @@ def main():
             results=run('readiness',[{}]); immutable(base/'readiness.json',results[0]); return
         results=run('train',[{'block':b} for b in range(6)])
         blocks={b:{a:r['models'][a]['checkpoint'] for a in ('visible','masked')} for b,r in enumerate(results)}
-        frozen={'identity':ident,'blocks':blocks,'optimization':{b:r['models'] for b,r in enumerate(results)}}
+        frozen=frozen_models(ident,results)
         models_path=immutable(base/'models.json',frozen)
         supervisor.tick(); freeze_sha=sha(frozen)
         plan=manifest(blocks); immutable(base/'evaluation-plan.json',{'identity':ident,'model_freeze_sha256':freeze_sha,'plan':plan})

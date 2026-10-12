@@ -2,6 +2,14 @@
 
 ## Operational resume repair
 
+Replacement1513a859 passed admission but stopped before fresh request creation:
+the reconstructed freeze used integer block keys, while the original immutable
+JSON writer read string keys and rejected direct dictionary comparison. The
+freeze now reconstructs string keys, preserving the original canonical digest
+and bytes. A regression uses the real pinned immutable writer on a legacy freeze,
+checks byte-identical reuse and rejects actual checkpoint drift. All original
+completions, models and plan remain unchanged; no fresh episode was dispatched.
+
 Original producer557ab023 sealed all12 authentic models and the1536-key manifest,
 then received SIGXCPU before creating any fresh request. Its list comprehension
 hashed the same1.4MB frozen manifest1536 times without renewing the10CPU-second

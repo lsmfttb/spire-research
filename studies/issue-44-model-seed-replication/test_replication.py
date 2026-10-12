@@ -182,6 +182,25 @@ class ReplicationTests(unittest.TestCase):
         bad={**current,'source':'changed'}
         with self.assertRaises(ValueError): launch.resume_identity(bad,old,'a'*40,old['wrapper_blobs'])
 
+    def test_frozen_models_reuse_real_immutable_json_writer(self):
+        import launch
+        from launcher import immutable
+        results=[{'models':self.models} for _ in range(6)]
+        ident={'original':'fixed'}
+        legacy={'identity':ident,'blocks':{b:self.checkpoints for b in range(6)},
+                'optimization':{b:self.models for b in range(6)}}
+        frozen=launch.frozen_models(ident,results)
+        self.assertEqual(frozen,json.loads(json.dumps(legacy)))
+        self.assertEqual(r.sha(frozen),r.sha(legacy))
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'models.json'
+            immutable(path,legacy); before=path.read_bytes()
+            immutable(path,frozen); self.assertEqual(path.read_bytes(),before)
+            bad=copy.deepcopy(frozen); bad['blocks']['0']['visible']['state']['c']+=1
+            with self.assertRaisesRegex(ValueError,'immutable artifact changed'):
+                immutable(path,bad)
+            self.assertEqual(path.read_bytes(),before)
+
     def test_resume_requires_explicit_replacement_grant(self):
         import launch
         reviewer={'body':'ISSUE44_READINESS_PASS\n'+('b'*40),'created_at':'2026-10-12T01:00:00Z'}
