@@ -54,7 +54,8 @@ def main():
     if base.is_relative_to(HERE.parents[1]) or base.is_relative_to(Path(CONTRACT['source_directory'])):
         raise ValueError('new independent outside-worktree lineage required')
     ident={'schema':'issue44-lineage-v1','producer_commit':args.producer_commit,'wrapper_blobs':binding,
-           'contract_sha256':sha(CONTRACT),'source':dep,'synthetic':args.mode=='readiness','purpose':'STUDY_ONLY'}
+           'contract_sha256':sha(CONTRACT),'source':dep,'synthetic':args.mode=='readiness','purpose':'STUDY_ONLY',
+           'consumers':'Issue44 independent Reviewer and Planner','review_delete':CONTRACT['review_delete']}
     authorization=None
     if args.mode=='formal': authorization=authorize(args.producer_commit,base,args.review_comment,args.planner_comment)
     ident['authorization_sha256']=sha(authorization)

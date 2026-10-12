@@ -115,6 +115,7 @@ class ReplicationTests(unittest.TestCase):
         self.assertEqual(result['crossed_interval']['lower'],1)
         self.assertEqual(len(result['runs']),1536)
         self.assertEqual(result['pooled_choices']['visible']['MAP_SCREEN_learned'],768)
+        self.assertEqual(set(result['blocks'][0]['shift']['fresh']),{'visible','masked'})
         with self.assertRaises(ValueError): r.report(rows[:-1],blocks,[])
         with self.assertRaises(ValueError): r.report(rows[:-1]+[rows[0]],blocks,[])
         rows[0]['choices'][0]['route']='explicit_other_fallback'

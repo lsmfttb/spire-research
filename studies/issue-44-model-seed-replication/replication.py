@@ -186,7 +186,9 @@ def report(runs,blocks,train_roots):
         for a in pooled:
             pooled_reach[a].update(reach[a]); pooled_choices[a].update(counts[a])
         ci=formal.clustered_interval({s:[d] for s,d in zip(range(435001,435129),differences)},CONTRACT['block_bootstrap_seeds'][b],10000)
-        block_reports.append({'block':b,'paired_interval':ci,'signs':{'positive':sum(d>0 for d in differences),'negative':sum(d<0 for d in differences),'tie':differences.count(0)},'choice_counts':{a:dict(c) for a,c in counts.items()},'progress':{a:dict(c) for a,c in reach.items()},'terminal_floors':{a:dict(c) for a,c in floors.items()},'shared_states':dict(shared),'disagreements':dict(disagree),'shift':reporting.shift(train_roots,rows)})
+        shift=reporting.shift(train_roots,rows)
+        shift['fresh'].pop('expert_source') # This replication has no Expert arm.
+        block_reports.append({'block':b,'paired_interval':ci,'signs':{'positive':sum(d>0 for d in differences),'negative':sum(d<0 for d in differences),'tie':differences.count(0)},'choice_counts':{a:dict(c) for a,c in counts.items()},'progress':{a:dict(c) for a,c in reach.items()},'terminal_floors':{a:dict(c) for a,c in floors.items()},'shared_states':dict(shared),'disagreements':dict(disagree),'shift':shift})
     ci=crossed(grid); means=[sum(r)/128 for r in grid]
     return {'classification':classify(True,coverage,ci,means),'purpose':'STUDY_ONLY',
         'information_regime':'fixed-data model-seed replication; privileged teacher-assisted Battle; not noSL',
