@@ -53,7 +53,7 @@ def main():
     assert seed in range(437001,437097) and arm in ('off','on')
     resource.setrlimit(resource.RLIMIT_CPU,(600,600)); resource.setrlimit(resource.RLIMIT_AS,(8*1024**3,8*1024**3))
     name=f'{seed}-{arm}'; adapter=LightSpeedAdapter(ascension=20)
-    battle=Battle(arm=='on'); counts=Counter(); maxima={'act':1,'floor':0}; opportunities=set(); offered=set()
+    battle=Battle(arm=='on'); counts=Counter(); maxima={'act':1,'floor':0}; opportunities=set(); offered=set(); encounters=set()
     action_space=ActionSpaceConfig.include_all() if arm=='on' else ActionSpaceConfig.initial_no_potions()
     log=(base/(name+'.jsonl')).open('a')
     parity_done=False
@@ -83,6 +83,7 @@ def main():
         kinds=step.legal_action_kinds; chosen=step.chosen_action_kind
         maxima['act']=max(maxima['act'],int(step.snapshot_raw.get('act',1)),int(step.next_snapshot_raw.get('act',1)))
         maxima['floor']=max(maxima['floor'],int(step.floor or 0),int(step.next_floor or 0))
+        if battle_step: encounters.add(str(step.snapshot_raw.get('encounter')))
         counts['decisions']+=1; counts[role+'_decisions']+=1
         if any(k in ('potion','game_potion_use') for k in kinds): counts[role+'_potion_eligible_decisions']+=1
         if any(k in POTION_ACTION_KINDS for k in kinds): opportunities.add((step.floor,step.screen_state))
@@ -113,6 +114,10 @@ def main():
             'producer':os.environ['ISSUE45_PRODUCER'],
             'valid':valid,'floor':run.final_raw.get('floor_num',maxima['floor']), 'max_act':maxima['act'],
             'initial_raw':dict(run.initial_raw),'final_raw':dict(run.final_raw),'metrics':dict(counts),
+            'source':json.loads((base/'source.json').read_text()),
+            'battle_encounters':sorted(encounters),
+            'loss_type':('battle' if run.final_raw.get('battle_active') else 'nonbattle') if run.outcome=='PLAYER_LOSS' else None,
+            'loss_encounter':run.final_raw.get('encounter') if run.outcome=='PLAYER_LOSS' else None,
             'potion_offer_option_occurrences':len(offered),'potion_opportunity_floor_screens':len(opportunities),
             'search_calls':battle.calls,'search_cpu':battle.cpu,'search_wall':battle.wall,
             'controller':dict(run.controller_provenance),'action_space':dict(run.action_space_config),

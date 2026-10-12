@@ -29,3 +29,27 @@ Primary report only after all192 valid:96 initial-seed differences,on-minus-off,
 5000 seed-paired percentile bootstrap,seed437099. Partial results are incomplete.
 Report does not condition primary on potion availability or prove optimal potion
 retention, normal-public control or Heart strength. No promotion/merge/deploy.
+## Reviewed native continuation
+
+Planner correction6119752233 removes aggregate wall ceilings prospectively.
+Retain original task start and same12000 aggregate CPU hard cap. Current
+independent repair-review-inclusive debit1585.025714CPU is carried forward,
+plus10CPU charged preparation/admin allowance; no CPU reset. Scheduler stops
+30CPU before cap, settles measured process CPU and accounts parent/report work.
+Wall remains descriptive; per-process600CPU/8GiB bounds and <=8workers remain.
+
+Native18bcd565b587186425bb46ad3d70a2eb80d947fc, extension0652b1ce6d757404278b840678b1f8548c81fb6b03cade598e7f3d82524b18d2;
+STSRL7d172f7c24c9d29429b6946ba44f6b59760b0d96. Independent review6120060502
+passed the exact source/build. All original192 final keys use this single pin.
+Old native25 terminals and the sealed original evidence remain diagnostics only.
+
+Final-grid rows live under the original task store's reviewed-native-18bcd565
+subdirectory. The same-task mutable ledger is original-store/current-execution.json,
+initialized with prior cumulative debit and original started_utc; it references
+the prior sealed evidence and independent repair receipt. It replaces the frozen
+execution snapshot as the active ledger without altering historical manifest
+files. This directory separation prevents mixing native versions in analysis.
+Source/producer equality is required for every report row. Existing terminal
+keys in this final grid are not rerun; invalid/interrupted keys remain invalid.
+Heart reach/wins and terminal loss context use native encounter/outcome fields.
+No new schema/controller, scientific contract, readiness grant or core promotion.

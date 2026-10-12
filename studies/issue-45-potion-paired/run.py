@@ -22,6 +22,8 @@ def proc_cpu(pid):
 def report(base,state):
     rows=[json.loads(p.read_text()) for p in base.glob('437*-o*.json') if '-progress' not in p.name]
     valid={(r['seed'],r['arm']):r for r in rows if r['valid']}
+    if any(r['producer']!=state['producer'] or r.get('source')!=state['source'] for r in rows):
+        raise ValueError('SOURCE_MISMATCH: final grid cannot pool producers/native versions')
     result={'classification':state.get('stop','INCOMPLETE'),'expected_runs':192,'completed':len(rows),'valid':len(valid),
             'cpu':state['cpu'],'wall':time.time()-state['started_utc'],'producer':state['producer'],
             'source':state['source'],'rows':rows,'driver_seed':433042,'limitations':'Privileged Battle; fixed Expert potion management. No optimal retention or normal-public/Heart strength claim.'}
@@ -33,12 +35,16 @@ def report(base,state):
         for r in arm_rows:
             for k,v in r['metrics'].items(): metrics[k]=metrics.get(k,0)+v
         result['secondary'][arm]={'valid_runs':len(arm_rows),'act_reach':{str(a):sum(r['max_act']>=a for r in arm_rows) for a in (2,3,4)},
+            'heart_reach':sum('THE_HEART' in r['battle_encounters'] for r in arm_rows),
+            'heart_wins':sum(r['outcome']=='PLAYER_WIN' and 'THE_HEART' in r['battle_encounters'] for r in arm_rows),
+            'loss_type_counts':{kind:sum(r['loss_type']==kind for r in arm_rows) for kind in ('battle','nonbattle')},
+            'loss_encounters':[r['loss_encounter'] for r in arm_rows if r['outcome']=='PLAYER_LOSS'],
             'outcomes':{o:sum(r['outcome']==o for r in arm_rows) for o in ('PLAYER_WIN','PLAYER_LOSS')},
             'terminal_hp':[r['final_raw'].get('cur_hp') for r in arm_rows], 'metrics':metrics,
             'potion_available_stratum':{label:{'n':len(group),'floors':[r['floor'] for r in group]} for label,group in
                 [('observed',[r for r in arm_rows if r['metrics'].get('battle_potion_eligible_decisions',0)>0]),
                  ('unobserved',[r for r in arm_rows if r['metrics'].get('battle_potion_eligible_decisions',0)==0])]}}
-    if len(valid)==192:
+    if set(valid)=={(s,a) for s in range(437001,437097) for a in ('off','on')} and not state.get('stop'):
         ds=[valid[s,'on']['floor']-valid[s,'off']['floor'] for s in range(437001,437097)]
         rng=random.Random(437099); bs=sorted(sum(rng.choice(ds) for _ in ds)/96 for _ in range(5000))
         def pct(q):
@@ -50,7 +56,8 @@ def report(base,state):
     write(base/'report.json',result)
 
 def main():
-    base=Path(sys.argv[1]); state=json.loads((base/'execution.json').read_text())
+    base=Path(sys.argv[1]); ledger=Path(sys.argv[3]) if len(sys.argv)>3 else base/'execution.json'
+    state=json.loads(ledger.read_text())
     lock=(base/'run.lock').open('a'); fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
     if state['active']: raise ValueError('Inspect active PID ownership before resume')
     if state.get('stop'): raise ValueError('Stopped task: no automatic incomplete-run replacement')
@@ -62,7 +69,7 @@ def main():
         state['cpu']=original_cpu+time.process_time()-began_cpu+sum(observed.values())+sum(proc_cpu(p.pid) for p in live.values())
         state['wall']=time.time()-state['started_utc']
         state['active']={k:{'pid':p.pid,'cpu':proc_cpu(p.pid)} for k,p in live.items()}
-        write(base/'execution.json',state)
+        write(ledger,state)
     def settle(name,p,blocking=False):
         pid,status,usage=os.wait4(p.pid,0 if blocking else os.WNOHANG)
         if not pid:return None
@@ -72,7 +79,7 @@ def main():
     try:
         while pending or live:
             sample()
-            if state['cpu']>=11970 or state['wall']>=3570: raise RuntimeError('RESOURCE_BLOCKED')
+            if state['cpu']>=11970: raise RuntimeError('RESOURCE_BLOCKED: aggregate CPU')
             available=int(next(x.split()[1] for x in Path('/proc/meminfo').read_text().splitlines() if x.startswith('MemAvailable:')))*1024
             while pending and len(live)<8 and available>=4*1024**3:
                 s,a=pending.pop(0); name=f'{s}-{a}'
@@ -92,6 +99,6 @@ def main():
             settle(name,p,True)
     finally:
         sample(); report(base,state); sample()
-        state['finished_utc']=time.time(); write(base/'execution.json',state)
+        state['finished_utc']=time.time(); write(ledger,state)
 
 if __name__=='__main__': main()
