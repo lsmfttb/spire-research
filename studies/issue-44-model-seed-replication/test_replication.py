@@ -5,7 +5,7 @@ from pathlib import Path
 import random
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch,Mock
 import replication as r
 
 def public():
@@ -157,6 +157,40 @@ class ReplicationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'RESOURCE_BLOCKED'): supervisor.check()
         supervisor.state['wall']=0
         with patch.object(budget,'available',return_value=0),self.assertRaisesRegex(RuntimeError,'available memory'): supervisor.check()
+
+    def test_full_dispatch_hash_once_and_guard_renewals(self):
+        import launch
+        plan=r.manifest({b:self.checkpoints for b in range(6)})
+        with patch.object(launch,'sha',side_effect=AssertionError('repeated full model hash')):
+            payloads=launch.frozen_requests(plan,Path('/tmp/models.json'),'frozen-once')
+        jobs=Mock(); jobs.get.return_value=None; guard=Mock(); freeze=Mock(side_effect=lambda p,v:p)
+        requests,keys=launch.prepare_requests('fresh',payloads,{}, {'producer_commit':'a'*40},Path('/tmp/fixture'),jobs,guard,freeze)
+        self.assertEqual(len(requests),1536); self.assertEqual(guard.tick.call_count,1536)
+        guard.reset_mock(); launch.collect_results(keys,jobs,guard); self.assertEqual(guard.tick.call_count,1536)
+        jobs.get.return_value={'already-completed':True}; freeze.reset_mock()
+        pending,_=launch.prepare_requests('train',[{'block':b} for b in range(6)],{}, {'producer_commit':'a'*40},Path('/tmp/fixture'),jobs,guard,freeze)
+        self.assertEqual(pending,[]); freeze.assert_not_called()
+
+    def test_operational_resume_preserves_identity_and_science(self):
+        import launch
+        old={'producer_commit':'a'*40,'wrapper_blobs':{'launch.py':'old','worker.py':'old','test_replication.py':'old','replication.py':'fixed','contract.json':'fixed'},'authorization_sha256':'old-grant','synthetic':False,'contract_sha256':'fixed','source':'fixed'}
+        current={**old,'producer_commit':'b'*40,'authorization_sha256':'new-grant','wrapper_blobs':{**old['wrapper_blobs'],'launch.py':'new','worker.py':'new'}}
+        self.assertEqual(launch.resume_identity(current,old,'a'*40,old['wrapper_blobs']),old)
+        for name in ('replication.py','contract.json'):
+            bad=copy.deepcopy(current); bad['wrapper_blobs'][name]='changed'
+            with self.assertRaises(ValueError): launch.resume_identity(bad,old,'a'*40,old['wrapper_blobs'])
+        bad={**current,'source':'changed'}
+        with self.assertRaises(ValueError): launch.resume_identity(bad,old,'a'*40,old['wrapper_blobs'])
+
+    def test_resume_requires_explicit_replacement_grant(self):
+        import launch
+        reviewer={'body':'ISSUE44_READINESS_PASS\n'+('b'*40),'created_at':'2026-10-12T01:00:00Z'}
+        planner={'body':'ISSUE44_FRESH_LAUNCH_AUTHORIZED\n'+('b'*40)+' exact-review-url\nLINEAGE_DIRECTORY=/tmp/existing','created_at':'2026-10-12T02:00:00Z'}
+        with patch.object(launch,'comment',side_effect=[reviewer,planner]),self.assertRaises(ValueError):
+            launch.authorize('b'*40,Path('/tmp/existing'),'exact-review-url','planner','a'*40)
+        planner['body']+='\nRESUME_LINEAGE_PRODUCER='+('a'*40)
+        with patch.object(launch,'comment',side_effect=[reviewer,planner]):
+            self.assertEqual(launch.authorize('b'*40,Path('/tmp/existing'),'exact-review-url','planner','a'*40)['resume_original_producer'],'a'*40)
 
     def test_source_adapter_fixture_suite(self):
         # Exact pinned public projection/action mapping fixtures; no simulator pilot.

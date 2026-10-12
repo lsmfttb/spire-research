@@ -1,5 +1,30 @@
 # Issue44 fixed-data model-seed replication
 
+## Operational resume repair
+
+Original producer557ab023 sealed all12 authentic models and the1536-key manifest,
+then received SIGXCPU before creating any fresh request. Its list comprehension
+hashed the same1.4MB frozen manifest1536 times without renewing the10CPU-second
+parent lease. The repaired orchestration hashes it once and ticks the unchanged
+budget guard during request preparation and completed-result collection.
+
+Resume needs independent PASS of the replacement exact head and a subsequent
+explicit replacement Planner grant. In addition to the normal exact-head grant
+fields below, require standalone
+`RESUME_LINEAGE_PRODUCER=557ab0232b3d42ab15e09913ab4850802f308062` and add
+`--resume-original-producer 557ab0232b3d42ab15e09913ab4850802f308062` to the
+formal invocation. Use the same `/home/lsmft/.cache/issue44-formal-lineage`.
+Original identity, authorization, six train completions,12 checkpoints, all
+optimization curves, full manifest and budget journal remain unchanged.
+Current code/grant bindings are append-only runtime-authorizations and request/
+completion provenance. Old completed keys are verified and reused before any
+request creation; no authentic model is retrained. Scientific replication.py,
+contract.json and all #43 dependencies must have identical original Git blobs;
+only launcher/worker admission/fixtures may differ. No second formal budget,
+sample/seed change or reset is permitted. An explicit maintenance close through
+the original audited guard charged the crash parent lease and clock exposure;
+future attempts continue that same now-closed journal.
+
 **STUDY_ONLY. Readiness only; formal training and fresh435xxx execution remain
 closed until independent exact-head review and a subsequent Planner grant.**
 

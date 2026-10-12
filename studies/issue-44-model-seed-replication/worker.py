@@ -9,10 +9,11 @@ import time
 def execute(path):
     begin=time.monotonic(); cpu=time.process_time()
     from replication import CONTRACT,HERE,dependencies,sha,read,train_block,evaluate,manifest,report
-    from launch import source_binding
+    from launch import source_binding,validate_execution
     request=read(path); ident=request['identity']
     dep,tables,roots=dependencies(os.environ['ISSUE44_SOURCE_CODE'])
-    if dep!=ident['source'] or source_binding(ident['producer_commit'])!=ident['wrapper_blobs'] or sha(CONTRACT)!=ident['contract_sha256']:
+    execution=request['execution']
+    if dep!=ident['source'] or source_binding(execution['producer_commit'])!=execution['wrapper_blobs'] or sha(CONTRACT)!=ident['contract_sha256']:
         raise ValueError('worker runtime/source identity drift')
     from formal import Completed
     store=Completed(request['store'],ident); key=request['key']
@@ -20,9 +21,7 @@ def execute(path):
     payload=request['payload']; kind=request['kind']; base=Path(request['directory'])
     if read(base/'identity.json')!=ident: raise ValueError('lineage identity mismatch')
     if not ident['synthetic']:
-        authority=read(base/'authorization.json')
-        if sha(authority)!=ident['authorization_sha256'] or authority['producer_commit']!=ident['producer_commit'] or authority['directory']!=str(base):
-            raise ValueError('formal authorization binding changed')
+        validate_execution(ident,execution,base)
     store.event({'boundary':'job_started','key':key,'kind':kind,'pid':os.getpid()})
     adapter=None
     try:
@@ -59,7 +58,7 @@ def execute(path):
                     rows.append({**row,'block':p['block']})
                 value={'report':report(rows,blocks,roots['train'])}
         else: raise ValueError('unexpected kind')
-        store.publish(key,{'terminal':True,'problems':[],**value,'cpu':time.process_time()-cpu,
+        store.publish(key,{'terminal':True,'problems':[],'execution':execution,**value,'cpu':time.process_time()-cpu,
             'wall':time.monotonic()-begin,'peak_rss_kib':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss})
     except BaseException as error:
         store.event({'boundary':'job_failed','key':key,'error':repr(error),'cpu':time.process_time()-cpu,'wall':time.monotonic()-begin}); raise
