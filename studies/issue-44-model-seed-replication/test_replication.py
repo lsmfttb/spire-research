@@ -8,10 +8,6 @@ import unittest
 from unittest.mock import patch
 import replication as r
 
-def tables():
-    from worker import fixture
-    # The source module's fixture is isolated here by a local public fixture.
-
 def public():
     return {'public_state':{'screen':'REWARDS','persistent_resources':{'hp':50},'screen_context':{'coverage_status':'supported'}},
         'legal_options':[{'candidate_index':i,'action':{'kind':'reward_card','idx1':i},'semantics':{'card':{'id':i+5,'upgraded':False}}} for i in range(2)]}

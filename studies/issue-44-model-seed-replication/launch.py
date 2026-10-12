@@ -63,6 +63,8 @@ def main():
     budget.HERE=HERE # Reviewed launcher integration: reuse guard, dispatch #44 worker.
     os.environ['ISSUE44_SOURCE_CODE']=str(Path(args.source_code).resolve())
     os.environ['PYTHONPATH']=str(HERE)+os.pathsep+os.environ.get('PYTHONPATH','')
+    base.mkdir(parents=True,exist_ok=True)
+    (base/'requests').mkdir(exist_ok=True)
     immutable(base/'identity.json',ident)
     if authorization: immutable(base/'authorization.json',authorization)
     caps=CONTRACT['readiness_caps' if args.mode=='readiness' else 'formal_caps']
