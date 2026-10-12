@@ -98,11 +98,33 @@ class ReplicationTests(unittest.TestCase):
         self.assertEqual(r.classify(False,True,{'lower':1,'upper':2},[1]*6),'INCOMPLETE')
         self.assertEqual(r.classify(True,False,{'lower':1,'upper':2},[1]*6),'FRESH_LEARNED_CONTROL_INSUFFICIENT')
 
+    def test_full_fixed_grid_report_and_incomplete_rejection(self):
+        blocks={b:self.checkpoints for b in range(6)}; rows=[]
+        for p in r.manifest(blocks):
+            floor=11 if p['arm']=='visible' else 10
+            choices=[]
+            for family in ('MAP_SCREEN','REWARDS'):
+                value=public(); value['public_state']['screen']=family
+                choices.append({'family':family,'route':'learned','ordinal':0,'public_sha256':r.sha(value),'serialized_public_input':json.dumps(value,sort_keys=True)})
+            rows.append({'block':p['block'],'seed':p['seed'],'arm':p['arm'],'key':[p['key'],p['seed'],p['arm']],
+                'terminal':True,'problems':[],'outcome':'PLAYER_LOSS','floor':floor,'max_act':1,'heart_encountered':False,'heart_win':False,
+                'steps':2,'choices':choices,'final_raw_privileged':{'cur_hp':0,'floor_num':floor,'outcome':'PLAYER_LOSS'},
+                'battle_search_calls':0,'battle_search_cpu':0,'battle_search_wall':0})
+        result=r.report(rows,blocks,[])
+        self.assertEqual(result['classification'],'SEMANTIC_GAIN_MODEL_SEED_ROBUST_WITHIN_FIXED_DATA')
+        self.assertEqual(result['crossed_interval']['lower'],1)
+        self.assertEqual(len(result['runs']),1536)
+        self.assertEqual(result['pooled_choices']['visible']['MAP_SCREEN_learned'],768)
+        with self.assertRaises(ValueError): r.report(rows[:-1],blocks,[])
+        with self.assertRaises(ValueError): r.report(rows[:-1]+[rows[0]],blocks,[])
+        rows[0]['choices'][0]['route']='explicit_other_fallback'
+        with self.assertRaisesRegex(ValueError,'PUBLIC_INPUT_INVALID'): r.report(rows,blocks,[])
+
     def test_authority_closed_without_real_comments(self):
         import launch
         with self.assertRaises(ValueError): launch.authorize('a'*40,Path('/tmp/frozen'),None,None)
-        reviewer={'body':'ISSUE44_READINESS_PASS '+('a'*40),'created_at':'2026-10-12T01:00:00Z'}
-        planner={'body':'ISSUE44_FRESH_LAUNCH_AUTHORIZED '+('a'*40)+' review\nLINEAGE_DIRECTORY=/tmp/frozen','created_at':'2026-10-12T02:00:00Z'}
+        reviewer={'body':'ISSUE44_READINESS_PASS\n'+('a'*40),'created_at':'2026-10-12T01:00:00Z'}
+        planner={'body':'ISSUE44_FRESH_LAUNCH_AUTHORIZED\n'+('a'*40)+' review\nLINEAGE_DIRECTORY=/tmp/frozen','created_at':'2026-10-12T02:00:00Z'}
         with patch.object(launch,'comment',side_effect=[reviewer,planner]):
             self.assertEqual(launch.authorize('a'*40,Path('/tmp/frozen'),'review','planner')['review_url'],'review')
         planner['body']=planner['body'].replace('/tmp/frozen','/tmp/other')

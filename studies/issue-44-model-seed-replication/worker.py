@@ -18,6 +18,11 @@ def execute(path):
     store=Completed(request['store'],ident); key=request['key']
     if store.get(key) is not None: return
     payload=request['payload']; kind=request['kind']; base=Path(request['directory'])
+    if read(base/'identity.json')!=ident: raise ValueError('lineage identity mismatch')
+    if not ident['synthetic']:
+        authority=read(base/'authorization.json')
+        if sha(authority)!=ident['authorization_sha256'] or authority['producer_commit']!=ident['producer_commit'] or authority['directory']!=str(base):
+            raise ValueError('formal authorization binding changed')
     store.event({'boundary':'job_started','key':key,'kind':kind,'pid':os.getpid()})
     adapter=None
     try:

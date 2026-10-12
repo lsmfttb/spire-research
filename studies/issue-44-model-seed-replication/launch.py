@@ -36,12 +36,12 @@ def comment(url):
 
 def authorize(commit,directory,review_url,planner_url):
     reviewer=comment(review_url); planner=comment(planner_url)
-    if 'ISSUE44_READINESS_PASS' not in reviewer['body'] or commit not in reviewer['body']: raise ValueError('independent exact-head readiness PASS required')
-    if 'ISSUE44_FRESH_LAUNCH_AUTHORIZED' not in planner['body'] or commit not in planner['body'] or review_url not in planner['body']:
+    if 'ISSUE44_READINESS_PASS' not in reviewer['body'].splitlines() or commit not in reviewer['body']: raise ValueError('independent exact-head readiness PASS required')
+    if 'ISSUE44_FRESH_LAUNCH_AUTHORIZED' not in planner['body'].splitlines() or commit not in planner['body'] or review_url not in planner['body']:
         raise ValueError('explicit subsequent exact-head Planner grant required')
     if planner['created_at']<=reviewer['created_at']: raise ValueError('grant must follow review')
     if 'LINEAGE_DIRECTORY='+str(directory) not in planner['body'].splitlines(): raise ValueError('grant must bind sole new lineage directory')
-    return {'review_url':review_url,'review_body_sha256':sha(reviewer['body']),'planner_url':planner_url,'planner_body_sha256':sha(planner['body'])}
+    return {'producer_commit':commit,'directory':str(directory),'review_url':review_url,'review_body_sha256':sha(reviewer['body']),'planner_url':planner_url,'planner_body_sha256':sha(planner['body'])}
 
 def main():
     begin=time.monotonic(); cpu=time.process_time()
@@ -57,6 +57,7 @@ def main():
            'contract_sha256':sha(CONTRACT),'source':dep,'synthetic':args.mode=='readiness','purpose':'STUDY_ONLY'}
     authorization=None
     if args.mode=='formal': authorization=authorize(args.producer_commit,base,args.review_comment,args.planner_comment)
+    ident['authorization_sha256']=sha(authorization)
     from launcher import immutable
     from formal import Completed
     import budget

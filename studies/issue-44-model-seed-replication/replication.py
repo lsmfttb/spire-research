@@ -146,6 +146,7 @@ def report(runs,blocks,train_roots):
         raise ValueError('INCOMPLETE: original1536 keys required')
     coverage=True; block_reports=[]; grid=[]; compact=[]
     pooled={a:Counter() for a in ('visible','masked')}
+    pooled_reach={a:Counter() for a in pooled}; pooled_choices={a:Counter() for a in pooled}
     for b in range(6):
         rows=[by[b,s,a] for s in range(435001,435129) for a in ('visible','masked')]
         expected={(p['seed'],p['arm']):p for p in block_plan(blocks[b],b)}
@@ -164,7 +165,10 @@ def report(runs,blocks,train_roots):
             for c in r['choices']:
                 counts[a][c['family']+'_'+c['route']]+=1
                 if c['family'] in ('MAP_SCREEN','REWARDS') and c['route']!='learned': raise ValueError('PUBLIC_INPUT_INVALID: supported fallback')
-            compact.append({k:v for k,v in r.items() if k not in ('choices','identity','final_raw_privileged')})
+            native=r['final_raw_privileged']
+            compact.append({**{k:v for k,v in r.items() if k not in ('choices','identity','final_raw_privileged')},
+                'native_terminal_resources':{k:native[k] for k in ('cur_hp','max_hp','gold','act','floor_num','potion_count','red_key','green_key','blue_key') if k in native},
+                'native_final_sha256':sha(native)})
         for s in range(435001,435129):
             indexed=[]
             for a in ('visible','masked'):
@@ -179,6 +183,8 @@ def report(runs,blocks,train_roots):
                 shared[v['family']]+=1; disagree[v['family']]+=int(v['ordinal']!=m['ordinal'])
         differences=[by[b,s,'visible']['floor']-by[b,s,'masked']['floor'] for s in range(435001,435129)]; grid.append(differences)
         coverage &= all(counts[a][f+'_learned']>=64 for a in counts for f in ('MAP_SCREEN','REWARDS'))
+        for a in pooled:
+            pooled_reach[a].update(reach[a]); pooled_choices[a].update(counts[a])
         ci=formal.clustered_interval({s:[d] for s,d in zip(range(435001,435129),differences)},CONTRACT['block_bootstrap_seeds'][b],10000)
         block_reports.append({'block':b,'paired_interval':ci,'signs':{'positive':sum(d>0 for d in differences),'negative':sum(d<0 for d in differences),'tie':differences.count(0)},'choice_counts':{a:dict(c) for a,c in counts.items()},'progress':{a:dict(c) for a,c in reach.items()},'terminal_floors':{a:dict(c) for a,c in floors.items()},'shared_states':dict(shared),'disagreements':dict(disagree),'shift':reporting.shift(train_roots,rows)})
     ci=crossed(grid); means=[sum(r)/128 for r in grid]
@@ -186,5 +192,8 @@ def report(runs,blocks,train_roots):
         'information_regime':'fixed-data model-seed replication; privileged teacher-assisted Battle; not noSL',
         'crossed_interval':ci,'blocks':block_reports,'differences':grid,'runs':compact,
         'pooled_terminal_floors':{a:dict(c) for a,c in pooled.items()},
+        'pooled_progress':{a:dict(c) for a,c in pooled_reach.items()},
+        'pooled_choices':{a:dict(c) for a,c in pooled_choices.items()},
+        'selected_checkpoints':{b:{a:{k:c[k] for k in ('checkpoint_sha256','model_seed','update','validation_mse','normalizer_sha256','train_targets_sha256')} for a,c in blocks[b].items()} for b in range(6)},
         'search_work':{k:sum(r[k] for r in runs) for k in ('battle_search_calls','battle_search_cpu','battle_search_wall')},
         'historical_discovery':'Issue43 primary+0.984375 [0.1328125,1.84375]; not pooled'}
