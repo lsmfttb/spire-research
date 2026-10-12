@@ -18,11 +18,19 @@ def livecpu(pid):
     except FileNotFoundError: return 0.
 
 def main():
+    resume_audit='--resume-audit' in sys.argv[2:]
     while True:
         ledger=json.loads(LEDGER.read_text())
         if ledger['status']!='COLLECTING': break
         time.sleep(15)
-    if ledger['status']!='SOURCE_LABELS_COMPLETE': return
+    if resume_audit:
+        assert ledger['status']=='INCOMPLETE_AUDITING' and not ledger['active']
+        assert not ledger['fresh_failed'] and len(ledger['fresh_completed'])==640
+        assert set(map(tuple,ledger['fresh_completed']))=={(s,a) for s in range(441001,441129) for a in ('SxT','SxB','LxT','LxB','Expert')}
+        # Retain the original diagnostic; no training/evaluation files change.
+        (STORE/'AUDITING.log').rename(STORE/'AUDITING-first-attempt.log')
+        (STORE/'finish-failure.json').rename(STORE/'finish-failure-first-attempt.json')
+    elif ledger['status']!='SOURCE_LABELS_COMPLETE': return
     prior=ledger['cumulative_cpu']; charged=0.
     ledger['final_producer']=os.environ['ISSUE46_FINAL_PRODUCER']
     def publish(status,active=None):
@@ -42,6 +50,11 @@ def main():
                 time.sleep(1)
             p.returncode=os.waitstatus_to_exitcode(status); charged+=usage.ru_utime+usage.ru_stime
         if p.returncode: publish('INCOMPLETE_'+name); raise ValueError(name+' failed')
+    if resume_audit:
+        single('AUDITING',sys.executable,'audit.py')
+        single('REPORTING',sys.executable,'report.py')
+        publish('COMPLETE_PENDING_INDEPENDENT_REVIEW')
+        return
     single('MODEL_VERIFICATION',TRAIN_PY,'verify_model.py')
     single('TRAINING',TRAIN_PY,'train.py')
     pending=[(s,a) for s in range(441001,441129) for a in ('SxT','SxB','LxT','LxB','Expert')]

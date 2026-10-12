@@ -26,7 +26,15 @@ def pathcheck(directory,name,result,search=True,assistance=None,checkpoint=None)
                 reports=row['decision_metadata']['oracle_search_decision_reports']; assert len(reports)==1
                 report=reports[0]; telemetry=report['decision_telemetry']
                 assert report['include_potions'] and not report['problems'] and report['model_calls']==0
-                assert telemetry['root_visits']==400 and telemetry['unmapped_search_edge_count']==0 and telemetry['unmapped_root_row_count']==0
+                assert telemetry['simulations_requested']==400 and telemetry['root_visits']==400 and telemetry['unmapped_search_edge_count']==0
+                # Existing API counts legal rows without a search edge here, not
+                # failed edge mappings (e.g. canonical duplicate card rows).
+                absent=[r for r in report['root_actions'] if not r['search_tree_present']]
+                assert telemetry['unmapped_root_row_count']==len(absent)
+                assert report['unsearched_legal_action_count']==len(absent)
+                assert all(r['visits']==0 and r['mean_value'] is None for r in absent)
+                assert sum(r['visits'] for r in report['root_actions'])==400
+                COUNTS['legal_rows_without_search_edges']+=len(absent)
                 assert report['native_api']=='StepSimulator.battle_search_v2.v1' and report['patch_identity']=='sts_lightspeed_battle_search_v2_tree_internal_v1'
                 eligible=[r for r in report['root_actions'] if r['eligible'] and r['visits']>0]
                 chosen=next(r for r in eligible if r['legal_action_index']==row['chosen_action_index'])
