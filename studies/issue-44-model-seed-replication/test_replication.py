@@ -147,6 +147,16 @@ class ReplicationTests(unittest.TestCase):
             with Path(directory,'resource.jsonl').open('a') as f: f.write('{bad}\n')
             with self.assertRaises(ValueError): budget.Journal(directory,identity,limit)
 
+    def test_cpu_wall_and_memory_fail_closed(self):
+        import budget
+        supervisor=object.__new__(budget.Supervisor); supervisor.free=4*1024**3
+        supervisor.state={'cpu':48000,'wall':0,'limit':{'cpu_seconds':48000,'wall_seconds':9000}}
+        with self.assertRaisesRegex(RuntimeError,'RESOURCE_BLOCKED'): supervisor.check()
+        supervisor.state['cpu']=0; supervisor.state['wall']=9000
+        with self.assertRaisesRegex(RuntimeError,'RESOURCE_BLOCKED'): supervisor.check()
+        supervisor.state['wall']=0
+        with patch.object(budget,'available',return_value=0),self.assertRaisesRegex(RuntimeError,'available memory'): supervisor.check()
+
     def test_source_adapter_fixture_suite(self):
         # Exact pinned public projection/action mapping fixtures; no simulator pilot.
         import test_adapter,test_student
