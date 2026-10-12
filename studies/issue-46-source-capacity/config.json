@@ -1,0 +1,19 @@
+{
+  "purpose": "STUDY_ONLY",
+  "native_commit": "18bcd565b587186425bb46ad3d70a2eb80d947fc",
+  "native_extension_sha256": "0652b1ce6d757404278b840678b1f8548c81fb6b03cade598e7f3d82524b18d2",
+  "stsrl_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+  "public_dependency": "origin/codex/issue-43-noncombat-semantic-learning:adapter.py,student.py",
+  "driver_seed": 433042,
+  "continuation_driver_seeds": [446001, 446002],
+  "model_seeds": [446101, 446102],
+  "source_selection": "Prefer MAP for even owner seed and REWARDS for odd. Among available preferred-family (act,floor,family) strata choose minimum SHA256([46001,owner,stratum]); within that stratum choose minimum SHA256([46002,owner,step]). Fall back to the other family only if preferred family has no root. Legal single-action roots included. No terminal outcome or return enters selection.",
+  "small_selection": "48 natural and 48 assisted owners; within each distribution group roots by (act,family,floor); deterministic round-robin sorted strata, owners ordered SHA256([46003,owner]). Freeze before reading return labels.",
+  "assistance_level": "assist_hp75_potion",
+  "training": {"optimizer":"full_batch_SGD", "learning_rate":0.01, "weight_decay":0, "epochs":100, "hidden_activation":"tanh", "target":"absolute terminal floor / 60", "root_weighting":"equal root weight, inverse legal count per option", "checkpoint_selection":"minimum validation root-weighted MSE, then epoch, then initialization seed", "initialization":"uniform(-0.05,0.05) weights, zero biases; tiny uses unchanged Issue43 Scorer initialization; bigger uses Python Random same seeds", "tiny_parameters":2081, "bigger_parameters":99073},
+  "cpu_cap": 200000,
+  "max_steps":20000,
+  "fresh_seeds":[441001,441128],
+  "bootstrap_seed":441999,
+  "bootstrap_replicates":5000
+}
