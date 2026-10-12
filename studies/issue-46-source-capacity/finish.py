@@ -68,6 +68,7 @@ def main():
         ledger.update(fresh_completed=completed,fresh_failed=failed,fresh_pending=len(pending))
         if active: time.sleep(1)
     if stopped: publish('RESOURCE_BLOCKED' if ledger['cumulative_cpu']>=CONFIG['cpu_cap']-200 else 'INCOMPLETE_FRESH'); return
+    single('AUDITING',sys.executable,'audit.py')
     single('REPORTING',sys.executable,'report.py')
     publish('COMPLETE_PENDING_INDEPENDENT_REVIEW')
 
