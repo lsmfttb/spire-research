@@ -1,0 +1,21 @@
+{
+  "purpose": "STUDY_ONLY",
+  "source_producer": "9d5deb3bbd87b98a2531300d1a262fe4e2777f2f",
+  "source_directory": "/home/lsmft/.cache/issue43-formal-lineage",
+  "source_manifest_sha256": "8b1aa5d3f4f750c62c982d0e6545bd1c87dcff306ab77db28eff1bf8a81f0b7a",
+  "train_target_digest": "6ad644addbee41a4f090dd4806e2d3a0d207b2cb06b2d63eb618d04b139ad313",
+  "config_git_blob": "12a1119933beecb72e52922444b387c9d9eaa0c2",
+  "blocks": 6,
+  "model_seeds": [[440101,440102],[440103,440104],[440105,440106],[440107,440108],[440109,440110],[440111,440112]],
+  "fresh_seeds": [435001,435128],
+  "block_bootstrap_seeds": [440911,440912,440913,440914,440915,440916],
+  "crossed_bootstrap_seed": 440901,
+  "bootstrap_replicates": 10000,
+  "formal_caps": {"cpu_seconds":48000,"wall_seconds":9000},
+  "readiness_caps": {"cpu_seconds":600,"wall_seconds":600},
+  "workers": 8,
+  "job_rss_bytes": 8589934592,
+  "free_memory_bytes": 4294967296,
+  "source_review_delete": "2026-10-26",
+  "review_delete": "2026-11-09"
+}
