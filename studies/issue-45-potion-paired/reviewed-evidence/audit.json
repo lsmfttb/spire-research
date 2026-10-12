@@ -1,0 +1,35 @@
+{
+  "ci95": [
+    -0.16692708333333323,
+    1.3541666666666667
+  ],
+  "classification": "POTION_EFFECT_NOT_ESTABLISHED",
+  "counts": {
+    "battle_decisions": 16110,
+    "off_battle_consumed": 0,
+    "off_battle_discarded": 0,
+    "on_battle_consumed": 186,
+    "on_battle_discarded": 3,
+    "transitions": 23762
+  },
+  "cpu_measured": 3.262956763,
+  "keys": 192,
+  "mean": 0.6354166666666666,
+  "native_version_pooled": false,
+  "producer": "31c36f126a2050f7d343ad67f6f8087ebf8c0cc2",
+  "purpose": "STUDY_ONLY",
+  "same_task_cpu": 6701.951681101001,
+  "signs": {
+    "negative": 10,
+    "positive": 24,
+    "tie": 62
+  },
+  "source": {
+    "native_commit": "18bcd565b587186425bb46ad3d70a2eb80d947fc",
+    "native_extension_sha256": "0652b1ce6d757404278b840678b1f8548c81fb6b03cade598e7f3d82524b18d2",
+    "native_source": "/mnt/d/DeadlycatCoding/native-issue45-reviewed",
+    "stsrl_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsrl_source": "/mnt/d/DeadlycatCoding/STSRL-issue45-reviewed"
+  },
+  "status": "PASS"
+}
