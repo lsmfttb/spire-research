@@ -1,0 +1,27 @@
+{
+  "consumer": "Issue51 independent Reviewer then Planner",
+  "files": [
+    {
+      "path": "public_examples.json",
+      "sha256": "4dddec1563041cf95a079135fd0c802dd60ce42dd98f89db0bcb25fc62cd2ed9"
+    },
+    {
+      "path": "receipt.json",
+      "sha256": "acf9658807aa69166b2bd58c42a03c1e58c17ca5ba741a4e0cf0e7fa7912de4a"
+    }
+  ],
+  "original_seal_sha256": "b586f6ac2c9bf6e30b4525941aa2674ae73af2226c8eb5bfd21793bd5b281a3d",
+  "producer_commit": "2be9425ba3e7fb31f011831b981520c098902191",
+  "purpose": "STUDY_ONLY_ADDITIVE_PUBLIC_PROJECTION_REPAIR",
+  "review_delete_date": "2026-11-14",
+  "source_files": [
+    {
+      "path": "repair_projection.py",
+      "sha256": "35e2ed23da4a12bc59271ab4d0a5cb30c6a43aab77db02d4697deba6051ea3b5"
+    },
+    {
+      "path": "trace_audit.py",
+      "sha256": "b054544a8bf887cd3fb7b68ee1de260c89839765e51d945db0cbc5407f2b49d9"
+    }
+  ]
+}

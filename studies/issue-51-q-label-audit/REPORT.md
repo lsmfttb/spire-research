@@ -1,5 +1,14 @@
 # Issue51 — frozen two-driver Q audit
 
+Public projection correction: use `projection-repair/public_examples.json`
+for exported examples. The historical examples in the original `evidence/`
+contain audit-only executor encodings and are retained solely for provenance.
+See `PROJECTION_REPAIR.md`; scientific ranking statistics remain unchanged.
+
+Planner priority clarification #6139666995 supersedes any suggested successor:
+the incumbent-swap outline below remains unexecuted and is not an automatic
+next study. Standing Issue1's unmet evaluation matrix has priority.
+
 STUDY_ONLY. All 512 original owners, 2886 label JSON receipts and 2886 gzip traces verified against original seals. No games, new labels, learning or simulator import. Traces begin after the forced action; full original raw states are audit-only and are not exported.
 
 ## Ranking stability
