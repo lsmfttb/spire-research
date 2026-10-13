@@ -40,7 +40,10 @@ def metrics(model,initial,data,rows_by_owner):
         s=scores[off:off+n].tolist();s0=baseline[off:off+n].tolist();q=t['q'];owner=t['root']['owner'];meta=rows_by_owner[owner]
         chosen=max(range(n),key=lambda i:s[i]);initial_choice=max(range(n),key=lambda i:s0[i]);pairs=[(i,j) for i in range(n) for j in range(i+1,n) if q[i]!=q[j]]
         def margin(v):return max(v)-sorted(v)[-2] if n>1 else 0.
-        roots.append({'owner':owner,'root_id':meta['root_id'],'assisted':meta['assisted'],'old45':meta['old45'],'family':meta['family'],'split':meta['diagnostic_split'],'legal_count':n,'scores':s,'initial_scores':s0,'q':q,'chosen':chosen,'initial_choice':initial_choice,'choice_changed':chosen!=initial_choice,'regret':max(q)-q[chosen],'initial_regret':max(q)-q[initial_choice],'margin':margin(s),'initial_margin':margin(s0),'top_score_ties':sum(v==max(s) for v in s),'optimal_q_ties':sum(v==max(q) for v in q),'positive_pairs':len(pairs),'common_score_shift':sum(s[i]-s0[i] for i in range(n))/n,'centered_score_motion_rms':math.sqrt(sum(((s[i]-sum(s)/n)-(s0[i]-sum(s0)/n))**2 for i in range(n))/n)})
+        oriented=[(i,j) if q[i]>q[j] else (j,i) for i,j in pairs]
+        pair_loss=sum(math.log1p(math.exp(-(s[i]-s[j]))) for i,j in oriented)/len(oriented) if oriented else None
+        original_options=json.loads(t['root']['serialized'])['legal_options']
+        roots.append({'owner':owner,'root_id':meta['root_id'],'assisted':meta['assisted'],'old45':meta['old45'],'family':meta['family'],'split':meta['diagnostic_split'],'legal_count':n,'scores':s,'initial_scores':s0,'q':q,'chosen':chosen,'selected_native_action':original_options[chosen]['action'],'initial_choice':initial_choice,'choice_changed':chosen!=initial_choice,'regret':max(q)-q[chosen],'initial_regret':max(q)-q[initial_choice],'margin':margin(s),'initial_margin':margin(s0),'top_score_ties':sum(v==max(s) for v in s),'optimal_q_ties':sum(v==max(q) for v in q),'positive_pairs':len(pairs),'pairwise_logistic_loss':pair_loss,'common_score_shift':sum(s[i]-s0[i] for i in range(n))/n,'centered_score_motion_rms':math.sqrt(sum(((s[i]-sum(s)/n)-(s0[i]-sum(s0)/n))**2 for i in range(n))/n)})
     return {'pairwise_logistic_loss':loss,'informative_roots':data['informative'],'uninformative_roots':len(roots)-data['informative'],'mean_regret':sum(r['regret'] for r in roots)/len(roots),'mean_initial_regret':sum(r['initial_regret'] for r in roots)/len(roots),'choice_changes':sum(r['choice_changed'] for r in roots),'roots':roots}
 def main():
     start=time.process_time();store=Path(sys.argv[1]);ledger=json.loads((store/'execution.json').read_text());assert ledger['stage']=='SPLIT_FROZEN_BEFORE_Q'
@@ -50,12 +53,14 @@ def main():
     for r in source['training_source_records']:
         path=OLD47/'inputs'/r['input_path'];assert sha(path)==r['derived_sha256'];t=json.loads(path.read_text());orig=OLD46/r['source_path'];assert sha(orig)==r['source_table_sha256'];original=json.loads(orig.read_text());assert t['q']==original['q'] and t['root']['serialized']==original['root']['serialized']
         assert t['root']['root_id']==byowner[r['owner']]['root_id'];tables.append(t);receipts.extend([{'path':str(path),'sha256':sha(path)},{'path':str(orig),'sha256':sha(orig)}])
+        options=json.loads(t['root']['serialized'])['legal_options'];assert t['root']['legal_count']==len(options)==len(t['q'])
+        assert [o['candidate_index'] for o in options]==list(range(len(options)))
     assert len(tables)==384;train=[t for t in tables if byowner[t['root']['owner']]['diagnostic_split']=='train'];diag=[t for t in tables if byowner[t['root']['owner']]['diagnostic_split']=='diagnostic'];assert len(train)==320 and len(diag)==64
     tr=train47.encode(train);va=train47.encode(diag)
     # Provenance and Q never enter features. Copy both fields and verify exact x.
     altered=copy.deepcopy(train);altered[0]['root']['assisted']=not altered[0]['root']['assisted'];altered[0]['q']=[v+1 for v in altered[0]['q']]
     assert torch.equal(tr['x'],train47.encode(altered)['x'])
-    check_start=time.process_time();checks=verify(tr);checks['features_independent_of_Q_and_assistance_metadata']=True;checks['cpu_seconds']=time.process_time()-check_start;write(store/'verification.json',checks)
+    check_start=time.process_time();checks=verify(tr);checks['features_independent_of_Q_and_assistance_metadata']=True;checks['all_384_original_native_option_ordinals_consistent']=True;checks['cpu_seconds']=time.process_time()-check_start;write(store/'verification.json',checks)
     write(store/'input-receipts.json',receipts);records=[];checkpoints={};outputs={}
     for seed in (446101,446102):
         initial=train47.initialize(seed)
