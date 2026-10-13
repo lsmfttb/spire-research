@@ -168,9 +168,9 @@ def main():
       'original_val_heldout_missing_cells':['natural/MAP_SCREEN','assisted/REWARDS'],
       'interpretation_limits':['Two fixed Expert seeds share restored Native root RNG; not independent hidden worlds.','Only descriptive retrospective evidence, no strategic indifference or true optimal-action claim.','Sampling variation, source confounding and continuation-policy mismatch are separate.','More Expert samples cannot by itself change Q under Expert into Q under repeated learned policy.']}
     write(OUT/'owner_metrics.json',rows); write(OUT/'ranking_examples.json',example_kinds); write(OUT/'rank_report.json',report)
-    write(OUT/'input_receipts.json',{'seals':SEALS,'inputs':inputs,'source46':lineage46,'source47_metadata_sha256':digest_bytes((S47/'source.json').read_bytes()),'original_retention':{'46':'2026-11-12','47':'2026-11-13'}})
+    write(OUT/'input_receipts.json',{'seals':SEALS,'inputs':inputs,'source46_pins':{k:lineage46[k] for k in ('producer','stsrl_commit','native_commit','native_extension_sha256')},'source47_metadata_sha256':digest_bytes((S47/'source.json').read_bytes()),'original_retention':{'46':'2026-11-12','47':'2026-11-13'}})
     write(OUT/'verification.json',unit_checks())
-    cpu=time.process_time()-start; ledger['charges']['receipt_rank_cpu']=cpu; ledger['stage']='RANKS_COMPLETE'; write(OUT/'execution.json',ledger)
+    cpu=time.process_time()-start; ledger['charges']['receipt_rank_cpu']=ledger['charges'].get('receipt_rank_cpu',0)+cpu; ledger.setdefault('receipt_rank_attempts',[]).append(cpu); ledger['stage']='RANKS_COMPLETE'; write(OUT/'execution.json',ledger)
     print(json.dumps({'owners':len(rows),'labels':expected,'cpu':cpu,'train':report['split']['train']},sort_keys=True))
 
 if __name__=='__main__': main()
