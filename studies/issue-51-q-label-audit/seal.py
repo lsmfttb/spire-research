@@ -2,6 +2,7 @@
 import os
 import time
 import shutil
+import subprocess
 from pathlib import Path
 from audit import OUT, S46, S47, SEALS, load, write, digest_bytes
 
@@ -13,6 +14,8 @@ def sha(path):
 def main():
     start = time.process_time()
     producer = os.environ['ISSUE51_PRODUCER']
+    assert len(producer) == 40 and all(c in '0123456789abcdef' for c in producer), 'Full exact producer SHA required'
+    assert subprocess.check_output(['/mnt/d/Git/cmd/git.exe','-C','D:/DeadlycatCoding/spire-issue51','rev-parse','HEAD']).decode().strip() == producer
     study = Path(__file__).parent
     ledger = load(OUT/'execution.json')
     assert ledger['stage'] == 'REPORT_COMPLETE'
@@ -34,7 +37,9 @@ def main():
     rows = load(OUT/'owner_metrics.json')
     assert len(rows) == len({r['owner'] for r in rows}) == len({r['root_id'] for r in rows}) == 512
     assert load(OUT/'verification.json')['passed']
-    ledger['charges']['seal_cpu'] = time.process_time()-start
+    elapsed = time.process_time()-start
+    ledger['charges']['seal_cpu'] = ledger['charges'].get('seal_cpu',0)+elapsed
+    ledger.setdefault('seal_attempts',[]).append(elapsed)
     ledger['charges']['root_recovery_administration_publication_cleanup_upper'] = 60
     ledger['builder_upper_cpu_seconds'] = sum(ledger['charges'].values())
     assert ledger['builder_upper_cpu_seconds'] + ledger['reviewer_reserved'] <= ledger['cpu_hard_upper']
@@ -56,7 +61,7 @@ def main():
             'reviewer_reserved':ledger['reviewer_reserved'],'cpu_hard_upper':3000,
             'raw_source_cache_exported':False,'new_games':0,'new_Q':0,'training':0}
     write(OUT/'artifact-manifest.json', seal)
-    evidence = study/'evidence'; evidence.mkdir(exist_ok=False)
+    evidence = study/'evidence'; evidence.mkdir(exist_ok=True)
     for name in [x['path'] for x in files] + ['artifact-manifest.json']:
         shutil.copyfile(OUT/name, evidence/name)
     shutil.copyfile(OUT/'REPORT.md', study/'REPORT.md')
