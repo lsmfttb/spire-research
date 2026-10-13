@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import subprocess
 import time
+import re
 
 DRIVERS = (446001, 446002)
 STSRL = "7d172f7c24c9d29429b6946ba44f6b59760b0d96"
@@ -35,7 +36,35 @@ def public(raw):
 
 def action(item):
     item = item.get("action", item)
-    return {k: item[k] for k in ("kind", "label") if k in item}
+    result = {k: item[k] for k in ("kind", "label") if k in item}
+    label = result.get("label", "")
+    if re.search(r"\bbits\s*=", label, re.IGNORECASE):
+        # Match the accepted public-action convention: kind and legal option
+        # indices are public; the opaque native executor integer is audit-only.
+        kind = result.get("kind", "unknown")
+        indices = re.findall(r"\bidx([123])=(-?\d+)\b", label)
+        result["label"] = "game." + kind + "".join(
+            f" idx{number}={value}" for number, value in indices)
+    assert_public_export(result)
+    return result
+
+
+def assert_public_export(value):
+    forbidden = ("bits", "hidden_rng", "rng_state", "random_state", "checkpoint",
+                 "native_payload", "native_object", "simulator_state", "draw_order",
+                 "draw_pile_order", "unrevealed", "future_encounter", "snapshot_raw",
+                 "forced_pre_raw", "forced_post_raw")
+    if isinstance(value, dict):
+        for key, child in value.items():
+            assert not any(token in key.lower() for token in forbidden), key
+            assert_public_export(child)
+    elif isinstance(value, list):
+        for child in value:
+            assert_public_export(child)
+    elif isinstance(value, str):
+        assert not re.search(r"\bbits\s*=", value, re.IGNORECASE), value
+        assert not any(token in value.lower() for token in forbidden[1:]), value
+    return True
 
 
 def write(path, value):
@@ -208,6 +237,7 @@ def audit_traces(owner_rows, store46, output_dir):
     except Exception as exc:
         summary["failure"] = {"type": type(exc).__name__, "message": str(exc)}
     summary["measured_cpu_seconds"] = time.process_time() - started
+    assert_public_export(examples)
     write(out / "public_examples.json", examples)
     write(out / "trace_summary.json", summary)
     return summary
