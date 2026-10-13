@@ -1,0 +1,17 @@
+{
+  "purpose": "STUDY_ONLY",
+  "native_commit": "18bcd565b587186425bb46ad3d70a2eb80d947fc",
+  "native_extension_sha256": "0652b1ce6d757404278b840678b1f8548c81fb6b03cade598e7f3d82524b18d2",
+  "stsrl_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+  "public_dependency": "f7037e2dadc57713bc60f2ad1b5c00c61048c7d1:studies/issue-46-source-capacity/adapter.py,student.py",
+  "driver_seed": 433042,
+  "continuation_driver_seeds": [446001, 446002],
+  "model_seeds": [446101, 446102],
+  "source_dependency": "Immutable Issue46 384/64/64 owners and original two-stream all-action mean terminal-floor labels; original root RNG retained, not independent native future RNG worlds.",
+  "training": {"optimizer":"full_batch_SGD", "learning_rate":0.01, "weight_decay":0, "epochs":100, "hidden_activation":"tanh", "A":"absolute terminal floor /60 root-equal option-balanced MSE", "P":"softplus(-(score_high-score_low)) over every unordered unequal-mean-Q legal pair; informative roots equal, pairs equal within root; no targets for uninformative roots", "checkpoint_selection":"minimum mean empirical validation action regret across all64 roots, then earliest epoch, then smaller initialization seed; native ordinal tie-break", "initialization":"unchanged Issue43 Scorer initialization at seeds446101,446102", "tiny_parameters":2081},
+  "cpu_cap": 40000,
+  "max_steps":20000,
+  "fresh_seeds":[471001,471128],
+  "bootstrap_seed":471999,
+  "bootstrap_replicates":5000
+}
