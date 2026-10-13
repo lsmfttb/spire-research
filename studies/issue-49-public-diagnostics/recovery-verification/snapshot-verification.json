@@ -1,0 +1,87 @@
+{
+  "Q_labels_generated": 0,
+  "checks": {
+    "all_current_native_candidates_resolve": true,
+    "all_policy_features_identical_to_original": true,
+    "mismatched_snapshot_candidate_list_rejected": true,
+    "missing_current_snapshot_rejected": true,
+    "native_card_group_remap": {
+      "old_semantics": {
+        "card": {
+          "id": 11,
+          "id_label": "ANGER",
+          "name": "Anger",
+          "rarity": "COMMON",
+          "type": "ATTACK",
+          "upgraded": false
+        },
+        "choice_type": "card"
+      },
+      "passed": true,
+      "reason": "stale public observation or choice set",
+      "replacement_semantics": {
+        "card": {
+          "id": 67,
+          "id_label": "CLEAVE",
+          "name": "Cleave",
+          "rarity": "COMMON",
+          "type": "ATTACK",
+          "upgraded": false
+        },
+        "choice_type": "card"
+      },
+      "reused_identity": {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "scope": "game"
+      }
+    },
+    "native_inventory_slot_reuse": {
+      "old_semantics": {
+        "choice_type": "game_potion_discard",
+        "potion": {
+          "id": 7,
+          "id_label": "BloodPotion",
+          "name": "Blood Potion",
+          "potion_index": 0
+        }
+      },
+      "passed": true,
+      "reason": "stale public observation or choice set",
+      "replacement_semantics": {
+        "choice_type": "game_potion_discard",
+        "potion": {
+          "id": 41,
+          "id_label": "Strength Potion",
+          "name": "Strength Potion",
+          "potion_index": 0
+        }
+      },
+      "reused_identity": {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "scope": "game"
+      }
+    }
+  },
+  "cpu_seconds": 0.047831591,
+  "fresh_games": 0,
+  "guard_external_to_policy_features": true,
+  "inputs": [
+    {
+      "path": "visibility-public-fixtures.json",
+      "sha256": "5189ec5aceb5321d734bd2b110f00fd3f9239d9f33d6c3c0ca960c80b24df4e2"
+    },
+    {
+      "path": "visibility-native.json",
+      "sha256": "ce5400aff2c84313cba16e024b998c7d0b92b9093dbd52b8c6f0106ad84206c3"
+    }
+  ],
+  "native_executions": 0,
+  "passed": true,
+  "training_steps": 0
+}

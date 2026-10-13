@@ -1,0 +1,170 @@
+{
+  "availability": {
+    "screen_payload": "available"
+  },
+  "legal_options": [
+    {
+      "action": {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "unused",
+        "scope": "game"
+      },
+      "candidate_index": 0,
+      "semantics": {
+        "card": {
+          "id": 1,
+          "misc": 0,
+          "upgraded": false
+        },
+        "choice_type": "card"
+      }
+    },
+    {
+      "action": {
+        "idx1": 0,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "unused",
+        "scope": "game"
+      },
+      "candidate_index": 1,
+      "semantics": {
+        "card": {
+          "id": 2,
+          "misc": 0,
+          "upgraded": false
+        },
+        "choice_type": "card"
+      }
+    },
+    {
+      "action": {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "unused",
+        "scope": "game"
+      },
+      "candidate_index": 2,
+      "semantics": {
+        "card": {
+          "id": 3,
+          "misc": 0,
+          "upgraded": false
+        },
+        "choice_type": "card"
+      }
+    },
+    {
+      "action": {
+        "idx1": 1,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "unused",
+        "scope": "game"
+      },
+      "candidate_index": 3,
+      "semantics": {
+        "card": {
+          "id": 4,
+          "misc": 0,
+          "upgraded": false
+        },
+        "choice_type": "card"
+      }
+    },
+    {
+      "action": {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_potion",
+        "label": "unused",
+        "scope": "game"
+      },
+      "candidate_index": 4,
+      "semantics": {
+        "choice_type": "potion",
+        "potion": {
+          "id": 5
+        }
+      }
+    },
+    {
+      "action": {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "label": "unused",
+        "scope": "game"
+      },
+      "candidate_index": 5,
+      "semantics": {
+        "choice_type": "potion_discard",
+        "potion": {
+          "id": 6,
+          "slot": 0
+        }
+      }
+    },
+    {
+      "action": {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "skip",
+        "label": "unused",
+        "scope": "game"
+      },
+      "candidate_index": 6,
+      "semantics": {
+        "choice_type": "skip"
+      }
+    }
+  ],
+  "public_state": {
+    "deck": [
+      {
+        "id": 10,
+        "misc": 0,
+        "upgraded": false
+      },
+      {
+        "id": 11,
+        "misc": 0,
+        "upgraded": true
+      }
+    ],
+    "map_graph": [
+      {
+        "outgoing_edges": [
+          {
+            "x": 1,
+            "y": 1
+          }
+        ],
+        "room_symbol": "M",
+        "x": 0,
+        "y": 0
+      }
+    ],
+    "potion_capacity": 2,
+    "potions": [
+      {
+        "id": 6,
+        "slot": 0
+      },
+      {
+        "id": 7,
+        "slot": 1
+      }
+    ]
+  }
+}

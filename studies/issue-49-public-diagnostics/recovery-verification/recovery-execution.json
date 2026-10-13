@@ -1,0 +1,34 @@
+{
+  "administrative_recovery_upper_cpu": 50.0,
+  "all_repaired_source_and_output_hashes_verified": true,
+  "budget": 3000,
+  "builder_cumulative_upper_cpu": 566.7355971209998,
+  "completed": [
+    {
+      "exit": 0,
+      "test": "snapshot"
+    },
+    {
+      "exit": 0,
+      "test": "prototype"
+    },
+    {
+      "exit": 0,
+      "test": "visibility"
+    }
+  ],
+  "fresh_games": 0,
+  "native_executions": 0,
+  "new_labels": 0,
+  "original_handoff": "9e3b4c6f531b86f7d2e94d1098fc5ad22a79bb27",
+  "original_seal_unchanged": true,
+  "parent_cpu": 0.014242055999999996,
+  "prior_builder_upper_cpu": 516.4543680649999,
+  "repair_handoff": "93f5941ab341e99cf8e40736e04516e1057ff53a",
+  "repair_seal_unchanged": true,
+  "retention_consumer": "Issue49 Reviewer/Planner",
+  "review_delete_date": "2026-11-14",
+  "stage": "RECOVERY_VERIFIED",
+  "training_steps": 0,
+  "worker_cpu": 0.266987
+}
