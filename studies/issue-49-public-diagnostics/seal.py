@@ -11,8 +11,9 @@ def main():
     grad=json.loads((store/'gradient-verification.json').read_text());proto=json.loads((store/'prototype-verification.json').read_text());visibility=json.loads((store/'visibility-checks.json').read_text())
     assert grad['passed'] and proto['passed'] and visibility['passed']
     execution=json.loads((store/'execution.json').read_text())
+    diagnostics_cpu=execution.get('measured_cpu_seconds',execution.get('measured_final_diagnostics_cpu'))
     ledger={'budget_upper_cpu_seconds':3000,'purpose':'Phase A only; independent Reviewer reserve remains',
-            'measured_final_diagnostics_cpu':execution['measured_cpu_seconds'],
+            'measured_final_diagnostics_cpu':diagnostics_cpu,
             'measured_prior_diagnostics_attempt_cpu':50.057715294,
             'native_probe_cpu_receipt':native,
             'prototype_cpu':proto['cpu_seconds'],'gradient_check_cpu':grad['cpu_seconds'],
@@ -25,7 +26,7 @@ def main():
     native_cpu=native.get('total_measured_cpu_seconds',native.get('measured_cpu_seconds',native.get('cpu_seconds',0)))
     assert native_cpu>0, 'Native receipt must expose all-attempt measured total'
     ledger['native_all_attempt_cpu_seconds']=native_cpu
-    ledger['builder_upper_cpu_seconds']=sum([execution['measured_cpu_seconds'],50.057715294,native_cpu,proto['cpu_seconds'],grad['cpu_seconds'],visibility['cpu_seconds'],150,108.273038541,10])
+    ledger['builder_upper_cpu_seconds']=sum([diagnostics_cpu,50.057715294,native_cpu,proto['cpu_seconds'],grad['cpu_seconds'],visibility['cpu_seconds'],150,108.273038541,10])
     ledger['seal_and_publication_upper_charge']=10
     assert ledger['builder_upper_cpu_seconds']+2200<=3000
     write(store/'execution.json',ledger)
