@@ -19,7 +19,7 @@ def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def available(value):return {'availability':'available','value':value,'source':'synthetic native fixture / sealed public envelope'}
 
 def main():
-    start=time.process_time();out=Path(sys.argv[1]);native=json.loads((out/'visibility-native.json').read_text())
+    start=time.process_time();out=Path(sys.argv[1]);input_store=Path(sys.argv[2]) if len(sys.argv)>2 else out;native=json.loads((input_store/'visibility-native.json').read_text())
     code=subprocess.check_output(['git.exe','-C','D:/DeadlycatCoding/spire-research','show',PIN47+':studies/issue-47-action-preference/adapter.py']).decode()
     adapter=types.ModuleType('visibility_pinned_adapter');sys.modules[adapter.__name__]=adapter;exec(compile(code,'pinned47_adapter','exec'),adapter.__dict__)
     path=Path('/home/lsmft/.cache/issue47-action-preference/inputs/437001.json')
@@ -44,7 +44,7 @@ def main():
         assert prototype.normalize(public[name])['facts']['card_reward_groups']
         for i,a in enumerate(row['candidate_actions']):
             assert adapter.resolve_native_action(prepared[name],i,p,row['candidate_actions'])==a
-            assert prototype.mapped_action(public[name],i,row['candidate_actions'])==a
+            assert prototype.mapped_action(public[name],i,row['candidate_actions'],current_public=public[name])==a
     before=public['before'];norm=prototype.normalize(before)
     groups=norm['facts']['card_reward_groups'];assert len(groups)==2
     assert len(prototype.normalize(public['after_discard'])['facts']['card_reward_groups'])==2
@@ -70,7 +70,7 @@ def main():
     (out/'visibility-public-fixtures.json').write_text(json.dumps(public,sort_keys=True,indent=2))
     receipt={'passed':True,'checks':checks,'fixture_kind':'native default-context reward transitions; map/resource envelope explicitly hybrid sealed public #47 root437001',
              'borrowed_public_source':record,'adapter_pin':PIN47,'adapter_source_sha256':hashlib.sha256(code.encode()).hexdigest(),
-             'native_input_sha256':sha(out/'visibility-native.json'),'output_sha256':sha(out/'visibility-public-fixtures.json'),
+             'native_input_sha256':sha(input_store/'visibility-native.json'),'output_sha256':sha(out/'visibility-public-fixtures.json'),
              'cpu_seconds':time.process_time()-start,'fresh_games':0,'continuations':0,'training_steps':0}
     (out/'visibility-checks.json').write_text(json.dumps(receipt,sort_keys=True,indent=2));print(json.dumps(receipt))
 

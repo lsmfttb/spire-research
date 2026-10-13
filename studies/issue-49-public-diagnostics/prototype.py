@@ -55,8 +55,21 @@ def features(public,index):
     target=canonical(candidate);context=canonical(observation['facts'])
     return {'candidate:'+target:1,'public-context:'+context:1,
             'candidate-x-context:'+canonical([candidate,observation['facts']]):1}
-def mapped_action(public,index,current_candidates):
-    """External action guard: mapping never enters features; reject stale IDs."""
+def mapped_action(public,index,current_candidates,*,current_public=None):
+    """External snapshot guard; executor identities never enter features.
+
+    Reward groups and potion slots can reuse the same indices for different
+    entities. Require a freshly prepared public observation, not indices alone.
+    The caller must obtain current_public and current_candidates together from
+    the current native boundary; supplying an old snapshot violates this API.
+    """
+    if current_public is None:raise ValueError('fresh current-public snapshot required')
+    if isinstance(public,str):public=json.loads(public)
+    if isinstance(current_public,str):current_public=json.loads(current_public)
+    if canonical(public)!=canonical(current_public):raise ValueError('stale public observation or choice set')
+    def identity(a):return {k:a[k] for k in ('scope','kind','idx1','idx2','idx3') if k in a}
+    projected=[identity(o['action']) for o in current_public['legal_options']]
+    if projected!=[identity(a) for a in current_candidates]:raise ValueError('current candidates do not match current-public snapshot')
     option=public['legal_options'][index];action=option['action']
     identity={k:action[k] for k in ('scope','kind','idx1','idx2','idx3') if k in action}
     matches=[a for a in current_candidates if all(a.get(k)==v for k,v in identity.items())]

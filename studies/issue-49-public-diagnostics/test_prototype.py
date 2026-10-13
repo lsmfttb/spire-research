@@ -35,8 +35,8 @@ def main():
     # This is an admission-boundary witness: it does not establish that an
     # arbitrary malicious nested public_state object would be truly public.
     candidates=[o['action'] for o in p['legal_options']]
-    assert prototype.mapped_action(p,0,candidates)==candidates[0]
-    try:prototype.mapped_action(p,0,candidates[1:])
+    assert prototype.mapped_action(p,0,candidates,current_public=p)==candidates[0]
+    try:prototype.mapped_action(p,0,candidates[1:],current_public=p)
     except ValueError:checks['stale-mapping-rejected']=True
     else:raise AssertionError('stale accepted')
     f=prototype.normalize(p);assert len(f['facts']['card_reward_groups'])==2

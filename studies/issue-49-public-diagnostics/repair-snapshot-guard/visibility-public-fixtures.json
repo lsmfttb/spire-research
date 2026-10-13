@@ -1,0 +1,4847 @@
+{
+  "after_card_group0": {
+    "availability": {
+      "candidate_actions": "available",
+      "current_map_node": "available",
+      "immediately_legal_routes": "unavailable",
+      "persistent_resources": "available",
+      "screen_identity": "available",
+      "screen_payload": "available",
+      "visible_act_boss": "available",
+      "visible_map_graph": "available"
+    },
+    "legal_options": [
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 0,
+        "semantics": {
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 1,
+        "semantics": {
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_potion",
+          "label": "game.reward_potion idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 2,
+        "semantics": {
+          "choice_type": "potion",
+          "potion": {
+            "id": 41,
+            "id_label": "Strength Potion",
+            "name": "Strength Potion"
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "skip",
+          "label": "game.skip idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 3,
+        "semantics": {
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 4,
+        "semantics": {
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      }
+    ],
+    "public_state": {
+      "current_map_node": {
+        "location": "map_node",
+        "room_symbol": "M",
+        "x": 1,
+        "y": 4
+      },
+      "map_graph": [
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 3
+            },
+            {
+              "x": 1,
+              "y": 3
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 3
+            },
+            {
+              "x": 2,
+              "y": 3
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            },
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "$",
+          "x": 1,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            },
+            {
+              "x": 2,
+              "y": 5
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 6
+            },
+            {
+              "x": 1,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 7
+            },
+            {
+              "x": 3,
+              "y": 7
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 8
+            },
+            {
+              "x": 3,
+              "y": 8
+            }
+          ],
+          "room_symbol": "$",
+          "x": 3,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 9
+            },
+            {
+              "x": 1,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 0,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 2,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 3,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 11
+            },
+            {
+              "x": 1,
+              "y": 11
+            },
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 4,
+              "y": 11
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 12
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 12
+            },
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            },
+            {
+              "x": 4,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 14
+            },
+            {
+              "x": 3,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 3,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 14
+            },
+            {
+              "x": 4,
+              "y": 14
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 3,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 4,
+          "y": 14
+        }
+      ],
+      "persistent_resources": {
+        "current_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 40
+        },
+        "deck": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": [
+            {
+              "deck_index": 0,
+              "id": 11,
+              "id_label": "ANGER",
+              "misc": 0,
+              "name": "Anger",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 99
+        },
+        "keys": {
+          "availability": "available",
+          "source": "GameContext::keyFlags",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 80
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 1
+        },
+        "potion_identities": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": [
+            {
+              "id": 1,
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id": 23,
+              "id_label": "Fire Potion",
+              "name": "Fire Potion",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "source": "GameContext::relics",
+          "value": [
+            {
+              "counter": 0,
+              "id": 98,
+              "id_label": "Busted Crown",
+              "name": "Busted Crown",
+              "relic_index": 0
+            }
+          ]
+        }
+      },
+      "screen": "REWARDS",
+      "screen_context": {
+        "coverage_status": "supported",
+        "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+      },
+      "visible_act_boss": "The Guardian"
+    },
+    "schema_id": "noncombat-visible-choice-input-v1"
+  },
+  "after_discard": {
+    "availability": {
+      "candidate_actions": "available",
+      "current_map_node": "available",
+      "immediately_legal_routes": "unavailable",
+      "persistent_resources": "available",
+      "screen_identity": "available",
+      "screen_payload": "available",
+      "visible_act_boss": "available",
+      "visible_map_graph": "available"
+    },
+    "legal_options": [
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 0,
+        "semantics": {
+          "card": {
+            "id": 11,
+            "id_label": "ANGER",
+            "name": "Anger",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 1,
+        "semantics": {
+          "card": {
+            "id": 25,
+            "id_label": "BASH",
+            "name": "Bash",
+            "rarity": "BASIC",
+            "type": "ATTACK",
+            "upgraded": true
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 2,
+        "semantics": {
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 3,
+        "semantics": {
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_potion",
+          "label": "game.reward_potion idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 4,
+        "semantics": {
+          "choice_type": "potion",
+          "potion": {
+            "id": 41,
+            "id_label": "Strength Potion",
+            "name": "Strength Potion"
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "skip",
+          "label": "game.skip idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 5,
+        "semantics": {
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 6,
+        "semantics": {
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      }
+    ],
+    "public_state": {
+      "current_map_node": {
+        "location": "map_node",
+        "room_symbol": "M",
+        "x": 1,
+        "y": 4
+      },
+      "map_graph": [
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 3
+            },
+            {
+              "x": 1,
+              "y": 3
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 3
+            },
+            {
+              "x": 2,
+              "y": 3
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            },
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "$",
+          "x": 1,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            },
+            {
+              "x": 2,
+              "y": 5
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 6
+            },
+            {
+              "x": 1,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 7
+            },
+            {
+              "x": 3,
+              "y": 7
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 8
+            },
+            {
+              "x": 3,
+              "y": 8
+            }
+          ],
+          "room_symbol": "$",
+          "x": 3,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 9
+            },
+            {
+              "x": 1,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 0,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 2,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 3,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 11
+            },
+            {
+              "x": 1,
+              "y": 11
+            },
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 4,
+              "y": 11
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 12
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 12
+            },
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            },
+            {
+              "x": 4,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 14
+            },
+            {
+              "x": 3,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 3,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 14
+            },
+            {
+              "x": 4,
+              "y": 14
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 3,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 4,
+          "y": 14
+        }
+      ],
+      "persistent_resources": {
+        "current_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 40
+        },
+        "deck": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": []
+        },
+        "gold": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 99
+        },
+        "keys": {
+          "availability": "available",
+          "source": "GameContext::keyFlags",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 80
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 1
+        },
+        "potion_identities": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": [
+            {
+              "id": 1,
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id": 23,
+              "id_label": "Fire Potion",
+              "name": "Fire Potion",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "source": "GameContext::relics",
+          "value": [
+            {
+              "counter": 0,
+              "id": 98,
+              "id_label": "Busted Crown",
+              "name": "Busted Crown",
+              "relic_index": 0
+            }
+          ]
+        }
+      },
+      "screen": "REWARDS",
+      "screen_context": {
+        "coverage_status": "supported",
+        "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+      },
+      "visible_act_boss": "The Guardian"
+    },
+    "schema_id": "noncombat-visible-choice-input-v1"
+  },
+  "after_noncombat_use": {
+    "availability": {
+      "candidate_actions": "available",
+      "current_map_node": "available",
+      "immediately_legal_routes": "unavailable",
+      "persistent_resources": "available",
+      "screen_identity": "available",
+      "screen_payload": "available",
+      "visible_act_boss": "available",
+      "visible_map_graph": "available"
+    },
+    "legal_options": [
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 0,
+        "semantics": {
+          "card": {
+            "id": 11,
+            "id_label": "ANGER",
+            "name": "Anger",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 1,
+        "semantics": {
+          "card": {
+            "id": 25,
+            "id_label": "BASH",
+            "name": "Bash",
+            "rarity": "BASIC",
+            "type": "ATTACK",
+            "upgraded": true
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 2,
+        "semantics": {
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 3,
+        "semantics": {
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "skip",
+          "label": "game.skip idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 4,
+        "semantics": {
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 5,
+        "semantics": {
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      }
+    ],
+    "public_state": {
+      "current_map_node": {
+        "location": "map_node",
+        "room_symbol": "M",
+        "x": 1,
+        "y": 4
+      },
+      "map_graph": [
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 3
+            },
+            {
+              "x": 1,
+              "y": 3
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 3
+            },
+            {
+              "x": 2,
+              "y": 3
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            },
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "$",
+          "x": 1,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            },
+            {
+              "x": 2,
+              "y": 5
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 6
+            },
+            {
+              "x": 1,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 7
+            },
+            {
+              "x": 3,
+              "y": 7
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 8
+            },
+            {
+              "x": 3,
+              "y": 8
+            }
+          ],
+          "room_symbol": "$",
+          "x": 3,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 9
+            },
+            {
+              "x": 1,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 0,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 2,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 3,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 11
+            },
+            {
+              "x": 1,
+              "y": 11
+            },
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 4,
+              "y": 11
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 12
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 12
+            },
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            },
+            {
+              "x": 4,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 14
+            },
+            {
+              "x": 3,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 3,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 14
+            },
+            {
+              "x": 4,
+              "y": 14
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 3,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 4,
+          "y": 14
+        }
+      ],
+      "persistent_resources": {
+        "current_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 56
+        },
+        "deck": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": []
+        },
+        "gold": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 99
+        },
+        "keys": {
+          "availability": "available",
+          "source": "GameContext::keyFlags",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 80
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 1
+        },
+        "potion_identities": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": [
+            {
+              "id": 1,
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id": 23,
+              "id_label": "Fire Potion",
+              "name": "Fire Potion",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "source": "GameContext::relics",
+          "value": [
+            {
+              "counter": 0,
+              "id": 98,
+              "id_label": "Busted Crown",
+              "name": "Busted Crown",
+              "relic_index": 0
+            }
+          ]
+        }
+      },
+      "screen": "REWARDS",
+      "screen_context": {
+        "coverage_status": "supported",
+        "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+      },
+      "visible_act_boss": "The Guardian"
+    },
+    "schema_id": "noncombat-visible-choice-input-v1"
+  },
+  "after_potion_take": {
+    "availability": {
+      "candidate_actions": "available",
+      "current_map_node": "available",
+      "immediately_legal_routes": "unavailable",
+      "persistent_resources": "available",
+      "screen_identity": "available",
+      "screen_payload": "available",
+      "visible_act_boss": "available",
+      "visible_map_graph": "available"
+    },
+    "legal_options": [
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 0,
+        "semantics": {
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 1,
+        "semantics": {
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "skip",
+          "label": "game.skip idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 2,
+        "semantics": {
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 3,
+        "semantics": {
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 41,
+            "id_label": "Strength Potion",
+            "name": "Strength Potion",
+            "potion_index": 0
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 4,
+        "semantics": {
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      }
+    ],
+    "public_state": {
+      "current_map_node": {
+        "location": "map_node",
+        "room_symbol": "M",
+        "x": 1,
+        "y": 4
+      },
+      "map_graph": [
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 3
+            },
+            {
+              "x": 1,
+              "y": 3
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 3
+            },
+            {
+              "x": 2,
+              "y": 3
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            },
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "$",
+          "x": 1,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            },
+            {
+              "x": 2,
+              "y": 5
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 6
+            },
+            {
+              "x": 1,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 7
+            },
+            {
+              "x": 3,
+              "y": 7
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 8
+            },
+            {
+              "x": 3,
+              "y": 8
+            }
+          ],
+          "room_symbol": "$",
+          "x": 3,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 9
+            },
+            {
+              "x": 1,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 0,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 2,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 3,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 11
+            },
+            {
+              "x": 1,
+              "y": 11
+            },
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 4,
+              "y": 11
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 12
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 12
+            },
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            },
+            {
+              "x": 4,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 14
+            },
+            {
+              "x": 3,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 3,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 14
+            },
+            {
+              "x": 4,
+              "y": 14
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 3,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 4,
+          "y": 14
+        }
+      ],
+      "persistent_resources": {
+        "current_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 40
+        },
+        "deck": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": [
+            {
+              "deck_index": 0,
+              "id": 11,
+              "id_label": "ANGER",
+              "misc": 0,
+              "name": "Anger",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 99
+        },
+        "keys": {
+          "availability": "available",
+          "source": "GameContext::keyFlags",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 80
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 2
+        },
+        "potion_identities": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": [
+            {
+              "id": 41,
+              "id_label": "Strength Potion",
+              "name": "Strength Potion",
+              "potion_index": 0
+            },
+            {
+              "id": 23,
+              "id_label": "Fire Potion",
+              "name": "Fire Potion",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "source": "GameContext::relics",
+          "value": [
+            {
+              "counter": 0,
+              "id": 98,
+              "id_label": "Busted Crown",
+              "name": "Busted Crown",
+              "relic_index": 0
+            }
+          ]
+        }
+      },
+      "screen": "REWARDS",
+      "screen_context": {
+        "coverage_status": "supported",
+        "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+      },
+      "visible_act_boss": "The Guardian"
+    },
+    "schema_id": "noncombat-visible-choice-input-v1"
+  },
+  "before": {
+    "availability": {
+      "candidate_actions": "available",
+      "current_map_node": "available",
+      "immediately_legal_routes": "unavailable",
+      "persistent_resources": "available",
+      "screen_identity": "available",
+      "screen_payload": "available",
+      "visible_act_boss": "available",
+      "visible_map_graph": "available"
+    },
+    "legal_options": [
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 0,
+        "semantics": {
+          "card": {
+            "id": 11,
+            "id_label": "ANGER",
+            "name": "Anger",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 1,
+        "semantics": {
+          "card": {
+            "id": 25,
+            "id_label": "BASH",
+            "name": "Bash",
+            "rarity": "BASIC",
+            "type": "ATTACK",
+            "upgraded": true
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 2,
+        "semantics": {
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 3,
+        "semantics": {
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_potion",
+          "label": "game.reward_potion idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 4,
+        "semantics": {
+          "choice_type": "potion",
+          "potion": {
+            "id": 41,
+            "id_label": "Strength Potion",
+            "name": "Strength Potion"
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "skip",
+          "label": "game.skip idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 5,
+        "semantics": {
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_use",
+          "label": "game.game_potion_use idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 6,
+        "semantics": {
+          "choice_type": "game_potion_use",
+          "potion": {
+            "id": 7,
+            "id_label": "BloodPotion",
+            "name": "Blood Potion",
+            "potion_index": 0
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 7,
+        "semantics": {
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 7,
+            "id_label": "BloodPotion",
+            "name": "Blood Potion",
+            "potion_index": 0
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 8,
+        "semantics": {
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      }
+    ],
+    "public_state": {
+      "current_map_node": {
+        "location": "map_node",
+        "room_symbol": "M",
+        "x": 1,
+        "y": 4
+      },
+      "map_graph": [
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 3
+            },
+            {
+              "x": 1,
+              "y": 3
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 3
+            },
+            {
+              "x": 2,
+              "y": 3
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            },
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "$",
+          "x": 1,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            },
+            {
+              "x": 2,
+              "y": 5
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 6
+            },
+            {
+              "x": 1,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 7
+            },
+            {
+              "x": 3,
+              "y": 7
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 8
+            },
+            {
+              "x": 3,
+              "y": 8
+            }
+          ],
+          "room_symbol": "$",
+          "x": 3,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 9
+            },
+            {
+              "x": 1,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 0,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 2,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 3,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 11
+            },
+            {
+              "x": 1,
+              "y": 11
+            },
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 4,
+              "y": 11
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 12
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 12
+            },
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            },
+            {
+              "x": 4,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 14
+            },
+            {
+              "x": 3,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 3,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 14
+            },
+            {
+              "x": 4,
+              "y": 14
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 3,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 4,
+          "y": 14
+        }
+      ],
+      "persistent_resources": {
+        "current_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 40
+        },
+        "deck": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": []
+        },
+        "gold": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 99
+        },
+        "keys": {
+          "availability": "available",
+          "source": "GameContext::keyFlags",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 80
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 2
+        },
+        "potion_identities": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": [
+            {
+              "id": 7,
+              "id_label": "BloodPotion",
+              "name": "Blood Potion",
+              "potion_index": 0
+            },
+            {
+              "id": 23,
+              "id_label": "Fire Potion",
+              "name": "Fire Potion",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "source": "GameContext::relics",
+          "value": [
+            {
+              "counter": 0,
+              "id": 98,
+              "id_label": "Busted Crown",
+              "name": "Busted Crown",
+              "relic_index": 0
+            }
+          ]
+        }
+      },
+      "screen": "REWARDS",
+      "screen_context": {
+        "coverage_status": "supported",
+        "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+      },
+      "visible_act_boss": "The Guardian"
+    },
+    "schema_id": "noncombat-visible-choice-input-v1"
+  },
+  "take_at_full_inventory": {
+    "availability": {
+      "candidate_actions": "available",
+      "current_map_node": "available",
+      "immediately_legal_routes": "unavailable",
+      "persistent_resources": "available",
+      "screen_identity": "available",
+      "screen_payload": "available",
+      "visible_act_boss": "available",
+      "visible_map_graph": "available"
+    },
+    "legal_options": [
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 0,
+        "semantics": {
+          "card": {
+            "id": 11,
+            "id_label": "ANGER",
+            "name": "Anger",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 1,
+        "semantics": {
+          "card": {
+            "id": 25,
+            "id_label": "BASH",
+            "name": "Bash",
+            "rarity": "BASIC",
+            "type": "ATTACK",
+            "upgraded": true
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 2,
+        "semantics": {
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 3,
+        "semantics": {
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "skip",
+          "label": "game.skip idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 4,
+        "semantics": {
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_use",
+          "label": "game.game_potion_use idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 5,
+        "semantics": {
+          "choice_type": "game_potion_use",
+          "potion": {
+            "id": 7,
+            "id_label": "BloodPotion",
+            "name": "Blood Potion",
+            "potion_index": 0
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 6,
+        "semantics": {
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 7,
+            "id_label": "BloodPotion",
+            "name": "Blood Potion",
+            "potion_index": 0
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 7,
+        "semantics": {
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      }
+    ],
+    "public_state": {
+      "current_map_node": {
+        "location": "map_node",
+        "room_symbol": "M",
+        "x": 1,
+        "y": 4
+      },
+      "map_graph": [
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 1
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 0
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 2
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 3
+            },
+            {
+              "x": 1,
+              "y": 3
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 3
+            },
+            {
+              "x": 2,
+              "y": 3
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 4
+            },
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "$",
+          "x": 1,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 4
+            }
+          ],
+          "room_symbol": "M",
+          "x": 2,
+          "y": 3
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 5
+            },
+            {
+              "x": 2,
+              "y": 5
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 4
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 6
+            },
+            {
+              "x": 1,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 6
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 5
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 7
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 7
+            },
+            {
+              "x": 3,
+              "y": 7
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 6
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 8
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 8
+            },
+            {
+              "x": 3,
+              "y": 8
+            }
+          ],
+          "room_symbol": "$",
+          "x": 3,
+          "y": 7
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 9
+            },
+            {
+              "x": 1,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 0,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 2,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 9
+            }
+          ],
+          "room_symbol": "T",
+          "x": 3,
+          "y": 8
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 10
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 10
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 9
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 11
+            },
+            {
+              "x": 1,
+              "y": 11
+            },
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 1,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 11
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 4,
+              "y": 11
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 10
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 0,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 1,
+              "y": 12
+            }
+          ],
+          "room_symbol": "E",
+          "x": 1,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 12
+            },
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "?",
+          "x": 2,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 12
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 11
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 0,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 1,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            }
+          ],
+          "room_symbol": "E",
+          "x": 2,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 13
+            },
+            {
+              "x": 4,
+              "y": 13
+            }
+          ],
+          "room_symbol": "M",
+          "x": 3,
+          "y": 12
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 0,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 0,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 2,
+              "y": 14
+            },
+            {
+              "x": 3,
+              "y": 14
+            }
+          ],
+          "room_symbol": "?",
+          "x": 3,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 14
+            },
+            {
+              "x": 4,
+              "y": 14
+            }
+          ],
+          "room_symbol": "M",
+          "x": 4,
+          "y": 13
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 0,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 2,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 3,
+          "y": 14
+        },
+        {
+          "outgoing_edges": [
+            {
+              "x": 3,
+              "y": 15
+            }
+          ],
+          "room_symbol": "R",
+          "x": 4,
+          "y": 14
+        }
+      ],
+      "persistent_resources": {
+        "current_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 40
+        },
+        "deck": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": []
+        },
+        "gold": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 99
+        },
+        "keys": {
+          "availability": "available",
+          "source": "GameContext::keyFlags",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 80
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": 2
+        },
+        "potion_identities": {
+          "availability": "available",
+          "source": "synthetic native fixture / sealed public envelope",
+          "value": [
+            {
+              "id": 7,
+              "id_label": "BloodPotion",
+              "name": "Blood Potion",
+              "potion_index": 0
+            },
+            {
+              "id": 23,
+              "id_label": "Fire Potion",
+              "name": "Fire Potion",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "source": "GameContext::relics",
+          "value": [
+            {
+              "counter": 0,
+              "id": 98,
+              "id_label": "Busted Crown",
+              "name": "Busted Crown",
+              "relic_index": 0
+            }
+          ]
+        }
+      },
+      "screen": "REWARDS",
+      "screen_context": {
+        "coverage_status": "supported",
+        "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+      },
+      "visible_act_boss": "The Guardian"
+    },
+    "schema_id": "noncombat-visible-choice-input-v1"
+  }
+}

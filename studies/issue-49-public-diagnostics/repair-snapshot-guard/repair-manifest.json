@@ -1,0 +1,65 @@
+{
+  "cumulative_builder_upper_cpu_seconds": 516.449000846,
+  "original_artifacts_verified_unchanged": true,
+  "original_commit": "9e3b4c6f531b86f7d2e94d1098fc5ad22a79bb27",
+  "original_seal_sha256": "0bbd889989139c8510b37c84228545abc723fd559d8f51b083287df24791d3bd",
+  "outputs": [
+    {
+      "bytes": 976,
+      "path": "prototype-verification.json",
+      "sha256": "63ea625267b94af300cf796786846c63eacc40f5bed9e5265031a7d5ba03d867"
+    },
+    {
+      "bytes": 887,
+      "path": "repair-execution.json",
+      "sha256": "165b229de29fc1263b47f65a6073e0f75d8a9f64ee2aa3fb0f6d2ae60739bed0"
+    },
+    {
+      "bytes": 2270,
+      "path": "snapshot-verification.json",
+      "sha256": "608ea5a07a34ffe606fef9c73f9aa1de7c8fad5f6b7c1d714e572a634b103378"
+    },
+    {
+      "bytes": 3030,
+      "path": "synthetic-public-fixture.json",
+      "sha256": "2dddf473b26c2c42fc729b97c1023d5592c6754a90364b449fe84a2d66d6e784"
+    },
+    {
+      "bytes": 1527,
+      "path": "visibility-checks.json",
+      "sha256": "393427732dca885baca4bfcc4efd20bf07f831fc9a34d6f99e650ed9c39743fc"
+    },
+    {
+      "bytes": 100803,
+      "path": "visibility-public-fixtures.json",
+      "sha256": "5189ec5aceb5321d734bd2b110f00fd3f9239d9f33d6c3c0ca960c80b24df4e2"
+    }
+  ],
+  "purpose": "ADDITIVE_OPERATIONAL_REPAIR_STUDY_ONLY",
+  "sources": [
+    {
+      "path": "prototype.py",
+      "sha256": "167cec430846777165f159bda1ffbdab061491132f255db4565639523126956f"
+    },
+    {
+      "path": "test_prototype.py",
+      "sha256": "376628fb3bb15d70f1b20372899188ac2c4240053dbf943b00489aa6d1f7e37a"
+    },
+    {
+      "path": "visibility_checks.py",
+      "sha256": "8d0c2516426077f0e348047820e7fbbf93773935253e8f53b045e4453f8bfff0"
+    },
+    {
+      "path": "verify_snapshot_guard.py",
+      "sha256": "6e90c6b80d5fc78d1a79b3704b7b803aad05b7cd12d9bb936f0968f03cc0a370"
+    },
+    {
+      "path": "seal_repair.py",
+      "sha256": "520478a0d0d5a2fc897efe4cbb5385e8462434ceadb6e0157e66b4bd5089624f"
+    },
+    {
+      "path": "REPAIR.md",
+      "sha256": "98f26ab06115f039e3071329f8c84c1f4ad33c89bcbf8b1d6c39c464d7ee6211"
+    }
+  ]
+}
