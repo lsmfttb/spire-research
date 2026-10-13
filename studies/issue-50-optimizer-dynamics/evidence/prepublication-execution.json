@@ -1,0 +1,39 @@
+{
+  "Q_values_opened": true,
+  "administrative_upper_charge": 250,
+  "budget_upper_cpu_seconds": 3000,
+  "builder_upper_cpu_seconds": 328.717225181,
+  "checkpoints": {
+    "D-446101": "1c1ba173815bd06874f1c65241ec0c1b0c084e4bb66690671b103cb4dda15396",
+    "D-446102": "a01aa3147385a7f9cbc423f378876513f30761b5a6acf0bed8153ea83d3723d5",
+    "S-446101": "5c711f706214e7dcb89265fbbdcc429fa2e93093fa43c1a1f559e7a62b019a40",
+    "S-446102": "852fa25b3195ce337ca88b91543f51fc34742762579cf11ea0f8bf923f097c7e"
+  },
+  "execution_producer_commit": "40fb24d0e25bf134e5c81f73f6c9ef8ace7bde69",
+  "fresh_games": 0,
+  "historical_store_retention_unchanged": true,
+  "measured_stage_cpu_seconds": {
+    "freeze": 0.322576058,
+    "report": 1.1361004430000001,
+    "run": 17.25854868
+  },
+  "ordinary_setup_or_failed_read_receipts": [
+    {
+      "covered_by_administrative_upper_charge": true,
+      "event": "mistyped producer env corrected before Q"
+    },
+    {
+      "covered_by_administrative_upper_charge": true,
+      "event": "post-fit read-only status command syntax error; no execution rerun"
+    }
+  ],
+  "producer_commit": "42e171e22a702cf0be384684852cb85a7403c645",
+  "producer_environment_typo_corrected_before_Q": "42e171e56 was a mistyped env string, corrected to verified full remote SHA before any Q table read",
+  "retention_consumer": "Issue50 independent Reviewer then Planner",
+  "review_delete_date": "2026-11-14",
+  "reviewer_reserve": 1000,
+  "root_coordination_upper_charge": 50,
+  "seal_and_publication_upper_charge": 10,
+  "split_sha256": "f8934dc2bb59fb9ea0ac712492546ff6d41caed9670bd1c933ad06b5a98eb637",
+  "stage": "SEALED_PENDING_INDEPENDENT_REVIEW"
+}

@@ -1,0 +1,3493 @@
+{
+  "Q_values_opened_before_freeze": false,
+  "diagnostic_owners": [
+    437003,
+    437005,
+    437009,
+    437018,
+    437024,
+    437032,
+    437033,
+    437047,
+    437053,
+    437076,
+    437084,
+    437089,
+    437090,
+    437092,
+    437094,
+    437095,
+    440002,
+    440011,
+    440027,
+    440031,
+    440032,
+    440046,
+    440054,
+    440059,
+    440065,
+    440067,
+    440074,
+    440075,
+    440088,
+    440090,
+    440093,
+    440096,
+    440112,
+    440114,
+    440124,
+    440136,
+    440140,
+    440142,
+    440145,
+    440155,
+    440157,
+    440165,
+    440170,
+    440187,
+    440188,
+    440191,
+    440194,
+    440195,
+    440209,
+    440211,
+    440212,
+    440241,
+    440245,
+    440250,
+    440251,
+    440252,
+    440256,
+    440257,
+    440268,
+    440269,
+    440272,
+    440275,
+    440285,
+    440286
+  ],
+  "historically_exposed_research_data": true,
+  "natural_origin_occupancy": [
+    {
+      "allocation": {
+        "False": 8,
+        "True": 8
+      },
+      "assisted": false,
+      "family": "MAP_SCREEN",
+      "old45": {
+        "False": 48,
+        "True": 48
+      }
+    },
+    {
+      "allocation": {
+        "False": 8,
+        "True": 8
+      },
+      "assisted": false,
+      "family": "REWARDS",
+      "old45": {
+        "False": 48,
+        "True": 48
+      }
+    }
+  ],
+  "rows": [
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437001,
+      "root_id": "76c596bfb8396dbe0aa72e8dbdd3c9e3ea86afe168eae773fa95ffcfb449f691"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437002,
+      "root_id": "a2d447e51a656d30f0d55ac6ddd56cb9b8475e08447d7922f1c18a893cad8e97"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437003,
+      "root_id": "bc4081cd9d726a0efe4e27995a0eb6ad44b611bf97ad24b4aff8334e28515ab1"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437004,
+      "root_id": "cdbf7be442fa46cc4bfe0e8dd0e25b16ada8a59b7c05abc617a734ebeaad8c14"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437005,
+      "root_id": "2a3dd879bd2c7554d7e24d56fa64bd479719ae26cddd70a4d8c737b2c257a593"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437006,
+      "root_id": "c88737be90d457a88bda758b2576ae922e8692e4d9b98539da1b22c0113a6def"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437007,
+      "root_id": "cb68cf84e6f8ff8b39ab8aee68b9da2950d14d01e597d682cce542620f184b9d"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437008,
+      "root_id": "34eeee966e600e098916e67035c93f6efaa192e71faee750eb8c4c43468c30cc"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437009,
+      "root_id": "e04607ae7540bcc4dd7dfbb71c0c44beb97a8cbfa2dbb327aa06a3fd4851df6f"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437010,
+      "root_id": "802447640fadadf7e95f46989fa2f07e2a3835c6ec68236fc4c4005f1b031f46"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437011,
+      "root_id": "acfe9796364411ed3a76afa9dfba6302fbe8ce502b290fa3ba5e7cd5c08e24f4"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437012,
+      "root_id": "dbe81bbbe5d392f466b4a7d5f743b95bd260c23587835d38a8a9632539c0abc2"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437013,
+      "root_id": "c7c77f6d36b9c1d2375a1a6e50cf138b661a1f270744c1e548de6b33890b22f9"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437014,
+      "root_id": "02afe110568c403865326696afa602c86294e6d1fa8221772cb3b1b8a28a5595"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437015,
+      "root_id": "8e27e98358fafcd7fc5427449c16a811da0d38a9b70aa3577942021c60099df7"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437016,
+      "root_id": "a55119ff98f498febff4f93080f25f8c76936511d0cce13364ce774e27a1997b"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437017,
+      "root_id": "c605f02706b89d2fdfb8250b33f78d68cba23db4f8ad9bb9a63b2ac7150ea353"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437018,
+      "root_id": "bc409d851e784d5a5e7295bc50924ef6b5364f6c6087e904c01d5b1de36dffc4"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437019,
+      "root_id": "08ede5ef22fb78d2a27ab37cfc28235582d5f0b638764a83b4bdb703acad3172"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437020,
+      "root_id": "1b6ca235c91eae430e3386850a576568988071eb2cdb5cc1a67ca26552e24e80"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437021,
+      "root_id": "ea1dd5d474bd6a9f87e24b6c9573d4466694b59dc7db630a5dcbc7a64fb5a824"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437022,
+      "root_id": "1bec32ef14d08f65c59ba1c33e29acde9c1475b98362fb53e0e310f6828c8c1f"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437023,
+      "root_id": "50fae4caf8ecc8252d41c4fdefe73395ebf95b08600135aa914a1eadeff66d46"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437024,
+      "root_id": "cce7c183a1366454f154fbe6da094518ef28add1548bebe274916d9e21aade65"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437025,
+      "root_id": "0e799697b6d612de395957a881553dd3b43c520019fc5d20e952429f52e3611e"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437026,
+      "root_id": "bb9e374647028621b1199b4960b186982120f3bc5bce404a7ba2437847bef463"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437027,
+      "root_id": "4226f5ff2e204da13ee4f0a5314dace8700dc8be4cdf7a237a82051c7d6426a4"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437028,
+      "root_id": "a13022ab79087884998faa5712ccbd6c63f1578246acf8c5998509b8a0cab2e2"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437029,
+      "root_id": "e9e2bb5877bad1a9ba664d37e504d770f85a19e81b70e28bb7e469125f63b157"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437030,
+      "root_id": "9be61e26c7b158ea7064c4a9c9028e00b1ffde6174b0016a8525e4e9e84a396a"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437031,
+      "root_id": "1a190ec368fdc269c3473c76c461d1dcf4ff80ce24c12bff2ccaf1f5f2092399"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437032,
+      "root_id": "f3387c4bdbc6c2e3160ab3b70f4fde56d79fb32164c9ed764fe275360d22e471"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437033,
+      "root_id": "8a56141d49118b5c5a45e4e291a735fbafd2b12609982afacb75ef10ba93561c"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437034,
+      "root_id": "6f40685bd89d79f7f10f8a5abaea77bab29488edc0280a626387e29ae83f177d"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437035,
+      "root_id": "719107846735100f519004fcad56ccc602d336abe586b026a5fda326f9c6ff87"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437036,
+      "root_id": "04af5e00a38aad39079118b17d2ed4aaedd1f4c26deee31d0504ca3fb652b6b8"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437037,
+      "root_id": "65c33b54643ea1ec468bc95fdeca92602b174e0bcd60a10a6e60d3b07c1ff6c8"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437038,
+      "root_id": "1c13e27b3b79bc8203cf0ef9826f1079059025546ef2afda160a978db0b720c2"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437039,
+      "root_id": "1fda95c3d066f48ad37ab723ef2f9b52d4c2a1c73ccb5fc228a2321f0798c508"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437040,
+      "root_id": "aa4f8caedade4b486f52144e5e47d7fad8ec5dd6da0677a95fa2eaa41b7655f6"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437041,
+      "root_id": "5e5073c56ba2fe0837ca63a30e3e2b1b7dc501f3aeb819b2adeb976c60cf2aa6"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437042,
+      "root_id": "df24766e1f5bca6547d1b5101e0ac9e6b55e8535e852663c4de997bbaa65f37c"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437043,
+      "root_id": "07d34d685e5a3c1da48e1f8084eb81ef2660af27d385b8e16f48e5cc2ca142e6"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437044,
+      "root_id": "25068dff1cace8686e81685429746cb5ae84d477e4980ea37a69e39d4f97adf1"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437045,
+      "root_id": "f52f45b85282b59c592294707a3e4ae10961e4c612d663cb86585b5a549f0b1c"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437046,
+      "root_id": "32502e63957c21c138632d6d4ba6afdc633f716ff9fe5f162d457f613d386c5e"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437047,
+      "root_id": "ce50be987ee0fb886a278b64f8a81d4a752269fe7f943b11256f24004ccaee74"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437048,
+      "root_id": "21ce762c715110203cbbd3615b22324ba076d788f4cda78294675109a397258f"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437049,
+      "root_id": "52ed9d7c360ea061ada858ab716d71c53f36d3d8b8b8463fe2833d5c92513dbc"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437050,
+      "root_id": "b5004660d9f68f5cd92c70d9fe6263a69fe746422be30fb6a1894250c010e91f"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437051,
+      "root_id": "57cfd280ca26617f2e71b1fde7455e88114820d3d1b5732ba5ac4db6e1d04a07"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437052,
+      "root_id": "2d9d64df7436b51993e47b835b12fb1c53288fb73070e8abcbfb2b171d8905de"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437053,
+      "root_id": "abf7e8650d3966772223cb0f2cb39cecbf50cc68887ef5b264ec825be844441f"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437054,
+      "root_id": "4a113de4e11d10e5df60476cdee4eea41ba517ab48ef4a92e7af3b20068478ea"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437055,
+      "root_id": "c954fe19909b318da9ed7cef21467a53a5731403184971d0e74eeb39a1d1a5dd"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437056,
+      "root_id": "932f8117359c75833832c49c728a4471dd3ca0b54a86a4d6f5faffd2143f96ca"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437057,
+      "root_id": "340fe4e233af6618450839195dacbeebe96de6db0bc4960b69beaf3c11a53493"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437058,
+      "root_id": "cc8596476720cacbff3ed8c0c85ef7a22d47c8994da028f52073fd5c274aa921"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437059,
+      "root_id": "47298ae9337d220afbbf8177aad5d86afbc99715b27fba41e6046bf1a02c97e2"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437060,
+      "root_id": "fe468438a7ca37ec8d16d4b4f9bd0cabcc31f8d64809579d4b7cd6185e2cd4cc"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437061,
+      "root_id": "b9720248d4eaafd14355c3321087733a2f626eac7cb84b1e238c5fd2e5aa1510"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437062,
+      "root_id": "1d2aa3561aaf75ee3ad50cb4fa24d596078f3ad49f25e3253a9aedc6471a83e6"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437063,
+      "root_id": "d1976df962f3d0947427e50e19e92b96f1b693d16f00daa13aa029bebe3770df"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437064,
+      "root_id": "e678a283f9910f0bd8fd5d57f961e9ec721927f66f13f60fd15f3dbc98702456"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437065,
+      "root_id": "0fc85cae3dcd1bf5eefdd31ccff526c60e6113dd5444db7d486023e96f046077"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437066,
+      "root_id": "ca8a233771abc65d47517c8e8bd7d28ab7a15047c94c83d1ae84105bb04bd85e"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437067,
+      "root_id": "9b5cc35607fef77bcbb7b64e80ce8899dc6645cb52c1f6992c2225b3ac726e1a"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437068,
+      "root_id": "411dffcb000610e7e2b9e8f5477eb72c3e3ddd6ff767f4100d3f007c218e966f"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437069,
+      "root_id": "dbab0513e79b11a284b3abd16467cf8dd876c258af7260004d2a1bfbd658b5f7"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437070,
+      "root_id": "22638d8a798afa4409ca645883322ab31499cba8f0a4ffb0d320311b71163670"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437071,
+      "root_id": "1f63621d1826a7c57b7f14dde894bb7dcf583a6c8eebb15656579e7efc04ef4a"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437072,
+      "root_id": "1d2f1217ae27e16dc62c06b3bc2bcc37669ccaeb5c24002237f8dbdbb4a33ee5"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437073,
+      "root_id": "eea0265fe7f1964dd91149eafefe16546cd372a27ea624c007e5e9729f575185"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437074,
+      "root_id": "7dd8b314c33984f9081c2bcb7566735179a347d59bbe940eb616796a347a9588"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437075,
+      "root_id": "184ac697e1dc9b57f75cf11552413cdc3418656698e2d17b84bad01bab456140"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437076,
+      "root_id": "02f953fffe9b897f0e51a8f28cad814094a69c87f86067b26db79c9f1d6ea504"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437077,
+      "root_id": "c446d2dc2c33bb4d3a907611cd8dd7192e61be4f03e19ee570a610e5210f0dce"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437078,
+      "root_id": "2ba8c2de495769c60cb0c9c5181c5acb2eaca8bec4696178a93a7c8c448c2ef7"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437079,
+      "root_id": "c6082f8835e311e9b772e15790011533fc4d127591e99375d9e84ff2b34255af"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437080,
+      "root_id": "c0fb72d3f88464ef115c1ea8d68bc1a2c043116e37e6267a6cf9f464b330be4e"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437081,
+      "root_id": "2b4b5b130f0ab85c2339f47e2028a7c218a9d22460ed2bc688118b87a8fbb6f2"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437082,
+      "root_id": "7fa11ca555c7ce6cc60edeeb9a926de5b89441480245244d53099e29fa9abecd"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437083,
+      "root_id": "e77c10a3061402c00f44adea7f5ad5217048aee0bcec277b23cb04d04cbad32f"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437084,
+      "root_id": "d921e5f2c4a104aa9406fa1c42bebce25f8192e52ad44cd27e41633210a4426c"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437085,
+      "root_id": "b64a276d26fa4f3a02e17662039897ecfeb785c8afab265d1549f5affc84bca3"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437086,
+      "root_id": "898278547aa0b2c2246f046de09d40597fdcce833ee27d8ba0b73afe824fd8b9"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437087,
+      "root_id": "1fe5cd923728c90147e487612bf8ac9579db86679f1784c3b8e754f2229fd682"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437088,
+      "root_id": "bd9e04725fe8bb3a43dfd6c3ea6026b5777f4e7df7b5939a4dbe99a1762de7af"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437089,
+      "root_id": "57d70c7f381f07722a346d8a1011e99f753d6e972de218152a8176a4514c8367"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437090,
+      "root_id": "3f58ce7d06d78c4ab7f0fa1c525597083d0096282f0be5a9141a380689c3e7b3"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437091,
+      "root_id": "bc419f46add16e19c9a2402af752c49c35f96be913da5e52bc571f5b82989fa3"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437092,
+      "root_id": "11abe63b9ec444de23ef31c75a700e61461777dda33bfbbcd8a5ddafdb9c3f38"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437093,
+      "root_id": "b86985ab1567a12f17da5ea4241b1e0cfa5d907d95ac88b1ba814e3068d34549"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437094,
+      "root_id": "f984f8d3fbd0743febf1d4e7e3ca6a2ff1b357412bf341dc325810bceba61672"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": true,
+      "owner": 437095,
+      "root_id": "9b0f77e92c01cfa5044cd38fb3aa2444908a6bd149a4ca83cd1d5a7372787610"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": true,
+      "owner": 437096,
+      "root_id": "daaccd3f4f8f7ec10d65d9aa34daea58200f306db62c725c4058fb8e3b097293"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440001,
+      "root_id": "c61115668c5bba850b00554208f3f2e4877483535f72b103e5ed33e6432daef6"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440002,
+      "root_id": "7e0a172e204d9b36af15167aa58e66aa174fce868d483ef55b586b38802600a8"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440003,
+      "root_id": "ee4d7a3bbb30c051e5ed7f6b423ffbb2964f199d95d5abc14601943b85f83225"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440004,
+      "root_id": "fcd314fc67ba1f778c7381fe0b3cb26314d6ccf7289406734b66ae391fd41747"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440005,
+      "root_id": "e5b5b8e2060dce516159a2fcbb1e9c9e487aecc1589476f8c196961babdbdeb5"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440006,
+      "root_id": "4d66e8f201ae106b8f595036c9d740a23386cf28b73aa75a2d4d84293467ad7c"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440007,
+      "root_id": "b8d682db46517b982d9d2dfa2c1e9582b51451356056939a353c686b5b5aa226"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440008,
+      "root_id": "b117dd584adbed4517d85132887c24a105968025aefc632e5d242672da6c3ddb"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440009,
+      "root_id": "42c886b66d150fa20e366f93d3a5c1b1b43a3a04b606889c63c33489169575bb"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440010,
+      "root_id": "7467f3b0a6e5385e4d19fe9ded5f8b263b3e3bcea46be6ea6dbffadc6f52ea51"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440011,
+      "root_id": "bf4fd4d661633c76174f5fc744b5170900e3011fdb8dc8da3cf20693fdef2b08"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440012,
+      "root_id": "0fce40436edacfa317f0d94fcaceb4ebe2a26b5fc931233e350ecd34d8ac05a7"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440013,
+      "root_id": "2d70485e19c1a99a6dcc62d2c558c6d53fc5ea602240c85c0f180b0e971ec23f"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440014,
+      "root_id": "f233bbbf2e903f8011d1bd5f4e4b4044617e94975bd6e33c2438ba483dda2793"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440015,
+      "root_id": "ff89283b3406a770d001cdc8b22d716c1e50be782dea079f07859e10e5859952"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440016,
+      "root_id": "6339b941b98d7e54ee856b24ae7256e4610e6a26f21572697bff1cd4ff3f9c26"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440017,
+      "root_id": "fcd945980ad6f09f7144dc76c33f40a530196fdc1cfba5f7a5a1c4de2834f6e4"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440018,
+      "root_id": "6797caf04dab6214b741e14b2706ed7fa117489eab9cc4aff60f6bd9887779c6"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440019,
+      "root_id": "6ee7ce34f69da1233f9fa24c7f664120e47ae94abd3c29ae7d370e17f76123e9"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440020,
+      "root_id": "a9a9cd9bb3276254eae154ed9c0457872752040c3739224de2a52076c6ddde63"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440021,
+      "root_id": "488268c172b54ae1d19d20331038bf2926ad6784a150417baab993cef79701eb"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440022,
+      "root_id": "7d0fbfaa3672b2d9a3a2ca1485f407e9f10ab6a9dd48df63b7cac5ea5b3cff70"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440023,
+      "root_id": "4ceefe72fc84d7fe2d6a4573f61ed20172664bb435a07480b219554c0c33e1c4"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440024,
+      "root_id": "88abd20f28b309b44d4ee151e93845f656fe5b571f3288a6f6d84bfa41e2eddf"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440025,
+      "root_id": "52c7a64a5682dfd7251ad9b305b3c915cdcaba2e5a7a8a0a20f0e2eb5f87aaa6"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440026,
+      "root_id": "30beef97ce1260c3f349c40543b2ffbfad67fa63299f7dd98193053ca1d4b001"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440027,
+      "root_id": "4437677cc5924b2313e19435f6393719f70f5742955ea79eef885861c05e260a"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440028,
+      "root_id": "b500518802725fbbb44daba48be8fc325babe8899ffef20d6757efa40e1b142b"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440029,
+      "root_id": "365b3dfc14245359bbf388449c93230b43937587ca9b3c3ebf146f7b64d16526"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440030,
+      "root_id": "ee6dc75f3c3ca4fa2067696cdcf3db4eadcd1654e0cf56f4bb7bd98b383139ed"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440031,
+      "root_id": "c4b6d9dc7da88d670ef4e009930d90959af37ab40fdb3d8d185f039a9852da98"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440032,
+      "root_id": "7cb2a6f6d0135565b6e5e6eee11b3a995082791029be63e7380bad165bacded7"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440033,
+      "root_id": "6901e85008563d3244f418566ab5f03fe5c61e48095600a110c474a0254fa478"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440034,
+      "root_id": "a068d4a4f8e11bca86acafca92ff33d34798ce502b7364c1416878d99b93f85b"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440035,
+      "root_id": "29bde6b42593d2da4f3efc379726662048d7f2f026e7563adb4ecf5dc717d312"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440036,
+      "root_id": "daea37d08163ea613ea47e93665a303841de8a56833f89d0153a3ac53cfbf298"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440037,
+      "root_id": "1637df3e308d555016ebf404986509fd162b324d4662ced84778332306b30c93"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440038,
+      "root_id": "339a28263e4917613d10d2964e211558eee6b697d0de9ec28c03512dba70b0fa"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440039,
+      "root_id": "fde29704ded241b2113a74b1648c5395e8f09ff067b9007ac4cd0e5ba4f2d38b"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440040,
+      "root_id": "df3fdae0d0b2adfc3d0e34a461fcb2b5ce99dfc848fa03ca329b1d71c38d2803"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440041,
+      "root_id": "bbe526ad489d2bb8e476e4d445ac59bd1b5a10c475e85e1ee402f90eac09a257"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440042,
+      "root_id": "f04cba5e171631b4af864989ff13fd9fe1d989e6d6e7b071f13424e6e69aa76d"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440043,
+      "root_id": "6720d527d5b8a2634f965568d17e5094583363de854c51852c9bb2386923e839"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440044,
+      "root_id": "b0e66beb432f3a221bf1e39dc73bb8f1e9c34415707d3b124b810d22e643e5a2"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440045,
+      "root_id": "c4996665f2a9cdf0310da47ec63a8eeac6488108537e20ddff1298bf3fb02443"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440046,
+      "root_id": "82732a3dd7bb18feec27d689a7be597e2dd3728965703bf859579eb9616b32cd"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440047,
+      "root_id": "26734aa80f42bff7d3fdec2ae51be46ab6b492ca8d816e2d8a3d767bc55ba150"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440048,
+      "root_id": "974793b46d2e6b4e4e079abe217340b6c96a48d1f564185eaac9b4df05b59aeb"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440049,
+      "root_id": "00338d144ae416530485ef3a944fec59d4b90add2d04f172555acf4e4c098295"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440050,
+      "root_id": "42bb460059c9c3684e729e95f0f5fad5de58d6ad7724ebe277ee6f0ee0c029a9"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440051,
+      "root_id": "7995153b0143ea365d4511ea21e5e9b994409533df44fb1d394dc95e0cbcd588"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440052,
+      "root_id": "040afeed84f20fb90b64653507b7b60517a55e48fc829af07f98b37cedc3c246"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440053,
+      "root_id": "82d52003cbe3235734397a17f19ece3838f7197ca1680def0b47d42acc1e2d56"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440054,
+      "root_id": "00686cdf11899f43c9037e3b8e7a340f372e894082f053ac8cc347317dc22837"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440055,
+      "root_id": "3dbd08554d3995f3c76cbd35e75b4ba1fa664959226201edd69fb52be19b6357"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440056,
+      "root_id": "38c660107ca1c931f6364b315545340d4f7d676d2b83a96fd7e66b9fea5fbceb"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440057,
+      "root_id": "29fb14580a963a8eb6789847308e50a1f36fe50e0a594e3e3fdd93e898376522"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440058,
+      "root_id": "eda2986eece9584da6f3605819993f0c0a7c0161c810fdb6c6528eaf6df3c171"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440059,
+      "root_id": "901c62260b2e932b023f3a08af6afe7e08477189a9dd5a31714c81c53e558c45"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440060,
+      "root_id": "59bd8967150d2b64fc1a79dec630649794da439a0ecb7b147b1959da075d76e3"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440061,
+      "root_id": "52d2c6f74f2de85f324dca66879411f0b74842333b2ce32606ee0351cb365f06"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440062,
+      "root_id": "f22fff723661a1ce68747c7c3cd847a856a1b6f8bb5fcb3300adebc5ef3b71bb"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440063,
+      "root_id": "09707045713c99e840bacecda6e5ab2ce0738cbb68c211be4492419fddf73c9d"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440064,
+      "root_id": "5e02edcbd26bb7f460ae5eb4fcca16ce496de98a5861580849165beb9eb8dd4f"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440065,
+      "root_id": "787ed74ed3f000aa368ad279b8619632aacd5a9bf4b04f2a3d823107e8b4a992"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440066,
+      "root_id": "ca2833bde138afd4c988440ecf41d42e57bab862f1e80879cfba9ad0afd415b6"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440067,
+      "root_id": "63ccfec277f79ecfdcef8f5a6a12cd33590b1dd2306fbcce780d3ee660fdcc49"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440068,
+      "root_id": "b9ab84748cf43acd1a3f775025240b9effbf90a7737d4bb9b6dcdc5009588315"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440069,
+      "root_id": "986f2818433039c98eca694e20e30ac46eda873c16f0900ea42a87a317501d43"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440070,
+      "root_id": "1ee8c79bace97532bc8eb41b1040fcc558319b0340a4f2a41f9d44c47b2c3a77"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440071,
+      "root_id": "de301b332cfed5da4ce2c95ee044f6aa715087b2962f7b9d9c53c7f27eee4af4"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440072,
+      "root_id": "eaecb667059f4b61e4ce4b7bb6ced589109b81215094b4d93608792f870b49a4"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440073,
+      "root_id": "5c938ae6365395996a350738ff2ba814e1386b29247defc40b010a17ce868b64"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440074,
+      "root_id": "b1b8d9a0ab0804725f6f52ff47012fa195cda46e5d3e779a053b2178d370bd0c"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440075,
+      "root_id": "8f072aa568e57b8e10ec0afb9a5a419198d9f6cfc91e9ace4315172fbdd81a46"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440076,
+      "root_id": "fe14d32a8537d04861e7bafa98eb8e045b582cb2a02100723bbc8a340a5638e8"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440077,
+      "root_id": "1e2e9ea55262658d8670f1641444b2cb2d82c5e88eff68027846a333f8f4d408"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440078,
+      "root_id": "bad87445917d58ebd4973c04f25fa1b7126cdaddeb81a02597e3a4a6c2b9d12c"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440079,
+      "root_id": "42a803a14323c68ac0671f907fc58c31be953421c40a6ab4a7f5bdaf538dc39f"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440080,
+      "root_id": "4b4d41eac670782d9787a1f5d00cac249ff68f6048b5df919496e8a3780ecf40"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440081,
+      "root_id": "96fd7d18c6a1648a126d1c737a22fe59fd9487819b551093baf141a0e469a8f1"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440082,
+      "root_id": "127f37dd548d0f964aa32966f92b1656722b4442bff24999d78ed798d1859653"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440083,
+      "root_id": "0ca91ca301f445e475aa6ee15edd8e13f60f03b17bbd90b89726064ecf121f84"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440084,
+      "root_id": "a93b06206f75ad7da9b38aec7e2c1c9439b4b4d55c862727e48bdfafe3a270f7"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440085,
+      "root_id": "a3d3aa7721cc24a2a396d694106bf0bb599bf7e16804601468f34cded6b31d31"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440086,
+      "root_id": "61c47344d99465816419768eef3a23630e645dec1626ebeb5c488b7f296c30fb"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440087,
+      "root_id": "e227af9674d93aa458ec776c350ae027e5c045803b2eec2acc2c7307b9b0a0c5"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440088,
+      "root_id": "181d3714e3bcdd815dd187740006d8991255e35f4a8273fafc6e6cbd5b93940c"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440089,
+      "root_id": "99a5b61f64c3aea22be7f1b4d5d7853798872dedbb46c1f12225e131519502b4"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440090,
+      "root_id": "7be880921f2f4117f7a8426fdc1013ee59b5ea25ccfe14138d18623c14054844"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440091,
+      "root_id": "31d4131160c21c7cca76dc7daa6b4a57068e634df301ad88a4cb6f159cbfeecc"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440092,
+      "root_id": "acc79637af6838d29a4381f21e95f9fac90838d9376c9afd4c009114ef35fe52"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440093,
+      "root_id": "4b2ab533add3647bb3fc47c858f13a1054f8de3e1e874e876fd506b4c8064818"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440094,
+      "root_id": "bf41e39910d8780e0c6478372a882d3b1f97243e663800827b48bcb51e6ebc7d"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440095,
+      "root_id": "ca312c4beb18a9caf749dc7466daa08b450ff5b9832c66dc732b7a94499a09db"
+    },
+    {
+      "assisted": false,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440096,
+      "root_id": "2e15e8742b63ac5f7aa5abba196250647364a3291f10a8faf2452e918a91c76f"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440097,
+      "root_id": "1bf6c9f6c0272fee1097ec327d0cc05965096eab6e7f33bc7e400198b57014b5"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440098,
+      "root_id": "441b7609c5c12fd1388f313f0cebde2a7e1d1f1d024e7fcc040199d61747e328"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440099,
+      "root_id": "02fbc6e1cd644a414d12c0b44bf16ae50d19ee499850054a613eb90d74c9a791"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440100,
+      "root_id": "cd95ab232c37010561817bb27c60471875e24078b50fc02b77f4f80a977a1f47"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440101,
+      "root_id": "5cdebc0af0969bbad49f05baad1f8364d0fea06e719217b0a4e0573190f13eb2"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440102,
+      "root_id": "be864f6d38ef405de87abff42aa2091ec8d18d203d7c66ae06f7eb5b70d6ec68"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440103,
+      "root_id": "3085d258f14635e76d1b678179c2759779b358a391e4f5f3484af5b6526bfe98"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440104,
+      "root_id": "23998e0babb362e47e1b85fb3084a774163fd0a0b1874713ea973af712ee1d45"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440105,
+      "root_id": "4038fa57583bfe6d6c406905f2ebe9e8a98223825be420e5f1c7fc74930b76ff"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440106,
+      "root_id": "f8f974f14c237cc20cf550213c707a2f5ba69010718d9b1dcb92f114e9bf0fb9"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440107,
+      "root_id": "7586c17b3363b6eb842ee1a159dae49daf42e659bf607edd062936b72d084a31"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440108,
+      "root_id": "b31c2aca2da26b35c4729f77a25c241064b094a0339e50cbaa813e44a6de053f"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440109,
+      "root_id": "a93d39d4e23e1b155ec298d2cda91d1d080a6f59ede0165bdda6e662ff1ede6d"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440110,
+      "root_id": "4b09e45d78ab5d9c95c9c3f1b888fb9df9c4f9ad4a6e53864ad745fece87766a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440111,
+      "root_id": "04a3823178f8e7a4a8f42a5a31a54db8082dafa3e53fcaf647afce86c8b1e788"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440112,
+      "root_id": "649ce142f23d3547508cb9dbd63abf40a9a5a0b16b5bba45e4b4fafd3b769fc1"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440113,
+      "root_id": "f63f84a02349b8c44f91f85ea64ba4462bb98063a06bae8905554a2f156e062c"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440114,
+      "root_id": "2180aae91a001b7e240b03cb492c79159acd42444dcd1acca29ec1ce1f474a50"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440115,
+      "root_id": "595cbc9ed32b1537d3a8cf2ef4cf573d46785abf2a3aed8df02332388b28c3a8"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440116,
+      "root_id": "1d275399322bb818bb52ca89c9b19c797ab97e9bc180a25c361475713bc1e580"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440117,
+      "root_id": "df2d36110c24efe4271652cc324be37a05027b20cd7394b4db0f0d9f2075bec3"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440118,
+      "root_id": "308051764be8bb9f2603c2283afc472e9747444d0efe2baafcc1ad3a4e4b224f"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440119,
+      "root_id": "10fb621a181475f2989e0806359f8f964c78ebb7ae1df90c0f86640bb1537674"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440120,
+      "root_id": "9580c8d46600e03ea856831b502c563b9608779036ad028774e9d071d9f13001"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440121,
+      "root_id": "9b8af40574cc5cea6c5515461ced59a4e9bd96f86846a5275eadf6fa6851a60f"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440122,
+      "root_id": "f439e72d33d2821fde7e32156f920f6829f19168e3910e869011bb48bdb64675"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440123,
+      "root_id": "b89560b74170f766011256d716c0610f329f625324672e100c494bfccd97c1d2"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440124,
+      "root_id": "4d4bb42cbf793dc178ef26634ee5f3ce146840aea9fbd7324b6bf25af9a325fb"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440125,
+      "root_id": "5a02d440c32f52beeced78279a7e6f053218434aee040a27228e513418e39326"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440126,
+      "root_id": "b3b03ac363f32e1eb9d90fde3581fc0ea97478942ce4b11f4e875e12e54f39c1"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440127,
+      "root_id": "dd2474a5142fee73c5237b1f191b4a631b3f4ab358e5d6df03b968d2c59aa3f6"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440128,
+      "root_id": "064987947f4bcbaab9b5af881b789a6e79341fe33d152bae84454b99c6f65beb"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440129,
+      "root_id": "4d53a4ea671acd415e4573b4d620f661fc2defcb298e8b20331d8283804fcb86"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440130,
+      "root_id": "3d47eefe8900e9007652fd39348165a6a80b4112439287efc87f1c5cfe6b34e6"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440131,
+      "root_id": "ef01dd6d1463d27be75b577291c715a45b7d42766e4aab450bb10f12fbc01b1a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440132,
+      "root_id": "3eae99ed6b8a350ea62a774da50c66169ce4b2051fd0d242c255fb1d8be1f665"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440133,
+      "root_id": "2d099451fdd2c4ddf2a88ed731b7f9269a78cf36541d9337e326005e4bbd5da7"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440134,
+      "root_id": "927b0617e9696943c7e061f6d850fdc98681b001d4deae585d7b38f19f000b1b"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440135,
+      "root_id": "e4fd1dc85bb3e918e4ceb01ec79e6650016f5d96d4522c3bc09aaadb22e2daaf"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440136,
+      "root_id": "f20d1a7eb83a343298dd2ffb738d0f028f565a7e052a65168319d776a727514c"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440137,
+      "root_id": "1e4b9d29e43b53cebd1d95d3f0b0619498fb2c5f7e6034247b03bbdae5ff1dbf"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440138,
+      "root_id": "f53eab75fc6c9413c4c2e64969158223702b988470753b838f780aa95de30968"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440139,
+      "root_id": "e93c888a72dc98e51d70248431daa96ab8f26e2dc4fa5ebec90d4d58e18c389d"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440140,
+      "root_id": "75f3dbbf11cebc558e6cba8c8a80c18bf8ff50d92992943e81cda69fbae0b1dd"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440141,
+      "root_id": "95df0a232c065fe8fa4d90492d3847fd93dfea17945a6731881a5fd50f0092f9"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440142,
+      "root_id": "7dbf7716eb11d0676516c4fd519a646d66b34ef9cfc85ce3c13785cbf1774a26"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440143,
+      "root_id": "502e3463aac331065f4563d1cde9f35363f327f7ae7fbb5845947ced308d3a9e"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440144,
+      "root_id": "8d3a4761e6208d75501338b0dde6f32a2ceaa2bf91abcfeb7a0dd86b8d1a84c6"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440145,
+      "root_id": "5c98a87b7da9024e932b74f7a1d2a0b964b5cb181ee739ac4089ee5a73f552c4"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440146,
+      "root_id": "7781dd0ae60d646e21e85bffa781a697d3265d17966eb6b8c4f77a0f5f219c97"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440147,
+      "root_id": "c894115b9095d1f9c22bb58a782383c27eb956203ca3c62806af561dc2ad32d7"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440148,
+      "root_id": "03facc20a805630afc2f99f842e34112cdbdaab6713105c414341e9021e82fad"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440149,
+      "root_id": "81265820ee8aac34152a811e710dc39e960039831208505facab93a48ebf46cc"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440150,
+      "root_id": "b6649c4e43bfdcc0ddbbc62b1777382293ac952f6914ee3ddec5275c87adc29f"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440151,
+      "root_id": "6d56cdd34d3860e28be1e95fa9bbae4d561a844dd2765ccc758d2bc14ff529d6"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440152,
+      "root_id": "c282e073fb767862b4163e48531931aaebaeac32b1b5d756d4073399d82a83c7"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440153,
+      "root_id": "10aaca155153b4ca8f46f6c60e00462c27c49cceb414dfd5433f3e8b0e3c55ad"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440154,
+      "root_id": "86364991c427857746abccc73eff9b6f077634423fd6acf3f1113d99cab9969f"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440155,
+      "root_id": "bc0ac4ad01a04ccbb486a9566499166a2929f3c41d0a720d46c843f4f498b730"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440156,
+      "root_id": "9ed16d7c43b4cb677471223fb1c92d944ed5a02e5c502d37e5c8e57680fd64b7"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440157,
+      "root_id": "2c07979a348b67f8a2fc839ad2412d60bb4c652e056132e5fbaa538364adbd32"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440158,
+      "root_id": "d27d3da85163139417eecdf37250bd17bda313fd0fe951b8fb96585821c5e841"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440159,
+      "root_id": "7c62a4b23d43749d1231c88df07bb3e187f9e48b4694860a166696ea0e80e90a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440160,
+      "root_id": "542269b9f0bf93148bd8e1c084948c99c2088f01ae493e3dfc5285ff043bac74"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440161,
+      "root_id": "433c84d8799db5b2500782d6d023a48f062fa2bec6951e4145a64656d4177397"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440162,
+      "root_id": "554d369266d2be2c7203c2fabd8f64bc740a8fca197e5a1761814ec405c574d1"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440163,
+      "root_id": "dd350482fbe81d311be0b515c3ebadaf06086c0e8644a9303b30708cc204b0bf"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440164,
+      "root_id": "440bc51a700d20b8abd6cb47b90e6bc60726c1721e1c8ee1ecd31f0a82f03b43"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440165,
+      "root_id": "54825c5d79b79c61859bfe6b3d8d24a82ce9ce9bd20b401cfbd76763d0675348"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440166,
+      "root_id": "decf5c4eb16a678bb78b8b2a27c80a587dcfae3744cf905c81f7140519b37ae5"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440167,
+      "root_id": "0d471a3513ec4a49749d736ba973ec1e9642c2e3dc5df4fcc4fcc458cc6975aa"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440168,
+      "root_id": "a3f93be710b043dbfd3c03d17ac4742ea4354ec4ee9a8f66b8cdca9cdedb9506"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440169,
+      "root_id": "18e0bf19debcc91dbf7cbb442b6dd157645da250895cbeb3e04934311312d09a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440170,
+      "root_id": "e4ecaae0e56eb0e521ea5ec90525bbae249bfdc04ad3681558abadb2607207f7"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440171,
+      "root_id": "f64e9d1d00c77d64e3762cfc73f20195b1c751afb503db9bbee6c017713c2301"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440172,
+      "root_id": "4df18633ceceb322acf37593d3caf7210b56ddba8189eb067cedb692d66159d7"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440173,
+      "root_id": "cbb73aa0a28d2eba3a3e7556a2a021683ef2c54ad8e6690c6ce6fad851a94c6b"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440174,
+      "root_id": "b94aaacac4690c2cce257758cd155bad20ae0d4638bc1285a21f47b363438ff9"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440175,
+      "root_id": "f3b59e852cf182ea5e6ac2439f81c8a43c8da37a78bf0dbb181a40be1cadc16d"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440176,
+      "root_id": "17ffb7a555105a8ac51b8381c273eb0c50da8cee683943753b775c60ccae0bc2"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440177,
+      "root_id": "6a672df33637a5d62296dcafe2d01a98b23dfc9a22722987807c41738bafc38d"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440178,
+      "root_id": "88589351ed9e89e0f17d39a5c9ea1e97486468d49c91806c7834e8cf9e895de1"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440179,
+      "root_id": "11699eb5fa2505b93091881bcc84e763ab516314399aa18cce1a4861d7892433"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440180,
+      "root_id": "83af3b675de3f1b180b401184d59ba17ed890616d4590f39328820ce59974402"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440181,
+      "root_id": "875694041ad4eba6c8ac76207b88bd5da41a2f9d18f5c7c7469ad469007f2827"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440182,
+      "root_id": "1c9b9dd019002273aa59da92a807a5ed9eb804933a0e1ad39fb73cb2303f330a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440183,
+      "root_id": "f8c1818d03e10aee735ac016a2d414bae7c0480ec1ddd7ec5f9a3d55519ec879"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440184,
+      "root_id": "cc7d26b9ec068dca13475bc714376e2e5e706fa4f94010d93648716e6e0a3b5b"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440185,
+      "root_id": "67f99d940ed0be5c74523cfedd00e54cc9c59fd12b62ad13ccd68ae9cc7d8b55"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440186,
+      "root_id": "5af9fe7a45ac613aa18ec1db9aa697d98ddaf9c33ef1538e8736579e0ebb9f8e"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440187,
+      "root_id": "0973870f04a04bbe5407ee1eeb39fc8fd96da78ec607c27c85d5f3f8af7d1b07"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440188,
+      "root_id": "562dc1520e2477903aef972cfa20f65286d9acdb2961169eb442437df6e9287e"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440189,
+      "root_id": "02e962c0448ed6bfcccecae671190ed298b4ab13654a5c1a92d2d435f2bd9c35"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440190,
+      "root_id": "77ab6bed9eb3be39698e73e49b463617a400ff41bf7d2bca82a2b9bd73e07300"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440191,
+      "root_id": "2908a6d84d1c3336103c9eae5adbd86fea79e8ed7fbe4232dfb0d3401ae7c063"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440192,
+      "root_id": "068cacdb032065d9043e4752abc7e9817824ecda81899bd67613144452440665"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440193,
+      "root_id": "490acb96cf546fc49d535daf0e20c5ac17d542f78f6955594a5dc442e48ba46a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440194,
+      "root_id": "149cd8f544d43cff4fde2c0b8645ea47381b09de8207a08ad7dd0933e734bb1d"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440195,
+      "root_id": "3211542d13fc62bf437c88ae371350337d4aac5a7614a8dcd8f555a659d28e8d"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440196,
+      "root_id": "b809659207bf804f5867b28f3fa82f1e72ef6a798c5cd8cb56004d9bce4be742"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440197,
+      "root_id": "50c2031e3597c4a1d668df5a9803c6658bf0ac68f6a8cabf7e05f2b6a243bade"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440198,
+      "root_id": "a3e9f0b7fcb311dd3cc546e39475b7170d830e17d9eb038b0c6858d433531979"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440199,
+      "root_id": "ae3cf550e7dabfeb4ad0faab233fa43b86509f9096f947214959dcd19c809d41"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440200,
+      "root_id": "4f6759a5d580d82be4098bd49b5e51aa99f81de60ab44d816eba1a9cd704080e"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440201,
+      "root_id": "5bc59af1610c763953041a50852c0198d61ef8b3574d45380c66bcd0e398f784"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440202,
+      "root_id": "e064513fa17ceed735e82a5bbd89606cb39c860c04e893faca67c02a54114b3a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440203,
+      "root_id": "893a3cf7c7f9ad326db888b36b4e735fe16a098809b08deb690b4c830ba6a4b8"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440204,
+      "root_id": "7dbb75def2b9d7cd1b066743318d3df89bd8102ebabb64a7a9632be434259063"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440205,
+      "root_id": "3c5b1e6b839e97c4bc98568ed9390c7d7ed8bb85df124e028341c9e19b53f18a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440206,
+      "root_id": "89085ce772e3ae4781b436eaf20d94aed5914d6ce98daa1db8b98d282bdb4300"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440207,
+      "root_id": "4e9ceb4b36afc0d963e5f4c8a52af050487c74c780c04fff55227e9f05f98910"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440208,
+      "root_id": "6c82a45d35c84b47d2eb0bb4fefbfbc4b4b9c4de7ce1f8f2ad1886451446cd5a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440209,
+      "root_id": "8d71aa73c211cbe69b4e7e3fa033014a5b4adf8ddecc0d1a3ff3274457dd4cac"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440210,
+      "root_id": "c3af57bc5fcad5ecd477c3f5363b39694d5fc937f6e1ba4f96ab8b656524d03e"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440211,
+      "root_id": "cf41d232fea5b0cca923f934d9953f8692eb42c7d1ab13c2680b22b84d7e524a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440212,
+      "root_id": "1e23906b87f1d80b8b2c5888d48e3045a719312d23cf37bb93be726e46ac9f63"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440213,
+      "root_id": "b97a8edd6bf2427290c136f9c3f90932837735ff60b401f10ef3ca96db03453e"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440214,
+      "root_id": "3257583f91fe3fed19a7f7de7342a36706d9f3992affcc1c1e21540dd16f9648"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440215,
+      "root_id": "30535243eec1913c4199d0e37a79303007fef804b0a59c2b92618d289ae045cd"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440216,
+      "root_id": "ed5bcb61b26ad0fe3b006eb593cf7783ca8c2efe170220146764651f3aa00cb4"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440217,
+      "root_id": "5d132b25196f12e7d9953f846ccf97ea725803a57ef8df3f8971b03e0c08546b"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440218,
+      "root_id": "dde8d04efdc31c5a0dd01d2cbb58fd4ec11fc0cc4e786877a2e99319c4dbb9b6"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440219,
+      "root_id": "ac25884863be78cb096b850879ea9033a813bf5b74d24eee7370017c26c69c8a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440220,
+      "root_id": "885f499afc43aa0f92e111e036295edcf963a81ed83d5e86b9c9ee3079c298a6"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440221,
+      "root_id": "e4db92eb7784acee96385b4189cb949768685157e36b89e0894150eb3d668fe5"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440222,
+      "root_id": "2337ae3fedc59e36322c86ebe78b7a34b3fab1297a1c27d379cdff7726a01c90"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440223,
+      "root_id": "6c66866cf0a3c5f6aa4df5fba2ff9be7959cea9348ea43e4437a9e231b49d413"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440224,
+      "root_id": "a324ebd567851ac2d7b26623c20315e872408e687d4fa87bc289c0cce04c93c5"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440225,
+      "root_id": "26f3c4698f7e41f7893f32fcea1924a30b3f153d8e33f8dd39f0c9ac039c284a"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440226,
+      "root_id": "c58b1d67512a596d6df27d48ff0ea7392e0a0fde8a6661427d689f05d30cf2ae"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440227,
+      "root_id": "22d6318f187e4be0674ed054403e56e698485b5858c08390e4bec0c3c07c3acb"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440228,
+      "root_id": "987beb63be4c3530cdc2bb9e34d478458105984b69ec4f9125a08f1652c4b5ff"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440229,
+      "root_id": "a3cbc9a3db7c72a1344406241671aae0346021c8b029e1c0aa53458ee580fb1d"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440230,
+      "root_id": "1b77cb28a8cb8d83d5c86ab8d5972b2071daa95d7ffb1e81e268182b86b534a3"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440231,
+      "root_id": "83ac8da0886b75a9776f1b52b2622ef6288d8ccc6cb1bbbdd8b6e824007b34af"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440232,
+      "root_id": "01dccc8f2e1c0164e30137607ad5471872ed13c096a0f48f8c428c8fff444ceb"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440233,
+      "root_id": "1e471c5135e8a228473358b2bb36364b90acb812506ba172edeb9ad1baefda9d"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440234,
+      "root_id": "4cfcb059d4f06032cadf2f7792e2deff78d1d91a240559eaa31d01b799674607"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440235,
+      "root_id": "86b6f420ec6804164289ac08ab1e6a99648fbae021a9d1fba045222994cd8337"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440236,
+      "root_id": "5e2affdd8ed1931a8245aad34541b7ad16a1804769824f73fead8060f4d97acb"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440237,
+      "root_id": "8f4628cf52af031a23b0fe238694969a5c74bc4ac94b46a4ffde87ce9557bd2e"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440238,
+      "root_id": "5149252b7108995b85bf4aaceafa4abefd24dc885c1f5e8a0d5bef87a0c3a0a9"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440239,
+      "root_id": "e393ac0f9bf7ac0ae458349eb5f815eb22d96504eeef97e36183271850b06f85"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440240,
+      "root_id": "1731382ff410eed821b55cb5fca32d93b432c46e53a1df6d28e157ed33cba3f1"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440241,
+      "root_id": "e4f5aa2fb0c613f432ef207cf37b840be705c751831efd9573bc6c1ac8a61461"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440242,
+      "root_id": "37d76416a02070671c5bbaca81dc45331fc9fdcf625138de19f5a3ed73dd17bc"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440243,
+      "root_id": "1e73ff36f273da3759a7949f5b309025ffcc57d9691a0e3817ba4b5cb64aeac7"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440244,
+      "root_id": "de655f5e0a138ccbdd8a00765a23857b349118db0f39028796ef8f5b5ec98dcc"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440245,
+      "root_id": "8e6be214d6eeb75668d3eb2183805e2874cc416f69b26d175a08436242073733"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440246,
+      "root_id": "0e4ef7a0d9467ccd013761c15b5730a06535d4e238b17db8220d77563ce927f3"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440247,
+      "root_id": "7d4c084333fd7fec7d0d712cf3024d2e2260e41dc39ee3ccfee8a7c8d51ef543"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440248,
+      "root_id": "eff2edc3ed8ec160fea7a298d3196a3a2f50012f79f892aca3e53fd36c7d5bce"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440249,
+      "root_id": "4313dd7d177a3dcc0c6e3e05290ad3f25bc8ac6aab4f4c927ee8a2ff5f11262f"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440250,
+      "root_id": "8bcdddfc2893ca11c28701849fbf059d5095bb29213a6c69f4376fd5d9d25762"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440251,
+      "root_id": "c67671162e5106ab114ef2727c3e260b316894a3d7bc2da3ceda828a1be500f8"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440252,
+      "root_id": "318c410fcd75d216143af880981059a02229ae88c9762a46215c1a466f2675cc"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440253,
+      "root_id": "cf5729c0ef123350bccddbf40fbf72a30c5a4bc6eb524f7c6dc0907e42118a5c"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440254,
+      "root_id": "447bd6d9de38c3a36dc98d1de8cffdd0ab08337979c5dc104ee80992dffbb738"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440255,
+      "root_id": "63dc47af088fbf067b12252d59565ffaf99fc99dd134502457c6e41f7f2ff19d"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440256,
+      "root_id": "20771c7940110799114646a185dfc142393950f04f18cf8fc2fdaf74ee830826"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440257,
+      "root_id": "6af269216bf9ee5febd832ca344e6b9e81dbdde2a10a84ede20d557a4dc503a1"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440258,
+      "root_id": "c30259202d2841dd5cab44cfb90f73164aefcaa5ba76123a01ab1a12609b99ac"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440259,
+      "root_id": "c080b1108df505f9b6dd864bb822b49c70eb0e700874a18acf2cbaea98221735"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440260,
+      "root_id": "abf94b13654e51d6e54ea5eac23427af024f1a83a6ee3cb38ef8a8109a1428ef"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440261,
+      "root_id": "ebb61a4be80075f45575646abe69c78ada082355fcb59600a07ec3a2b7b0e864"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440262,
+      "root_id": "4314a1a359ac7051938baac98008f7d3c50a8e3fa9e4973b7ffbdfe0bae45be5"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440263,
+      "root_id": "c23a925e46aa74713719f4e38bb0dbbaba0a65751e1f193bdfa0b27306f283b5"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440264,
+      "root_id": "4ceaaa3a05dedef187bfcf32d5e6a848c9e305f19d3294847bc26dee1ae5b847"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440265,
+      "root_id": "5d345191edeb02e3b493c0e0d7d7d65f1221d95a118750a6432e61c75a395209"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440266,
+      "root_id": "38ae6385465d12e3382e3986fd4830fb68913008fedc0c3121338c79b6170976"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440267,
+      "root_id": "b573d5ad5ec523f7ffd41815026aab135f6093d4ffd2f3a6f376d0b863f4c742"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440268,
+      "root_id": "48595f2b7c2bc5d1b770facd49e3c9099438f8e3748dd59c322032d343a12271"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440269,
+      "root_id": "4d2ef832b5f133ecfbcfd07756497cb9f7660960a083baff66c75ddea4db3c12"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440270,
+      "root_id": "c2a082dbcf37c47a02cc1aa37299c15ca88ab03170737334859af7ca54d45186"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440271,
+      "root_id": "5a8c646db5c0d4c28dbb10921614d82255f2a240809aab37318afdafdb2ea998"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440272,
+      "root_id": "f17d76bf5977ff6d3c004db6ad4a0ff98eec8c1771eb5dd3411e0d5f02d6a9d3"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440273,
+      "root_id": "d0e1f5b13f26001a1d4177fd3564e0127d5d445f5627f1879a0f60759418d293"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440274,
+      "root_id": "b7c71e4d9fa47d9cb7c690aa6e570d1cb9a8f548eb98b59bafe60e3976804b22"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440275,
+      "root_id": "2888a32f9336a7b6e7b54b9cf3c989bfe32620885b5ea1e473b1d3fe67f24e30"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440276,
+      "root_id": "882a4e0259f0675e24a30df0fc3e7ea20316c5ba623eb64eeb075207d3aa308f"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440277,
+      "root_id": "57abab9dbe03c48dea8d53614c0da0032154836011ebe47d596ad7940832e0ee"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440278,
+      "root_id": "355cd488b2d8575f9cc522b3396b3237e8ac4f5d89b775a61b48536be17b13f3"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440279,
+      "root_id": "7b68e71d28f29d699f30b6095184fb8ef68ecd20baa2e488ac19bfb0f4ccecdb"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440280,
+      "root_id": "1b6966b1feb88977ab2fc773ed6ce167e8901ed387e98ff957ef332aa13bbf07"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440281,
+      "root_id": "def0d49cc3273cf1204ac7cdc1c10a0e57c45208a8f0095647138bee36ea8cf1"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440282,
+      "root_id": "b75fd5c6cc39f88c18f5814e1570699a5c88646014cbe18ad66e1bf1ed71742b"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440283,
+      "root_id": "0b6144356490e1d83c07b0f183edcc290cca34eae2a495a6ff82436ad3c2d7e2"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440284,
+      "root_id": "92304c49c1c6c86a0cd0d9f1f2e7fdc294b7ff2826fcc00a55ab2223a5ddaa08"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440285,
+      "root_id": "1c7ada8f4f4f7d7f33d158dcc76602781c35a9e24e9d11353af6efab4e43251f"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "diagnostic",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440286,
+      "root_id": "70e8eeb39b8e119e74e59f509ed469057abd3768a8c8166bfa1e51fc1bcf6058"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "REWARDS",
+      "old45": false,
+      "owner": 440287,
+      "root_id": "f335151bee6d900f9f7b3897be86082833a90f9f6d780ed99b3b28fde6e1db49"
+    },
+    {
+      "assisted": true,
+      "diagnostic_split": "train",
+      "family": "MAP_SCREEN",
+      "old45": false,
+      "owner": 440288,
+      "root_id": "5ae368a23957afd3083cee5c7a967efc1587c7dc9cc437081ad0bb73fd57981d"
+    }
+  ],
+  "rule": "SHA256 UTF8 compact JSON [50017,owner], no whitespace",
+  "training_owners": [
+    437001,
+    437002,
+    437004,
+    437006,
+    437007,
+    437008,
+    437010,
+    437011,
+    437012,
+    437013,
+    437014,
+    437015,
+    437016,
+    437017,
+    437019,
+    437020,
+    437021,
+    437022,
+    437023,
+    437025,
+    437026,
+    437027,
+    437028,
+    437029,
+    437030,
+    437031,
+    437034,
+    437035,
+    437036,
+    437037,
+    437038,
+    437039,
+    437040,
+    437041,
+    437042,
+    437043,
+    437044,
+    437045,
+    437046,
+    437048,
+    437049,
+    437050,
+    437051,
+    437052,
+    437054,
+    437055,
+    437056,
+    437057,
+    437058,
+    437059,
+    437060,
+    437061,
+    437062,
+    437063,
+    437064,
+    437065,
+    437066,
+    437067,
+    437068,
+    437069,
+    437070,
+    437071,
+    437072,
+    437073,
+    437074,
+    437075,
+    437077,
+    437078,
+    437079,
+    437080,
+    437081,
+    437082,
+    437083,
+    437085,
+    437086,
+    437087,
+    437088,
+    437091,
+    437093,
+    437096,
+    440001,
+    440003,
+    440004,
+    440005,
+    440006,
+    440007,
+    440008,
+    440009,
+    440010,
+    440012,
+    440013,
+    440014,
+    440015,
+    440016,
+    440017,
+    440018,
+    440019,
+    440020,
+    440021,
+    440022,
+    440023,
+    440024,
+    440025,
+    440026,
+    440028,
+    440029,
+    440030,
+    440033,
+    440034,
+    440035,
+    440036,
+    440037,
+    440038,
+    440039,
+    440040,
+    440041,
+    440042,
+    440043,
+    440044,
+    440045,
+    440047,
+    440048,
+    440049,
+    440050,
+    440051,
+    440052,
+    440053,
+    440055,
+    440056,
+    440057,
+    440058,
+    440060,
+    440061,
+    440062,
+    440063,
+    440064,
+    440066,
+    440068,
+    440069,
+    440070,
+    440071,
+    440072,
+    440073,
+    440076,
+    440077,
+    440078,
+    440079,
+    440080,
+    440081,
+    440082,
+    440083,
+    440084,
+    440085,
+    440086,
+    440087,
+    440089,
+    440091,
+    440092,
+    440094,
+    440095,
+    440097,
+    440098,
+    440099,
+    440100,
+    440101,
+    440102,
+    440103,
+    440104,
+    440105,
+    440106,
+    440107,
+    440108,
+    440109,
+    440110,
+    440111,
+    440113,
+    440115,
+    440116,
+    440117,
+    440118,
+    440119,
+    440120,
+    440121,
+    440122,
+    440123,
+    440125,
+    440126,
+    440127,
+    440128,
+    440129,
+    440130,
+    440131,
+    440132,
+    440133,
+    440134,
+    440135,
+    440137,
+    440138,
+    440139,
+    440141,
+    440143,
+    440144,
+    440146,
+    440147,
+    440148,
+    440149,
+    440150,
+    440151,
+    440152,
+    440153,
+    440154,
+    440156,
+    440158,
+    440159,
+    440160,
+    440161,
+    440162,
+    440163,
+    440164,
+    440166,
+    440167,
+    440168,
+    440169,
+    440171,
+    440172,
+    440173,
+    440174,
+    440175,
+    440176,
+    440177,
+    440178,
+    440179,
+    440180,
+    440181,
+    440182,
+    440183,
+    440184,
+    440185,
+    440186,
+    440189,
+    440190,
+    440192,
+    440193,
+    440196,
+    440197,
+    440198,
+    440199,
+    440200,
+    440201,
+    440202,
+    440203,
+    440204,
+    440205,
+    440206,
+    440207,
+    440208,
+    440210,
+    440213,
+    440214,
+    440215,
+    440216,
+    440217,
+    440218,
+    440219,
+    440220,
+    440221,
+    440222,
+    440223,
+    440224,
+    440225,
+    440226,
+    440227,
+    440228,
+    440229,
+    440230,
+    440231,
+    440232,
+    440233,
+    440234,
+    440235,
+    440236,
+    440237,
+    440238,
+    440239,
+    440240,
+    440242,
+    440243,
+    440244,
+    440246,
+    440247,
+    440248,
+    440249,
+    440253,
+    440254,
+    440255,
+    440258,
+    440259,
+    440260,
+    440261,
+    440262,
+    440263,
+    440264,
+    440265,
+    440266,
+    440267,
+    440270,
+    440271,
+    440273,
+    440274,
+    440276,
+    440277,
+    440278,
+    440279,
+    440280,
+    440281,
+    440282,
+    440283,
+    440284,
+    440287,
+    440288
+  ]
+}

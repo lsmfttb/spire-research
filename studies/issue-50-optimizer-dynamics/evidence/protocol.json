@@ -1,0 +1,42 @@
+{
+  "D": {
+    "algorithm": "Adam",
+    "betas": [
+      0.9,
+      0.999
+    ],
+    "eps": 1e-08,
+    "lr": 0.001,
+    "weight_decay": 0
+  },
+  "S": {
+    "algorithm": "SGD",
+    "lr": 0.01,
+    "momentum": 0,
+    "weight_decay": 0
+  },
+  "administrative_and_imports_upper_charge": 250,
+  "bootstrap": {
+    "cell_intervals": "continue same fixed RNG stream, sorted cell order",
+    "percentile": "linear",
+    "primary": "owner-paired, sample16 with replacement per cell, equal four-cell weighting",
+    "replicates": 5000,
+    "rng": "Python random.Random",
+    "seed": 501999
+  },
+  "budget_upper_cpu_seconds": 3000,
+  "epochs": 100,
+  "fresh_games": 0,
+  "model_seeds": [
+    446101,
+    446102
+  ],
+  "natural_origin_validation": "8 old45 and 8 fresh46 when both support; otherwise deterministic proportional Hamilton allocation, origin label tie-break",
+  "partition_hash_encoding": "SHA256 UTF8 compact JSON [50017,owner], no whitespace",
+  "pinned47": "41484c97d7a7b294bcfe13a9b9864c1cabf10603",
+  "purpose": "STUDY_ONLY_OPTIMIZER_CONTRAST",
+  "retention": "Issue50 Reviewer then Planner; review/delete 2026-11-14 unless explicitly extended",
+  "reviewer_reserve_upper_cpu_seconds": 1000,
+  "root_coordination_upper_charge": 50,
+  "validation_per_cell": 16
+}
