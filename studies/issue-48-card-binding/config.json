@@ -1,0 +1,38 @@
+{
+  "purpose": "STUDY_ONLY",
+  "native_commit": "18bcd565b587186425bb46ad3d70a2eb80d947fc",
+  "native_extension_sha256": "0652b1ce6d757404278b840678b1f8548c81fb6b03cade598e7f3d82524b18d2",
+  "stsrl_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+  "public_dependency": "41484c97d7a7b294bcfe13a9b9864c1cabf10603 exact adapter.py/student.py",
+  "driver_seed": 433042,
+  "continuation_driver_seeds": [
+    446001,
+    446002
+  ],
+  "model_seeds": [
+    446101,
+    446102
+  ],
+  "source_dependency": "Immutable Issue46 384/64/64 owners and original two-stream all-action mean terminal-floor labels; original root RNG retained, not independent native future RNG worlds.",
+  "training": {
+    "initialization": "exact original Scorer seeds446101/446102",
+    "learning_rate": 0.01,
+    "loss": "root-equal/action-balanced MSE",
+    "weight_decay": 0,
+    "parameters": 2081,
+    "target": "original two-stream Q/60 absolute mean terminal floor",
+    "epochs": 100,
+    "optimizer": "full_batch_SGD",
+    "checkpoint_selection": "all64 validation mean Q-regret, earliest epoch, smaller seed; ordinal tie"
+  },
+  "cpu_cap": 40000,
+  "max_steps": 20000,
+  "fresh_seeds": [
+    481001,
+    481128
+  ],
+  "bootstrap_seed": 481999,
+  "bootstrap_replicates": 5000,
+  "frozen_A_sha256": "0ecb46dd7a39d2aa33a12d50c60be15d438a1c9cb3d9bc893183b9143d55f555",
+  "intervention": "Only add public persistent-deck composite canonical JSON token of id/upgraded/upgrade_count/misc; original tokens/map relations unchanged; no deck_index binding"
+}
