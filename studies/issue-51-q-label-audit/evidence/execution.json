@@ -1,0 +1,47 @@
+{
+  "builder_upper_cpu_seconds": 411.730145912,
+  "charges": {
+    "receipt_rank_cpu": 6.145726518,
+    "report_cpu": 0.396286936,
+    "root_coordination_upper": 50,
+    "root_recovery_administration_publication_cleanup_upper": 60,
+    "seal_cpu": 3.054494841,
+    "setup_admin_failures_upper": 250,
+    "trace_wrapper_cpu": 42.133637617
+  },
+  "consumer": "Issue51 independent Reviewer and Planner",
+  "cpu_hard_upper": 3000,
+  "failed_or_provisional_attempts": [
+    {
+      "consumer": "Issue51 Reviewer then Planner",
+      "original_sources_unchanged": true,
+      "reason": "root producer environment string was mistyped as364acc1269; exact full SHA guard added before formal handoff",
+      "retained_path": "/home/lsmft/.cache/issue51-q-label-audit/provisional-seal-19560fb1",
+      "review_delete_date": "2026-11-14",
+      "seal_sha256": "19560fb1fd05387be7e3790ce7238b156ca9698e2b41a2568c304ef86c329f41",
+      "status": "NOT_HANDOFF_PROVISIONAL_SEAL"
+    }
+  ],
+  "new_Q": 0,
+  "new_games": 0,
+  "original_rank_producer": "f1767d5",
+  "original_report_producer": "2051f6d",
+  "original_retention_unchanged": true,
+  "original_trace_producer": "d94256e",
+  "purpose": "STUDY_ONLY",
+  "receipt_rank_attempts": [
+    3.049764357
+  ],
+  "report_attempts": [
+    0.19761814699999997
+  ],
+  "review_delete_date": "2026-11-14",
+  "reviewer_reserved": 1000,
+  "root_recovery": "Execution agent stopped at model capacity after report; root repeated the cheap ranking audit and report, retained earlier CPU charges, and completed sealing/publication. No trace rerun, simulation or learning.",
+  "seal_attempts": [
+    1.8184523849999998
+  ],
+  "seal_producer": "337bd60c41bfdf1f5bf6a9add48a8a9a6f0d42fb",
+  "stage": "SEALED_PENDING_INDEPENDENT_REVIEW",
+  "training": 0
+}

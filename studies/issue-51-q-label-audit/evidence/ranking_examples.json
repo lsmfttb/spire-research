@@ -1,0 +1,1435 @@
+{
+  "concealed_mean_tie": {
+    "act": 1,
+    "action_centered_q": [
+      1.3571428571428577,
+      1.3571428571428577,
+      1.3571428571428577,
+      -1.6428571428571423,
+      1.3571428571428577,
+      -2.1428571428571423,
+      -1.6428571428571423
+    ],
+    "actions": [
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_gold",
+          "label": "game.reward_gold idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 0,
+        "semantics": {
+          "choice_type": "gold",
+          "gold": 10
+        }
+      },
+      {
+        "action": {
+          "idx1": 1,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_gold",
+          "label": "game.reward_gold idx1=1 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 1,
+        "semantics": {
+          "choice_type": "gold",
+          "gold": 39
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 2,
+        "semantics": {
+          "card": {
+            "id": 360,
+            "id_label": "WHIRLWIND",
+            "name": "Whirlwind",
+            "rarity": "UNCOMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 1,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 3,
+        "semantics": {
+          "card": {
+            "id": 345,
+            "id_label": "TRUE_GRIT",
+            "name": "True Grit",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 2,
+          "idx3": 0,
+          "kind": "reward_card",
+          "label": "game.reward_card idx1=0 idx2=2 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 4,
+        "semantics": {
+          "card": {
+            "id": 244,
+            "id_label": "PERFECTED_STRIKE",
+            "name": "Perfected Strike",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "skip",
+          "label": "game.skip idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 5,
+        "semantics": {
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 6,
+        "semantics": {
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 6,
+            "id_label": "Block Potion",
+            "name": "Block Potion",
+            "potion_index": 0
+          }
+        }
+      }
+    ],
+    "all_mean_q_tied": false,
+    "all_option_driver_floors_identical": false,
+    "assisted": false,
+    "both_drivers_all_action_tied": false,
+    "candidate_sha256": [
+      "cc34061cbcf5cbdc483e681fcdd08093ff0b0a1d6b6f5f9637f76c8f96230884",
+      "021d2eab91c2b629f142bb551a6627d090bcc5128e0c80048a228bcb960e0f7c",
+      "5e3b61d04a55ac368ea5fd607dbd1b64a2b7bd70281f74aa0488c10744be5595",
+      "266c48c6434fadd51720c161fec2463b13a535be3fdc63422abb4de1ad328d07",
+      "86263eb9f25505e69c6fdbeb4e483e250fd03e7a627d94c2a1ca425ca05bdd49",
+      "defa60140d75d59fe67f09413b186503086f5ab88cd2efe316c7d0889228a57e",
+      "92233f751948e393833fa8c27f7d92c9e52f2c8e94e210e5f6e879cef961b15f"
+    ],
+    "concealed_opposition_pairs": 1,
+    "driver_ranking_informative": true,
+    "family": "REWARDS",
+    "floor": 7,
+    "floors": [
+      [
+        11,
+        16
+      ],
+      [
+        11,
+        16
+      ],
+      [
+        11,
+        16
+      ],
+      [
+        10,
+        11
+      ],
+      [
+        11,
+        16
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        11,
+        10
+      ]
+    ],
+    "kendall_tau_b": 0.5916079783099616,
+    "label_outcomes": [
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 11,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 56,
+          "battle_potion_discard": 1,
+          "nonbattle_decisions": 18,
+          "nonbattle_potion_discard": 1,
+          "potion_acquisition": 1
+        },
+        "ordinal": 0,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 63,
+          "battle_potion_use": 2,
+          "nonbattle_decisions": 39,
+          "potion_acquisition": 2
+        },
+        "ordinal": 0,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 11,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 56,
+          "battle_potion_discard": 1,
+          "nonbattle_decisions": 18,
+          "nonbattle_potion_discard": 1,
+          "potion_acquisition": 1
+        },
+        "ordinal": 1,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 63,
+          "battle_potion_use": 2,
+          "nonbattle_decisions": 39,
+          "potion_acquisition": 2
+        },
+        "ordinal": 1,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 11,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 47,
+          "battle_potion_discard": 1,
+          "nonbattle_decisions": 18,
+          "nonbattle_potion_discard": 1,
+          "potion_acquisition": 1
+        },
+        "ordinal": 2,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 63,
+          "battle_potion_use": 2,
+          "nonbattle_decisions": 39,
+          "potion_acquisition": 2
+        },
+        "ordinal": 2,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 10,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 55,
+          "battle_potion_discard": 1,
+          "nonbattle_decisions": 13,
+          "nonbattle_potion_discard": 1,
+          "potion_acquisition": 1
+        },
+        "ordinal": 3,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 11,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 63,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 18,
+          "potion_acquisition": 1
+        },
+        "ordinal": 3,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 11,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 56,
+          "battle_potion_discard": 1,
+          "nonbattle_decisions": 18,
+          "nonbattle_potion_discard": 1,
+          "potion_acquisition": 1
+        },
+        "ordinal": 4,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 95,
+          "battle_potion_discard": 1,
+          "battle_potion_use": 2,
+          "nonbattle_decisions": 39,
+          "potion_acquisition": 2
+        },
+        "ordinal": 4,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 10,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 48,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 8
+        },
+        "ordinal": 5,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 10,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 50,
+          "battle_potion_discard": 1,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 9,
+          "potion_acquisition": 1
+        },
+        "ordinal": 5,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 11,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 58,
+          "nonbattle_decisions": 19,
+          "nonbattle_potion_discard": 1,
+          "potion_acquisition": 1
+        },
+        "ordinal": 6,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 10,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 51,
+          "battle_potion_discard": 1,
+          "nonbattle_decisions": 14,
+          "potion_acquisition": 1
+        },
+        "ordinal": 6,
+        "outcome": "PLAYER_LOSS"
+      }
+    ],
+    "legal_count": 7,
+    "mean_abs_driver_disagreement": 3.142857142857143,
+    "mean_abs_pair_gap": 1.8571428571428572,
+    "mean_q_equal_pairs": 7,
+    "mean_q_informative": true,
+    "mean_q_tied_but_driver_action_variation": false,
+    "midranks1": [
+      3.0,
+      3.0,
+      3.0,
+      6.5,
+      3.0,
+      6.5,
+      3.0
+    ],
+    "midranks2": [
+      2.5,
+      2.5,
+      2.5,
+      5.0,
+      2.5,
+      6.5,
+      6.5
+    ],
+    "old45": true,
+    "owner": 437011,
+    "pair_count": 21,
+    "pair_counts": {
+      "both_driver_tie": 6,
+      "concordant": 8,
+      "one_driver_tie": 6,
+      "reversal": 1
+    },
+    "pairs": [
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 0,
+        "j": 1,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 0,
+        "j": 2,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 1,
+        "driver2_gap": 5,
+        "i": 0,
+        "j": 3,
+        "kind": "concordant",
+        "mean_q_gap": 3.0,
+        "signs": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 0,
+        "j": 4,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 1,
+        "driver2_gap": 6,
+        "i": 0,
+        "j": 5,
+        "kind": "concordant",
+        "mean_q_gap": 3.5,
+        "signs": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 6,
+        "i": 0,
+        "j": 6,
+        "kind": "one_driver_tie",
+        "mean_q_gap": 3.0,
+        "signs": [
+          0,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 1,
+        "j": 2,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 1,
+        "driver2_gap": 5,
+        "i": 1,
+        "j": 3,
+        "kind": "concordant",
+        "mean_q_gap": 3.0,
+        "signs": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 1,
+        "j": 4,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 1,
+        "driver2_gap": 6,
+        "i": 1,
+        "j": 5,
+        "kind": "concordant",
+        "mean_q_gap": 3.5,
+        "signs": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 6,
+        "i": 1,
+        "j": 6,
+        "kind": "one_driver_tie",
+        "mean_q_gap": 3.0,
+        "signs": [
+          0,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 1,
+        "driver2_gap": 5,
+        "i": 2,
+        "j": 3,
+        "kind": "concordant",
+        "mean_q_gap": 3.0,
+        "signs": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 2,
+        "j": 4,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 1,
+        "driver2_gap": 6,
+        "i": 2,
+        "j": 5,
+        "kind": "concordant",
+        "mean_q_gap": 3.5,
+        "signs": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 6,
+        "i": 2,
+        "j": 6,
+        "kind": "one_driver_tie",
+        "mean_q_gap": 3.0,
+        "signs": [
+          0,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": -1,
+        "driver2_gap": -5,
+        "i": 3,
+        "j": 4,
+        "kind": "concordant",
+        "mean_q_gap": -3.0,
+        "signs": [
+          -1,
+          -1,
+          -1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 1,
+        "i": 3,
+        "j": 5,
+        "kind": "one_driver_tie",
+        "mean_q_gap": 0.5,
+        "signs": [
+          0,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": true,
+        "driver1_gap": -1,
+        "driver2_gap": 1,
+        "i": 3,
+        "j": 6,
+        "kind": "reversal",
+        "mean_q_gap": 0.0,
+        "signs": [
+          -1,
+          1,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 1,
+        "driver2_gap": 6,
+        "i": 4,
+        "j": 5,
+        "kind": "concordant",
+        "mean_q_gap": 3.5,
+        "signs": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 6,
+        "i": 4,
+        "j": 6,
+        "kind": "one_driver_tie",
+        "mean_q_gap": 3.0,
+        "signs": [
+          0,
+          1,
+          1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": -1,
+        "driver2_gap": 0,
+        "i": 5,
+        "j": 6,
+        "kind": "one_driver_tie",
+        "mean_q_gap": -0.5,
+        "signs": [
+          -1,
+          0,
+          -1
+        ]
+      }
+    ],
+    "potion_action_present": true,
+    "q": [
+      13.5,
+      13.5,
+      13.5,
+      10.5,
+      13.5,
+      10.0,
+      10.5
+    ],
+    "q_over_60": [
+      0.225,
+      0.225,
+      0.225,
+      0.175,
+      0.225,
+      0.16666666666666666,
+      0.175
+    ],
+    "q_spread": 3.5,
+    "ranking_eligible": true,
+    "root_gold": 0,
+    "root_hp": 73,
+    "root_id": "acfe9796364411ed3a76afa9dfba6302fbe8ce502b290fa3ba5e7cd5c08e24f4",
+    "root_mean_floor": 12.142857142857142,
+    "root_potion_count": 1,
+    "spearman_midrank": 0.6173419725817378,
+    "split": "train",
+    "top1": [
+      0,
+      1,
+      2,
+      4,
+      6
+    ],
+    "top2": [
+      0,
+      1,
+      2,
+      4
+    ],
+    "top_jaccard": 0.8,
+    "top_sets_disjoint": false,
+    "top_sets_equal": false,
+    "within_root_variance": 2.4795918367346936
+  },
+  "exact_both_driver_tie": {
+    "act": 1,
+    "action_centered_q": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "actions": [
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_gold",
+          "label": "game.reward_gold idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 0,
+        "semantics": {
+          "choice_type": "gold",
+          "gold": 24
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_relic",
+          "label": "game.reward_relic idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 1,
+        "semantics": {
+          "choice_type": "relic",
+          "relic": {
+            "id": 149,
+            "id_label": "MealTicket",
+            "name": "Meal Ticket"
+          },
+          "sapphire_key_is_lost": true
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "reward_key",
+          "label": "game.reward_key idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 2,
+        "semantics": {
+          "choice_type": "key",
+          "key": "SAPPHIRE_KEY",
+          "relic_removed_with_key": {
+            "id": 149,
+            "id_label": "MealTicket",
+            "name": "Meal Ticket"
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "skip",
+          "label": "game.skip idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 3,
+        "semantics": {
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        }
+      }
+    ],
+    "all_mean_q_tied": true,
+    "all_option_driver_floors_identical": true,
+    "assisted": false,
+    "both_drivers_all_action_tied": true,
+    "candidate_sha256": [
+      "d967440b886df4d2eb0fb232375aae661456b75d21794803dd913dd4c8719ddc",
+      "cb1367fb5fc5a37ba37aa4d97f491d322a32b22406c1e2335cfdad6ace36f712",
+      "8e9b88c00c45510252531c67e3cc6d1ae9bd358225031b747781d5db41872b4c",
+      "770fce490289432f365cfe4083c4147ea798674354a7a3301627e42b820d90dd"
+    ],
+    "concealed_opposition_pairs": 0,
+    "driver_ranking_informative": false,
+    "family": "REWARDS",
+    "floor": 9,
+    "floors": [
+      [
+        16,
+        16
+      ],
+      [
+        16,
+        16
+      ],
+      [
+        16,
+        16
+      ],
+      [
+        16,
+        16
+      ]
+    ],
+    "kendall_tau_b": null,
+    "label_outcomes": [
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 64,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 22,
+          "potion_acquisition": 1
+        },
+        "ordinal": 0,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 77,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 24,
+          "potion_acquisition": 1
+        },
+        "ordinal": 0,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 64,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 22,
+          "potion_acquisition": 1
+        },
+        "ordinal": 1,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 77,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 24,
+          "potion_acquisition": 1
+        },
+        "ordinal": 1,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 64,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 22,
+          "potion_acquisition": 1
+        },
+        "ordinal": 2,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 77,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 24,
+          "potion_acquisition": 1
+        },
+        "ordinal": 2,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 78,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 22,
+          "potion_acquisition": 1
+        },
+        "ordinal": 3,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 70,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 24,
+          "potion_acquisition": 1
+        },
+        "ordinal": 3,
+        "outcome": "PLAYER_LOSS"
+      }
+    ],
+    "legal_count": 4,
+    "mean_abs_driver_disagreement": 0,
+    "mean_abs_pair_gap": 0.0,
+    "mean_q_equal_pairs": 6,
+    "mean_q_informative": false,
+    "mean_q_tied_but_driver_action_variation": false,
+    "midranks1": [
+      2.5,
+      2.5,
+      2.5,
+      2.5
+    ],
+    "midranks2": [
+      2.5,
+      2.5,
+      2.5,
+      2.5
+    ],
+    "old45": true,
+    "owner": 437005,
+    "pair_count": 6,
+    "pair_counts": {
+      "both_driver_tie": 6,
+      "concordant": 0,
+      "one_driver_tie": 0,
+      "reversal": 0
+    },
+    "pairs": [
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 0,
+        "j": 1,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 0,
+        "j": 2,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 0,
+        "j": 3,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 1,
+        "j": 2,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 1,
+        "j": 3,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 0,
+        "i": 2,
+        "j": 3,
+        "kind": "both_driver_tie",
+        "mean_q_gap": 0.0,
+        "signs": [
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "potion_action_present": false,
+    "q": [
+      16.0,
+      16.0,
+      16.0,
+      16.0
+    ],
+    "q_over_60": [
+      0.26666666666666666,
+      0.26666666666666666,
+      0.26666666666666666,
+      0.26666666666666666
+    ],
+    "q_spread": 0.0,
+    "ranking_eligible": true,
+    "root_gold": 109,
+    "root_hp": 35,
+    "root_id": "2a3dd879bd2c7554d7e24d56fa64bd479719ae26cddd70a4d8c737b2c257a593",
+    "root_mean_floor": 16.0,
+    "root_potion_count": 0,
+    "spearman_midrank": null,
+    "split": "train",
+    "top1": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "top2": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "top_jaccard": 1.0,
+    "top_sets_disjoint": false,
+    "top_sets_equal": true,
+    "within_root_variance": 0.0
+  },
+  "reversal": {
+    "act": 1,
+    "action_centered_q": [
+      -1.166666666666666,
+      1.833333333333334,
+      -0.6666666666666661
+    ],
+    "actions": [
+      {
+        "action": {
+          "idx1": 2,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "map",
+          "label": "game.map idx1=2 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 0,
+        "semantics": {
+          "choice_type": "map_route",
+          "destination": {
+            "location": "map_node",
+            "room_symbol": "E",
+            "x": 2,
+            "y": 5
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 3,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "map",
+          "label": "game.map idx1=3 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 1,
+        "semantics": {
+          "choice_type": "map_route",
+          "destination": {
+            "location": "map_node",
+            "room_symbol": "R",
+            "x": 3,
+            "y": 5
+          }
+        }
+      },
+      {
+        "action": {
+          "idx1": 0,
+          "idx2": 0,
+          "idx3": 0,
+          "kind": "game_potion_discard",
+          "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+          "scope": "game"
+        },
+        "candidate_index": 2,
+        "semantics": {
+          "choice_type": "potion_discard",
+          "potion": {
+            "id": 14,
+            "id_label": "DuplicationPotion",
+            "name": "Duplication Potion",
+            "potion_index": 0
+          }
+        }
+      }
+    ],
+    "all_mean_q_tied": false,
+    "all_option_driver_floors_identical": false,
+    "assisted": false,
+    "both_drivers_all_action_tied": false,
+    "candidate_sha256": [
+      "7f9783f435fb18f50db4fddd2baa25607f7b3ec6e361a4d5680e27d545cce07c",
+      "34b8dfaac7bbd5b330fb793eea9beb0209b23370006daf886e868699d0661a0b",
+      "591485363d09d1e59cbc08ecdf6f409deefec6e511c51f19b4afa6b8d76c7fe7"
+    ],
+    "concealed_opposition_pairs": 0,
+    "driver_ranking_informative": true,
+    "family": "MAP_SCREEN",
+    "floor": 5,
+    "floors": [
+      [
+        11,
+        12
+      ],
+      [
+        16,
+        13
+      ],
+      [
+        16,
+        8
+      ]
+    ],
+    "kendall_tau_b": 0.0,
+    "label_outcomes": [
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 11,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 56,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 18
+        },
+        "ordinal": 0,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 12,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 78,
+          "battle_potion_use": 2,
+          "nonbattle_decisions": 21,
+          "potion_acquisition": 1
+        },
+        "ordinal": 0,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 71,
+          "battle_potion_use": 3,
+          "nonbattle_decisions": 35,
+          "potion_acquisition": 2
+        },
+        "ordinal": 1,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 13,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 67,
+          "battle_potion_use": 2,
+          "nonbattle_decisions": 25,
+          "potion_acquisition": 2
+        },
+        "ordinal": 1,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446001,
+        "floor": 16,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 112,
+          "battle_potion_use": 3,
+          "nonbattle_decisions": 40,
+          "potion_acquisition": 3
+        },
+        "ordinal": 2,
+        "outcome": "PLAYER_LOSS"
+      },
+      {
+        "act": 1,
+        "driver": 446002,
+        "floor": 8,
+        "heart_win": false,
+        "metrics": {
+          "battle_decisions": 44,
+          "battle_potion_use": 1,
+          "nonbattle_decisions": 10,
+          "potion_acquisition": 1
+        },
+        "ordinal": 2,
+        "outcome": "PLAYER_LOSS"
+      }
+    ],
+    "legal_count": 3,
+    "mean_abs_driver_disagreement": 4,
+    "mean_abs_pair_gap": 2.0,
+    "mean_q_equal_pairs": 0,
+    "mean_q_informative": true,
+    "mean_q_tied_but_driver_action_variation": false,
+    "midranks1": [
+      3.0,
+      1.5,
+      1.5
+    ],
+    "midranks2": [
+      2.0,
+      1.0,
+      3.0
+    ],
+    "old45": true,
+    "owner": 437010,
+    "pair_count": 3,
+    "pair_counts": {
+      "both_driver_tie": 0,
+      "concordant": 1,
+      "one_driver_tie": 1,
+      "reversal": 1
+    },
+    "pairs": [
+      {
+        "concealed_opposition": false,
+        "driver1_gap": -5,
+        "driver2_gap": -1,
+        "i": 0,
+        "j": 1,
+        "kind": "concordant",
+        "mean_q_gap": -3.0,
+        "signs": [
+          -1,
+          -1,
+          -1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": -5,
+        "driver2_gap": 4,
+        "i": 0,
+        "j": 2,
+        "kind": "reversal",
+        "mean_q_gap": -0.5,
+        "signs": [
+          -1,
+          1,
+          -1
+        ]
+      },
+      {
+        "concealed_opposition": false,
+        "driver1_gap": 0,
+        "driver2_gap": 5,
+        "i": 1,
+        "j": 2,
+        "kind": "one_driver_tie",
+        "mean_q_gap": 2.5,
+        "signs": [
+          0,
+          1,
+          1
+        ]
+      }
+    ],
+    "potion_action_present": true,
+    "q": [
+      11.5,
+      14.5,
+      12.0
+    ],
+    "q_over_60": [
+      0.19166666666666668,
+      0.24166666666666667,
+      0.2
+    ],
+    "q_spread": 3.0,
+    "ranking_eligible": true,
+    "root_gold": 264,
+    "root_hp": 62,
+    "root_id": "802447640fadadf7e95f46989fa2f07e2a3835c6ec68236fc4c4005f1b031f46",
+    "root_mean_floor": 12.666666666666666,
+    "root_potion_count": 1,
+    "spearman_midrank": 0.0,
+    "split": "train",
+    "top1": [
+      1,
+      2
+    ],
+    "top2": [
+      1
+    ],
+    "top_jaccard": 0.5,
+    "top_sets_disjoint": false,
+    "top_sets_equal": false,
+    "within_root_variance": 1.7222222222222223
+  }
+}

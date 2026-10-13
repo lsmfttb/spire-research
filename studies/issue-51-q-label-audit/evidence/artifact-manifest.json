@@ -1,0 +1,110 @@
+{
+  "builder_upper_cpu_seconds": 411.730145912,
+  "consumer": "Issue51 independent Reviewer then Planner",
+  "cpu_hard_upper": 3000,
+  "files": [
+    {
+      "bytes": 6973,
+      "path": "REPORT.md",
+      "sha256": "4c22d73bc5f836a4708a80606be91a60147a03bea0b6958584bd2cdf18e317b9"
+    },
+    {
+      "bytes": 1773,
+      "path": "execution.json",
+      "sha256": "d7b08f401c6ec7cde10cc9d06732850bff121a8a40781db5d5b842d85097b6cd"
+    },
+    {
+      "bytes": 801516,
+      "path": "input_receipts.json",
+      "sha256": "36156145c17e26ffb6cc404510401f6daab00f65a8a16a9e77f8b4e2a0b73bbc"
+    },
+    {
+      "bytes": 3188783,
+      "path": "owner_metrics.json",
+      "sha256": "02d1f89c1ccf4a0726e687d1cbaf8f1683ef1a0d04c7133ef395f6f8e6331d47"
+    },
+    {
+      "bytes": 468,
+      "path": "provisional_seal_receipt.json",
+      "sha256": "744ab64d6f547e47fa8049270106d7a81ee16ca0f2e36a045278905dc5a165cb"
+    },
+    {
+      "bytes": 472885,
+      "path": "public_examples.json",
+      "sha256": "0496199eec5a3e4e50babf474dcd24619e209e55421094c6f6b866a627e14a92"
+    },
+    {
+      "bytes": 267278,
+      "path": "rank_report.json",
+      "sha256": "19fa6bcf8b52ff7ec9e7e2105e21b81faaa8182179c4e66507b6da3fd16d01a7"
+    },
+    {
+      "bytes": 31400,
+      "path": "ranking_examples.json",
+      "sha256": "1ec43f3f5f18cf49b6bb4672dda2aaa1936e9f3564c3f10372f184436fd0c541"
+    },
+    {
+      "bytes": 307866,
+      "path": "report.json",
+      "sha256": "85a2b424f6b78e0da91793aff7c93979627651d1bb2c92cef52fbe4069b931b6"
+    },
+    {
+      "bytes": 3569241,
+      "path": "trace_summary.json",
+      "sha256": "0882801cacb8c6db98a67b1ef7be077a5135e8063d1b8e35555dd59141800c91"
+    },
+    {
+      "bytes": 228,
+      "path": "verification.json",
+      "sha256": "587581469e617ed6d60558d572cf8888998233cd64621495840db2a5e80c5fc5"
+    }
+  ],
+  "new_Q": 0,
+  "new_games": 0,
+  "original_retention": {
+    "46": "2026-11-12",
+    "47": "2026-11-13"
+  },
+  "original_seals": {
+    "46": "9807c5a02554f57947db1d507d0ed49b10fa07fab88042976b44e60a879e0cd1",
+    "47": "119a514692836954ab205284c35d1070a9a089cebcc9344fd27ded2c850ff1de"
+  },
+  "producer_commit": "337bd60c41bfdf1f5bf6a9add48a8a9a6f0d42fb",
+  "purpose": "STUDY_ONLY",
+  "raw_source_cache_exported": false,
+  "review_delete_date": "2026-11-14",
+  "reviewer_reserved": 1000,
+  "source_files": [
+    {
+      "bytes": 6973,
+      "path": "REPORT.md",
+      "sha256": "4c22d73bc5f836a4708a80606be91a60147a03bea0b6958584bd2cdf18e317b9"
+    },
+    {
+      "bytes": 15986,
+      "path": "audit.py",
+      "sha256": "e2b9b94cd083a197d1eed2ce52e10fab654ff022cd13452358ee6b0aa0ee2124"
+    },
+    {
+      "bytes": 12585,
+      "path": "report.py",
+      "sha256": "c6bf3b884693f878689cc81c43286d387f9b78510750b9982e4e428470a4e6be"
+    },
+    {
+      "bytes": 844,
+      "path": "run_traces.py",
+      "sha256": "c83ec0f4989afaf4f48339fa15056932c40d39658ec62309f9d9dc8ba259cb9a"
+    },
+    {
+      "bytes": 4179,
+      "path": "seal.py",
+      "sha256": "bd4f6cc96e46d2df3031788790caa67e263b46190c6096ed4b9ed9bfe865c854"
+    },
+    {
+      "bytes": 13704,
+      "path": "trace_audit.py",
+      "sha256": "c83ecbfeafb41bf1d8b4a8648b4c9ed80200f87d0e08335ec0012dbf3fc862ed"
+    }
+  ],
+  "training": 0
+}
