@@ -10,7 +10,7 @@ def main():
     for row in old_manifest['files']:assert sha(original/row['path'])==row['sha256']
     checks=[json.loads((out/name).read_text()) for name in ('snapshot-verification.json','prototype-verification.json','visibility-checks.json')]
     assert all(c['passed'] for c in checks)
-    measured=sum(c['cpu_seconds'] for c in checks)+0.008520664999999997
+    measured=sum(c['cpu_seconds'] for c in checks)+0.008520664999999997+0.005666274000000006
     ledger={'stage':'REPAIR_VERIFIED_AND_SEALED','budget_upper_cpu_seconds':3000,'prior_builder_upper_cpu_seconds':416.330496165,'measured_completed_test_attempts_cpu_seconds':measured,'administrative_imports_failed_check_and_publication_upper_charge':100,'failed_attempts':[{'stage':'visibility_checks','reason':'repair output directory lacked native input; corrected invocation reads original store','cpu_covered_by_administrative_upper_charge':True}],'repair_builder_upper_cpu_seconds':measured+100,'cumulative_builder_upper_cpu_seconds':416.330496165+measured+100,'reviewer_reserve_upper_cpu_seconds':2200,'fresh_games':0,'native_executions':0,'training_steps':0,'new_Q_labels':0,'retention_consumer':'Issue49 Reviewer then Planner; delete with named original store after 2026-11-14 unless extended'}
     assert ledger['cumulative_builder_upper_cpu_seconds']+2200<=3000
     write(out/'repair-execution.json',ledger)
