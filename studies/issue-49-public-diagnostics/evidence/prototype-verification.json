@@ -1,0 +1,28 @@
+{
+  "checks": {
+    "deck-binding": true,
+    "discard-complete-card-and-offer-context": true,
+    "duplicates-multiplicity": true,
+    "group-card-reorder-equivariant": true,
+    "hidden-top-level-input-excluded": true,
+    "other-group-card": {
+      "old_max_diff": 0,
+      "target_ordinal_and_legal_count_fixed": true,
+      "v2_distinct": true
+    },
+    "potion-offer": {
+      "old_max_diff": 0,
+      "target_ordinal_and_legal_count_fixed": true,
+      "v2_distinct": true
+    },
+    "same-card-multiset-different-group": true,
+    "stale-mapping-rejected": true
+  },
+  "cpu_seconds": 0.005322195000000002,
+  "feature_kind": "exact semantic/candidate-cross tokens, no learned weights",
+  "fixtures": "synthetic public-format; reward misc deliberately synthetic since pinned native reward projection does not emit it",
+  "fresh_games": 0,
+  "passed": true,
+  "source_sha256": "2456aef47068dcb674da382be7d54f7b307b162e94e2c35870688ab0cfad0c90",
+  "training_steps": 0
+}

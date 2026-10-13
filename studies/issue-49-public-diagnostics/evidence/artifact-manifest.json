@@ -1,0 +1,133 @@
+{
+  "cpu_builder_upper": 416.330496165,
+  "files": [
+    {
+      "bytes": 70254,
+      "path": "diagnostics.json",
+      "sha256": "3e8ad6a90bd4b330ab24c920c1b3b0e4f771d8c47184e0ade6308a2fb2531ba5"
+    },
+    {
+      "bytes": 1562,
+      "path": "execution.json",
+      "sha256": "9dd5d883fc4b941d1c69fb042df58ffd528bb3fd3c976f6b469632f356e6d48b"
+    },
+    {
+      "bytes": 279,
+      "path": "gradient-verification.json",
+      "sha256": "43bf9c985bade50e29e6a82a9140aecaa38e3e344b1c31773ef86d4b6e051364"
+    },
+    {
+      "bytes": 195508,
+      "path": "inputs.json",
+      "sha256": "aadf2a058ab66c09540dc97eeb358983e9c974c0294a4f8ad8f7f64d95aaecbd"
+    },
+    {
+      "bytes": 2182946,
+      "path": "per-root.json",
+      "sha256": "d23f1d29c3e07229f34dcec0095e9da8831c10bfeb6bb6da8bcb3d5fcf5a0478"
+    },
+    {
+      "bytes": 976,
+      "path": "prototype-verification.json",
+      "sha256": "79f40af11f551b42c21e010f003d6b91168694f27cdca717f761cbbca1692d56"
+    },
+    {
+      "bytes": 3030,
+      "path": "synthetic-public-fixture.json",
+      "sha256": "2dddf473b26c2c42fc729b97c1023d5592c6754a90364b449fe84a2d66d6e784"
+    },
+    {
+      "bytes": 1526,
+      "path": "visibility-checks.json",
+      "sha256": "b1f186f1b86f16771c659fea8797c6ae1be5fa6e18e239a036ae8fbaa3cd8647"
+    },
+    {
+      "bytes": 21366,
+      "path": "visibility-cpu.json",
+      "sha256": "a8cbe05f64cbd671cfd0bf2f2ad509a27c325bd707a001bee6d00ec0a7e84968"
+    },
+    {
+      "bytes": 32107,
+      "path": "visibility-native.json",
+      "sha256": "ce5400aff2c84313cba16e024b998c7d0b92b9093dbd52b8c6f0106ad84206c3"
+    },
+    {
+      "bytes": 100803,
+      "path": "visibility-public-fixtures.json",
+      "sha256": "5189ec5aceb5321d734bd2b110f00fd3f9239d9f33d6c3c0ca960c80b24df4e2"
+    },
+    {
+      "bytes": 516,
+      "path": "visibility-work-receipt.json",
+      "sha256": "ef5ecca8ca1e15a04004b66dbc39b105301163874d71706a28ff38d8f3becfbd"
+    }
+  ],
+  "input_hashes_file": "inputs.json",
+  "no_48_results_read": true,
+  "producer_commit": "filled by exact remote handoff SHA; manifest does not self-hash",
+  "purpose": "STUDY_ONLY_NO_MERGE",
+  "retention": "Issue49 independent Reviewer, then Planner; delete after 2026-11-14 unless explicitly extended",
+  "schema": "issue49-phaseA-manifest-v1",
+  "source_files": [
+    {
+      "bytes": 7197,
+      "path": "REPORT.md",
+      "sha256": "f102a8282ce65a820fb38101d90fdad99861a52662b7a41db52e645aae029d48"
+    },
+    {
+      "bytes": 12202,
+      "path": "diagnose.py",
+      "sha256": "f9c1d2964793ef8e42ed7aaff884fd952690488c3b932c3ae5e36aac5ab49836"
+    },
+    {
+      "bytes": 3940,
+      "path": "prototype.py",
+      "sha256": "c5d8ac05df0ab55bc5d2ec17ba7547d379d398eda3a550e32370ef280ada4d27"
+    },
+    {
+      "bytes": 3625,
+      "path": "seal.py",
+      "sha256": "3e557c04d2ec66298319ee68b536a492913daf1ff79375a36a1afa3269faf1a2"
+    },
+    {
+      "bytes": 5059,
+      "path": "student46.py",
+      "sha256": "c3a8108c0f057c68b735a8decc3c8e73cb3edc422f9be7d78003a7dec6bd4ed8"
+    },
+    {
+      "bytes": 5059,
+      "path": "student47.py",
+      "sha256": "c3a8108c0f057c68b735a8decc3c8e73cb3edc422f9be7d78003a7dec6bd4ed8"
+    },
+    {
+      "bytes": 6378,
+      "path": "summarize.py",
+      "sha256": "d7f77390add4ba2358a87283ecc2f46b21b2ad5421a890d39125320c694aac91"
+    },
+    {
+      "bytes": 4766,
+      "path": "test_prototype.py",
+      "sha256": "2456aef47068dcb674da382be7d54f7b307b162e94e2c35870688ab0cfad0c90"
+    },
+    {
+      "bytes": 1576,
+      "path": "verify_gradients.py",
+      "sha256": "1b81189c4d35e1cfb8797fc60d01d9ffde95c8870b05c624b00d1c88ca93ffb7"
+    },
+    {
+      "bytes": 10078,
+      "path": "visibility.md",
+      "sha256": "09131e19d216b35cee574c1fc6360ac0033e2df3af39d3e91479725cb9cbc796"
+    },
+    {
+      "bytes": 5909,
+      "path": "visibility_checks.py",
+      "sha256": "5b076d0e50688c1599eded70a96175e3178c56c00a04ee625c429e707c7ca7e2"
+    },
+    {
+      "bytes": 9943,
+      "path": "visibility_native.py",
+      "sha256": "be6d941f562b2bde02ce54ca258d1a22a036529c464b79ae6b743bf542a94879"
+    }
+  ]
+}

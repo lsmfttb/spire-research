@@ -1,0 +1,1256 @@
+{
+  "after_card_group0": {
+    "candidate_actions": [
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_potion",
+        "label": "game.reward_potion idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "skip",
+        "label": "game.skip idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      }
+    ],
+    "current_hp": 40,
+    "deck": [
+      {
+        "deck_index": 0,
+        "id": 11,
+        "id_label": "ANGER",
+        "misc": 0,
+        "name": "Anger",
+        "rarity": "COMMON",
+        "type": "ATTACK",
+        "upgrade_count": 0,
+        "upgraded": false
+      }
+    ],
+    "gold": 99,
+    "max_hp": 80,
+    "payload": {
+      "choices": [
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 0,
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 1,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 1,
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_potion",
+            "label": "game.reward_potion idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 2,
+          "choice_type": "potion",
+          "potion": {
+            "id": 41,
+            "id_label": "Strength Potion",
+            "name": "Strength Potion"
+          }
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "skip",
+            "label": "game.skip idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 3,
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_discard",
+            "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 4,
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      ],
+      "coverage_status": "supported",
+      "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+    },
+    "potion_capacity": 2,
+    "potion_count": 1,
+    "potions": [
+      {
+        "id": 1,
+        "id_label": "EMPTY_POTION_ID",
+        "name": "EMPTY_POTION_SLOT",
+        "potion_index": 0
+      },
+      {
+        "id": 23,
+        "id_label": "Fire Potion",
+        "name": "Fire Potion",
+        "potion_index": 1
+      }
+    ]
+  },
+  "after_discard": {
+    "candidate_actions": [
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_potion",
+        "label": "game.reward_potion idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "skip",
+        "label": "game.skip idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      }
+    ],
+    "current_hp": 40,
+    "deck": [],
+    "gold": 99,
+    "max_hp": 80,
+    "payload": {
+      "choices": [
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 0,
+          "card": {
+            "id": 11,
+            "id_label": "ANGER",
+            "name": "Anger",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 1,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 1,
+          "card": {
+            "id": 25,
+            "id_label": "BASH",
+            "name": "Bash",
+            "rarity": "BASIC",
+            "type": "ATTACK",
+            "upgraded": true
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 2,
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 1,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 3,
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_potion",
+            "label": "game.reward_potion idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 4,
+          "choice_type": "potion",
+          "potion": {
+            "id": 41,
+            "id_label": "Strength Potion",
+            "name": "Strength Potion"
+          }
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "skip",
+            "label": "game.skip idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 5,
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_discard",
+            "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 6,
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      ],
+      "coverage_status": "supported",
+      "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+    },
+    "potion_capacity": 2,
+    "potion_count": 1,
+    "potions": [
+      {
+        "id": 1,
+        "id_label": "EMPTY_POTION_ID",
+        "name": "EMPTY_POTION_SLOT",
+        "potion_index": 0
+      },
+      {
+        "id": 23,
+        "id_label": "Fire Potion",
+        "name": "Fire Potion",
+        "potion_index": 1
+      }
+    ]
+  },
+  "after_noncombat_use": {
+    "candidate_actions": [
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "skip",
+        "label": "game.skip idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      }
+    ],
+    "current_hp": 56,
+    "deck": [],
+    "gold": 99,
+    "max_hp": 80,
+    "payload": {
+      "choices": [
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 0,
+          "card": {
+            "id": 11,
+            "id_label": "ANGER",
+            "name": "Anger",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 1,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 1,
+          "card": {
+            "id": 25,
+            "id_label": "BASH",
+            "name": "Bash",
+            "rarity": "BASIC",
+            "type": "ATTACK",
+            "upgraded": true
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 2,
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 1,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 3,
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "skip",
+            "label": "game.skip idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 4,
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_discard",
+            "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 5,
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      ],
+      "coverage_status": "supported",
+      "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+    },
+    "potion_capacity": 2,
+    "potion_count": 1,
+    "potions": [
+      {
+        "id": 1,
+        "id_label": "EMPTY_POTION_ID",
+        "name": "EMPTY_POTION_SLOT",
+        "potion_index": 0
+      },
+      {
+        "id": 23,
+        "id_label": "Fire Potion",
+        "name": "Fire Potion",
+        "potion_index": 1
+      }
+    ]
+  },
+  "after_potion_take": {
+    "candidate_actions": [
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "skip",
+        "label": "game.skip idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      }
+    ],
+    "current_hp": 40,
+    "deck": [
+      {
+        "deck_index": 0,
+        "id": 11,
+        "id_label": "ANGER",
+        "misc": 0,
+        "name": "Anger",
+        "rarity": "COMMON",
+        "type": "ATTACK",
+        "upgrade_count": 0,
+        "upgraded": false
+      }
+    ],
+    "gold": 99,
+    "max_hp": 80,
+    "payload": {
+      "choices": [
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 0,
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 1,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 1,
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "skip",
+            "label": "game.skip idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 2,
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_discard",
+            "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 3,
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 41,
+            "id_label": "Strength Potion",
+            "name": "Strength Potion",
+            "potion_index": 0
+          }
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_discard",
+            "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 4,
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      ],
+      "coverage_status": "supported",
+      "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+    },
+    "potion_capacity": 2,
+    "potion_count": 2,
+    "potions": [
+      {
+        "id": 41,
+        "id_label": "Strength Potion",
+        "name": "Strength Potion",
+        "potion_index": 0
+      },
+      {
+        "id": 23,
+        "id_label": "Fire Potion",
+        "name": "Fire Potion",
+        "potion_index": 1
+      }
+    ]
+  },
+  "before": {
+    "candidate_actions": [
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_potion",
+        "label": "game.reward_potion idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "skip",
+        "label": "game.skip idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_use",
+        "label": "game.game_potion_use idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      }
+    ],
+    "current_hp": 40,
+    "deck": [],
+    "gold": 99,
+    "max_hp": 80,
+    "payload": {
+      "choices": [
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 0,
+          "card": {
+            "id": 11,
+            "id_label": "ANGER",
+            "name": "Anger",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 1,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 1,
+          "card": {
+            "id": 25,
+            "id_label": "BASH",
+            "name": "Bash",
+            "rarity": "BASIC",
+            "type": "ATTACK",
+            "upgraded": true
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 2,
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 1,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 3,
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_potion",
+            "label": "game.reward_potion idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 4,
+          "choice_type": "potion",
+          "potion": {
+            "id": 41,
+            "id_label": "Strength Potion",
+            "name": "Strength Potion"
+          }
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "skip",
+            "label": "game.skip idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 5,
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_use",
+            "label": "game.game_potion_use idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 6,
+          "choice_type": "game_potion_use",
+          "potion": {
+            "id": 7,
+            "id_label": "BloodPotion",
+            "name": "Blood Potion",
+            "potion_index": 0
+          }
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_discard",
+            "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 7,
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 7,
+            "id_label": "BloodPotion",
+            "name": "Blood Potion",
+            "potion_index": 0
+          }
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_discard",
+            "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 8,
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      ],
+      "coverage_status": "supported",
+      "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+    },
+    "potion_capacity": 2,
+    "potion_count": 2,
+    "potions": [
+      {
+        "id": 7,
+        "id_label": "BloodPotion",
+        "name": "Blood Potion",
+        "potion_index": 0
+      },
+      {
+        "id": 23,
+        "id_label": "Fire Potion",
+        "name": "Fire Potion",
+        "potion_index": 1
+      }
+    ]
+  },
+  "fixture_kind": "synthetic_native_default_context_no_game_generation",
+  "no_games_generated": true,
+  "reward_misc_not_exposed": true,
+  "take_at_full_inventory": {
+    "candidate_actions": [
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 1,
+        "idx3": 0,
+        "kind": "reward_card",
+        "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "skip",
+        "label": "game.skip idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_use",
+        "label": "game.game_potion_use idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 0,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      {
+        "idx1": 1,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "game_potion_discard",
+        "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+        "scope": "game"
+      }
+    ],
+    "current_hp": 40,
+    "deck": [],
+    "gold": 99,
+    "max_hp": 80,
+    "payload": {
+      "choices": [
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 0,
+          "card": {
+            "id": 11,
+            "id_label": "ANGER",
+            "name": "Anger",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 1,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=0 idx2=1 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 1,
+          "card": {
+            "id": 25,
+            "id_label": "BASH",
+            "name": "Bash",
+            "rarity": "BASIC",
+            "type": "ATTACK",
+            "upgraded": true
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=1 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 2,
+          "card": {
+            "id": 67,
+            "id_label": "CLEAVE",
+            "name": "Cleave",
+            "rarity": "COMMON",
+            "type": "ATTACK",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 1,
+            "idx3": 0,
+            "kind": "reward_card",
+            "label": "game.reward_card idx1=1 idx2=1 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 3,
+          "card": {
+            "id": 301,
+            "id_label": "SHRUG_IT_OFF",
+            "name": "Shrug It Off",
+            "rarity": "COMMON",
+            "type": "SKILL",
+            "upgraded": false
+          },
+          "choice_type": "card"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "skip",
+            "label": "game.skip idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 4,
+          "choice_type": "skip",
+          "description": "Skip the remaining reward screen choices"
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_use",
+            "label": "game.game_potion_use idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 5,
+          "choice_type": "game_potion_use",
+          "potion": {
+            "id": 7,
+            "id_label": "BloodPotion",
+            "name": "Blood Potion",
+            "potion_index": 0
+          }
+        },
+        {
+          "candidate_action": {
+            "idx1": 0,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_discard",
+            "label": "game.game_potion_discard idx1=0 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 6,
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 7,
+            "id_label": "BloodPotion",
+            "name": "Blood Potion",
+            "potion_index": 0
+          }
+        },
+        {
+          "candidate_action": {
+            "idx1": 1,
+            "idx2": 0,
+            "idx3": 0,
+            "kind": "game_potion_discard",
+            "label": "game.game_potion_discard idx1=1 idx2=0 idx3=0",
+            "scope": "game"
+          },
+          "candidate_index": 7,
+          "choice_type": "game_potion_discard",
+          "potion": {
+            "id": 23,
+            "id_label": "Fire Potion",
+            "name": "Fire Potion",
+            "potion_index": 1
+          }
+        }
+      ],
+      "coverage_status": "supported",
+      "source": "GameContext::info.rewardsContainer and StepSimulator::legalActions"
+    },
+    "potion_capacity": 2,
+    "potion_count": 2,
+    "potions": [
+      {
+        "id": 7,
+        "id_label": "BloodPotion",
+        "name": "Blood Potion",
+        "potion_index": 0
+      },
+      {
+        "id": 23,
+        "id_label": "Fire Potion",
+        "name": "Fire Potion",
+        "potion_index": 1
+      }
+    ]
+  }
+}

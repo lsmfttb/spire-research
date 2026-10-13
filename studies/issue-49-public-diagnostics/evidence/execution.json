@@ -1,0 +1,41 @@
+{
+  "Q_continuations": 0,
+  "additional_parent_aborted_optional_diagnostic_conservative_charge": 108.273038541,
+  "administrative_and_imports_upper_charge": 150,
+  "budget_upper_cpu_seconds": 3000,
+  "builder_upper_cpu_seconds": 416.330496165,
+  "fitted_models": 0,
+  "fresh_seeded_games": 0,
+  "gradient_check_cpu": 0.02450209999999986,
+  "historical_store_retention_unchanged": true,
+  "measured_final_diagnostics_cpu": 49.424913109,
+  "measured_prior_diagnostics_attempt_cpu": 50.057715294,
+  "native_all_attempt_cpu_seconds": 48.500524196,
+  "native_probe_cpu_receipt": {
+    "adapter_check_attempts_cpu_seconds": [
+      0.049421934,
+      0.04448073
+    ],
+    "administrative_charge_seconds": 50,
+    "charged_total_cpu_seconds": 98.500524196,
+    "continuations": 0,
+    "fresh_games": 0,
+    "measured_cpu_seconds": 48.500524196,
+    "native_build_attempts_cpu_seconds": [
+      14.006391283,
+      17.046535247,
+      17.353695002
+    ],
+    "reason_for_attempt3": "emit actual post-use HP in public envelope; previous native transitions already passed",
+    "source_owners_generated": 0,
+    "training_steps": 0
+  },
+  "prototype_cpu": 0.005322195000000002,
+  "purpose": "Phase A only; independent Reviewer reserve remains",
+  "retention_consumer": "Issue49 independent Reviewer, then Planner; delete after 2026-11-14 unless explicitly extended",
+  "reviewer_upper_reserve": 2200,
+  "seal_and_publication_upper_charge": 10,
+  "source_owner_generation": 0,
+  "stage": "BUILDER_SEALED_PENDING_INDEPENDENT_REVIEW",
+  "visibility_check_cpu": 0.04448073
+}
