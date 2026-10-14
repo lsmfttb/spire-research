@@ -41,7 +41,7 @@
     "source": "same deterministic seeded stream; branch copies exact in-memory RNG state at root"
   },
   "preflight_gate": {
-    "manifest_sha256": "47bfbfe75f75b41bbac5779cc4f7e8fcb47f24dcd8c92eb1c4b8a2ef76929782",
+    "manifest_sha256": "4743a8da4da341768383c56b3a13e235e3cc68b46194d064eac05a64ae34944d",
     "owners_jsonl_sha256": "6845c46845ae54079034ce95d3b8346f4333788b273ca9a632b41bd5aecbca62",
     "preflight_path": "studies/issue56/preflight",
     "qualified_owner_seeds": [
@@ -49,9 +49,9 @@
       558035
     ],
     "source_attempts_sha256": "abeed46a9f97fb16a327dc34c8417fb4d6672e6fdc7649a3cfad6b7aef795279",
-    "summary_sha256": "e5db7b9a5fe7761c16076efa378ee9679a370f8a2d4a1351bd66488322f2ad57"
+    "summary_sha256": "3b34b6d8c6f11cd60731f75c2149cbcb29f07508dbd2a41e9367eebf0356612c"
   },
-  "producer_checkout": "f30b538b552fcb4120764d861246adec477c9c50",
+  "producer_checkout": "f7243b3845115f893ff7021e0995dc59c5718ee2",
   "search": {
     "api": "StepSimulator.battle_search_v2.v1",
     "include_potions": true,
@@ -142,6 +142,6 @@
     558064
   ],
   "source_selection": "first selected legal non-Smoke potion use in B1; one root maximum per owner",
-  "study_code_sha256": "5cb12c6aa9420528e4bff31801371b853e3b466f1c94f10be890cf06f5e12cff",
+  "study_code_sha256": "2a7b63922e4edeb8cc77d20ffe595cba99b3a2c0235765c385569e4806d55b74",
   "study_disposition": "STUDY_ONLY"
 }
