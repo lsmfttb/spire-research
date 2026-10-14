@@ -10,13 +10,18 @@ Run with Python 3.11+ from the shared workspace or a machine with the sealed #45
 python3 run_study.py prepare
 python3 run_study.py fit
 python3 run_study.py evaluate
+python3 run_study.py repair-reporting
 ```
 
 `prepare` verifies the source seals and opens only the preregistered 64 training owners. It writes a compressed, allowlisted public-feature/target file without raw snapshots. `fit` fits the frozen visible and masked models from that file, writes both coefficient files, then writes the freeze receipt. Only then may `evaluate` open the 16 heldout owners. The 16 validation owners are never opened or used.
 
-If a stage ends with a source-admission failure and an ordinary implementation correction is made, use the matching `retry-prepare`, `retry-fit`, or `retry-evaluate` command. The previous attempt stays in the execution history and CPU ledger. A `NO_IDENTIFIABLE_POTION_FEATURE_VARIATION` terminal result is not rerun into another specification.
+`repair-reporting` is the bounded independent-review follow-up. It requires the completed heldout evaluation and verifies the unchanged freeze, model, admission, and safe-feature hashes. It adds owner-equal heldout coverage against the frozen training 90th-percentile residual bands, plus descriptive present/offered/legally-usable support by partition, screen family, and Act 1 floor band from the already sealed train and heldout decision receipts. It does not refit either model, change the split or metrics/bootstrap results, read validation receipts, or add legal/selected action identities to model inputs. The CPU ledger carries the independent review charge and the measured reporting-repair stage.
 
-Each stage persists its start, last owner checkpoint, CPU time, status, and error boundary in `artifacts/execution_state.json`. The separate CPU ledger charges a conservative 25 CPU seconds for Builder setup, includes measured stage process time, and stops work before Builder plus admin exceeds 1,900 CPU seconds, leaving at least 600 of the 2,500 all-in limit for independent review. If a process dies mid-stage, the next invocation records the interrupted boundary and reserves 60 CPU seconds for that attempt.
+Study JSON files keep LF line endings so the byte-level freeze hashes remain stable in Windows/WSL shared worktrees. The reporting-only opportunity audit reduces sealed legal action kinds to binary support counts; it does not export candidate identities or read selected-action identities.
+
+If a stage ends with a source-admission failure and an ordinary implementation correction is made, use the matching `retry-prepare`, `retry-fit`, `retry-evaluate`, or `retry-reporting` command. A reporting stage left at an ordinary `FAILED` boundary can be rerun directly with `repair-reporting`. The previous attempt stays in the execution history and CPU ledger. A `NO_IDENTIFIABLE_POTION_FEATURE_VARIATION` terminal result is not rerun into another specification.
+
+Each stage persists its start, last owner checkpoint, CPU time, status, and error boundary in `artifacts/execution_state.json`. The separate CPU ledger charges a conservative 25 CPU seconds for Builder setup, records the independent review charges, includes measured stage process time, and stops work before Builder plus admin exceeds 1,900 CPU seconds. The 600-second reviewer reserve is reduced by already charged reviewer work. If a process dies mid-stage, the next invocation records the interrupted boundary and reserves 60 CPU seconds for that attempt.
 
 ## Public-feature boundary
 

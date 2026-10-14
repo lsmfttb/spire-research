@@ -35,6 +35,16 @@ BUILDER_CPU_LIMIT_SECONDS = 1900.0
 ALL_IN_CPU_LIMIT_SECONDS = 2500.0
 REVIEWER_CPU_RESERVE_SECONDS = 600.0
 BOOTSTRAP_REPLICATES = 5000
+OFFERED_POTION_ACTION_KINDS = frozenset({"reward_potion", "shop_reward_potion"})
+USABLE_POTION_ACTION_KINDS = frozenset({"potion", "game_potion_use"})
+INITIAL_REVIEW_CPU_CHARGE = {
+    "id": "issue55-independent-review-3ddd567b",
+    "failed_verification_setup_cpu_seconds": 1.58,
+    "successful_verification_process_cpu_seconds": 3.31,
+    "administration_upper_bound_cpu_seconds": 50.0,
+    "charged_cpu_seconds": 54.89,
+    "evidence": "Issue #55 review comment 6164321138; conservative charge includes failed setup, successful user/system CPU, and administration upper bound.",
+}
 
 SOURCE_ROOT = Path("/home/lsmft/.cache/issue45-potion-paired/reviewed-native-18bcd565")
 EXPECTED_MANIFEST_SHA256 = "624b656dee2afe33cf0e0410dd4cdf1a198c456d3d050a3ac061cb1aec18c160"
@@ -173,6 +183,7 @@ def _default_ledger() -> dict[str, Any]:
         "unit": "process CPU seconds",
         "admin_cpu_upper_bound_seconds": ADMIN_CPU_UPPER_SECONDS,
         "stage_attempts": [],
+        "reviewer_charges": [INITIAL_REVIEW_CPU_CHARGE],
         "interrupted_attempt_reserve_cpu_seconds": 0.0,
         "builder_plus_admin_limit_seconds": BUILDER_CPU_LIMIT_SECONDS,
         "all_in_limit_seconds": ALL_IN_CPU_LIMIT_SECONDS,
@@ -187,6 +198,9 @@ def load_state_and_ledger() -> None:
     ledger_path = ARTIFACTS / "cpu_ledger.json"
     _state = read_json(state_path) if state_path.exists() else _default_state()
     _ledger = read_json(ledger_path) if ledger_path.exists() else _default_ledger()
+    reviewer_charges = _ledger.setdefault("reviewer_charges", [])
+    if not any(row.get("id") == INITIAL_REVIEW_CPU_CHARGE["id"] for row in reviewer_charges):
+        reviewer_charges.append(INITIAL_REVIEW_CPU_CHARGE)
 
     # A RUNNING attempt left by a process crash remains visible and receives a
     # conservative 60 CPU-second reserve; its exact final process-time reading
@@ -200,7 +214,7 @@ def load_state_and_ledger() -> None:
                 attempt["interrupted_attempt_reserve_cpu_seconds"] = 60.0
                 _ledger["interrupted_attempt_reserve_cpu_seconds"] += 60.0
     write_json(state_path, _state)
-    write_json(ledger_path, _ledger)
+    _write_ledger()
 
 
 def _ledger_total(stage_extra: float = 0.0) -> float:
@@ -231,10 +245,17 @@ def _write_state() -> None:
 
 def _write_ledger() -> None:
     assert _ledger is not None
-    total = _ledger_total()
-    _ledger["builder_plus_admin_charged_seconds"] = total
+    builder_total = _ledger_total()
+    reviewer_total = sum(float(row["charged_cpu_seconds"]) for row in _ledger.get("reviewer_charges", []))
+    all_in_total = builder_total + reviewer_total
+    reviewer_reserve_remaining = max(0.0, REVIEWER_CPU_RESERVE_SECONDS - reviewer_total)
+    _ledger["builder_plus_admin_charged_seconds"] = builder_total
+    _ledger["reviewer_charged_cpu_seconds"] = reviewer_total
+    _ledger["reviewer_reserve_remaining_seconds"] = reviewer_reserve_remaining
+    _ledger["all_in_charged_seconds"] = all_in_total
+    _ledger["all_in_remaining_seconds"] = max(0.0, ALL_IN_CPU_LIMIT_SECONDS - all_in_total)
     _ledger["all_in_remaining_after_reviewer_reserve_seconds"] = max(
-        0.0, ALL_IN_CPU_LIMIT_SECONDS - REVIEWER_CPU_RESERVE_SECONDS - total
+        0.0, ALL_IN_CPU_LIMIT_SECONDS - all_in_total - reviewer_reserve_remaining
     )
     write_json(ARTIFACTS / "cpu_ledger.json", _ledger)
 
@@ -1018,6 +1039,193 @@ def _metrics_for_rows(
     return result
 
 
+def _new_opportunity_group() -> dict[str, Any]:
+    return {
+        "owners": set(),
+        "decision_rows": 0,
+        "owners_by_support": {"potion_present": set(), "offered": set(), "legally_usable": set()},
+        "rows_by_support": Counter(),
+    }
+
+
+def _record_opportunity_row(
+    group: dict[str, Any], owner: int, support: dict[str, bool]
+) -> None:
+    group["owners"].add(owner)
+    group["decision_rows"] += 1
+    for name, present in support.items():
+        if present:
+            group["owners_by_support"][name].add(owner)
+            group["rows_by_support"][name] += 1
+
+
+def _finish_opportunity_group(group: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "distinct_decision_owners": len(group["owners"]),
+        "decision_rows": group["decision_rows"],
+        "distinct_owners_with_any": {
+            name: len(owners) for name, owners in sorted(group["owners_by_support"].items())
+        },
+        "decision_rows_with_any": {
+            name: int(group["rows_by_support"].get(name, 0))
+            for name in sorted(group["owners_by_support"])
+        },
+    }
+
+
+def _opportunity_support(partitions: dict[str, list[int]], source_index: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    result: dict[str, Any] = {}
+    verified_inputs: list[dict[str, Any]] = []
+    support_names = ("potion_present", "offered", "legally_usable")
+    for partition_name in ("train", "heldout"):
+        whole_episode = _new_opportunity_group()
+        by_screen: dict[str, dict[str, Any]] = defaultdict(_new_opportunity_group)
+        act1_by_floor_band: dict[str, dict[str, Any]] = defaultdict(_new_opportunity_group)
+        partition_rows = 0
+        for owner in partitions[partition_name]:
+            ensure_budget()
+            verified_inputs.extend(
+                [
+                    verify_manifested_file(source_index, f"{owner}-on.json"),
+                    verify_manifested_file(source_index, f"{owner}-on.jsonl"),
+                ]
+            )
+            owner_metadata(owner)
+            owner_rows = 0
+            with (SOURCE_ROOT / f"{owner}-on.jsonl").open("r", encoding="utf-8") as rows_file:
+                for line_number, line in enumerate(rows_file, start=1):
+                    ensure_budget()
+                    try:
+                        row = _mapping(json.loads(line), f"opportunity owner {owner} row {line_number}")
+                        snapshot = _mapping(row.get("snapshot_raw"), f"opportunity owner {owner} row {line_number} snapshot_raw")
+                        _, _, context = feature_tokens(snapshot)
+                        validate_redundant_row_fields(row, snapshot, context)
+                        legal_kinds = row.get("legal_action_kinds")
+                        legal_identities = row.get("legal_action_identities")
+                        eligible_indices = row.get("eligible_action_indices")
+                        require(
+                            isinstance(legal_kinds, list)
+                            and isinstance(legal_identities, list)
+                            and len(legal_kinds) == len(legal_identities)
+                            and all(isinstance(kind, str) for kind in legal_kinds),
+                            "Decision receipt has inconsistent legal action kind metadata.",
+                        )
+                        require(
+                            isinstance(eligible_indices, list)
+                            and all(
+                                0 <= strict_int(index, "eligible_action_index") < len(legal_kinds)
+                                for index in eligible_indices
+                            ),
+                            "Decision receipt has an invalid eligible action index.",
+                        )
+                    except StudyFailure as exc:
+                        raise StudyFailure(exc.code, f"{partition_name} opportunity owner {owner} row {line_number}: {exc}") from exc
+                    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                        raise StudyFailure(
+                            "PUBLIC_FEATURE_SUBSET_UNAVAILABLE",
+                            f"{partition_name} opportunity owner {owner} row {line_number}: malformed JSONL record",
+                        ) from exc
+
+                    # Use only recorded legal action *kinds* to summarize opportunity.
+                    # Candidate identities and selected actions are neither emitted nor
+                    # added to model features; each row contributes at most one count.
+                    legal_kind_set = set(legal_kinds)
+                    support = {
+                        "potion_present": bool(context["potion_present"]),
+                        "offered": bool(legal_kind_set & OFFERED_POTION_ACTION_KINDS),
+                        "legally_usable": bool(legal_kind_set & USABLE_POTION_ACTION_KINDS),
+                    }
+                    _record_opportunity_row(whole_episode, owner, support)
+                    _record_opportunity_row(by_screen[context["screen_family"]], owner, support)
+                    if context["act"] == 1:
+                        _record_opportunity_row(act1_by_floor_band[context["floor_band"]], owner, support)
+                    owner_rows += 1
+                    partition_rows += 1
+            require(owner_rows > 0, f"{partition_name} owner {owner} has no sealed decision rows.")
+            checkpoint_stage(
+                {
+                    "opportunity_partition": partition_name,
+                    "opportunity_owners_complete": len(whole_episode["owners"]),
+                    "opportunity_rows_complete": partition_rows,
+                }
+            )
+
+        result[partition_name] = {
+            "assigned_owner_count": len(partitions[partition_name]),
+            "decision_owner_count": len(whole_episode["owners"]),
+            "decision_row_count": partition_rows,
+            "whole_episode_owner_counts_with_any": {
+                name: len(whole_episode["owners_by_support"][name]) for name in support_names
+            },
+            "whole_episode_row_counts_with_any": {
+                name: int(whole_episode["rows_by_support"].get(name, 0)) for name in support_names
+            },
+            "screen_family": {
+                screen: _finish_opportunity_group(group) for screen, group in sorted(by_screen.items())
+            },
+            "act1_floor_band": {
+                band: _finish_opportunity_group(group)
+                for band, group in sorted(act1_by_floor_band.items())
+            },
+        }
+    return (
+        {
+            "schema": "issue55-opportunity-support-v1",
+            "basis": "Sealed train and heldout on-arm decision receipts only; validation receipts were not opened.",
+            "support_definitions": {
+                "potion_present": "Allowlisted decision-time public inventory has at least one nonempty potion slot.",
+                "offered": "At least one recorded legal_action_kinds entry is reward_potion or shop_reward_potion.",
+                "legally_usable": "At least one recorded legal_action_kinds entry is potion or game_potion_use.",
+                "row_counting": "Each decision row contributes at most once to each support count; owner support means at least one qualifying row in the partition/group.",
+                "screen_family": "All included decision rows grouped by validated decision-time public screen family.",
+                "act1_floor_band": "Only rows with validated act == 1, grouped by the preregistered F00-F08/F09-F16/F17+ current-floor bands.",
+                "interpretation": "Descriptive availability support from historical receipts, not independent action labels, selected-action counts, counterfactuals, or model features.",
+                "action_identity_handling": "Legal action identities and selected actions are not emitted or used in model inputs; only the sealed receipt's exact legal action kind enums are reduced to binary row indicators.",
+            },
+            "source_manifest_sha256": EXPECTED_MANIFEST_SHA256,
+            "source_metadata_sha256": EXPECTED_SOURCE_METADATA_SHA256,
+            "validation_files_opened": False,
+            "partition_counts": result,
+        },
+        sorted(verified_inputs, key=lambda item: item["basename"]),
+    )
+
+
+def _residual_band_coverage(
+    model: dict[str, Any], rows_by_owner: dict[str, list[dict[str, Any]]], *, visible: bool
+) -> dict[str, Any]:
+    band = float(model["training_residual_absolute_q90_nearest_rank"])
+    per_owner: dict[str, dict[str, Any]] = {}
+    covered_rows = 0
+    total_rows = 0
+    owner_fractions: list[float] = []
+    for owner, rows in sorted(rows_by_owner.items()):
+        owner_covered = sum(
+            abs(float(row["target_remaining_floors"]) - _model_prediction(model, row, visible)) <= band
+            for row in rows
+        )
+        owner_fraction = owner_covered / len(rows)
+        per_owner[owner] = {
+            "decision_rows_within_band": owner_covered,
+            "decision_row_denominator": len(rows),
+            "within_band_fraction": owner_fraction,
+        }
+        owner_fractions.append(owner_fraction)
+        covered_rows += owner_covered
+        total_rows += len(rows)
+    require(bool(per_owner) and total_rows > 0, "Residual-band coverage has no rows.")
+    return {
+        "training_residual_absolute_q90_nearest_rank": band,
+        "owner_equal_row_fraction_within_band": statistics.fmean(owner_fractions),
+        "pooled_decision_row_fraction_within_band": covered_rows / total_rows,
+        "distinct_owner_denominator": len(per_owner),
+        "decision_row_denominator": total_rows,
+        "decision_rows_within_band": covered_rows,
+        "per_owner": per_owner,
+        "warning": "Descriptive heldout coverage using the frozen training residual band; not calibrated or guaranteed.",
+    }
+
+
 def evaluate() -> None:
     freeze_path = ARTIFACTS / "freeze_receipt.json"
     require(freeze_path.exists(), "Heldout cannot be opened before a freeze receipt exists.")
@@ -1263,6 +1471,171 @@ def evaluate() -> None:
     checkpoint_stage({"evaluation_report_written": True, "heldout_owners_complete": len(heldout_owner_rows)})
 
 
+def repair_reporting() -> None:
+    assert _state is not None
+    require(
+        _state.get("stages", {}).get("evaluate_heldout", {}).get("status") == "COMPLETE",
+        "Reporting repair requires the completed original heldout evaluation.",
+        "BUILDER_REPAIR_REQUIRED",
+    )
+    freeze_path = ARTIFACTS / "freeze_receipt.json"
+    admission_path = ARTIFACTS / "admission_report.json"
+    report_path = ARTIFACTS / "report.json"
+    require(freeze_path.exists() and admission_path.exists() and report_path.exists(), "Frozen study artifacts are incomplete.", "BUILDER_REPAIR_REQUIRED")
+    freeze = read_json(freeze_path)
+    admission = read_json(admission_path)
+    report = read_json(report_path)
+    require(freeze.get("status") == "FROZEN_BEFORE_HELDOUT_ACCESS", "Model freeze receipt is invalid.", "BUILDER_REPAIR_REQUIRED")
+    require(freeze.get("heldout_opened") is False, "Freeze receipt was altered after evaluation.", "BUILDER_REPAIR_REQUIRED")
+    fit_attempts = _state.get("stages", {}).get("fit_frozen_models", {}).get("attempts", [])
+    require(
+        _state.get("stages", {}).get("fit_frozen_models", {}).get("status") == "COMPLETE" and len(fit_attempts) == 1,
+        "Reporting repair requires the single completed frozen-model fit; do not refit.",
+        "BUILDER_REPAIR_REQUIRED",
+    )
+    require(
+        sha256_file(admission_path)[0] == freeze.get("admission_report_sha256"),
+        "Training admission changed after model freeze.",
+        "BUILDER_REPAIR_REQUIRED",
+    )
+    require(
+        report.get("source", {}).get("validation_files_opened") is False
+        and report.get("pre_registration", {}).get("heldout_opened_after_models_frozen") is True,
+        "Evaluation report does not preserve the frozen heldout/untouched-validation boundary.",
+        "BUILDER_REPAIR_REQUIRED",
+    )
+    primary_sha_before = canonical_hash(report.get("primary_evaluation"))
+    stratified_sha_before = canonical_hash(report.get("stratified_descriptives"))
+    bootstrap_sha_before = canonical_hash(report["primary_evaluation"].get("primary_paired_owner_cluster_bootstrap"))
+    model_hashes: dict[str, str] = {}
+    models: dict[str, dict[str, Any]] = {}
+    for filename, frozen_record in freeze["models"].items():
+        model_path = ARTIFACTS / filename
+        model_sha = sha256_file(model_path)[0]
+        require(model_sha == frozen_record.get("sha256"), f"Frozen model hash mismatch: {filename}.", "BUILDER_REPAIR_REQUIRED")
+        model_hashes[filename] = model_sha
+        models[filename] = read_json(model_path)
+
+    prereg = read_json(PREREG_PATH)
+    partitions = expected_partitions(prereg)
+    train_path = ARTIFACTS / admission["training_public_features"]["path"]
+    heldout_artifact = report["heldout_support"]["public_feature_artifact"]
+    heldout_path = ARTIFACTS / heldout_artifact["path"]
+    require(
+        sha256_file(train_path)[0] == admission["training_public_features"]["sha256"],
+        "Sealed training feature artifact hash changed.",
+        "BUILDER_REPAIR_REQUIRED",
+    )
+    require(
+        sha256_file(heldout_path)[0] == heldout_artifact["sha256"],
+        "Sealed heldout feature artifact hash changed.",
+        "BUILDER_REPAIR_REQUIRED",
+    )
+    train_owner_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    heldout_owner_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    train_owner_ids = {str(owner) for owner in partitions["train"]}
+    heldout_owner_ids = {str(owner) for owner in partitions["heldout"]}
+    for record in iter_gzip_jsonl(train_path):
+        ensure_budget()
+        owner = str(record.get("owner_id"))
+        require(owner in train_owner_ids, "Training feature artifact contains a nontraining owner.", "BUILDER_REPAIR_REQUIRED")
+        train_owner_rows[owner].append(record)
+    for record in iter_gzip_jsonl(heldout_path):
+        ensure_budget()
+        owner = str(record.get("owner_id"))
+        require(owner in heldout_owner_ids, "Heldout feature artifact contains a nonheldout owner.", "BUILDER_REPAIR_REQUIRED")
+        heldout_owner_rows[owner].append(record)
+    require(set(train_owner_rows) == train_owner_ids, "Training feature owner set changed.", "BUILDER_REPAIR_REQUIRED")
+    require(set(heldout_owner_rows) == heldout_owner_ids, "Heldout feature owner set changed.", "BUILDER_REPAIR_REQUIRED")
+    require(
+        sum(map(len, train_owner_rows.values())) == int(admission["eligible_training_rows"]),
+        "Training feature row denominator changed.",
+        "BUILDER_REPAIR_REQUIRED",
+    )
+    require(
+        sum(map(len, heldout_owner_rows.values())) == int(report["heldout_support"]["decision_row_count"]),
+        "Heldout feature row denominator changed.",
+        "BUILDER_REPAIR_REQUIRED",
+    )
+    for owner, counts in admission["training_owner_rows"].items():
+        require(len(train_owner_rows[str(owner)]) == int(counts["eligible_rows"]), f"Training row count changed for owner {owner}.", "BUILDER_REPAIR_REQUIRED")
+    for owner, counts in report["heldout_support"]["owner_rows"].items():
+        require(len(heldout_owner_rows[str(owner)]) == int(counts["eligible_rows"]), f"Heldout row count changed for owner {owner}.", "BUILDER_REPAIR_REQUIRED")
+
+    visible = models["model_visible.json"]
+    masked = models["model_masked.json"]
+    training_coverage_visible = _residual_band_coverage(visible, train_owner_rows, visible=True)
+    training_coverage_masked = _residual_band_coverage(masked, train_owner_rows, visible=False)
+    for name, calculated in (
+        ("POTION_VISIBLE", training_coverage_visible),
+        ("POTION_MASKED", training_coverage_masked),
+    ):
+        prior = report["descriptive_training_residual_band_coverage"][name]
+        require(
+            abs(float(prior["owner_equal_row_fraction_within_band"]) - calculated["owner_equal_row_fraction_within_band"]) < 1e-12,
+            f"Existing training coverage check changed for {name}.",
+            "BUILDER_REPAIR_REQUIRED",
+        )
+    heldout_coverage = {
+        "POTION_VISIBLE": _residual_band_coverage(visible, heldout_owner_rows, visible=True),
+        "POTION_MASKED": _residual_band_coverage(masked, heldout_owner_rows, visible=False),
+    }
+
+    source_index, source_seal = manifest_index()
+    opportunity_support, support_inputs = _opportunity_support(partitions, source_index)
+    expected_receipt_inputs = sorted(
+        admission["training_input_hashes"] + report["source"]["heldout_inputs"],
+        key=lambda item: item["basename"],
+    )
+    require(
+        support_inputs == expected_receipt_inputs,
+        "Opportunity support did not use the same sealed training and heldout receipt set.",
+        "BUILDER_REPAIR_REQUIRED",
+    )
+    require(len(support_inputs) == 160, "Unexpected train+heldout sealed receipt file count.", "BUILDER_REPAIR_REQUIRED")
+    for partition_name, expected_owner_count, expected_row_count in (("train", 64, int(admission["eligible_training_rows"])), ("heldout", 16, int(report["heldout_support"]["decision_row_count"]))):
+        counts = opportunity_support["partition_counts"][partition_name]
+        require(counts["assigned_owner_count"] == expected_owner_count, f"Unexpected {partition_name} support owner count.", "BUILDER_REPAIR_REQUIRED")
+        require(counts["decision_owner_count"] == expected_owner_count, f"Some {partition_name} support owners have no receipt rows.", "BUILDER_REPAIR_REQUIRED")
+        require(counts["decision_row_count"] == expected_row_count, f"Unexpected {partition_name} support row count.", "BUILDER_REPAIR_REQUIRED")
+    opportunity_support["verified_receipt_file_count"] = len(support_inputs)
+    opportunity_support["verified_receipt_hashes_sha256"] = canonical_hash(support_inputs)
+    opportunity_support["source_controller_config_fingerprint"] = EXPECTED_CONTROLLER_CONFIG_SHA256
+
+    report["schema"] = "issue55-evaluation-report-v2"
+    report["descriptive_heldout_training_residual_band_coverage"] = heldout_coverage
+    report["opportunity_support"] = opportunity_support
+    report["reporting_repair"] = {
+        "schema": "issue55-reporting-repair-v1",
+        "completed_utc": utc_now(),
+        "source_manifest_sha256": source_seal["manifest_sha256"],
+        "source_metadata_sha256": source_seal["source_metadata_sha256"],
+        "source_receipt_hashes_sha256": opportunity_support["verified_receipt_hashes_sha256"],
+        "freeze_receipt_sha256": sha256_file(freeze_path)[0],
+        "model_hashes_unchanged": model_hashes,
+        "validation_files_opened": False,
+        "validation_used": False,
+        "models_refit": False,
+        "primary_evaluation_sha256_before_and_after": primary_sha_before,
+        "stratified_descriptives_sha256_before_and_after": stratified_sha_before,
+        "primary_bootstrap_specification_sha256_before_and_after": bootstrap_sha_before,
+    }
+    require(canonical_hash(report["primary_evaluation"]) == primary_sha_before, "Primary result changed during reporting repair.", "BUILDER_REPAIR_REQUIRED")
+    require(canonical_hash(report["stratified_descriptives"]) == stratified_sha_before, "Bootstrap strata changed during reporting repair.", "BUILDER_REPAIR_REQUIRED")
+    for filename, frozen_record in freeze["models"].items():
+        require(sha256_file(ARTIFACTS / filename)[0] == frozen_record["sha256"], f"Model file changed during reporting repair: {filename}.", "BUILDER_REPAIR_REQUIRED")
+    write_json(report_path, report)
+    _state.pop("execution_error", None)
+    checkpoint_stage(
+        {
+            "heldout_coverage_models_complete": len(heldout_coverage),
+            "opportunity_support_partitions_complete": 2,
+            "opportunity_support_receipt_files_verified": len(support_inputs),
+            "reporting_repair_written": True,
+        }
+    )
+
+
 def run_stage(name: str, function: Callable[[], None]) -> int:
     try:
         if not start_stage(name):
@@ -1308,15 +1681,17 @@ def main(argv: list[str]) -> int:
         "prepare": ("prepare_train_only", prepare),
         "fit": ("fit_frozen_models", fit),
         "evaluate": ("evaluate_heldout", evaluate),
+        "repair-reporting": ("repair_reporting", repair_reporting),
     }
     retry_commands = {
         "retry-prepare": ("prepare_train_only", prepare),
         "retry-fit": ("fit_frozen_models", fit),
         "retry-evaluate": ("evaluate_heldout", evaluate),
+        "retry-reporting": ("repair_reporting", repair_reporting),
     }
     all_commands = commands | retry_commands
     if len(argv) != 2 or argv[1] not in all_commands:
-        print("usage: python3 run_study.py {prepare|fit|evaluate|retry-prepare|retry-fit|retry-evaluate}", file=sys.stderr)
+        print("usage: python3 run_study.py {prepare|fit|evaluate|repair-reporting|retry-prepare|retry-fit|retry-evaluate|retry-reporting}", file=sys.stderr)
         return 64
     load_state_and_ledger()
     command = argv[1]
