@@ -118,10 +118,6 @@ class StopAtRoot(BaseException):
     pass
 
 
-class StopAtB1Exit(BaseException):
-    pass
-
-
 class StopAtB2Exit(BaseException):
     pass
 
@@ -171,6 +167,7 @@ class Root:
     selected_identity: dict[str, Any]
     potion: dict[str, Any]
     rng_state: Any
+    source_battle_number: int
 
 
 class StudySearch:
@@ -222,16 +219,17 @@ class StudySearch:
             raise RuntimeError("native Search-v2 report invalid: " + "; ".join(report.problems))
         target = select_oracle_root_action(report, selection_rule="highest_mean")
         action = actions[target.legal_action_index]
-        if self.mode == "source" and self.root_state.get("b1_seen") and action.kind == "potion" and is_smoke(potion_at_action_slot(snapshot.raw, action)):
-            self.root_state["smoke_uses"] += 1
-        if self.mode == "source" and self.root_state.get("b1_seen") and is_qualifying_source_use(action, snapshot.raw):
+        if self.mode == "source" and self.root_state.get("source_battle_number") is not None and action.kind == "potion" and is_smoke(potion_at_action_slot(snapshot.raw, action)):
+            self.root_state["smoke_uses_total"] += 1
+        if self.mode == "source" and self.root_state.get("source_battle_number") is not None and is_qualifying_source_use(action, snapshot.raw):
             identities = action_identity_dicts_for_actions(actions)
             self.root = Root(checkpoint=adapter.capture_checkpoint(snapshot),
                 fingerprint=adapter.checkpoint_fingerprint(snapshot), raw=dict(snapshot.raw),
                 actions=list(actions), action_identities=identities,
                 selected_identity=identities[target.legal_action_index],
                 potion=potion_at_action_slot(snapshot.raw, action),
-                rng_state=self.root_state["driver"]._rng.getstate())
+                rng_state=self.root_state["driver"]._rng.getstate(),
+                source_battle_number=int(self.root_state["source_battle_number"]))
             self.root_state["search_root_report"] = {"native_api": report.native_api,
                 "patch_identity": report.patch_identity, "include_potions": report.include_potions,
                 "simulations_requested": report.simulations_requested, "root_visits": report.root_visits}
@@ -405,38 +403,46 @@ def run_source(seed: int, journal: EventJournal, output: Path) -> tuple[dict[str
     journal.check_budget(seed)
     adapter = LightSpeedAdapter(seed=seed, ascension=20, module=slaythespire)
     driver = ExpertNonCombatDriver(DRIVER_SEED)
-    state: dict[str, Any] = {"b1_seen": False, "driver": driver, "smoke_uses": 0,
+    state: dict[str, Any] = {"source_battle_number": None, "driver": driver, "smoke_uses_total": 0,
         "journal": journal, "owner_seed": seed}
     battle = StudySearch("source", state)
     controller = RoutedRunController(battle=battle, non_combat=PolicyController(driver))
-    source_exit: dict[str, Any] = {}
+    source_battle_exits: list[dict[str, Any]] = []
+    source_completion: dict[str, Any] = {}
 
     def before(snapshot: Any, actions: Sequence[Any], context: DecisionContext, step_index: int) -> None:
         del actions, step_index
+        journal.check_budget(seed)
         if is_battle_state(snapshot.raw, context.screen_state):
-            state["b1_seen"] = True
+            state["source_battle_number"] = len(source_battle_exits) + 1
+        else:
+            state["source_battle_number"] = None
 
     def after(step: ControlledRunStep) -> None:
         if step.battle_active and not step.next_battle_active:
-            source_exit.update({"battle_outcome": step.next_battle_outcome or step.battle_outcome or "UNKNOWN",
+            battle_number = len(source_battle_exits) + 1
+            source_battle_exits.append({"battle_number": battle_number,
+                "battle_outcome": step.next_battle_outcome or step.battle_outcome or "UNKNOWN",
                 "terminal": step.terminal_after_step, "outcome": step.next_snapshot_raw.get("outcome", "UNKNOWN"),
                 "floor": step.next_floor, "hp": step.next_player_hp, "max_hp": step.next_player_max_hp,
                 "gold": step.next_gold, "potion_count": step.next_potion_count,
+                "smoke_uses_total": state["smoke_uses_total"],
+                "qualifying_source_use_not_yet_selected": True,
                 "potion_inventory": step.next_snapshot_raw.get("battle_potions", step.next_snapshot_raw.get("potions"))})
-            raise StopAtB1Exit
+            journal.event(seed, "source_battle_exit", battle_number=battle_number,
+                battle_outcome=source_battle_exits[-1]["battle_outcome"],
+                terminal=step.terminal_after_step, floor=step.next_floor)
 
     journal.event(seed, "source_started")
     try:
         result = execute_controlled_run(adapter, controller, seed=seed, max_steps=MAX_STEPS,
             action_space=ActionSpaceConfig.include_all(), before_decision=before,
             after_transition=after, retain_steps=False)
-        source_exit.update({"terminal": result.terminal, "outcome": result.outcome,
+        source_completion.update({"terminal": result.terminal, "outcome": result.outcome,
             "problems": result.problems, "final_screen": result.final_raw.get("screen_state"),
             "final_floor": result.final_raw.get("floor_num"), "final_hp": result.final_raw.get("player_hp"),
             "final_max_hp": result.final_raw.get("player_max_hp")})
     except StopAtRoot:
-        pass
-    except StopAtB1Exit:
         pass
     except BudgetStop:
         adapter.close()
@@ -448,24 +454,25 @@ def run_source(seed: int, journal: EventJournal, output: Path) -> tuple[dict[str
     root = battle.root
     if root is not None:
         disposition = "eligible_root"
-    elif source_exit.get("problems"):
+    elif source_completion.get("problems"):
         disposition = "source_error"
-    elif source_exit.get("terminal"):
-        disposition = "source_terminal_before_use"
-    elif source_exit.get("battle_outcome") is not None:
-        disposition = "smoke_only" if state["smoke_uses"] else "no_qualifying_use_b1"
+    elif source_completion.get("terminal"):
+        disposition = "source_terminal_no_qualifying_use"
     else:
-        disposition = "source_incomplete_before_b1_exit"
+        disposition = "source_truncated_before_qualifying_use"
     record = {"seed": seed, "source_disposition": disposition,
-        "source_b1_outcome": source_exit.get("battle_outcome"),
-        "source_smoke_uses_b1": state["smoke_uses"],
-        "source_terminal": source_exit.get("terminal", False),
-        "source_outcome": source_exit.get("outcome", "UNKNOWN"),
-        "source_problems": source_exit.get("problems", []),
+        "source_root_battle_number": None if root is None else root.source_battle_number,
+        "source_battles_before_root": len(source_battle_exits) if root is not None else None,
+        "source_battle_exits": source_battle_exits,
+        "source_smoke_uses_total": state["smoke_uses_total"],
+        "source_terminal": source_completion.get("terminal", False),
+        "source_outcome": source_completion.get("outcome", "UNKNOWN"),
+        "source_problems": source_completion.get("problems", []),
         "source_root": None if root is None else {"visible_snapshot": {k: root.raw.get(k) for k in ("screen_state", "floor_num", "player_hp", "player_max_hp", "gold", "battle_potions")},
             "potion": root.potion, "chosen_action": root.selected_identity,
+            "source_battle_number": root.source_battle_number,
             "search": state.get("search_root_report")},
-        "source_b1_exit": source_exit or None}
+        "source_completion": source_completion or None}
     append_jsonl(output, record)
     journal.event(seed, "source_root_found" if root else disposition,
         potion=None if root is None else root.potion)
@@ -726,7 +733,7 @@ def source_manifest(output: Path, preflight_gate: Mapping[str, Any] | None = Non
         "study_disposition": "STUDY_ONLY",
         "source_seed_order": list(SEEDS),
         "source_seed_count": len(SEEDS),
-        "source_selection": "first selected legal non-Smoke potion use in B1; one root maximum per owner",
+        "source_selection": "first selected legal non-Smoke potion use anywhere in the natural source run before authentic terminal or max-step truncation; one root maximum per owner",
         "simulator": {"repository": "lsmfttb/sts_lightspeed", "commit": NATIVE_COMMIT,
             "module_path": str(module_path), "module_sha256": NATIVE_MODULE_SHA256,
             "build": {"type": "Release", "cmake": "4.2.3", "compiler": "GNU g++ 15",
@@ -954,7 +961,7 @@ def finalize(owners: Sequence[Mapping[str, Any]], journal: EventJournal, preflig
     any_b2 = stats["eligible_owners_with_any_branch_reaching_b2"]
     both_b2 = stats["eligible_owners_with_both_branches_reaching_b2"]
     preflight_fail = any(row.get("preflight_integrity_pass") is False for row in owners)
-    incomplete_sources = sum(source_counts[k] for k in ("source_incomplete_before_b1_exit", "source_error"))
+    incomplete_sources = sum(source_counts[k] for k in ("source_truncated_before_qualifying_use", "source_error"))
     not_run = sum(value for key, value in source_counts.items() if key.startswith("not_run"))
     incomplete_pairs = stats["incomplete_or_invalid_pairs"]
     unclassified_terminal_branches = sum(
@@ -1110,7 +1117,7 @@ def run(output: Path, *, preflight: bool) -> dict[str, Any]:
             status = "INTERVENTION_NOT_EXECUTABLE"
             write_progress(output / "progress.json", journal, owners, status=status)
             break
-        if owner.get("source_disposition") in {"source_error", "source_incomplete_before_b1_exit"}:
+        if owner.get("source_disposition") in {"source_error", "source_truncated_before_qualifying_use"}:
             status = "VALIDITY_FAILURE" if owner.get("source_disposition") == "source_error" else "RESOURCE_BLOCKED_INCOMPLETE"
             write_progress(output / "progress.json", journal, owners, status=status)
             break

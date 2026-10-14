@@ -97,7 +97,7 @@ class StudyContractTests(unittest.TestCase):
             "fixed-denominator worst-case bounds with owner-resampled paired bootstrap envelope")
 
     def test_final_report_handles_sources_without_an_eligible_root(self):
-        report = finalize([{"seed": 558001, "source_disposition": "no_qualifying_use_b1"}],
+        report = finalize([{"seed": 558001, "source_disposition": "source_terminal_no_qualifying_use"}],
             SimpleNamespace(prior_cpu_s=0.0, cpu_started=0.0))
         self.assertEqual(report["eligible_owner_denominator"], 0)
         self.assertEqual(report["terminal_disposition"], "RESOURCE_BLOCKED_INCOMPLETE")
@@ -192,6 +192,20 @@ class StudyContractTests(unittest.TestCase):
         self.assertEqual(formal_manifest["study_code_sha256"], current_code_sha)
         gate = verify_preflight_gate(preflight_path, producer)
         self.assertEqual(gate["qualified_owner_seeds"], formal_manifest["preflight_gate"]["qualified_owner_seeds"])
+
+        owners = [json.loads(line) for line in (artifact_root / "results" / "owners.jsonl").read_text(encoding="utf-8").splitlines()]
+        later_root_owners = [row for row in owners
+            if row.get("source_disposition") == "eligible_root"
+            and row.get("source_root_battle_number", 1) > 1]
+        self.assertTrue(later_root_owners, "fixed natural-run cohort has no real later-battle source root regression case")
+        for owner in later_root_owners:
+            root_battle = owner["source_root_battle_number"]
+            exits = owner["source_battle_exits"]
+            self.assertEqual(root_battle, owner["source_root"]["source_battle_number"])
+            self.assertEqual(owner["source_battles_before_root"], root_battle - 1)
+            self.assertEqual([row["battle_number"] for row in exits], list(range(1, root_battle)))
+            self.assertTrue(all(row["qualifying_source_use_not_yet_selected"] for row in exits))
+            self.assertFalse(any(row["terminal"] for row in exits))
 
 
 if __name__ == "__main__":

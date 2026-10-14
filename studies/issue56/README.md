@@ -21,6 +21,14 @@ export SPIRE_WORKTREE_COMMIT=<exact-pushed-commit-sha>
 
 ## Run and artifacts
 
+The source cursor follows each fixed seed through its natural run until the
+first selected legal non-Smoke potion use, an authentic game terminal, or the
+20,000-step cursor limit. The battle containing that first qualifying use is
+the study's B1; it may occur after the game's first battle. Earlier battles
+remain part of source collection only and are recorded as source battle exits.
+The consume/reserve branches both resume at the selected root, so their B1 is
+the battle containing that use and B2 is the next battle after it.
+
 First run the fixed-order preflight. It stops only after two distinct eligible
 owners each pass the root/action/mask checks, have at least two reserve-mask
 decisions, show no post-root raw-state fingerprint collision across the two
@@ -50,6 +58,13 @@ The checkpoint handle and expert-driver RNG state remain in memory and are
 never written to artifacts. `progress.json` and the append-only event log record
 durable coarse progress; manifests, owner ledgers, summaries, transition
 ledgers, and their hashes identify the evidence.
+
+The earlier first-battle-only outputs are retained as
+`preflight-first-battle-only-superseded/` and
+`results-first-battle-only-superseded/`; they are not part of the corrected
+formal gate or denominator. The regression test requires a real fixed-cohort
+owner whose first qualifying use occurs after at least one earlier battle
+exit without a qualifying use.
 
 The artifacts remain study-only. Paired differences are local to this frozen
 privileged teacher-assisted intervention and do not establish normal-public
