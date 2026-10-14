@@ -33,7 +33,21 @@ def owner_key(seed):
 
 def potion_name(v):
     if isinstance(v, dict): v = v.get("name", v.get("id_label", ""))
-    return str(v or "").strip().upper()
+    # Canonicalize display names ("Blood Potion") and identifiers
+    # ("BLOOD_POTION") to the same token before event and slot-label checks.
+    return re.sub(r"[^A-Z0-9]+", "_", str(v or "").strip().upper()).strip("_")
+
+def relic_inventory(*snapshots):
+    observed = False
+    names = set()
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict): continue
+        for key in ("battle_relics", "relics"):
+            values = snapshot.get(key)
+            if isinstance(values, list):
+                observed = True
+                names.update(potion_name(x) for x in values if isinstance(x, (str, dict)))
+    return observed, names
 
 def action_kind(v):
     if isinstance(v, dict): v = v.get("kind")
@@ -96,10 +110,16 @@ def scan_on_trace(path):
         "potion_use_identity_mapped_count": 0, "potion_use_identity_unmapped_count": 0,
         "potion_use_slot_label_identity_match_count": 0, "potion_use_slot_label_identity_mismatch_count": 0,
         "blood_potion_uses": 0, "blood_potion_uses_with_sacred_bark": 0,
+        "blood_potion_battle_uses": 0,
+        "blood_potion_battle_uses_with_sacred_bark": 0,
+        "blood_potion_battle_uses_without_sacred_bark": 0,
+        "blood_potion_battle_bark_context_unobserved": 0,
         "smoke_bomb_uses": 0, "smoke_bomb_escapes": 0,
+        "smoke_bomb_battle_uses": 0,
         "victory_with_meat_on_bone_and_burning_blood": 0,
         "victory_face_of_cleric_to_rewards": 0,
         "sensitive_event_context_unobserved": 0,
+        "potentially_affected_event_counts": collections.Counter(),
         "owners_actions": set(), "floor_decisions": collections.Counter(),
         "screen_decisions": collections.Counter(), "pre_snapshot_rows": 0,
         "post_snapshot_rows": 0, "pre_post_rows": 0,
@@ -207,28 +227,46 @@ def scan_on_trace(path):
                 else:
                     item = potion_name(slots[slot]); out["potion_use_identity_mapped_count"] += bool(item)
                     if not item: out["potion_use_identity_unmapped_count"] += 1
-                    elif isinstance(chosen, dict) and item in str(chosen.get("label", "")).upper():
+                    elif isinstance(chosen, dict) and item in potion_name(chosen.get("label", "")):
                         out["potion_use_slot_label_identity_match_count"] += 1
                     else: out["potion_use_slot_label_identity_mismatch_count"] += 1
-                rel = {potion_name(x) for x in (s or {}).get("battle_relics", []) if isinstance(x, (str, dict))}
-                rel |= {potion_name(x) for x in (s or {}).get("relics", []) if isinstance(x, (str, dict))}
+                relics_observed, rel = relic_inventory(s, n)
                 if "BLOOD_POTION" in item:
                     out["blood_potion_uses"] += 1
-                    if "SACRED_BARK" in rel: out["blood_potion_uses_with_sacred_bark"] += 1
+                    if "SACRED_BARK" in rel:
+                        out["blood_potion_uses_with_sacred_bark"] += 1
+                    if screen == "BATTLE":
+                        out["blood_potion_battle_uses"] += 1
+                        out["potentially_affected_event_counts"]["battle_blood_potion_use"] += 1
+                        if not relics_observed:
+                            out["blood_potion_battle_bark_context_unobserved"] += 1
+                            out["sensitive_event_context_unobserved"] += 1
+                        elif "SACRED_BARK" in rel:
+                            out["blood_potion_battle_uses_with_sacred_bark"] += 1
+                        else:
+                            out["blood_potion_battle_uses_without_sacred_bark"] += 1
                 if "SMOKE_BOMB" in item:
                     out["smoke_bomb_uses"] += 1
-                    if n is not None and n.get("completed_battle_outcome", n.get("battle_outcome")) == "PLAYER_ESCAPE":
+                    out["potentially_affected_event_counts"]["smoke_bomb_use"] += 1
+                    if screen == "BATTLE": out["smoke_bomb_battle_uses"] += 1
+                    outcome = n.get("completed_battle_outcome", n.get("battle_outcome")) if n is not None else None
+                    if outcome == "PLAYER_ESCAPE":
                         out["smoke_bomb_escapes"] += 1
-                    elif n is None: out["sensitive_event_context_unobserved"] += 1
+                        out["potentially_affected_event_counts"]["smoke_bomb_escape_transition"] += 1
+                    elif outcome is None:
+                        out["sensitive_event_context_unobserved"] += 1
             if screen == "BATTLE" and n is not None and not bool(n.get("battle_active", False)):
                 outcome = n.get("completed_battle_outcome", n.get("battle_outcome"))
                 nscreen = n.get("screen_state")
-                relics = {potion_name(x) for x in (s or {}).get("battle_relics", []) if isinstance(x, (str, dict))}
-                relics |= {potion_name(x) for x in (n or {}).get("relics", []) if isinstance(x, (str, dict))}
+                relics_observed, relics = relic_inventory(s, n)
+                if outcome == "PLAYER_VICTORY" and not relics_observed:
+                    out["sensitive_event_context_unobserved"] += 1
                 if outcome == "PLAYER_VICTORY" and "MEAT_ON_THE_BONE" in relics and ({"BURNING_BLOOD", "BLACK_BLOOD"} & relics):
                     out["victory_with_meat_on_bone_and_burning_blood"] += 1
+                    out["potentially_affected_event_counts"]["victory_with_meat_on_bone_and_blood_relic"] += 1
                 if outcome == "PLAYER_VICTORY" and "FACE_OF_CLERIC" in relics and nscreen == "REWARDS":
                     out["victory_face_of_cleric_to_rewards"] += 1
+                    out["potentially_affected_event_counts"]["victory_face_of_cleric_to_rewards"] += 1
             if r.get("terminal_after_step") is True: out["checks"]["terminal_step_marked"] += 1
             out["terminal_step"] = r.get("terminal_after_step") is True
     if out["terminal_step"]: out["checks"]["last_step_terminal"] += 1
@@ -356,18 +394,28 @@ def main():
           "potion_use_slot_label_identity_mismatch_count":trace["potion_use_slot_label_identity_mismatch_count"],
           "blood_potion_uses":trace["blood_potion_uses"],
           "blood_potion_uses_with_sacred_bark":trace["blood_potion_uses_with_sacred_bark"],
+          "blood_potion_battle_uses":trace["blood_potion_battle_uses"],
+          "blood_potion_battle_uses_with_sacred_bark":trace["blood_potion_battle_uses_with_sacred_bark"],
+          "blood_potion_battle_uses_without_sacred_bark":trace["blood_potion_battle_uses_without_sacred_bark"],
+          "blood_potion_battle_bark_context_unobserved":trace["blood_potion_battle_bark_context_unobserved"],
           "smoke_bomb_uses":trace["smoke_bomb_uses"],"smoke_bomb_escapes":trace["smoke_bomb_escapes"],
+          "smoke_bomb_battle_uses":trace["smoke_bomb_battle_uses"],
           "victory_with_meat_on_bone_and_burning_blood":trace["victory_with_meat_on_bone_and_burning_blood"],
           "victory_face_of_cleric_to_rewards":trace["victory_face_of_cleric_to_rewards"],
           "sensitive_event_context_unobserved":trace["sensitive_event_context_unobserved"],
-          "observed_semantic_exposure_class":(
-            "affected_on_observed_path" if (
-              trace["blood_potion_uses_with_sacred_bark"] or trace["smoke_bomb_escapes"] or
-              trace["victory_with_meat_on_bone_and_burning_blood"] or trace["victory_face_of_cleric_to_rewards"]
-            ) else ("not_ascertainable" if (
-              trace["potion_use_identity_unmapped_count"] or trace["potion_use_slot_label_identity_mismatch_count"] or trace["sensitive_event_context_unobserved"]
-            ) else "no_direct_changed_event_observed")
+          "potentially_affected_event_counts":trace["potentially_affected_event_counts"],
+          "observed_semantic_context_class":(
+            "potentially_affected_context_observed_with_other_context_unresolved" if (
+              trace["potentially_affected_event_counts"] and (
+                trace["potion_use_identity_unmapped_count"] or trace["potion_use_slot_label_identity_mismatch_count"] or trace["sensitive_event_context_unobserved"]
+              )
+            ) else ("potentially_affected_context_observed" if trace["potentially_affected_event_counts"] else (
+              "not_ascertainable" if (
+                trace["potion_use_identity_unmapped_count"] or trace["potion_use_slot_label_identity_mismatch_count"] or trace["sensitive_event_context_unobserved"]
+              ) else "no_direct_changed_event_observed"
+            ))
           ),
+          "numerical_trajectory_change_status":"not_established_without_counterfactual_replay",
           "recorded_pre_post_rows":trace["pre_post_rows"],"recorded_pre_snapshot_rows":trace["pre_snapshot_rows"],
           "recorded_post_snapshot_rows":trace["post_snapshot_rows"],"pre_post_key_coverage":trace["pre_post_key_coverage"],
           "integrity_checks":trace["checks"],
@@ -393,10 +441,11 @@ def main():
     for row in owners:
         allchecks.update(row["integrity_checks"])
     row={
-      "schema":"issue54-targeted-retained-complete-run-audit-v1","purpose":"STUDY_ONLY",
+      "schema":"issue54-targeted-retained-complete-run-audit-v2","purpose":"STUDY_ONLY",
       "assessment_status":"INCOMPLETE_PUBLIC_CONTEXT",
       "assessment_reason":"Historical recorded inputs are present, but this targeted cache audit does not establish compatibility with the accepted normal-public projection; all complete runs use a pre-#52 Native pin.",
-      "interpretation":"Descriptive retained-data inventory; not a policy-evaluation result, causal estimate, eligibility threshold, power claim, or approval to train.",
+      "interpretation":"Descriptive retained-data inventory; observed potentially affected contexts do not prove a numerical trajectory change. This is not a policy-evaluation result, causal estimate, eligibility threshold, power claim, or approval to train.",
+      "numerical_trajectory_change_status":"not_established_without_counterfactual_replay",
       "historical_policy_source":{
         "issue45_reviewed_manifest_sha256":mh["sha256"],"manifest_bytes":mh["bytes"],"manifest_files":len(manifest),
         "manifest_total_bytes":sum(int(x["bytes"]) for x in manifest),
@@ -476,13 +525,24 @@ def main():
         "observed_semantic_event_counts":{
           "blood_potion_uses":sum(r["blood_potion_uses"] for r in owners),
           "blood_potion_uses_with_sacred_bark":sum(r["blood_potion_uses_with_sacred_bark"] for r in owners),
+          "battle_blood_potion_uses":sum(r["blood_potion_battle_uses"] for r in owners),
+          "battle_blood_potion_uses_with_sacred_bark":sum(r["blood_potion_battle_uses_with_sacred_bark"] for r in owners),
+          "battle_blood_potion_uses_without_sacred_bark":sum(r["blood_potion_battle_uses_without_sacred_bark"] for r in owners),
+          "battle_blood_bark_context_unobserved":sum(r["blood_potion_battle_bark_context_unobserved"] for r in owners),
           "smoke_bomb_uses":sum(r["smoke_bomb_uses"] for r in owners),
+          "smoke_bomb_battle_uses":sum(r["smoke_bomb_battle_uses"] for r in owners),
           "smoke_bomb_escape_transitions":sum(r["smoke_bomb_escapes"] for r in owners),
           "victory_with_meat_on_bone_and_burning_blood":sum(r["victory_with_meat_on_bone_and_burning_blood"] for r in owners),
           "victory_face_of_cleric_to_rewards":sum(r["victory_face_of_cleric_to_rewards"] for r in owners),
           "sensitive_event_context_unobserved":sum(r["sensitive_event_context_unobserved"] for r in owners),
         },
-        "observed_semantic_exposure_owner_counts":dict(sorted(collections.Counter(r["observed_semantic_exposure_class"] for r in owners).items())),
+        "observed_potentially_affected_event_occurrences":sum_counters((r["potentially_affected_event_counts"] for r in owners)),
+        "owners_with_observed_potentially_affected_context":sum(bool(r["potentially_affected_event_counts"]) for r in owners),
+        "observed_semantic_context_owner_counts":dict(sorted(collections.Counter(r["observed_semantic_context_class"] for r in owners).items())),
+        "owners_with_unresolved_sensitive_context":sum(
+          r["sensitive_event_context_unobserved"] > 0 or r["potion_use_identity_unmapped_count"] > 0 or r["potion_use_slot_label_identity_mismatch_count"] > 0
+          for r in owners
+        ),
         "recorded_pre_post_transition_rows":sum(r["recorded_pre_post_rows"] for r in owners),
         "recorded_decision_rows":sum(r["decision_count"] for r in owners),
         "normal_public_projection_compatibility":"not independently established by this targeted cache check; raw snapshots were not exported",
@@ -497,14 +557,24 @@ def main():
     a.out.parent.mkdir(parents=True,exist_ok=True)
     a.out.write_text(json.dumps(row,indent=2,sort_keys=True)+"\n",encoding="utf-8")
     cpu=time.process_time()-start
-    # Conservative prior charge includes the abandoned broad audit/diagnostic attempts before the scope correction.
-    prior=418.0
+    # Preserve all already-recorded Builder and Reviewer charges when this bounded repair is rerun.
+    previous_execution = read_json(a.execution) if a.execution.is_file() else {}
+    prior = float(previous_execution.get("builder_total_charged_upper_seconds", 419.829365))
+    reviewer_charge = max(float(previous_execution.get("reviewer_charged_upper_seconds", 0)), 200.25)
+    current_admin_charge = 25.0
     execution={"purpose":"STUDY_ONLY","phase":"targeted retained complete-run source audit",
-      "current_process_cpu_seconds":round(cpu,6),"prior_builder_charged_upper_seconds":prior,
-      "prior_charge_includes_inventory_setup_failed_diagnostics_and_targeted_source-inspection":True,
-      "builder_total_charged_upper_seconds":round(prior+cpu,6),"all_in_hard_cap_seconds":2000,
+      "current_process_cpu_seconds":round(cpu,6),"current_builder_admin_charged_upper_seconds":current_admin_charge,
+      "prior_builder_charged_upper_seconds":prior,
+      "prior_charge_includes_inventory_setup_failed_diagnostics_and_targeted_source_inspection":True,
+      "cumulative_before_current_run_all_participants_charged_upper_seconds":round(prior+reviewer_charge,6),
+      "builder_total_charged_upper_seconds":round(prior+cpu+current_admin_charge,6),
+      "reviewer_charged_upper_seconds":reviewer_charge,
+      "cumulative_all_participants_charged_upper_seconds":round(prior+cpu+current_admin_charge+reviewer_charge,6),
+      "remaining_all_in_hard_cap_seconds":round(2000-(prior+cpu+current_admin_charge+reviewer_charge),6),
+      "all_in_hard_cap_seconds":2000,
       "reviewer_reserved_minimum_seconds":600,"builder_maximum_seconds":1400,
-      "reviewer_cpu_charged_here":0,"new_complete_seeded_games":0,"search_value_training":0,
+      "remaining_builder_cap_seconds":round(1400-(prior+cpu+current_admin_charge),6),
+      "new_complete_seeded_games":0,"search_value_training":0,
       "continuation_or_label_generation":0,"policy_variants":0,"permanent_core_additions":0,
       "raw_artifact_copies":0,"review_delete_date":"2026-11-14","source_retention_extended":False}
     a.execution.write_text(json.dumps(execution,indent=2,sort_keys=True)+"\n",encoding="utf-8")
