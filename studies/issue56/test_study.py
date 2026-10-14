@@ -1,4 +1,5 @@
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -193,7 +194,31 @@ class StudyContractTests(unittest.TestCase):
         gate = verify_preflight_gate(preflight_path, producer)
         self.assertEqual(gate["qualified_owner_seeds"], formal_manifest["preflight_gate"]["qualified_owner_seeds"])
 
-        owners = [json.loads(line) for line in (artifact_root / "results" / "owners.jsonl").read_text(encoding="utf-8").splitlines()]
+        formal_path = artifact_root / "results"
+        formal_summary = json.loads((formal_path / "summary.json").read_text(encoding="utf-8"))
+        preflight_summary = json.loads((preflight_path / "summary.json").read_text(encoding="utf-8"))
+        budget_path = artifact_root / "budget_events.jsonl"
+        self.assertEqual(formal_summary["budget_events_sha256"], sha256_file(budget_path))
+        budget_prefix_hash = hashlib.sha256()
+        preflight_budget_hash_found = False
+        for line in budget_path.read_bytes().splitlines(keepends=True):
+            budget_prefix_hash.update(line)
+            if budget_prefix_hash.hexdigest() == preflight_summary["budget_events_sha256"]:
+                preflight_budget_hash_found = True
+                break
+        self.assertTrue(preflight_budget_hash_found, "preflight budget hash is not recoverable as an append-only ledger prefix")
+        self.assertEqual(formal_summary["budget_accounting"]["prior_reviewer_cpu_s"], 28.660953)
+        owners = [json.loads(line) for line in (formal_path / "owners.jsonl").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(formal_summary["owners_processed"], len(study.SEEDS))
+        self.assertEqual([row["seed"] for row in owners], list(study.SEEDS))
+        self.assertEqual(sum(formal_summary["source_dispositions"].values()), len(study.SEEDS))
+        self.assertEqual(formal_summary["intervention_failure_owner_seeds"], [558003])
+        self.assertEqual(formal_summary["source_dispositions"]["source_error"], 1)
+        self.assertEqual(formal_summary["terminal_disposition"], "VALIDITY_FAILURE")
+        self.assertGreater(formal_summary["branches_not_run_after_intervention_gate"], 0)
+        owners_by_seed = {row["seed"]: row for row in owners}
+        self.assertIn("no visited eligible root action", owners_by_seed[558003]["reserve"]["error"])
+        self.assertEqual(owners_by_seed[558046]["source_disposition"], "source_error")
         later_root_owners = [row for row in owners
             if row.get("source_disposition") == "eligible_root"
             and row.get("source_root_battle_number", 1) > 1]
@@ -206,6 +231,22 @@ class StudyContractTests(unittest.TestCase):
             self.assertEqual([row["battle_number"] for row in exits], list(range(1, root_battle)))
             self.assertTrue(all(row["qualifying_source_use_not_yet_selected"] for row in exits))
             self.assertFalse(any(row["terminal"] for row in exits))
+        later_root_with_valid_pair = [row for row in later_root_owners
+            if row.get("consume", {}).get("endpoint", {}).get("status") == "b2_resolved"
+            and row.get("reserve", {}).get("endpoint", {}).get("status") == "b2_resolved"]
+        self.assertTrue(later_root_with_valid_pair, "no later-battle source root has a valid paired B1-to-next-B2 continuation")
+        for owner in later_root_with_valid_pair:
+            source_floor = owner["source_root"]["visible_snapshot"]["floor_num"]
+            for mode in ("consume", "reserve"):
+                trace = owner[mode]["trace"]
+                self.assertEqual(trace["public_transition_ledger"][0]["floor"], source_floor)
+                self.assertGreaterEqual(len(trace["battle_exits"]), 2)
+                self.assertEqual([row["battle_number"] for row in trace["battle_exits"][:2]], [1, 2])
+
+        terminal_no_use = [row for row in owners
+            if row.get("source_disposition") == "source_terminal_no_qualifying_use"]
+        self.assertTrue(terminal_no_use, "cohort lacks a real authentic terminal no-use source")
+        self.assertTrue(all(row["source_terminal"] for row in terminal_no_use))
 
         for owner in owners:
             if owner.get("source_disposition") == "source_terminal_no_qualifying_use":

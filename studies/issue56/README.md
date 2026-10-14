@@ -78,6 +78,14 @@ classified. The regression test requires a real fixed-cohort owner
 whose first qualifying use occurs after at least one earlier battle exit
 without a qualifying use.
 
+The completed corrected source cohort processed all 64 fixed seeds: 54 had a
+qualifying root, 9 ended at authentic terminal without one, and seed 558046
+encountered a native Search-400 root-report error. The reserve intervention
+was not executable for eligible seed 558003, so later paired branches were
+not run. The formal artifact therefore reports `VALIDITY_FAILURE`; it provides
+the corrected source denominator and failure evidence, not an allocation
+effect estimate.
+
 The artifacts remain study-only. Paired differences are local to this frozen
 privileged teacher-assisted intervention and do not establish normal-public
 policy value, full-run Heart performance, or a promotion decision.
