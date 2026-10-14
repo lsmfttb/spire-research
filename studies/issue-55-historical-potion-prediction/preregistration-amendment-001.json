@@ -1,0 +1,24 @@
+{
+  "amendment": 1,
+  "recorded_before_model_fit_and_heldout_access": true,
+  "date": "2026-10-14",
+  "reason": "Executable field-shape audit against the pinned Native and STSRL source found that the preregistration's shorthand battle HP path was imprecise. This corrects the raw-record mapping and freezes the deterministic bootstrap stream before any heldout file is opened.",
+  "scope_changes": [],
+  "field_mapping_correction": {
+    "previous_shorthand": "snapshot_raw.battle_player_hp when battle_active else snapshot_raw.cur_hp; snapshot_raw.max_hp when battle_active else snapshot_raw.max_hp",
+    "implemented_mapping": "snapshot_raw.battle_player.current_hp and .max_hp when battle_active; otherwise snapshot_raw.cur_hp and .max_hp",
+    "basis": "Pinned Native publicProjectionV3 reads BattleContext::player.curHp/maxHp or GameContext::curHp/maxHp. The pinned raw snapshot serializes battle-player values under battle_player.current_hp/max_hp. The redundant top-level row summaries are checked for consistency, not used as features.",
+    "source_commits": {
+      "native": "18bcd565b587186425bb46ad3d70a2eb80d947fc",
+      "stsrl": "7d172f7c24c9d29429b6946ba44f6b59760b0d96"
+    }
+  },
+  "bootstrap_algorithm": {
+    "name": "SHA-256 counter stream with replacement at owner-cluster level",
+    "seed": 550055,
+    "domain": "issue55-owner-bootstrap-v1",
+    "draw": "index = big-endian first 8 bytes of SHA256(UTF8(domain + NUL + seed + NUL + stratum_key + NUL + replicate + NUL + draw_index)) modulo number_of_eligible_owners",
+    "interval": "linear-interpolated 2.5th and 97.5th percentiles of 5,000 bootstrap estimates"
+  },
+  "data_access_note": "Before this amendment, only training owner 437031's metadata and first two raw rows were inspected to verify key shapes and one training terminal label. No fitting occurred; no validation or heldout files or labels were opened. This was a limited training-only source-shape check."
+}
