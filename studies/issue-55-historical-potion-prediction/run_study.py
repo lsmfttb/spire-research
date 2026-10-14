@@ -23,6 +23,7 @@ AMENDMENT_PATHS = [
     AMENDMENT_PATH,
     HERE / "preregistration-amendment-002.json",
     HERE / "preregistration-amendment-003.json",
+    HERE / "preregistration-amendment-004.json",
 ]
 FEATURE_DOMAIN = b"issue55-feature-v1\0"
 BOOTSTRAP_DOMAIN = "issue55-owner-bootstrap-v1"
@@ -1040,6 +1041,7 @@ def evaluate() -> None:
     safe_records: list[dict[str, Any]] = []
     heldout_battle_hp_summary_mismatches = 0
     heldout_battle_max_hp_summary_mismatches = 0
+    heldout_adjacencies_checked = 0
 
     for owner in partitions["heldout"]:
         ensure_budget()
@@ -1048,6 +1050,7 @@ def evaluate() -> None:
         owner_meta = owner_metadata(owner)
         terminal_floor = owner_meta["terminal_floor"]
         rows_for_owner: list[dict[str, Any]] = []
+        previous_next_tokens: tuple[list[str], list[str]] | None = None
         with (SOURCE_ROOT / f"{owner}-on.jsonl").open("r", encoding="utf-8") as rows_file:
             for line_number, line in enumerate(rows_file, start=1):
                 ensure_budget()
@@ -1062,6 +1065,9 @@ def evaluate() -> None:
                     raise StudyFailure(exc.code, f"heldout owner {owner} row {line_number}: {exc}") from exc
                 except (json.JSONDecodeError, UnicodeDecodeError) as exc:
                     raise StudyFailure("PUBLIC_FEATURE_SUBSET_UNAVAILABLE", f"heldout owner {owner} row {line_number}: malformed JSONL record") from exc
+                if previous_next_tokens is not None:
+                    require(previous_next_tokens == (baseline, potion), f"Adjacent pre/post public state mismatch for heldout owner {owner}, row {line_number}.")
+                    heldout_adjacencies_checked += 1
                 record = {
                     "owner_id": owner,
                     "source_row_number": line_number,
@@ -1079,6 +1085,12 @@ def evaluate() -> None:
                 require(record["target_remaining_floors"] >= 0, f"Current floor exceeds terminal floor for heldout owner {owner}.")
                 rows_for_owner.append(record)
                 safe_records.append(record)
+                next_snapshot = row.get("next_snapshot_raw")
+                if next_snapshot is None:
+                    previous_next_tokens = None
+                else:
+                    next_baseline, next_potion, _ = feature_tokens(next_snapshot)
+                    previous_next_tokens = (next_baseline, next_potion)
         require(rows_for_owner, f"Heldout owner {owner} has no eligible decision rows.")
         heldout_owner_rows[str(owner)] = rows_for_owner
         heldout_counts[str(owner)] = {
@@ -1215,6 +1227,7 @@ def evaluate() -> None:
                 "game_context_hp_vs_projection_battle_context_rows": heldout_battle_hp_summary_mismatches,
                 "game_context_max_hp_vs_projection_battle_context_rows": heldout_battle_max_hp_summary_mismatches,
             },
+            "adjacent_transitions_checked": heldout_adjacencies_checked,
             "public_feature_artifact": {"path": heldout_path.name, "sha256": heldout_sha, "bytes": heldout_path.stat().st_size},
         },
         "primary_evaluation": overall,

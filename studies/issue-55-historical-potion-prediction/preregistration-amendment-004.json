@@ -1,0 +1,14 @@
+{
+  "amendment": 4,
+  "recorded_after_model_freeze_and_before_heldout_access": true,
+  "date": "2026-10-14",
+  "reason": "Code review before opening heldout found the executable adjacency check was applied to training rows but not repeated on heldout rows, although the preregistration requires checking adjacent pre/post public fields where present.",
+  "scope_changes": [],
+  "evaluation_integrity_correction": {
+    "change": "Run the same allowlist-token comparison from each heldout row's next_snapshot_raw to the next decision row's snapshot_raw before computing heldout predictions/errors.",
+    "model_weights_changed": false,
+    "training_or_validation_data_reopened": false,
+    "heldout_data_opened_before_change": false
+  },
+  "data_access_note": "Both model weight files and their freeze receipt were written before this correction. No heldout or validation file or label had been opened when the correction was recorded. This only completes the already preregistered action-time integrity check."
+}
