@@ -1,0 +1,85 @@
+{
+  "schema": "issue54-source-inspection-v1",
+  "purpose": "STUDY_ONLY",
+  "repository": "lsmfttb/spire-research",
+  "repository_base_ref": "origin/main",
+  "repository_base_sha": "9525d416b9488bb2455435699893b03fe19fe30a",
+  "repository_remote_fetch_prune": "completed",
+  "current_accepted_native_ref": "lsmfttb/sts_lightspeed:stsrl/main",
+  "current_accepted_native_sha": "9e6f2acc50188a05ea5cc10b760e6f96c6856c8e",
+  "current_native_ref_verified_by_github_api_and_pruned_remote": true,
+  "historical_frozen_stsrl_sha": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+  "issue52_reviewed_native_head": "676d31e7a18eff8a4d078d121b4e463956287100",
+  "issue52_review_reference": "https://github.com/lsmfttb/spire-research/issues/52#issuecomment-6156266446",
+  "cohorts": {
+    "issue45_potion_on": {
+      "local_cache": "/home/lsmft/.cache/issue45-potion-paired/reviewed-native-18bcd565",
+      "source_metadata_sha256": "265a0a5d07083d4fe80fe26d6a802b250f3df1b5600b46689b351d2c1a4e5197",
+      "reviewed_pair_manifest_sha256": "624b656dee2afe33cf0e0410dd4cdf1a198c456d3d050a3ac061cb1aec18c160",
+      "reviewed_pair_manifest_file_count": 785,
+      "reviewed_pair_manifest_total_bytes": 505413067,
+      "producer_commit": "31c36f126a2050f7d343ad67f6f8087ebf8c0cc2",
+      "native_commit": "18bcd565b587186425bb46ad3d70a2eb80d947fc",
+      "native_extension_sha256": "0652b1ce6d757404278b840678b1f8548c81fb6b03cade598e7f3d82524b18d2",
+      "stsrl_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+      "source_retention_delete_date": "2026-11-09",
+      "on_arm_run_metadata_and_trace_files_physically_present_and_hash_verified": 192,
+      "on_arm_run_metadata_and_trace_bytes_hash_verified": 247291469,
+      "on_arm_unique_complete_terminal_run_owners": 96,
+      "on_arm_seed_id_range": "437001-437096",
+      "run_controller_name": "issue45_search_v2_400+expert_non_combat_v1",
+      "run_controller_config_fingerprint": "2c5e2c2ef06c903d625d6ef7b84d3f0809ac34d8eb1023357d1af0b728817300",
+      "run_controller_config_fingerprint_count": 96
+    },
+    "issue46_fresh_expert": {
+      "local_cache": "/home/lsmft/.cache/issue46-source-capacity",
+      "manifest_sha256": "9807c5a02554f57947db1d507d0ed49b10fa07fab88042976b44e60a879e0cd1",
+      "source_metadata_sha256": "d0d98e64174589357306c1dc4a99c3960752a2474a480661527ef00b486e7877",
+      "source_config_sha256": "89989772901b913f3e6b710948ee6deb9ea6f92a37ea5eca9e80efc640fda3dd",
+      "expected_expert_owner_count": 128,
+      "expert_seed_id_range": "441001-441128",
+      "expected_metadata_and_trace_files": 256,
+      "physical_metadata_and_trace_files": 0,
+      "review_delete_date": "2026-11-12"
+    },
+    "issue47_fresh_expert": {
+      "local_cache": "/home/lsmft/.cache/issue47-action-preference",
+      "manifest_sha256": "119a514692836954ab205284c35d1070a9a089cebcc9344fd27ded2c850ff1de",
+      "source_metadata_sha256": "d62961b805fc438d1f4532c0d600ebaae315383929f5868af5d0f5061985fcb1",
+      "source_config_sha256": "960559c82ab42c87feed93d84c690d8cecf006c96d2997f763ff2040ea3763d5",
+      "expected_expert_owner_count": 128,
+      "expert_seed_id_range": "471001-471128",
+      "expected_metadata_and_trace_files": 256,
+      "physical_metadata_and_trace_files": 0,
+      "review_delete_date": "2026-11-13"
+    },
+    "issue48_fresh_expert": {
+      "local_cache": "/home/lsmft/.cache/issue48-card-binding",
+      "manifest_sha256": "210cb9c5aa5423645fc2f41c95f16c0e37784e7523d9b66fa0357afa3a7202ed",
+      "source_metadata_sha256": "10cfa43f9fbf558061da2b9942f94251dbe5804a9d97971d1ec37cb0e90606f9",
+      "source_config_sha256": "8144f42c6f2563a684daf23e636c9ca1cc31260201a41985107c659fd62611fa",
+      "expected_expert_owner_count": 128,
+      "expert_seed_id_range": "481001-481128",
+      "expected_metadata_and_trace_files": 256,
+      "physical_metadata_and_trace_files": 0,
+      "review_delete_date": "2026-11-14"
+    }
+  },
+  "scope_limits": {
+    "new_games": 0,
+    "new_q_labels": 0,
+    "training": 0,
+    "native_or_stsrl_changes": 0,
+    "raw_source_copies": 0,
+    "source_retention_extended": false,
+    "normal_public_projection_reaudit": false,
+    "current_native_replay": false
+  },
+  "evidence_references": {
+    "issue45": "https://github.com/lsmfttb/spire-research/issues/45#issuecomment-6120729291",
+    "issue46": "https://github.com/lsmfttb/spire-research/issues/46#issuecomment-6134144190",
+    "issue47": "https://github.com/lsmfttb/spire-research/issues/47#issuecomment-6135353400",
+    "issue48": "https://github.com/lsmfttb/spire-research/issues/48#issuecomment-6136899040",
+    "issue54_scope_correction": "https://github.com/lsmfttb/spire-research/issues/54#issuecomment-6158533672"
+  }
+}
