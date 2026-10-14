@@ -44,7 +44,11 @@ The formal command verifies the preflight summary, producer and source hashes,
 the two-owner paired-B2 gate, and the preflight owner/source-ledger hashes. It
 then copies all preflight owners into the formal denominator and runs the
 remaining fixed seeds once, without replacement, extending or result-driven
-selection.
+selection. If a reserve intervention cannot be executed for an eligible root,
+the failure is recorded and paired branches for later roots are not run; natural
+source collection still continues in fixed seed order to preserve the source
+cohort denominator. A source cursor that reaches its step cap is recorded as
+truncated, not as a no-use terminal.
 
 ```bash
 python3 studies/issue56/study.py --output studies/issue56/results
@@ -62,9 +66,13 @@ ledgers, and their hashes identify the evidence.
 The earlier first-battle-only outputs are retained as
 `preflight-first-battle-only-superseded/` and
 `results-first-battle-only-superseded/`; they are not part of the corrected
-formal gate or denominator. The regression test requires a real fixed-cohort
-owner whose first qualifying use occurs after at least one earlier battle
-exit without a qualifying use.
+formal gate or denominator. The first natural-horizon attempt is also retained
+as `preflight-natural-root-91cc0a3-superseded/` and
+`results-natural-root-91cc0a3-intervention-failure-superseded/`; it exposed an
+infeasible reserve intervention at seed 558003 and stopped before completing
+the source cohort. The regression test requires a real fixed-cohort owner
+whose first qualifying use occurs after at least one earlier battle exit
+without a qualifying use.
 
 The artifacts remain study-only. Paired differences are local to this frozen
 privileged teacher-assisted intervention and do not establish normal-public

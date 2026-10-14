@@ -207,6 +207,14 @@ class StudyContractTests(unittest.TestCase):
             self.assertTrue(all(row["qualifying_source_use_not_yet_selected"] for row in exits))
             self.assertFalse(any(row["terminal"] for row in exits))
 
+        for owner in owners:
+            if owner.get("source_disposition") == "source_terminal_no_qualifying_use":
+                self.assertTrue(owner["source_terminal"])
+            if owner.get("source_disposition") == "source_truncated_before_qualifying_use":
+                self.assertFalse(owner["source_terminal"])
+            if str(owner.get("source_disposition", "")).startswith("not_run"):
+                self.assertNotIn("no_qualifying_use", owner["source_disposition"])
+
 
 if __name__ == "__main__":
     unittest.main()

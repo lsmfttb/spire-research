@@ -940,3 +940,34 @@
 {"disposition":"no_qualifying_use_b1","elapsed_process_cpu_s":173.871,"owner_seed":558064,"stage":"owner_completed"}
 {"disposition":"no_qualifying_use_b1","elapsed_process_cpu_s":173.873,"eligible_roots":2,"owner_seed":558064,"preflight_qualified_owner_seeds":[558022,558035],"stage":"owner_result_durable"}
 {"elapsed_process_cpu_s":173.89,"eligible_owners":2,"owner_seed":null,"owners_processed":64,"stage":"summary_durable","terminal_disposition":"TWO_ENCOUNTER_VALUE_UNRESOLVED"}
+{"elapsed_process_cpu_s":173.893,"owner_seed":558001,"stage":"owner_started"}
+{"elapsed_process_cpu_s":173.894,"owner_seed":558001,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":174.158,"floor":1.0,"owner_seed":558001,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":174.688,"floor":2.0,"owner_seed":558001,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_ESCAPE","elapsed_process_cpu_s":175.486,"floor":4.0,"owner_seed":558001,"stage":"source_battle_exit","terminal":false}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":176.898,"floor":5.0,"owner_seed":558001,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":178.899,"owner_seed":558001,"stage":"cpu_checkpoint"}
+{"battle_number":5,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":179.544,"floor":7.0,"owner_seed":558001,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":180.72,"owner_seed":558001,"potion":{"id":12,"id_label":"Dexterity Potion","name":"Dexterity Potion","potion_index":0},"stage":"source_root_found"}
+{"elapsed_process_cpu_s":180.721,"owner_seed":558001,"stage":"consume_branch_started"}
+{"elapsed_process_cpu_s":182.123,"owner_seed":558001,"stage":"reserve_branch_started"}
+{"boundary":"reserve_branch_started","elapsed_process_cpu_s":183.925,"owner_seed":558001,"stage":"cpu_checkpoint"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":184.423,"integrity_pass":true,"owner_seed":558001,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":184.433,"eligible_roots":1,"owner_seed":558001,"preflight_qualified_owner_seeds":[558001],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":184.434,"owner_seed":558002,"stage":"owner_started"}
+{"elapsed_process_cpu_s":184.435,"owner_seed":558002,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":184.625,"floor":1.0,"owner_seed":558002,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":184.955,"owner_seed":558002,"potion":{"id":36,"id_label":"SkillPotion","name":"Skill Potion","potion_index":0},"stage":"source_root_found"}
+{"elapsed_process_cpu_s":184.956,"owner_seed":558002,"stage":"consume_branch_started"}
+{"elapsed_process_cpu_s":185.581,"owner_seed":558002,"stage":"reserve_branch_started"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":186.691,"integrity_pass":true,"owner_seed":558002,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":186.7,"eligible_roots":2,"owner_seed":558002,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":186.717,"eligible_owners":2,"owner_seed":null,"owners_processed":2,"stage":"summary_durable","terminal_disposition":"PREFLIGHT_INTEGRITY_PASS"}
+{"elapsed_process_cpu_s":186.725,"owner_seed":558003,"stage":"owner_started"}
+{"elapsed_process_cpu_s":186.726,"owner_seed":558003,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":186.908,"floor":1.0,"owner_seed":558003,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":187.314,"owner_seed":558003,"potion":{"id":22,"id_label":"FearPotion","name":"Fear Potion","potion_index":0},"stage":"source_root_found"}
+{"elapsed_process_cpu_s":187.316,"owner_seed":558003,"stage":"consume_branch_started"}
+{"elapsed_process_cpu_s":187.867,"owner_seed":558003,"stage":"reserve_branch_started"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":188.041,"integrity_pass":false,"owner_seed":558003,"stage":"owner_completed"}
+{"elapsed_process_cpu_s":188.142,"eligible_owners":3,"owner_seed":null,"owners_processed":64,"stage":"summary_durable","terminal_disposition":"INTERVENTION_NOT_EXECUTABLE"}

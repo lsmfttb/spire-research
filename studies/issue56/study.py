@@ -817,12 +817,21 @@ def branch_record(trace: DetailedTrace, provenance: Mapping[str, Any], root_stat
     }
 
 
-def run_owner(seed: int, journal: EventJournal, output: Path, source_attempts: Path) -> dict[str, Any]:
+def run_owner(seed: int, journal: EventJournal, output: Path, source_attempts: Path,
+              *, branches_enabled: bool = True) -> dict[str, Any]:
     journal.event(seed, "owner_started")
     source, root, adapter = run_source(seed, journal, source_attempts)
     owner: dict[str, Any] = dict(source)
     if root is None:
         journal.event(seed, "owner_completed", disposition=source["source_disposition"])
+        return owner
+    if not branches_enabled:
+        for mode in ("consume", "reserve"):
+            owner[mode] = {"endpoint": {"primary": None, "status": "not_run_after_intervention_gate"}}
+        owner["preflight_integrity"] = None
+        owner["preflight_integrity_pass"] = None
+        journal.event(seed, "owner_completed", disposition=source["source_disposition"],
+            branches="not_run_after_intervention_gate")
         return owner
     try:
         for mode, key in (("consume", "consume"), ("reserve", "reserve")):
@@ -961,6 +970,12 @@ def finalize(owners: Sequence[Mapping[str, Any]], journal: EventJournal, preflig
     any_b2 = stats["eligible_owners_with_any_branch_reaching_b2"]
     both_b2 = stats["eligible_owners_with_both_branches_reaching_b2"]
     preflight_fail = any(row.get("preflight_integrity_pass") is False for row in owners)
+    intervention_failure_seeds = [int(row["seed"]) for row in owners
+        if row.get("preflight_integrity_pass") is False and "seed" in row]
+    branches_not_run_after_intervention_gate = sum(
+        branch.get("endpoint", {}).get("status") == "not_run_after_intervention_gate"
+        for owner in owners for branch in (owner.get("consume", {}), owner.get("reserve", {}))
+    )
     incomplete_sources = sum(source_counts[k] for k in ("source_truncated_before_qualifying_use", "source_error"))
     not_run = sum(value for key, value in source_counts.items() if key.startswith("not_run"))
     incomplete_pairs = stats["incomplete_or_invalid_pairs"]
@@ -994,6 +1009,8 @@ def finalize(owners: Sequence[Mapping[str, Any]], journal: EventJournal, preflig
         "preflight_only": preflight, "owners_processed": len(owners),
         "fixed_source_owner_denominator": len(SEEDS),
         "source_dispositions": dict(source_counts),
+        "intervention_failure_owner_seeds": intervention_failure_seeds,
+        "branches_not_run_after_intervention_gate": branches_not_run_after_intervention_gate,
         "unrun_fixed_seed_owners": not_run,
         "unclassified_terminal_branches_before_b2": unclassified_terminal_branches,
         "eligible_owner_fraction": eligible / len(owners) if owners else 0.0,
@@ -1093,13 +1110,15 @@ def run(output: Path, *, preflight: bool) -> dict[str, Any]:
     completed = {int(row["seed"]) for row in owners}
     eligible_seen = sum(row.get("source_disposition") == "eligible_root" for row in owners)
     preflight_seeds = set(qualifying_preflight_seeds(owners))
+    intervention_failed = any(row.get("preflight_integrity_pass") is False for row in owners)
     status = "PREFLIGHT_IN_PROGRESS" if preflight else "FORMAL_IN_PROGRESS"
     for seed in SEEDS:
         if seed in completed:
             continue
         try:
             journal.check_budget(seed)
-            owner = run_owner(seed, journal, output, source_attempts)
+            owner = run_owner(seed, journal, output, source_attempts,
+                branches_enabled=not intervention_failed)
         except BudgetStop:
             journal.event(seed, "owner_stopped_at_cpu_ceiling", prior_stage=journal.last_stage)
             status = "RESOURCE_BLOCKED_INCOMPLETE"
@@ -1115,8 +1134,10 @@ def run(output: Path, *, preflight: bool) -> dict[str, Any]:
         eligible_seen += owner.get("source_disposition") == "eligible_root"
         if owner.get("preflight_integrity_pass") is False:
             status = "INTERVENTION_NOT_EXECUTABLE"
+            intervention_failed = True
             write_progress(output / "progress.json", journal, owners, status=status)
-            break
+            if preflight:
+                break
         if owner.get("source_disposition") in {"source_error", "source_truncated_before_qualifying_use"}:
             status = "VALIDITY_FAILURE" if owner.get("source_disposition") == "source_error" else "RESOURCE_BLOCKED_INCOMPLETE"
             write_progress(output / "progress.json", journal, owners, status=status)
@@ -1132,7 +1153,7 @@ def run(output: Path, *, preflight: bool) -> dict[str, Any]:
             break
     if preflight and len(owners) == len(SEEDS) and len(preflight_seeds) < 2 and status == "PREFLIGHT_IN_PROGRESS":
         status = "INSUFFICIENT_NATURAL_EXPOSURE"
-    if not preflight and (len(owners) < len(SEEDS) or status in {"INTERVENTION_NOT_EXECUTABLE", "VALIDITY_FAILURE", "RESOURCE_BLOCKED_INCOMPLETE"}):
+    if not preflight and (len(owners) < len(SEEDS) or status in {"VALIDITY_FAILURE", "RESOURCE_BLOCKED_INCOMPLETE"}):
         if status == "RESOURCE_BLOCKED_INCOMPLETE":
             disposition = "not_run_budget_stop"
         elif status == "INTERVENTION_NOT_EXECUTABLE":
