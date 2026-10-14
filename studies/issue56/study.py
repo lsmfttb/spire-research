@@ -122,6 +122,10 @@ class StopAtB1Exit(BaseException):
     pass
 
 
+class StopAtB2Exit(BaseException):
+    pass
+
+
 class BudgetStop(BaseException):
     pass
 
@@ -201,7 +205,9 @@ class StudySearch:
                 masked_context = dataclasses.replace(context, eligible_action_indices=allowed)
             elif self.root_state.get("b1_seen"):
                 self.root_state["b1_closed"] = True
-        if self.mode == "reserve" and self.root_state.get("b1_closed") and is_battle_state(snapshot.raw, context.screen_state):
+        if (self.mode == "reserve" and self.root_state.get("b1_closed")
+                and not self.root_state.get("b2_resolved")
+                and is_battle_state(snapshot.raw, context.screen_state)):
             self.root_state["b2_unmasked_decisions"] = self.root_state.get("b2_unmasked_decisions", 0) + 1
         start = time.process_time()
         raw = adapter.battle_search_v2(snapshot, simulations=SIMULATIONS,
@@ -557,14 +563,21 @@ def run_branch(adapter: LightSpeedAdapter, root: Root, seed: int, mode: str, jou
         trace.transition(step)
         if mode == "reserve" and step.battle_active and not step.next_battle_active:
             root_state["b1_closed"] = True
+        if trace.b2_resolved:
+            root_state["b2_resolved"] = True
+            raise StopAtB2Exit
 
     journal.event(seed, f"{mode}_branch_started")
-    result = execute_controlled_run(resume, controller, seed=seed, max_steps=MAX_STEPS,
-        action_space=ActionSpaceConfig.include_all(), before_decision=before,
-        after_transition=after, retain_steps=True)
-    if result.problems:
-        raise RuntimeError("controlled continuation problems: " + "; ".join(result.problems))
-    trace.terminal, trace.outcome = result.terminal, result.outcome
+    try:
+        result = execute_controlled_run(resume, controller, seed=seed, max_steps=MAX_STEPS,
+            action_space=ActionSpaceConfig.include_all(), before_decision=before,
+            after_transition=after, retain_steps=True)
+    except StopAtB2Exit:
+        result = None
+    if result is not None:
+        if result.problems:
+            raise RuntimeError("controlled continuation problems: " + "; ".join(result.problems))
+        trace.terminal, trace.outcome = result.terminal, result.outcome
     if not resume.fingerprint_ok:
         raise RuntimeError("executor did not restore the exact root")
     root_state["root_restore_equal"] = resume.fingerprint_ok
@@ -936,7 +949,8 @@ def pareto_report(owners: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 def finalize(owners: Sequence[Mapping[str, Any]], journal: EventJournal, preflight: bool = False) -> dict[str, Any]:
     source_counts = Counter(str(row.get("source_disposition")) for row in owners)
     stats = paired_statistics(owners)
-    eligible = stats["eligible_owner_denominator"]
+    eligible_owners = [row for row in owners if row.get("source_disposition") == "eligible_root"]
+    eligible = len(eligible_owners)
     any_b2 = stats["eligible_owners_with_any_branch_reaching_b2"]
     both_b2 = stats["eligible_owners_with_both_branches_reaching_b2"]
     preflight_fail = any(row.get("preflight_integrity_pass") is False for row in owners)
@@ -945,7 +959,7 @@ def finalize(owners: Sequence[Mapping[str, Any]], journal: EventJournal, preflig
     incomplete_pairs = stats["incomplete_or_invalid_pairs"]
     unclassified_terminal_branches = sum(
         branch.get("endpoint", {}).get("status") in {"unclassified_terminal_before_b2", "unclassified_b2_outcome"}
-        for owner in eligible for branch in (owner.get("consume", {}), owner.get("reserve", {}))
+        for owner in eligible_owners for branch in (owner.get("consume", {}), owner.get("reserve", {}))
     )
     if preflight_fail:
         disposition = "INTERVENTION_NOT_EXECUTABLE"

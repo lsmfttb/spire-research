@@ -12,6 +12,7 @@ from study import (
     RunTrace,
     branch_primary,
     eligible_after_exact_potion_mask,
+    finalize,
     paired_statistics,
     qualifying_preflight_seeds,
     sha256_file,
@@ -94,6 +95,12 @@ class StudyContractTests(unittest.TestCase):
         self.assertEqual(result["primary_fixed_denominator_difference_bounds"], [0.0, 0.5])
         self.assertEqual(result["primary_estimator"],
             "fixed-denominator worst-case bounds with owner-resampled paired bootstrap envelope")
+
+    def test_final_report_handles_sources_without_an_eligible_root(self):
+        report = finalize([{"seed": 558001, "source_disposition": "no_qualifying_use_b1"}],
+            SimpleNamespace(prior_cpu_s=0.0, cpu_started=0.0))
+        self.assertEqual(report["eligible_owner_denominator"], 0)
+        self.assertEqual(report["terminal_disposition"], "RESOURCE_BLOCKED_INCOMPLETE")
 
     def test_preflight_requires_two_owners_with_paired_b2_and_b1_long_divergence(self):
         def owner(seed, consume_b2, reserve_b2, consume_states, reserve_states):
