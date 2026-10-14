@@ -1,0 +1,25 @@
+{
+  "amendment": 2,
+  "recorded_before_model_fit_and_heldout_access": true,
+  "date": "2026-10-14",
+  "reason": "The first train-only admission attempt stopped on its first decision row because this historical recording omits the redundant player_max_hp row field. The pinned public projection still exposes max HP through the allowlisted raw current-state field.",
+  "scope_changes": [],
+  "field_mapping_correction": {
+    "row_summary_player_max_hp": "optional; compare with the allowlisted projection-backed current/max HP when present",
+    "feature_source": "always use snapshot_raw.battle_player.max_hp during battle or snapshot_raw.max_hp outside battle",
+    "availability": "The #45 rows inspected do not serialize player_max_hp as a redundant top-level decision field; absence is recorded and does not trigger imputation or exclusion.",
+    "source_commits": {
+      "native": "18bcd565b587186425bb46ad3d70a2eb80d947fc",
+      "stsrl": "7d172f7c24c9d29429b6946ba44f6b59760b0d96"
+    }
+  },
+  "failed_attempt": {
+    "stage": "prepare_train_only",
+    "status": "PUBLIC_FEATURE_SUBSET_UNAVAILABLE",
+    "builder_cpu_seconds": 0.017858918,
+    "failure": "row.player_max_hp is not numeric.",
+    "scope_accessed": "training partition only; the attempt stopped on its first included row before any model fit",
+    "validation_or_heldout_opened": false
+  },
+  "data_access_note": "The failed attempt began preparation with the already published owner split, verified source seals, and opened only assigned training files. No validation or heldout path was opened, no model was fit, and no scientific variant or feature was changed."
+}

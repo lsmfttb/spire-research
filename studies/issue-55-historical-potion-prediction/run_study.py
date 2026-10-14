@@ -19,6 +19,7 @@ HERE = Path(__file__).resolve().parent
 ARTIFACTS = HERE / "artifacts"
 PREREG_PATH = HERE / "preregistration.json"
 AMENDMENT_PATH = HERE / "preregistration-amendment-001.json"
+AMENDMENT_PATHS = [AMENDMENT_PATH, HERE / "preregistration-amendment-002.json"]
 FEATURE_DOMAIN = b"issue55-feature-v1\0"
 BOOTSTRAP_DOMAIN = "issue55-owner-bootstrap-v1"
 BOOTSTRAP_SEED = 550055
@@ -237,8 +238,17 @@ def start_stage(name: str) -> bool:
     global _stage_name, _stage_start_cpu, _stage_attempt
     assert _state is not None and _ledger is not None
     existing = _state.setdefault("stages", {}).get(name, {})
-    if existing.get("status") in {"COMPLETE", "TERMINAL"}:
+    if existing.get("status") == "COMPLETE":
         return False
+    if existing.get("status") == "TERMINAL":
+        attempts = existing.get("attempts", [])
+        terminal_code = attempts[-1].get("terminal_classification") if attempts else None
+        if terminal_code == "NO_IDENTIFIABLE_POTION_FEATURE_VARIATION":
+            return False
+        raise StudyFailure(
+            "PUBLIC_FEATURE_SUBSET_UNAVAILABLE",
+            "A prior source-admission failure is terminal; correct the cause and use the matching retry command.",
+        )
     if existing.get("status") == "BLOCKED":
         raise ResourceBlocked(existing.get("message", "A prior stage blocked the study."))
     ensure_budget()
@@ -254,6 +264,8 @@ def start_stage(name: str) -> bool:
     existing.setdefault("attempts", []).append(attempt)
     existing["status"] = "RUNNING"
     existing["started_utc"] = attempt["started_utc"]
+    existing.pop("ended_utc", None)
+    existing.pop("message", None)
     _state["stages"][name] = existing
     _stage_attempt = attempt
     _write_state()
@@ -475,15 +487,18 @@ def negative_control_check(snapshot: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def validate_redundant_row_fields(row: dict[str, Any], context: dict[str, Any]) -> None:
+def validate_redundant_row_fields(row: dict[str, Any], context: dict[str, Any]) -> bool:
     require(isinstance(row.get("legal_action_identities"), list) and bool(row["legal_action_identities"]), "Decision record has no legal actions.")
     require(isinstance(row.get("eligible_action_indices"), list) and bool(row["eligible_action_indices"]), "Decision record has no eligible action indices.")
     require(strict_int(row.get("floor"), "row.floor") == context["current_floor"], "Co-recorded current floor disagrees with snapshot.")
     require(strict_int(row.get("player_hp"), "row.player_hp") == context["current_hp"], "Co-recorded current HP disagrees with public projection source.")
-    require(strict_int(row.get("player_max_hp"), "row.player_max_hp") == context["max_hp"], "Co-recorded max HP disagrees with public projection source.")
+    max_hp_available = row.get("player_max_hp") is not None
+    if max_hp_available:
+        require(strict_int(row["player_max_hp"], "row.player_max_hp") == context["max_hp"], "Co-recorded max HP disagrees with public projection source.")
     require(strict_int(row.get("potion_count"), "row.potion_count") == context["potion_count"], "Co-recorded potion count disagrees with public inventory.")
     require(row.get("screen_state") == context["screen_family"], "Co-recorded screen identity disagrees with snapshot.")
     require(row.get("battle_active") is context["battle_active"], "Co-recorded battle-active flag disagrees with snapshot.")
+    return max_hp_available
 
 
 def manifest_index() -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
@@ -593,10 +608,10 @@ def iter_gzip_jsonl(path: Path):
 
 def prepare() -> None:
     prereg = read_json(PREREG_PATH)
-    amendment = read_json(AMENDMENT_PATH)
+    amendments = [read_json(path) for path in AMENDMENT_PATHS]
     partitions = expected_partitions(prereg)
     prereg_hash, _ = sha256_file(PREREG_PATH)
-    amendment_hash, _ = sha256_file(AMENDMENT_PATH)
+    amendment_hashes = {path.name: sha256_file(path)[0] for path in AMENDMENT_PATHS}
     index, source_seal = manifest_index()
     train_records_path = ARTIFACTS / "train_public_features.jsonl.gz"
     temporary = train_records_path.with_name(train_records_path.name + ".tmp")
@@ -608,6 +623,7 @@ def prepare() -> None:
     support_potion_states: Counter[str] = Counter()
     total_rows = 0
     checked_adjacencies = 0
+    max_hp_redundant_rows = 0
     control: dict[str, Any] | None = None
 
     with temporary.open("wb") as raw:
@@ -625,10 +641,15 @@ def prepare() -> None:
                 with (SOURCE_ROOT / f"{owner}-on.jsonl").open("r", encoding="utf-8") as rows_file:
                     for line_number, line in enumerate(rows_file, start=1):
                         ensure_budget()
-                        row = _mapping(json.loads(line), f"owner {owner} row {line_number}")
-                        snapshot = _mapping(row.get("snapshot_raw"), f"owner {owner} row {line_number} snapshot_raw")
-                        baseline, potion, context = feature_tokens(snapshot)
-                        validate_redundant_row_fields(row, context)
+                        try:
+                            row = _mapping(json.loads(line), f"owner {owner} row {line_number}")
+                            snapshot = _mapping(row.get("snapshot_raw"), f"owner {owner} row {line_number} snapshot_raw")
+                            baseline, potion, context = feature_tokens(snapshot)
+                            max_hp_redundant_rows += int(validate_redundant_row_fields(row, context))
+                        except StudyFailure as exc:
+                            raise StudyFailure(exc.code, f"owner {owner} row {line_number}: {exc}") from exc
+                        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                            raise StudyFailure("PUBLIC_FEATURE_SUBSET_UNAVAILABLE", f"owner {owner} row {line_number}: malformed JSONL record") from exc
                         if previous_next_tokens is not None:
                             require(previous_next_tokens == (baseline, potion), f"Adjacent pre/post public state mismatch for owner {owner}, row {line_number}.")
                             checked_adjacencies += 1
@@ -683,7 +704,7 @@ def prepare() -> None:
         "disposition": "STUDY_ONLY",
         "source_seal": source_seal,
         "preregistration_sha256": prereg_hash,
-        "preregistration_amendment_sha256": amendment_hash,
+        "preregistration_amendment_sha256s": amendment_hashes,
         "partition_counts": {name: len(ids) for name, ids in partitions.items()},
         "opened_partitions": ["train"],
         "validation_opened": False,
@@ -698,7 +719,9 @@ def prepare() -> None:
         "training_inventory_variation_count_at_least": 2 if len(inventory_states) > 1 else len(inventory_states),
         "negative_control": control,
         "action_time_checks": {
-            "redundant_current_floor_hp_max_hp_potion_count_screen_and_battle_flag": "PASS",
+            "redundant_current_floor_hp_potion_count_screen_and_battle_flag": "PASS",
+            "co_recorded_max_hp_rows": max_hp_redundant_rows,
+            "max_hp_source_when_not_co_recorded": "allowlisted raw current state field checked against the pinned public projection mapping",
             "adjacent_previous_next_to_current_public_allowlist_tokens": "PASS",
             "adjacent_transitions_checked": checked_adjacencies,
             "legal_action_set_nonempty_each_included_row": "PASS",
@@ -828,7 +851,7 @@ def fit() -> None:
         "frozen_utc": utc_now(),
         "disposition": "STUDY_ONLY",
         "preregistration_sha256": sha256_file(PREREG_PATH)[0],
-        "preregistration_amendment_sha256": sha256_file(AMENDMENT_PATH)[0],
+        "preregistration_amendment_sha256s": {path.name: sha256_file(path)[0] for path in AMENDMENT_PATHS},
         "admission_report_sha256": sha256_file(ARTIFACTS / "admission_report.json")[0],
         "training_feature_sha256": training_sha,
         "models": {
@@ -990,10 +1013,15 @@ def evaluate() -> None:
         with (SOURCE_ROOT / f"{owner}-on.jsonl").open("r", encoding="utf-8") as rows_file:
             for line_number, line in enumerate(rows_file, start=1):
                 ensure_budget()
-                row = _mapping(json.loads(line), f"heldout owner {owner} row {line_number}")
-                snapshot = _mapping(row.get("snapshot_raw"), f"heldout owner {owner} row {line_number} snapshot_raw")
-                baseline, potion, context = feature_tokens(snapshot)
-                validate_redundant_row_fields(row, context)
+                try:
+                    row = _mapping(json.loads(line), f"heldout owner {owner} row {line_number}")
+                    snapshot = _mapping(row.get("snapshot_raw"), f"heldout owner {owner} row {line_number} snapshot_raw")
+                    baseline, potion, context = feature_tokens(snapshot)
+                    validate_redundant_row_fields(row, context)
+                except StudyFailure as exc:
+                    raise StudyFailure(exc.code, f"heldout owner {owner} row {line_number}: {exc}") from exc
+                except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                    raise StudyFailure("PUBLIC_FEATURE_SUBSET_UNAVAILABLE", f"heldout owner {owner} row {line_number}: malformed JSONL record") from exc
                 record = {
                     "owner_id": owner,
                     "source_row_number": line_number,
@@ -1135,7 +1163,7 @@ def evaluate() -> None:
         },
         "pre_registration": {
             "sha256": sha256_file(PREREG_PATH)[0],
-            "amendment_001_sha256": sha256_file(AMENDMENT_PATH)[0],
+            "amendments_sha256": {path.name: sha256_file(path)[0] for path in AMENDMENT_PATHS},
             "freeze_receipt_sha256": sha256_file(freeze_path)[0],
             "heldout_opened_after_models_frozen": True,
         },
@@ -1191,6 +1219,9 @@ def run_stage(name: str, function: Callable[[], None]) -> int:
         print(f"{name}: {exc.code}: {exc}")
         return 0
     except StudyFailure as exc:
+        if _stage_name is None:
+            print(f"{name}: {exc.code}: {exc}", file=sys.stderr)
+            return 2 if exc.code != "RESOURCE_BLOCKED" else 3
         fail_stage(exc.code, str(exc))
         print(f"{name}: {exc.code}: {exc}", file=sys.stderr)
         return 2 if exc.code != "RESOURCE_BLOCKED" else 3
@@ -1200,17 +1231,45 @@ def run_stage(name: str, function: Callable[[], None]) -> int:
         return 2
 
 
+def retry_terminal_stage(name: str) -> None:
+    assert _state is not None
+    stage = _state.get("stages", {}).get(name)
+    require(
+        stage is not None and stage.get("status") == "TERMINAL",
+        f"Stage {name} is not in a retryable terminal state.",
+        "BUILDER_REPAIR_REQUIRED",
+    )
+    stage["status"] = "FAILED"
+    stage["retry_note"] = "Explicit retry after an implementation or source-admission correction; earlier attempt remains in the audit history."
+    _state["terminal_classification"] = None
+    _write_state()
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) != 2 or argv[1] not in {"prepare", "fit", "evaluate"}:
-        print("usage: python3 run_study.py {prepare|fit|evaluate}", file=sys.stderr)
+    commands = {
+        "prepare": ("prepare_train_only", prepare),
+        "fit": ("fit_frozen_models", fit),
+        "evaluate": ("evaluate_heldout", evaluate),
+    }
+    retry_commands = {
+        "retry-prepare": ("prepare_train_only", prepare),
+        "retry-fit": ("fit_frozen_models", fit),
+        "retry-evaluate": ("evaluate_heldout", evaluate),
+    }
+    all_commands = commands | retry_commands
+    if len(argv) != 2 or argv[1] not in all_commands:
+        print("usage: python3 run_study.py {prepare|fit|evaluate|retry-prepare|retry-fit|retry-evaluate}", file=sys.stderr)
         return 64
     load_state_and_ledger()
     command = argv[1]
-    if command == "prepare":
-        return run_stage("prepare_train_only", prepare)
-    if command == "fit":
-        return run_stage("fit_frozen_models", fit)
-    return run_stage("evaluate_heldout", evaluate)
+    stage_name, function = all_commands[command]
+    if command.startswith("retry-"):
+        try:
+            retry_terminal_stage(stage_name)
+        except StudyFailure as exc:
+            print(f"{command}: {exc.code}: {exc}", file=sys.stderr)
+            return 2
+    return run_stage(stage_name, function)
 
 
 if __name__ == "__main__":
