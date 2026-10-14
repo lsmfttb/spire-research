@@ -1,0 +1,759 @@
+{
+  "baselines": {
+    "floor_hp": "fixed training-set equal-owner mean terminal-floor prior minus current floor, multiplied by current_hp/max_hp; deterministic survival-context heuristic with no fitted weights",
+    "floor_only": "fixed training-set equal-owner mean terminal-floor prior minus current floor; a one-scalar null value anchor, no fitted weights",
+    "warning": "These are frozen descriptive heuristics only; neither is a trained model or potion-use counterfactual. Report denominators and do not infer mechanism."
+  },
+  "disposition": "STUDY_ONLY",
+  "estimand": "V^{oldNative, Expert+privilegedBattle}_{restricted-public-subset}",
+  "evaluation": {
+    "bootstrap": {
+      "interval": "percentile 95%",
+      "replicates": 5000,
+      "rng_seed": 550055,
+      "strata": "overall; then potion-presence, public screen family, and floor bands F00-F08/F09-F16/F17+ where at least 2 heldout owners contribute; preserve all rows within sampled owners",
+      "unit": "whole owner cluster"
+    },
+    "calibration": "owner-equal mean prediction, mean actual, bias, and slope/intercept over owner-mean prediction/actual pairs when defined",
+    "coverage": "descriptive heldout owner-equal row fraction within the 90th-percentile absolute training residual band; not a calibrated or guaranteed interval",
+    "heldout": "open only after both ridge weight files and a freeze receipt are durably written",
+    "primary_metrics": [
+      "owner-equal MAE",
+      "owner-equal MSE",
+      "mean paired owner-level absolute_error(masked-visible)"
+    ]
+  },
+  "interpretation": "Observational predictive signal under historical old-Native Expert+privileged-Battle-search visitation only; not causal use/retain value, current-Native V^pi, policy readiness, or actual Heart strength. Null is not absence of potion value. STUDY_ONLY regardless of result.",
+  "models": {
+    "estimator": "float64 ridge normal equations (X^T W X + 1.0 I)^-1 X^T W y; no intercept exemption, optimizer, tuning, or validation use",
+    "feature_map": {
+      "dimension": 256,
+      "intercept": "constant token included and uniformly regularized",
+      "numeric_handling": "categorical integer buckets only; no normalization fitted from validation/heldout",
+      "token_hash": "SHA256(UTF8('issue55-feature-v1\\0' + token)); bucket=first4bytes big-endian mod256; sign=+1 if low bit of byte4 is0 else -1; repeated categorical items accumulate signed counts"
+    },
+    "masked": "POTION_MASKED removes only the potion-only allowlist; all other inputs, eligible rows, owner weights, mapping, model capacity and alpha are identical",
+    "owner_weighting": "each training row weight=1/number_of_eligible_rows_for_that_owner; objective sums owner-mean squared errors over training owners, plus alpha*L2 norm",
+    "validation": "fixed split only; unused for model selection or tuning",
+    "visible": "POTION_VISIBLE uses baseline allowlist plus potion-only allowlist"
+  },
+  "public_feature_allowlist": {
+    "action_time_consistency": "check redundant current snapshot summaries and adjacent pre/post snapshots where present; next state, action choice and terminal label are excluded from feature tokens",
+    "baseline": [
+      {
+        "basis": "visible current Act",
+        "encoding": "categorical",
+        "field": "act",
+        "source": "snapshot_raw.act"
+      },
+      {
+        "basis": "visible current floor; also target origin",
+        "encoding": "categorical",
+        "field": "current_floor",
+        "source": "snapshot_raw.floor_num"
+      },
+      {
+        "basis": "publicProjectionV3 screen_identity",
+        "encoding": "categorical",
+        "field": "screen_family",
+        "source": "snapshot_raw.screen_state"
+      },
+      {
+        "basis": "publicProjectionV3 BattleContext::player.curHp or GameContext::curHp",
+        "encoding": "categorical",
+        "field": "current_hp",
+        "source": "snapshot_raw.battle_player_hp when battle_active else snapshot_raw.cur_hp"
+      },
+      {
+        "basis": "publicProjectionV3 BattleContext::player.maxHp or GameContext::maxHp",
+        "encoding": "categorical",
+        "field": "max_hp",
+        "source": "snapshot_raw.battle_player.max_hp when battle_active else snapshot_raw.max_hp"
+      },
+      {
+        "basis": "publicProjectionV3 persistent_resources.deck from GameContext::deck",
+        "encoding": "one token per card identity; no order, upgrade, misc, or deck_index",
+        "field": "deck_identity_multiset",
+        "source": "snapshot_raw.deck[].id_label"
+      },
+      {
+        "basis": "publicProjectionV3 persistent_resources.relics from GameContext::relics",
+        "encoding": "one token per relic identity; no counter or relic_index",
+        "field": "relic_identity_multiset",
+        "source": "snapshot_raw.relics[].id_label"
+      }
+    ],
+    "eligible_rows": "decision records with non-empty legal action set, complete allowlisted current snapshot, and a verified terminal owner label; same eligibility for both model arms and baselines",
+    "not_features": [
+      "owner_id",
+      "seed",
+      "terminal_floor",
+      "outcome",
+      "current or next chosen action",
+      "policy/controller/search metadata",
+      "native packed observations",
+      "next_snapshot_raw",
+      "full-run summaries",
+      "map/boss/reward/screen payloads not explicitly allowed",
+      "gold",
+      "keys",
+      "room_type",
+      "all battle hand/draw/discard/exhaust/monster/intent/energy/block/status fields",
+      "relic counters",
+      "card upgrade/misc/order fields",
+      "unknown or unsupported identity values"
+    ],
+    "potion_only": [
+      {
+        "basis": "publicProjectionV3 BattleContext::potionCount or GameContext::potionCount",
+        "encoding": "categorical",
+        "field": "potion_count",
+        "source": "snapshot_raw.battle_potion_count when battle_active else snapshot_raw.potion_count"
+      },
+      {
+        "basis": "publicProjectionV3 BattleContext::potionCapacity or GameContext::potionCapacity",
+        "encoding": "categorical",
+        "field": "potion_capacity",
+        "source": "snapshot_raw.battle_potion_capacity when battle_active else snapshot_raw.potion_capacity"
+      },
+      {
+        "basis": "publicProjectionV3 persistent_resources.potion_identities from BattleContext::potions or GameContext::potions",
+        "encoding": "ordered slot identity; EMPTY_POTION_ID records an empty visible slot",
+        "field": "potion_slot_identity",
+        "source": "snapshot_raw.battle_potions[] when battle_active else snapshot_raw.potions[]; use potion_index and id_label"
+      }
+    ],
+    "projection_evidence": {
+      "limitation": "The original #45 decision records do not serialize a separate per-row projection payload. Admission will crosscheck allowed raw fields against the exact pinned projection source expressions and co-recorded decision-time values; unsupported or inconsistent rows fail closed. This is not complete observation closure.",
+      "native_source": "18bcd565b587186425bb46ad3d70a2eb80d947fc:bindings/slaythespire.cpp",
+      "normal_semantics": "Act/floor, current/max HP, deck/relic identities, potion identities/slots/count/capacity are ordinary player-visible state; the raw native snapshot contains additional simulator and battle internals that are excluded",
+      "projection": "StepSimulator::publicProjectionV3; screen_identity from GameContext::screenState; persistent_resources exposes current_hp, max_hp, deck, relics, potion_count, potion_capacity, potion_identities",
+      "stsrl_recording": "7d172f7c24c9d29429b6946ba44f6b59760b0d96:src/sts_combat_rl/sim/controlled_run.py records decision-time SimulatorSnapshot.raw; this study extracts only explicitly listed fields"
+    },
+    "unknown_or_inconsistent_allowlist_value": "fail closed as PUBLIC_FEATURE_SUBSET_UNAVAILABLE; do not impute"
+  },
+  "resource_budget": {
+    "all_in_cpu_seconds_max": 2500,
+    "builder_plus_admin_max_cpu_seconds": 1900,
+    "no_new_games_builds_labels_or_replays": true,
+    "reviewer_reserved_min_cpu_seconds": 600
+  },
+  "schema": "issue55-preregistration-v1",
+  "source": {
+    "issue": 45,
+    "manifest_sha256": "624b656dee2afe33cf0e0410dd4cdf1a198c456d3d050a3ac061cb1aec18c160",
+    "native_commit": "18bcd565b587186425bb46ad3d70a2eb80d947fc",
+    "owner_id_field": "seed",
+    "owner_ids": [
+      437001,
+      437002,
+      437003,
+      437004,
+      437005,
+      437006,
+      437007,
+      437008,
+      437009,
+      437010,
+      437011,
+      437012,
+      437013,
+      437014,
+      437015,
+      437016,
+      437017,
+      437018,
+      437019,
+      437020,
+      437021,
+      437022,
+      437023,
+      437024,
+      437025,
+      437026,
+      437027,
+      437028,
+      437029,
+      437030,
+      437031,
+      437032,
+      437033,
+      437034,
+      437035,
+      437036,
+      437037,
+      437038,
+      437039,
+      437040,
+      437041,
+      437042,
+      437043,
+      437044,
+      437045,
+      437046,
+      437047,
+      437048,
+      437049,
+      437050,
+      437051,
+      437052,
+      437053,
+      437054,
+      437055,
+      437056,
+      437057,
+      437058,
+      437059,
+      437060,
+      437061,
+      437062,
+      437063,
+      437064,
+      437065,
+      437066,
+      437067,
+      437068,
+      437069,
+      437070,
+      437071,
+      437072,
+      437073,
+      437074,
+      437075,
+      437076,
+      437077,
+      437078,
+      437079,
+      437080,
+      437081,
+      437082,
+      437083,
+      437084,
+      437085,
+      437086,
+      437087,
+      437088,
+      437089,
+      437090,
+      437091,
+      437092,
+      437093,
+      437094,
+      437095,
+      437096
+    ],
+    "root": "/home/lsmft/.cache/issue45-potion-paired/reviewed-native-18bcd565",
+    "source_metadata_sha256": "265a0a5d07083d4fe80fe26d6a802b250f3df1b5600b46689b351d2c1a4e5197",
+    "stsrl_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96"
+  },
+  "split": {
+    "algorithm": "SHA256(domain || canonical_owner_id_ascii), sort ascending by digest then numeric owner_id; first64 train, next16 validation, final16 heldout",
+    "canonical_owner_id": "base-10 integer ASCII without leading zeroes",
+    "domain_hex": "73706972652d72657365617263682f697373756535352f6f776e65722d73706c69742f763100",
+    "partitions": {
+      "heldout": [
+        437048,
+        437002,
+        437019,
+        437090,
+        437036,
+        437072,
+        437071,
+        437092,
+        437038,
+        437061,
+        437076,
+        437040,
+        437009,
+        437082,
+        437065,
+        437032
+      ],
+      "train": [
+        437031,
+        437030,
+        437080,
+        437034,
+        437005,
+        437086,
+        437075,
+        437074,
+        437051,
+        437083,
+        437073,
+        437028,
+        437017,
+        437046,
+        437001,
+        437079,
+        437067,
+        437093,
+        437043,
+        437091,
+        437078,
+        437060,
+        437066,
+        437052,
+        437015,
+        437088,
+        437021,
+        437039,
+        437056,
+        437003,
+        437070,
+        437059,
+        437016,
+        437057,
+        437026,
+        437096,
+        437023,
+        437042,
+        437013,
+        437022,
+        437024,
+        437025,
+        437008,
+        437089,
+        437094,
+        437045,
+        437037,
+        437012,
+        437063,
+        437068,
+        437084,
+        437027,
+        437011,
+        437007,
+        437004,
+        437069,
+        437058,
+        437014,
+        437041,
+        437010,
+        437055,
+        437020,
+        437018,
+        437095
+      ],
+      "validation": [
+        437029,
+        437062,
+        437047,
+        437006,
+        437085,
+        437087,
+        437077,
+        437053,
+        437050,
+        437044,
+        437035,
+        437054,
+        437064,
+        437033,
+        437081,
+        437049
+      ]
+    },
+    "ranked_owner_digests": [
+      {
+        "owner_id": 437031,
+        "sha256": "01375a56b6b2737ffb27b71883fe25909558293911dee20d95ceb5d99967d484"
+      },
+      {
+        "owner_id": 437030,
+        "sha256": "023ea60c4d52bc8a3cb6dd8bb6b18b9760bdb5fe4f2724997eb39d222a12bbad"
+      },
+      {
+        "owner_id": 437080,
+        "sha256": "05983b74b86602bedf397f858da7cfbcc8bf945516a279b6661e326b2c2a2a1b"
+      },
+      {
+        "owner_id": 437034,
+        "sha256": "07507bdb56c35ef6d78e3894d74e046a470fa3f934deb03471bdf28c01881836"
+      },
+      {
+        "owner_id": 437005,
+        "sha256": "07b72f6473b4acd35b2d7f829272f96ec79fcb803f467097941717151d6cd567"
+      },
+      {
+        "owner_id": 437086,
+        "sha256": "0eae5cd2b6d01c57f5eb2dbf1492d6f5db995bc7f5b6edcb65a5b91806f71ea4"
+      },
+      {
+        "owner_id": 437075,
+        "sha256": "11daadfed3f844d22a33fa7a6c3813b03912a79b2d449de78361f18b99ebd274"
+      },
+      {
+        "owner_id": 437074,
+        "sha256": "14496164dfe4f3885adaa72c7b96661aa8e0b23fac46cf0c5511dd722c57e50e"
+      },
+      {
+        "owner_id": 437051,
+        "sha256": "17985ad1eafea7dde62f1d4dbfee3104c626e316ffb064586d6a9eb08ebf9f4b"
+      },
+      {
+        "owner_id": 437083,
+        "sha256": "1c5d2a8153774b9217e9d00a20a2f2f8836ff700092185f38f0288e799a2fd5a"
+      },
+      {
+        "owner_id": 437073,
+        "sha256": "1e5f6fe3949fc715d936db71ae7d4a77f6bbf654dc8bfcc4a1d0b18510c10f8b"
+      },
+      {
+        "owner_id": 437028,
+        "sha256": "1e9ade525cb8f99a028361f6358139da65989925f0355dfc61f8d56ec8a38eec"
+      },
+      {
+        "owner_id": 437017,
+        "sha256": "2312e0d03c952314d50c658577f1a07659f7c47bc7124cdef47aed7e25ac7837"
+      },
+      {
+        "owner_id": 437046,
+        "sha256": "238ac9f644fb6a42d4d977cb300a3c13ec692596697b88dc9e9d394c93e77f07"
+      },
+      {
+        "owner_id": 437001,
+        "sha256": "24d5f64a5261a3f0f012108018d7935f1eea4dc6837a92324b437734a84e8c4a"
+      },
+      {
+        "owner_id": 437079,
+        "sha256": "2701df2878efb4de6e45f742c421d0e1847575d99bbedae3463298c53ad23fe4"
+      },
+      {
+        "owner_id": 437067,
+        "sha256": "2ddbae21fb0ad2d641fb715364447ab55a3ed5e081f51ab8a2dc9a9cf48a3dfa"
+      },
+      {
+        "owner_id": 437093,
+        "sha256": "30b00a9d2a37f72da73bfe93031775cd31f61caa31fc7294c7e0b49e615d3c80"
+      },
+      {
+        "owner_id": 437043,
+        "sha256": "353957a4f0917fb4bfd335ec09904f605c36b8515b6b7bff15f8872f90978e48"
+      },
+      {
+        "owner_id": 437091,
+        "sha256": "3547f429c3eb28ffc5aabc90e09fb1af1567bca39b85989bed27bec2cabb538f"
+      },
+      {
+        "owner_id": 437078,
+        "sha256": "35897f2e2fe5fab60f9db8aec7c8c3283f506b02e91ea703b1b0a1a90aec5ceb"
+      },
+      {
+        "owner_id": 437060,
+        "sha256": "38b06dead92bfeae369e230cc70ac96d4b62a32b453b5714d6d91d4bf0f7e28f"
+      },
+      {
+        "owner_id": 437066,
+        "sha256": "3a1800b1d94f0542dbc0c400640e0e6621f8bda330070df7e36d0bcc2bd23de1"
+      },
+      {
+        "owner_id": 437052,
+        "sha256": "3bdd6749e887be630cd5e49c488b73d26eea6f2f25c9b171b92f642c1078d586"
+      },
+      {
+        "owner_id": 437015,
+        "sha256": "3e8633c08a480f16e17f10ba9fb0f266bb4e1d4e4a3ba13b816c9824ca1a68d6"
+      },
+      {
+        "owner_id": 437088,
+        "sha256": "3f880d271edfad15ae17c410feb6313dc275d0b1d110616b2762004e5b3a1450"
+      },
+      {
+        "owner_id": 437021,
+        "sha256": "3fc7e8314fc9978e06af1d7c599d8440e217a4fd0115dc3c9a69530d6a7dba62"
+      },
+      {
+        "owner_id": 437039,
+        "sha256": "441f1b42084295202afb20456725dbcea468e2bfeb6c7e89ce8cd7b62470dcd2"
+      },
+      {
+        "owner_id": 437056,
+        "sha256": "4588bc75520412edfe6d1c1fa61f4c9ef848aca348da94f72df4be80476bab3f"
+      },
+      {
+        "owner_id": 437003,
+        "sha256": "47e6bed00f02057fb3533fb4ec0578524475434bb106b3fd6a81cd427c08db02"
+      },
+      {
+        "owner_id": 437070,
+        "sha256": "4932197d1c0379ed19e4e43f4953d9a4f543411b68fd7eaa2f3e39efafc274a6"
+      },
+      {
+        "owner_id": 437059,
+        "sha256": "4f5bff73fcc9800407215374edaf0b085575beb4a2314577aeea5bf30b2c3521"
+      },
+      {
+        "owner_id": 437016,
+        "sha256": "525fe228af9f7fe6db9a5351b2c42052226c43daf90339a3d20f79d7e5c561cd"
+      },
+      {
+        "owner_id": 437057,
+        "sha256": "549ecbf78a449f5b70254ab04f2b828f9b6e4c8e22dc0681dc25c23c0d4bce17"
+      },
+      {
+        "owner_id": 437026,
+        "sha256": "5824c6416166be1e7a6d659b218277360a9ac1e4e3bf60e6d524cf1718f35b18"
+      },
+      {
+        "owner_id": 437096,
+        "sha256": "59b05bc2deea1ef8a8dbb44eea2f3ee3b98c48557a5281920ee8f0b333b4c81d"
+      },
+      {
+        "owner_id": 437023,
+        "sha256": "5c7d68e19854e5cd21476f824a1e34cdb61dfb1d27ae0f47e4347c7fb29e7ed7"
+      },
+      {
+        "owner_id": 437042,
+        "sha256": "5ef35f71045e4e39cf0117ee28fd03086b7ab0a53cfa30f45fd532d1e0afb84b"
+      },
+      {
+        "owner_id": 437013,
+        "sha256": "613543921c0827a7b75e724efe8ec102be85d75d602ef320d28106fb74294001"
+      },
+      {
+        "owner_id": 437022,
+        "sha256": "62097303871915a8aa519a0a18d25c329d84154b24d787abdfcf72a317f54295"
+      },
+      {
+        "owner_id": 437024,
+        "sha256": "67cdcd4294a6150b39ac9c9787e3684382fd3b870d643a5f1eef337a2eb0aed5"
+      },
+      {
+        "owner_id": 437025,
+        "sha256": "699c663bdc3dae1d3ffd8f393d3e5306703f035101f5944ea81408a8855dda7e"
+      },
+      {
+        "owner_id": 437008,
+        "sha256": "6b4540088b9f8531806522554de3776823691b3424d86d84b778a8d384093a1d"
+      },
+      {
+        "owner_id": 437089,
+        "sha256": "6ea8b56dab472cfabdd7fa8ac9b8647c716ade1900e5eb6184c1c23e1944b025"
+      },
+      {
+        "owner_id": 437094,
+        "sha256": "769117078ebb14169e0b74899403294fd7f891999ca630d9e60b9caabe29b07c"
+      },
+      {
+        "owner_id": 437045,
+        "sha256": "82d2d152ea18ff9958a19933a4dc09bcab81febbb89bf98fa12a557f0d011d4e"
+      },
+      {
+        "owner_id": 437037,
+        "sha256": "8510cb0ac552a929a333bdb9a6a081e9503de9a90a263db791c62638ef15da48"
+      },
+      {
+        "owner_id": 437012,
+        "sha256": "879ca3593e3ea17786c6e415d2faddc0ef490a5569204d0eaac6543a2b16e1a2"
+      },
+      {
+        "owner_id": 437063,
+        "sha256": "8e0c8a97d0fb702494dc1b765d17677866f3ecb325e0eb8f4f4399e35184a5bc"
+      },
+      {
+        "owner_id": 437068,
+        "sha256": "8ede929258eced73a7bdea45e35eb766240b5368c5f64aea5bca43d4245d95b8"
+      },
+      {
+        "owner_id": 437084,
+        "sha256": "9117f93345ca661725493c4ee0253dcb79bb22f7e19ed1423e3ac09de3843475"
+      },
+      {
+        "owner_id": 437027,
+        "sha256": "9264778393fb18f96aaf068793d39796fcf10b1f38be505efa0cc4e49effb99b"
+      },
+      {
+        "owner_id": 437011,
+        "sha256": "926dd07c15e7f75722fb23bdab0e74cce04e18d4fa57c63064c2feb21d2290c1"
+      },
+      {
+        "owner_id": 437007,
+        "sha256": "9408ce20e4eefa13d0f82d3d827fb1b9a3f6ede37ba81c2390a54967cc3e114e"
+      },
+      {
+        "owner_id": 437004,
+        "sha256": "96fa4a9f76bf5d7b965574b7c129ebeb7e484dfa6b394adc89d29e804e72b090"
+      },
+      {
+        "owner_id": 437069,
+        "sha256": "96fb9313b9dffebc6a5d450ca2d3ae98757d37b8a9725dc5aa792f47f975b2da"
+      },
+      {
+        "owner_id": 437058,
+        "sha256": "9a955d1377910c7c24dc3fa2caffa7da846fa034ebd5afc6f9228649d112797e"
+      },
+      {
+        "owner_id": 437014,
+        "sha256": "9c7a1d40dcb3b7fbddb6388f1c969f98c1684ff7572128802bf70d5295c696cd"
+      },
+      {
+        "owner_id": 437041,
+        "sha256": "a44af8202775de473f4569832edd696c931df276e8255944bc6446ce60d9c4d2"
+      },
+      {
+        "owner_id": 437010,
+        "sha256": "a74cf2ee8a9ab350f232f5260bcf5e2d030daaa0076c69c3a3a2f865271a6b97"
+      },
+      {
+        "owner_id": 437055,
+        "sha256": "a89d259f8bab6d428624062f85682a3e0aad3a8a03d180bd3c43dc229df4af76"
+      },
+      {
+        "owner_id": 437020,
+        "sha256": "aee0574766b0fc3f4a0d2af1fcfddf5d42b4281cc0638e649418eeda4f6611ea"
+      },
+      {
+        "owner_id": 437018,
+        "sha256": "b91cd75a1c53a434f43185370750617098e4493a5ee0e8115993acb341d8addd"
+      },
+      {
+        "owner_id": 437095,
+        "sha256": "bdb2b93b8ea51de48ca31df64a6cb69d4f7ddd08db89ab583d0c8e44fc2a53ac"
+      },
+      {
+        "owner_id": 437029,
+        "sha256": "c4ce598714739547102d7f6374cba5fe036bd89507a53220bcf0b0282e336adb"
+      },
+      {
+        "owner_id": 437062,
+        "sha256": "c52c65c48e002f4ad96a1c1e684fb9697fb6ec7763055be9acbd92a90483fd67"
+      },
+      {
+        "owner_id": 437047,
+        "sha256": "c7bef327e178546c4271f690ebaff4574b6efa8f0ffbf521f6caf726979e4b8f"
+      },
+      {
+        "owner_id": 437006,
+        "sha256": "c7c115b613215132fa91495cef96f3868cb65da5e56d3e52568f8595567fdeec"
+      },
+      {
+        "owner_id": 437085,
+        "sha256": "c876aa72ac923998d20681804c302186e4c4e2086f43142df8de44153415061a"
+      },
+      {
+        "owner_id": 437087,
+        "sha256": "cfb806eb0b4e6b2057405a0307ce9e398529d5ee7e4a78eefa99acfc82dce081"
+      },
+      {
+        "owner_id": 437077,
+        "sha256": "d374d698194c4f851c751660450d2dc79c3c82a4d673422312e992950bba55f2"
+      },
+      {
+        "owner_id": 437053,
+        "sha256": "d452c654eefc894ac8449dd0cbd616df596ef10c3d8d5b25d406b9247d7cec60"
+      },
+      {
+        "owner_id": 437050,
+        "sha256": "d7a14b12f38f4146bef49201097d517366f70221e788c482b1817e6a53664a6d"
+      },
+      {
+        "owner_id": 437044,
+        "sha256": "d7f574522ce9898f7bad7368cc92dfd4874947d5fb86206649e5fdd4819cba68"
+      },
+      {
+        "owner_id": 437035,
+        "sha256": "d90e889402e5d32f3f1bba07055cf74c75e7c14427aff5da1da127d1eb8122bb"
+      },
+      {
+        "owner_id": 437054,
+        "sha256": "d9c0b25a0e5c045d1b768efe1c260c2737531f041c1dda20cf19f1ca6c7e1e02"
+      },
+      {
+        "owner_id": 437064,
+        "sha256": "db44df2a16a0e67aab14beed9b796fec80ee82c77f3a0d56241cf87e79c6b87d"
+      },
+      {
+        "owner_id": 437033,
+        "sha256": "df19d78467564507544a115f735da8057688407f3be446f8b8e61e10cdbee3aa"
+      },
+      {
+        "owner_id": 437081,
+        "sha256": "df6c120ec9fa723e75d2e18a849b38210edc7c3f2ac4548290ec35a6c3ca2c5c"
+      },
+      {
+        "owner_id": 437049,
+        "sha256": "e0c9044a2e39cac1a10ec4846ec22ed3bc22377a57f24756904f862572451e00"
+      },
+      {
+        "owner_id": 437048,
+        "sha256": "e1f49d03708562625e81bcea87037719e42be9c57de6298f223e420beb523172"
+      },
+      {
+        "owner_id": 437002,
+        "sha256": "e33b318491b7c64310ce284c07be374ac1226e9507c98d3a0fdb51d07261c6ee"
+      },
+      {
+        "owner_id": 437019,
+        "sha256": "e7e326d72c666f78e6bfc6e7f5800fbbc4f4725a49d92d639f1434397eacd6c4"
+      },
+      {
+        "owner_id": 437090,
+        "sha256": "ea1d656a10f632a416b64e285c1abc607dc3f8573d62c342b3f2deb75988774b"
+      },
+      {
+        "owner_id": 437036,
+        "sha256": "ea81d06ffcfb9aa0d133e861e797e440533bd6769f55d0b2161899f0c49b7fe6"
+      },
+      {
+        "owner_id": 437072,
+        "sha256": "ec22cf13a8ca16d7a062735e7b9f573644b789b9799b4335364e5f43a574c78d"
+      },
+      {
+        "owner_id": 437071,
+        "sha256": "ece31273e17f4506ce6b12e221956db6d9dfaa5590b110ec1edf3ccc2ed9d295"
+      },
+      {
+        "owner_id": 437092,
+        "sha256": "ed95d9b6f868a840f9252a0082e1c9b0c2c528c90422e7298642d3f7447e9593"
+      },
+      {
+        "owner_id": 437038,
+        "sha256": "f0dfd1fb18ae80cbdc5fff76aeb022d0a947b9c97609fe5f2c8d589d1fcf7e27"
+      },
+      {
+        "owner_id": 437061,
+        "sha256": "f2674674dbfa94bd2a41025424e6a0621092502dc74261d04c1db90a8c6dd507"
+      },
+      {
+        "owner_id": 437076,
+        "sha256": "f2aceeef566fd9c76d01863976bb0c8a7be4fea563d38e5ceaf0a6799a253870"
+      },
+      {
+        "owner_id": 437040,
+        "sha256": "f2c7d329b474c5541853fd6900ed1ad6cefbfdf75f41b180b258e387cb59def5"
+      },
+      {
+        "owner_id": 437009,
+        "sha256": "f526d9cd8bdc8e7bb4b3b18c5e7cfdca6f08693d571e40788153450062f94eea"
+      },
+      {
+        "owner_id": 437082,
+        "sha256": "f7ea9177803c1d3fd88d15471fb55713622803f6d439fc53e67aa73dd45301a7"
+      },
+      {
+        "owner_id": 437065,
+        "sha256": "fd422ff2f03b62451af2ff6fffc689058c526348dc395b6f787a4152cadf83f0"
+      },
+      {
+        "owner_id": 437032,
+        "sha256": "fe270f8b98f9cff267a1c101f90162b8352c2c8bd3d95885bfdc94a28a938cf0"
+      }
+    ],
+    "tie_break": "numeric owner_id ascending"
+  },
+  "target": {
+    "current_floor_source": "decision-time snapshot_raw.floor_num",
+    "formula": "genuine_terminal_floor - current_floor_num",
+    "name": "remaining_terminal_floors",
+    "terminal_source": "verified per-run root metadata terminal floor; never a feature"
+  },
+  "termination": [
+    "PUBLIC_FEATURE_SUBSET_UNAVAILABLE",
+    "NO_IDENTIFIABLE_POTION_FEATURE_VARIATION",
+    "RESTRICTED_HISTORICAL_PREDICTION_SIGNAL_SUPPORTED",
+    "SIGNAL_NOT_ESTABLISHED",
+    "SIGNAL_HARM_SUPPORTED",
+    "RESOURCE_BLOCKED"
+  ]
+}
