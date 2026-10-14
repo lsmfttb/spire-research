@@ -19,7 +19,11 @@ HERE = Path(__file__).resolve().parent
 ARTIFACTS = HERE / "artifacts"
 PREREG_PATH = HERE / "preregistration.json"
 AMENDMENT_PATH = HERE / "preregistration-amendment-001.json"
-AMENDMENT_PATHS = [AMENDMENT_PATH, HERE / "preregistration-amendment-002.json"]
+AMENDMENT_PATHS = [
+    AMENDMENT_PATH,
+    HERE / "preregistration-amendment-002.json",
+    HERE / "preregistration-amendment-003.json",
+]
 FEATURE_DOMAIN = b"issue55-feature-v1\0"
 BOOTSTRAP_DOMAIN = "issue55-owner-bootstrap-v1"
 BOOTSTRAP_SEED = 550055
@@ -487,18 +491,43 @@ def negative_control_check(snapshot: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def validate_redundant_row_fields(row: dict[str, Any], context: dict[str, Any]) -> bool:
+def validate_redundant_row_fields(
+    row: dict[str, Any], snapshot: dict[str, Any], context: dict[str, Any]
+) -> dict[str, bool]:
     require(isinstance(row.get("legal_action_identities"), list) and bool(row["legal_action_identities"]), "Decision record has no legal actions.")
     require(isinstance(row.get("eligible_action_indices"), list) and bool(row["eligible_action_indices"]), "Decision record has no eligible action indices.")
     require(strict_int(row.get("floor"), "row.floor") == context["current_floor"], "Co-recorded current floor disagrees with snapshot.")
-    require(strict_int(row.get("player_hp"), "row.player_hp") == context["current_hp"], "Co-recorded current HP disagrees with public projection source.")
-    max_hp_available = row.get("player_max_hp") is not None
-    if max_hp_available:
-        require(strict_int(row["player_max_hp"], "row.player_max_hp") == context["max_hp"], "Co-recorded max HP disagrees with public projection source.")
+    row_player_hp = strict_int(row.get("player_hp"), "row.player_hp")
+    battle_hp_mismatch = False
+    battle_max_hp_mismatch = False
+    if context["battle_active"]:
+        game_hp = snapshot.get("cur_hp")
+        require(game_hp is not None, "Battle snapshot is missing the raw GameContext cur_hp summary.")
+        require(row_player_hp == strict_int(game_hp, "snapshot_raw.cur_hp"), "Co-recorded legacy current HP disagrees with GameContext cur_hp.")
+        battle_hp_mismatch = strict_int(game_hp, "snapshot_raw.cur_hp") != context["current_hp"]
+        battle_hp_alias = snapshot.get("battle_player_hp")
+        require(battle_hp_alias is not None, "Battle snapshot is missing the duplicate BattleContext HP alias.")
+        require(strict_int(battle_hp_alias, "snapshot_raw.battle_player_hp") == context["current_hp"], "BattleContext HP aliases disagree.")
+        game_max_hp = snapshot.get("max_hp")
+        require(game_max_hp is not None, "Battle snapshot is missing the raw GameContext max_hp summary.")
+        battle_max_hp_mismatch = strict_int(game_max_hp, "snapshot_raw.max_hp") != context["max_hp"]
+        max_hp_available = row.get("player_max_hp") is not None
+        if max_hp_available:
+            expected_row_max = game_max_hp if game_max_hp is not None else context["max_hp"]
+            require(strict_int(row["player_max_hp"], "row.player_max_hp") == strict_int(expected_row_max, "expected legacy max_hp"), "Co-recorded legacy max HP disagrees with its source.")
+    else:
+        require(row_player_hp == context["current_hp"], "Co-recorded current HP disagrees with public projection source.")
+        max_hp_available = row.get("player_max_hp") is not None
+        if max_hp_available:
+            require(strict_int(row["player_max_hp"], "row.player_max_hp") == context["max_hp"], "Co-recorded max HP disagrees with public projection source.")
     require(strict_int(row.get("potion_count"), "row.potion_count") == context["potion_count"], "Co-recorded potion count disagrees with public inventory.")
     require(row.get("screen_state") == context["screen_family"], "Co-recorded screen identity disagrees with snapshot.")
     require(row.get("battle_active") is context["battle_active"], "Co-recorded battle-active flag disagrees with snapshot.")
-    return max_hp_available
+    return {
+        "max_hp_redundant_row_available": max_hp_available,
+        "battle_game_context_hp_differs_from_public_battle_context": battle_hp_mismatch,
+        "battle_game_context_max_hp_differs_from_public_battle_context": battle_max_hp_mismatch,
+    }
 
 
 def manifest_index() -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
@@ -624,6 +653,8 @@ def prepare() -> None:
     total_rows = 0
     checked_adjacencies = 0
     max_hp_redundant_rows = 0
+    battle_hp_summary_mismatches = 0
+    battle_max_hp_summary_mismatches = 0
     control: dict[str, Any] | None = None
 
     with temporary.open("wb") as raw:
@@ -645,7 +676,10 @@ def prepare() -> None:
                             row = _mapping(json.loads(line), f"owner {owner} row {line_number}")
                             snapshot = _mapping(row.get("snapshot_raw"), f"owner {owner} row {line_number} snapshot_raw")
                             baseline, potion, context = feature_tokens(snapshot)
-                            max_hp_redundant_rows += int(validate_redundant_row_fields(row, context))
+                            redundancy = validate_redundant_row_fields(row, snapshot, context)
+                            max_hp_redundant_rows += int(redundancy["max_hp_redundant_row_available"])
+                            battle_hp_summary_mismatches += int(redundancy["battle_game_context_hp_differs_from_public_battle_context"])
+                            battle_max_hp_summary_mismatches += int(redundancy["battle_game_context_max_hp_differs_from_public_battle_context"])
                         except StudyFailure as exc:
                             raise StudyFailure(exc.code, f"owner {owner} row {line_number}: {exc}") from exc
                         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
@@ -719,9 +753,11 @@ def prepare() -> None:
         "training_inventory_variation_count_at_least": 2 if len(inventory_states) > 1 else len(inventory_states),
         "negative_control": control,
         "action_time_checks": {
-            "redundant_current_floor_hp_potion_count_screen_and_battle_flag": "PASS",
+            "redundant_current_floor_potion_count_screen_and_battle_flag": "PASS",
             "co_recorded_max_hp_rows": max_hp_redundant_rows,
             "max_hp_source_when_not_co_recorded": "allowlisted raw current state field checked against the pinned public projection mapping",
+            "battle_game_context_hp_vs_public_battle_context_mismatch_rows": battle_hp_summary_mismatches,
+            "battle_game_context_max_hp_vs_public_battle_context_mismatch_rows": battle_max_hp_summary_mismatches,
             "adjacent_previous_next_to_current_public_allowlist_tokens": "PASS",
             "adjacent_transitions_checked": checked_adjacencies,
             "legal_action_set_nonempty_each_included_row": "PASS",
@@ -1002,6 +1038,8 @@ def evaluate() -> None:
     heldout_counts: dict[str, Any] = {}
     heldout_inputs: list[dict[str, Any]] = []
     safe_records: list[dict[str, Any]] = []
+    heldout_battle_hp_summary_mismatches = 0
+    heldout_battle_max_hp_summary_mismatches = 0
 
     for owner in partitions["heldout"]:
         ensure_budget()
@@ -1017,7 +1055,9 @@ def evaluate() -> None:
                     row = _mapping(json.loads(line), f"heldout owner {owner} row {line_number}")
                     snapshot = _mapping(row.get("snapshot_raw"), f"heldout owner {owner} row {line_number} snapshot_raw")
                     baseline, potion, context = feature_tokens(snapshot)
-                    validate_redundant_row_fields(row, context)
+                    redundancy = validate_redundant_row_fields(row, snapshot, context)
+                    heldout_battle_hp_summary_mismatches += int(redundancy["battle_game_context_hp_differs_from_public_battle_context"])
+                    heldout_battle_max_hp_summary_mismatches += int(redundancy["battle_game_context_max_hp_differs_from_public_battle_context"])
                 except StudyFailure as exc:
                     raise StudyFailure(exc.code, f"heldout owner {owner} row {line_number}: {exc}") from exc
                 except (json.JSONDecodeError, UnicodeDecodeError) as exc:
@@ -1157,7 +1197,7 @@ def evaluate() -> None:
                 "native_public_projection_v3": "bindings/slaythespire.cpp:3842-3920",
                 "native_raw_snapshot_representation": "bindings/slaythespire.cpp:3628-3692",
                 "native_potion_id_label_and_slot_helpers": "bindings/slaythespire.cpp:583-600; include/constants/Potions.h:116-163",
-                "stsrl_decision_time_record_fields": "src/sts_combat_rl/sim/controlled_run.py:368-384",
+                "stsrl_decision_time_record_fields": "src/sts_combat_rl/sim/controlled_run.py:368-384 and _player_hp at 577-589",
                 "public_projection_is_not_serialized_separately_in_issue45_records": True,
             },
         },
@@ -1171,6 +1211,10 @@ def evaluate() -> None:
             "owner_count": len(heldout_owner_rows),
             "decision_row_count": sum(len(rows) for rows in heldout_owner_rows.values()),
             "owner_rows": heldout_counts,
+            "battle_legacy_summary_disagreements": {
+                "game_context_hp_vs_projection_battle_context_rows": heldout_battle_hp_summary_mismatches,
+                "game_context_max_hp_vs_projection_battle_context_rows": heldout_battle_max_hp_summary_mismatches,
+            },
             "public_feature_artifact": {"path": heldout_path.name, "sha256": heldout_sha, "bytes": heldout_path.stat().st_size},
         },
         "primary_evaluation": overall,
@@ -1192,6 +1236,7 @@ def evaluate() -> None:
             "The input omits visible map, boss, reward, and other unsupported screen facts; this is a restricted public subset, not observation closure.",
             "The floor-plus-HP baseline is a fixed heuristic frozen before fitting, not a trained model.",
             "Validation owners remain unused and unopened.",
+            "During battle, the historical STSRL player_hp summary can reflect GameContext cur_hp while the pinned Native public projection exposes BattleContext player.curHp; the feature uses the latter and records their disagreement count.",
         ],
     }
     delta_ci = overall["primary_paired_owner_cluster_bootstrap"]["ci_95"]

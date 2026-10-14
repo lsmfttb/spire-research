@@ -1,0 +1,28 @@
+{
+  "amendment": 3,
+  "recorded_before_model_fit_and_heldout_access": true,
+  "date": "2026-10-14",
+  "reason": "The second train-only admission attempt found a mismatch between STSRL's legacy top-level player_hp summary and the BattleContext current HP at owner 437031 row 15. Pinned source inspection shows STSRL reads GameContext cur_hp first, while Native publicProjectionV3 exposes BattleContext player.curHp during battle.",
+  "scope_changes": [],
+  "battle_hp_mapping": {
+    "feature_source": "snapshot_raw.battle_player.current_hp and snapshot_raw.battle_player.max_hp when battle_active",
+    "native_public_source": "BattleContext::player.curHp and BattleContext::player.maxHp in publicProjectionV3",
+    "legacy_summary_validation": "In battle, validate row.player_hp against snapshot_raw.cur_hp when present, and validate snapshot_raw.battle_player_hp against the allowlisted battle_player.current_hp when present. If a player_max_hp row summary is present, compare it with the raw legacy max_hp summary. Record disagreement between GameContext and BattleContext HP/max HP instead of treating the legacy summary as the public feature. Outside battle, row.player_hp/max_hp must equal snapshot_raw.cur_hp/max_hp.",
+    "stsrl_summary_source": "controlled_run.py:_player_hp checks cur_hp before battle_player.current_hp",
+    "source_commits": {
+      "native": "18bcd565b587186425bb46ad3d70a2eb80d947fc",
+      "stsrl": "7d172f7c24c9d29429b6946ba44f6b59760b0d96"
+    }
+  },
+  "failed_attempt": {
+    "stage": "prepare_train_only",
+    "attempt": 2,
+    "status": "PUBLIC_FEATURE_SUBSET_UNAVAILABLE",
+    "builder_cpu_seconds": 0.014704884999999994,
+    "failure": "owner 437031 row 15: Co-recorded current HP disagrees with public projection source.",
+    "scope_accessed": "training partition only, first assigned training owner",
+    "validation_or_heldout_opened": false,
+    "model_fit_started": false
+  },
+  "data_access_note": "No heldout or validation data were opened. The feature source remains the same projection-backed public BattleContext HP/max HP field; only the redundant-summary check was corrected to reflect the pinned recorder's documented source order."
+}
