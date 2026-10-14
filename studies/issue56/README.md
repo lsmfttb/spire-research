@@ -70,7 +70,11 @@ formal gate or denominator. The first natural-horizon attempt is also retained
 as `preflight-natural-root-91cc0a3-superseded/` and
 `results-natural-root-91cc0a3-intervention-failure-superseded/`; it exposed an
 infeasible reserve intervention at seed 558003 and stopped before completing
-the source cohort. The regression test requires a real fixed-cohort owner
+the source cohort. The next attempt is retained as
+`preflight-natural-root-a6a0983-superseded/` and
+`results-natural-root-a6a0983-validity-stop-superseded/`; its source collector
+stopped at a Search-400 root error at seed 558046 before later fixed seeds were
+classified. The regression test requires a real fixed-cohort owner
 whose first qualifying use occurs after at least one earlier battle exit
 without a qualifying use.
 

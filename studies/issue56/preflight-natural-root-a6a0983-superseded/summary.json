@@ -1,0 +1,107 @@
+{
+  "b2_exposure_percent_of_eligible": 100.0,
+  "branches_not_run_after_intervention_gate": 0,
+  "budget_events_sha256": "af00c17a956f0cc36929b01bc14acc1367aed863e7a1744fcb669a2e3e43fc36",
+  "builder_runner_process_cpu_s": 200.693,
+  "descriptive_public_strata": {
+    "minimum_owner_n": 5,
+    "predeclared_public_strata": [
+      "floor_band",
+      "visible_hp_fraction_band",
+      "source_potion_id_label"
+    ],
+    "reported": {
+      "floor_band": {},
+      "hp_fraction_band": {},
+      "potion_id_label": {}
+    }
+  },
+  "eligible_owner_denominator": 2,
+  "eligible_owner_fraction": 1.0,
+  "eligible_owners_reaching_b2_any_branch": 2,
+  "eligible_owners_reaching_b2_both_branches": 2,
+  "fixed_source_owner_denominator": 64,
+  "intervention_failure_owner_seeds": [],
+  "issue": 56,
+  "limitations": [
+    "teacher-assisted privileged native Search-v2/400 study; no normal-public Battle-policy evidence",
+    "at most 64 independent source owners; no equivalence or powered full-run Heart claim",
+    "post-divergence maps/rewards/draws are authentic and are not synchronized",
+    "opaque native checkpoints and expert-driver RNG states are process-memory only"
+  ],
+  "owners_jsonl_sha256": "355a405db06cb747468f68d322814f25cbb3a794d0c717b92eec5b9302e0f155",
+  "owners_processed": 2,
+  "paired_primary": {
+    "bootstrap_replicates": 10000,
+    "bootstrap_seed": 558099,
+    "complete_case_owner_bootstrap_percentile_95_ci": [
+      0.0,
+      0.0
+    ],
+    "complete_case_paired_difference_consume_minus_reserve": 0.0,
+    "complete_paired_owners": 2,
+    "discordant_pairs": {
+      "consume_only_success": 0,
+      "reserve_only_success": 0,
+      "ties": 2
+    },
+    "eligible_owner_denominator": 2,
+    "eligible_owners_with_any_branch_reaching_b2": 2,
+    "eligible_owners_with_both_branches_reaching_b2": 2,
+    "incomplete_or_invalid_pairs": 0,
+    "primary_estimator": "fixed-denominator worst-case bounds with owner-resampled paired bootstrap envelope",
+    "primary_fixed_denominator_difference_bounds": [
+      0.0,
+      0.0
+    ],
+    "primary_owner_bootstrap_95_bound_envelope": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "pareto_resource_comparison": {
+    "b2_state_pair_candidates": 2,
+    "consume_resource_dominance": 0,
+    "equivalence_fields_required": [
+      "floor_num",
+      "gold",
+      "relics",
+      "deck",
+      "map_node",
+      "keys"
+    ],
+    "hp_potion_tradeoffs_or_other_incomparables": 0,
+    "interpretation": "No dominance claim without same deck/relic/gold/map/floor/key state and componentwise HP plus potion inventory.",
+    "missing_fields": {
+      "keys": 2,
+      "map_node": 2
+    },
+    "pairs_missing_required_equivalence_fields": 2,
+    "reserve_resource_dominance": 0,
+    "same_context_pairs_assessed": 0
+  },
+  "preflight_eligible_root_count": 2,
+  "preflight_integrity_pass": true,
+  "preflight_only": true,
+  "preflight_qualified_owner_seeds": [
+    558001,
+    558002
+  ],
+  "preflight_required_paired_b2_owner_count": 2,
+  "producer_manifest_sha256": "c38f8b02b864ecb8b4dac941114390304c8a00aec14a33a3fd40f7e25f91ea63",
+  "reviewer_cpu_reserve_s": 1500,
+  "source_attempts_sha256": "1ef3454082e0653433d5f0965d8b9e4dc5d4c174c703fd3f0c8fb85d5917e6f0",
+  "source_dispositions": {
+    "eligible_root": 2
+  },
+  "study_disposition": "STUDY_ONLY",
+  "terminal_disposition": "PREFLIGHT_INTEGRITY_PASS",
+  "unclassified_terminal_branches_before_b2": 0,
+  "unrun_fixed_seed_owners": 0
+}

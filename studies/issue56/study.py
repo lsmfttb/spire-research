@@ -1111,6 +1111,8 @@ def run(output: Path, *, preflight: bool) -> dict[str, Any]:
     eligible_seen = sum(row.get("source_disposition") == "eligible_root" for row in owners)
     preflight_seeds = set(qualifying_preflight_seeds(owners))
     intervention_failed = any(row.get("preflight_integrity_pass") is False for row in owners)
+    source_error_seen = any(row.get("source_disposition") == "source_error" for row in owners)
+    source_truncation_seen = any(row.get("source_disposition") == "source_truncated_before_qualifying_use" for row in owners)
     status = "PREFLIGHT_IN_PROGRESS" if preflight else "FORMAL_IN_PROGRESS"
     for seed in SEEDS:
         if seed in completed:
@@ -1118,7 +1120,8 @@ def run(output: Path, *, preflight: bool) -> dict[str, Any]:
         try:
             journal.check_budget(seed)
             owner = run_owner(seed, journal, output, source_attempts,
-                branches_enabled=not intervention_failed)
+                branches_enabled=not intervention_failed and (preflight or not source_error_seen)
+                and (preflight or not source_truncation_seen))
         except BudgetStop:
             journal.event(seed, "owner_stopped_at_cpu_ceiling", prior_stage=journal.last_stage)
             status = "RESOURCE_BLOCKED_INCOMPLETE"
@@ -1138,10 +1141,15 @@ def run(output: Path, *, preflight: bool) -> dict[str, Any]:
             write_progress(output / "progress.json", journal, owners, status=status)
             if preflight:
                 break
+        if owner.get("source_disposition") == "source_error":
+            status = "VALIDITY_FAILURE"
+            source_error_seen = True
+        elif owner.get("source_disposition") == "source_truncated_before_qualifying_use":
+            if status != "VALIDITY_FAILURE":
+                status = "RESOURCE_BLOCKED_INCOMPLETE"
+            source_truncation_seen = True
         if owner.get("source_disposition") in {"source_error", "source_truncated_before_qualifying_use"}:
-            status = "VALIDITY_FAILURE" if owner.get("source_disposition") == "source_error" else "RESOURCE_BLOCKED_INCOMPLETE"
             write_progress(output / "progress.json", journal, owners, status=status)
-            break
         preflight_seeds.update(qualifying_preflight_seeds([owner]))
         journal.event(seed, "owner_result_durable",
             disposition=owner.get("source_disposition"),

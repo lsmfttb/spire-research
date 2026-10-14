@@ -971,3 +971,392 @@
 {"elapsed_process_cpu_s":187.867,"owner_seed":558003,"stage":"reserve_branch_started"}
 {"disposition":"eligible_root","elapsed_process_cpu_s":188.041,"integrity_pass":false,"owner_seed":558003,"stage":"owner_completed"}
 {"elapsed_process_cpu_s":188.142,"eligible_owners":3,"owner_seed":null,"owners_processed":64,"stage":"summary_durable","terminal_disposition":"INTERVENTION_NOT_EXECUTABLE"}
+{"elapsed_process_cpu_s":188.145,"owner_seed":558001,"stage":"owner_started"}
+{"elapsed_process_cpu_s":188.146,"owner_seed":558001,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":188.416,"floor":1.0,"owner_seed":558001,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":188.936,"floor":2.0,"owner_seed":558001,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_ESCAPE","elapsed_process_cpu_s":189.72,"floor":4.0,"owner_seed":558001,"stage":"source_battle_exit","terminal":false}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":191.067,"floor":5.0,"owner_seed":558001,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":193.171,"owner_seed":558001,"stage":"cpu_checkpoint"}
+{"battle_number":5,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":193.672,"floor":7.0,"owner_seed":558001,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":194.853,"owner_seed":558001,"potion":{"id":12,"id_label":"Dexterity Potion","name":"Dexterity Potion","potion_index":0},"stage":"source_root_found"}
+{"elapsed_process_cpu_s":194.854,"owner_seed":558001,"stage":"consume_branch_started"}
+{"elapsed_process_cpu_s":196.196,"owner_seed":558001,"stage":"reserve_branch_started"}
+{"boundary":"reserve_branch_started","elapsed_process_cpu_s":198.275,"owner_seed":558001,"stage":"cpu_checkpoint"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":198.531,"integrity_pass":true,"owner_seed":558001,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":198.541,"eligible_roots":1,"owner_seed":558001,"preflight_qualified_owner_seeds":[558001],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":198.543,"owner_seed":558002,"stage":"owner_started"}
+{"elapsed_process_cpu_s":198.545,"owner_seed":558002,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":198.735,"floor":1.0,"owner_seed":558002,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":199.057,"owner_seed":558002,"potion":{"id":36,"id_label":"SkillPotion","name":"Skill Potion","potion_index":0},"stage":"source_root_found"}
+{"elapsed_process_cpu_s":199.058,"owner_seed":558002,"stage":"consume_branch_started"}
+{"elapsed_process_cpu_s":199.64,"owner_seed":558002,"stage":"reserve_branch_started"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":200.67,"integrity_pass":true,"owner_seed":558002,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":200.677,"eligible_roots":2,"owner_seed":558002,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":200.695,"eligible_owners":2,"owner_seed":null,"owners_processed":2,"stage":"summary_durable","terminal_disposition":"PREFLIGHT_INTEGRITY_PASS"}
+{"elapsed_process_cpu_s":200.704,"owner_seed":558003,"stage":"owner_started"}
+{"elapsed_process_cpu_s":200.705,"owner_seed":558003,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":200.881,"floor":1.0,"owner_seed":558003,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":201.27,"owner_seed":558003,"potion":{"id":22,"id_label":"FearPotion","name":"Fear Potion","potion_index":0},"stage":"source_root_found"}
+{"elapsed_process_cpu_s":201.271,"owner_seed":558003,"stage":"consume_branch_started"}
+{"elapsed_process_cpu_s":201.781,"owner_seed":558003,"stage":"reserve_branch_started"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":201.947,"integrity_pass":false,"owner_seed":558003,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":201.953,"eligible_roots":3,"owner_seed":558003,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":201.955,"owner_seed":558004,"stage":"owner_started"}
+{"elapsed_process_cpu_s":201.956,"owner_seed":558004,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":202.145,"floor":1.0,"owner_seed":558004,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":202.563,"floor":2.0,"owner_seed":558004,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":203.091,"owner_seed":558004,"potion":{"id":14,"id_label":"DuplicationPotion","name":"Duplication Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":203.091,"owner_seed":558004,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":203.093,"eligible_roots":4,"owner_seed":558004,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":203.095,"owner_seed":558005,"stage":"owner_started"}
+{"elapsed_process_cpu_s":203.096,"owner_seed":558005,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":203.3,"floor":1.0,"owner_seed":558005,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_ESCAPE","elapsed_process_cpu_s":203.605,"floor":2.0,"owner_seed":558005,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":204.516,"floor":3.0,"owner_seed":558005,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":205.713,"owner_seed":558005,"stage":"cpu_checkpoint"}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":206.625,"floor":4.0,"owner_seed":558005,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":208.761,"owner_seed":558005,"potion":{"id":4,"id_label":"AttackPotion","name":"Attack Potion","potion_index":1},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":208.761,"owner_seed":558005,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":208.763,"eligible_roots":5,"owner_seed":558005,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":208.765,"owner_seed":558006,"stage":"owner_started"}
+{"elapsed_process_cpu_s":208.766,"owner_seed":558006,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":208.919,"floor":1.0,"owner_seed":558006,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":209.331,"owner_seed":558006,"potion":{"id":16,"id_label":"Energy Potion","name":"Energy Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":209.332,"owner_seed":558006,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":209.334,"eligible_roots":6,"owner_seed":558006,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":209.336,"owner_seed":558007,"stage":"owner_started"}
+{"elapsed_process_cpu_s":209.337,"owner_seed":558007,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":209.637,"floor":1.0,"owner_seed":558007,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":210.536,"floor":3.0,"owner_seed":558007,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":210.738,"owner_seed":558007,"stage":"cpu_checkpoint"}
+{"elapsed_process_cpu_s":211.536,"owner_seed":558007,"potion":{"id":34,"id_label":"PowerPotion","name":"Power Potion","potion_index":1},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":211.537,"owner_seed":558007,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":211.539,"eligible_roots":7,"owner_seed":558007,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":211.54,"owner_seed":558008,"stage":"owner_started"}
+{"elapsed_process_cpu_s":211.541,"owner_seed":558008,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":211.687,"floor":1.0,"owner_seed":558008,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":212.085,"owner_seed":558008,"potion":{"id":34,"id_label":"PowerPotion","name":"Power Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":212.086,"owner_seed":558008,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":212.087,"eligible_roots":8,"owner_seed":558008,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":212.089,"owner_seed":558009,"stage":"owner_started"}
+{"elapsed_process_cpu_s":212.09,"owner_seed":558009,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":212.25,"floor":1.0,"owner_seed":558009,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":212.988,"floor":2.0,"owner_seed":558009,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":214.121,"owner_seed":558009,"potion":{"id":43,"id_label":"Weak Potion","name":"Weak Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":214.122,"owner_seed":558009,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":214.124,"eligible_roots":9,"owner_seed":558009,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":214.125,"owner_seed":558010,"stage":"owner_started"}
+{"elapsed_process_cpu_s":214.126,"owner_seed":558010,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":214.403,"floor":1.0,"owner_seed":558010,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":215.024,"floor":4.0,"owner_seed":558010,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":215.766,"owner_seed":558010,"stage":"cpu_checkpoint"}
+{"elapsed_process_cpu_s":215.773,"owner_seed":558010,"potion":{"id":20,"id_label":"Explosive Potion","name":"Explosive Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":215.774,"owner_seed":558010,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":215.776,"eligible_roots":10,"owner_seed":558010,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":215.778,"owner_seed":558011,"stage":"owner_started"}
+{"elapsed_process_cpu_s":215.779,"owner_seed":558011,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":215.934,"floor":1.0,"owner_seed":558011,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":216.374,"floor":2.0,"owner_seed":558011,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":217.104,"owner_seed":558011,"potion":{"id":43,"id_label":"Weak Potion","name":"Weak Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":217.105,"owner_seed":558011,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":217.108,"eligible_roots":11,"owner_seed":558011,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":217.11,"owner_seed":558012,"stage":"owner_started"}
+{"elapsed_process_cpu_s":217.111,"owner_seed":558012,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":217.302,"floor":1.0,"owner_seed":558012,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":218.006,"owner_seed":558012,"potion":{"id":6,"id_label":"Block Potion","name":"Block Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":218.007,"owner_seed":558012,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":218.009,"eligible_roots":12,"owner_seed":558012,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":218.011,"owner_seed":558013,"stage":"owner_started"}
+{"elapsed_process_cpu_s":218.013,"owner_seed":558013,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":218.208,"floor":1.0,"owner_seed":558013,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":219.067,"floor":4.0,"owner_seed":558013,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":220.675,"owner_seed":558013,"potion":{"id":4,"id_label":"AttackPotion","name":"Attack Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":220.676,"owner_seed":558013,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":220.678,"eligible_roots":13,"owner_seed":558013,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":220.679,"owner_seed":558014,"stage":"owner_started"}
+{"elapsed_process_cpu_s":220.68,"owner_seed":558014,"stage":"source_started"}
+{"boundary":"source_started","elapsed_process_cpu_s":220.77,"owner_seed":558014,"stage":"cpu_checkpoint"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":220.82,"floor":1.0,"owner_seed":558014,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":221.65,"floor":4.0,"owner_seed":558014,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":222.972,"floor":7.0,"owner_seed":558014,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":223.822,"owner_seed":558014,"potion":{"id":34,"id_label":"PowerPotion","name":"Power Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":223.823,"owner_seed":558014,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":223.825,"eligible_roots":14,"owner_seed":558014,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":223.826,"owner_seed":558015,"stage":"owner_started"}
+{"elapsed_process_cpu_s":223.827,"owner_seed":558015,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":224.053,"floor":1.0,"owner_seed":558015,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":224.611,"floor":2.0,"owner_seed":558015,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":225.407,"floor":4.0,"owner_seed":558015,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":225.853,"owner_seed":558015,"stage":"cpu_checkpoint"}
+{"elapsed_process_cpu_s":226.229,"owner_seed":558015,"potion":{"id":29,"id_label":"HeartOfIron","name":"Heart Of Iron","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":226.23,"owner_seed":558015,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":226.231,"eligible_roots":15,"owner_seed":558015,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":226.233,"owner_seed":558016,"stage":"owner_started"}
+{"elapsed_process_cpu_s":226.234,"owner_seed":558016,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":226.369,"floor":1.0,"owner_seed":558016,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":227.242,"floor":3.0,"owner_seed":558016,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":228.073,"floor":4.0,"owner_seed":558016,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":229.041,"owner_seed":558016,"potion":{"id":23,"id_label":"Fire Potion","name":"Fire Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":229.042,"owner_seed":558016,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":229.043,"eligible_roots":16,"owner_seed":558016,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":229.045,"owner_seed":558017,"stage":"owner_started"}
+{"elapsed_process_cpu_s":229.047,"owner_seed":558017,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":229.287,"floor":1.0,"owner_seed":558017,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":229.778,"owner_seed":558017,"potion":{"id":39,"id_label":"SpeedPotion","name":"Speed Potion","potion_index":1},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":229.779,"owner_seed":558017,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":229.781,"eligible_roots":17,"owner_seed":558017,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":229.783,"owner_seed":558018,"stage":"owner_started"}
+{"elapsed_process_cpu_s":229.784,"owner_seed":558018,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":230.371,"floor":1.0,"owner_seed":558018,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":230.858,"owner_seed":558018,"stage":"cpu_checkpoint"}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":231.652,"floor":2.0,"owner_seed":558018,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":233.734,"floor":4.0,"owner_seed":558018,"stage":"source_battle_exit","terminal":false}
+{"battle_number":4,"battle_outcome":"PLAYER_LOSS","elapsed_process_cpu_s":235.875,"floor":6.0,"owner_seed":558018,"stage":"source_battle_exit","terminal":true}
+{"elapsed_process_cpu_s":235.878,"owner_seed":558018,"potion":null,"stage":"source_terminal_no_qualifying_use"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":235.881,"owner_seed":558018,"stage":"owner_completed"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":235.882,"eligible_roots":17,"owner_seed":558018,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"boundary":"owner_result_durable","elapsed_process_cpu_s":235.884,"owner_seed":558019,"stage":"cpu_checkpoint"}
+{"elapsed_process_cpu_s":235.885,"owner_seed":558019,"stage":"owner_started"}
+{"elapsed_process_cpu_s":235.886,"owner_seed":558019,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":236.066,"floor":1.0,"owner_seed":558019,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":236.463,"owner_seed":558019,"potion":{"id":35,"id_label":"Regen Potion","name":"Regen Potion","potion_index":1},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":236.463,"owner_seed":558019,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":236.465,"eligible_roots":18,"owner_seed":558019,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":236.467,"owner_seed":558020,"stage":"owner_started"}
+{"elapsed_process_cpu_s":236.468,"owner_seed":558020,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":236.71,"floor":1.0,"owner_seed":558020,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":237.381,"owner_seed":558020,"potion":{"id":41,"id_label":"Strength Potion","name":"Strength Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":237.382,"owner_seed":558020,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":237.384,"eligible_roots":19,"owner_seed":558020,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":237.386,"owner_seed":558021,"stage":"owner_started"}
+{"elapsed_process_cpu_s":237.387,"owner_seed":558021,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":237.603,"floor":1.0,"owner_seed":558021,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":238.084,"floor":2.0,"owner_seed":558021,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":238.736,"floor":3.0,"owner_seed":558021,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":240.252,"owner_seed":558021,"potion":{"id":3,"id_label":"Ancient Potion","name":"Ancient Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":240.252,"owner_seed":558021,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":240.255,"eligible_roots":20,"owner_seed":558021,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":240.257,"owner_seed":558022,"stage":"owner_started"}
+{"elapsed_process_cpu_s":240.258,"owner_seed":558022,"stage":"source_started"}
+{"elapsed_process_cpu_s":240.465,"owner_seed":558022,"potion":{"id":16,"id_label":"Energy Potion","name":"Energy Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":240.466,"owner_seed":558022,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":240.468,"eligible_roots":21,"owner_seed":558022,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":240.47,"owner_seed":558023,"stage":"owner_started"}
+{"elapsed_process_cpu_s":240.471,"owner_seed":558023,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":240.662,"floor":1.0,"owner_seed":558023,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":240.893,"owner_seed":558023,"stage":"cpu_checkpoint"}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":241.178,"floor":2.0,"owner_seed":558023,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":242.022,"floor":4.0,"owner_seed":558023,"stage":"source_battle_exit","terminal":false}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":243.527,"floor":5.0,"owner_seed":558023,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":245.964,"owner_seed":558023,"stage":"cpu_checkpoint"}
+{"battle_number":5,"battle_outcome":"PLAYER_LOSS","elapsed_process_cpu_s":247.934,"floor":7.0,"owner_seed":558023,"stage":"source_battle_exit","terminal":true}
+{"elapsed_process_cpu_s":247.939,"owner_seed":558023,"potion":null,"stage":"source_terminal_no_qualifying_use"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":247.942,"owner_seed":558023,"stage":"owner_completed"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":247.944,"eligible_roots":21,"owner_seed":558023,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":247.946,"owner_seed":558024,"stage":"owner_started"}
+{"elapsed_process_cpu_s":247.947,"owner_seed":558024,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":248.06,"floor":1.0,"owner_seed":558024,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":248.596,"floor":2.0,"owner_seed":558024,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":249.337,"floor":3.0,"owner_seed":558024,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":250.191,"owner_seed":558024,"potion":{"id":42,"id_label":"Swift Potion","name":"Swift Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":250.192,"owner_seed":558024,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":250.194,"eligible_roots":22,"owner_seed":558024,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":250.196,"owner_seed":558025,"stage":"owner_started"}
+{"elapsed_process_cpu_s":250.197,"owner_seed":558025,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":250.307,"floor":1.0,"owner_seed":558025,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":250.699,"floor":2.0,"owner_seed":558025,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":251.004,"owner_seed":558025,"stage":"cpu_checkpoint"}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":252.21,"floor":5.0,"owner_seed":558025,"stage":"source_battle_exit","terminal":false}
+{"battle_number":4,"battle_outcome":"PLAYER_ESCAPE","elapsed_process_cpu_s":253.951,"floor":8.0,"owner_seed":558025,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":256.086,"owner_seed":558025,"stage":"cpu_checkpoint"}
+{"battle_number":5,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":256.337,"floor":10.0,"owner_seed":558025,"stage":"source_battle_exit","terminal":false}
+{"battle_number":6,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":258.36,"floor":11.0,"owner_seed":558025,"stage":"source_battle_exit","terminal":false}
+{"battle_number":7,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":260.837,"floor":13.0,"owner_seed":558025,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":261.112,"owner_seed":558025,"stage":"cpu_checkpoint"}
+{"battle_number":8,"battle_outcome":"PLAYER_LOSS","elapsed_process_cpu_s":265.476,"floor":16.0,"owner_seed":558025,"stage":"source_battle_exit","terminal":true}
+{"elapsed_process_cpu_s":265.482,"owner_seed":558025,"potion":null,"stage":"source_terminal_no_qualifying_use"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":265.484,"owner_seed":558025,"stage":"owner_completed"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":265.486,"eligible_roots":22,"owner_seed":558025,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":265.488,"owner_seed":558026,"stage":"owner_started"}
+{"elapsed_process_cpu_s":265.489,"owner_seed":558026,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":265.644,"floor":1.0,"owner_seed":558026,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":266.118,"owner_seed":558026,"stage":"cpu_checkpoint"}
+{"elapsed_process_cpu_s":266.127,"owner_seed":558026,"potion":{"id":24,"id_label":"SteroidPotion","name":"Flex Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":266.128,"owner_seed":558026,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":266.13,"eligible_roots":23,"owner_seed":558026,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":266.132,"owner_seed":558027,"stage":"owner_started"}
+{"elapsed_process_cpu_s":266.133,"owner_seed":558027,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":266.463,"floor":1.0,"owner_seed":558027,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":267.218,"floor":4.0,"owner_seed":558027,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":268.271,"owner_seed":558027,"potion":{"id":3,"id_label":"Ancient Potion","name":"Ancient Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":268.272,"owner_seed":558027,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":268.274,"eligible_roots":24,"owner_seed":558027,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":268.276,"owner_seed":558028,"stage":"owner_started"}
+{"elapsed_process_cpu_s":268.277,"owner_seed":558028,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":268.435,"floor":1.0,"owner_seed":558028,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":269.115,"floor":2.0,"owner_seed":558028,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":270.137,"floor":5.0,"owner_seed":558028,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":271.149,"owner_seed":558028,"stage":"cpu_checkpoint"}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":271.891,"floor":7.0,"owner_seed":558028,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":273.917,"owner_seed":558028,"potion":{"id":3,"id_label":"Ancient Potion","name":"Ancient Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":273.918,"owner_seed":558028,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":273.92,"eligible_roots":25,"owner_seed":558028,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":273.922,"owner_seed":558029,"stage":"owner_started"}
+{"elapsed_process_cpu_s":273.923,"owner_seed":558029,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":274.143,"floor":1.0,"owner_seed":558029,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":274.494,"floor":2.0,"owner_seed":558029,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":275.084,"floor":3.0,"owner_seed":558029,"stage":"source_battle_exit","terminal":false}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":275.982,"floor":4.0,"owner_seed":558029,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":276.231,"owner_seed":558029,"stage":"cpu_checkpoint"}
+{"battle_number":5,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":277.493,"floor":5.0,"owner_seed":558029,"stage":"source_battle_exit","terminal":false}
+{"battle_number":6,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":279.928,"floor":7.0,"owner_seed":558029,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":281.307,"owner_seed":558029,"stage":"cpu_checkpoint"}
+{"battle_number":7,"battle_outcome":"PLAYER_LOSS","elapsed_process_cpu_s":283.652,"floor":11.0,"owner_seed":558029,"stage":"source_battle_exit","terminal":true}
+{"elapsed_process_cpu_s":283.657,"owner_seed":558029,"potion":null,"stage":"source_terminal_no_qualifying_use"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":283.662,"owner_seed":558029,"stage":"owner_completed"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":283.663,"eligible_roots":25,"owner_seed":558029,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":283.665,"owner_seed":558030,"stage":"owner_started"}
+{"elapsed_process_cpu_s":283.666,"owner_seed":558030,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":283.979,"floor":1.0,"owner_seed":558030,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":284.693,"floor":3.0,"owner_seed":558030,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":285.726,"floor":4.0,"owner_seed":558030,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":286.315,"owner_seed":558030,"stage":"cpu_checkpoint"}
+{"battle_number":4,"battle_outcome":"PLAYER_LOSS","elapsed_process_cpu_s":288.018,"floor":6.0,"owner_seed":558030,"stage":"source_battle_exit","terminal":true}
+{"elapsed_process_cpu_s":288.023,"owner_seed":558030,"potion":null,"stage":"source_terminal_no_qualifying_use"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":288.025,"owner_seed":558030,"stage":"owner_completed"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":288.027,"eligible_roots":25,"owner_seed":558030,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":288.029,"owner_seed":558031,"stage":"owner_started"}
+{"elapsed_process_cpu_s":288.031,"owner_seed":558031,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":288.222,"floor":1.0,"owner_seed":558031,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":288.377,"floor":2.0,"owner_seed":558031,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":289.083,"floor":3.0,"owner_seed":558031,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":291.397,"owner_seed":558031,"stage":"cpu_checkpoint"}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":292.509,"floor":5.0,"owner_seed":558031,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":294.209,"owner_seed":558031,"potion":{"id":39,"id_label":"SpeedPotion","name":"Speed Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":294.21,"owner_seed":558031,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":294.212,"eligible_roots":26,"owner_seed":558031,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":294.214,"owner_seed":558032,"stage":"owner_started"}
+{"elapsed_process_cpu_s":294.215,"owner_seed":558032,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":294.234,"floor":1.0,"owner_seed":558032,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":294.313,"floor":2.0,"owner_seed":558032,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":294.535,"floor":3.0,"owner_seed":558032,"stage":"source_battle_exit","terminal":false}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":295.858,"floor":4.0,"owner_seed":558032,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":296.442,"owner_seed":558032,"stage":"cpu_checkpoint"}
+{"elapsed_process_cpu_s":297.58,"owner_seed":558032,"potion":{"id":15,"id_label":"ElixirPotion","name":"Elixir Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":297.581,"owner_seed":558032,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":297.583,"eligible_roots":27,"owner_seed":558032,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":297.585,"owner_seed":558033,"stage":"owner_started"}
+{"elapsed_process_cpu_s":297.586,"owner_seed":558033,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":297.802,"floor":1.0,"owner_seed":558033,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":298.061,"owner_seed":558033,"potion":{"id":3,"id_label":"Ancient Potion","name":"Ancient Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":298.062,"owner_seed":558033,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":298.064,"eligible_roots":28,"owner_seed":558033,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":298.066,"owner_seed":558034,"stage":"owner_started"}
+{"elapsed_process_cpu_s":298.067,"owner_seed":558034,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":298.321,"floor":1.0,"owner_seed":558034,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":298.829,"floor":2.0,"owner_seed":558034,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":300.138,"floor":4.0,"owner_seed":558034,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":301.48,"owner_seed":558034,"stage":"cpu_checkpoint"}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":301.979,"floor":5.0,"owner_seed":558034,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":303.334,"owner_seed":558034,"potion":{"id":30,"id_label":"LiquidBronze","name":"Liquid Bronze","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":303.335,"owner_seed":558034,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":303.337,"eligible_roots":29,"owner_seed":558034,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":303.339,"owner_seed":558035,"stage":"owner_started"}
+{"elapsed_process_cpu_s":303.34,"owner_seed":558035,"stage":"source_started"}
+{"elapsed_process_cpu_s":303.546,"owner_seed":558035,"potion":{"id":17,"id_label":"EntropicBrew","name":"Entropic Brew","potion_index":1},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":303.548,"owner_seed":558035,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":303.55,"eligible_roots":30,"owner_seed":558035,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":303.551,"owner_seed":558036,"stage":"owner_started"}
+{"elapsed_process_cpu_s":303.552,"owner_seed":558036,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":303.734,"floor":1.0,"owner_seed":558036,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":304.37,"floor":2.0,"owner_seed":558036,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":304.709,"owner_seed":558036,"potion":{"id":24,"id_label":"SteroidPotion","name":"Flex Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":304.71,"owner_seed":558036,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":304.711,"eligible_roots":31,"owner_seed":558036,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":304.713,"owner_seed":558037,"stage":"owner_started"}
+{"elapsed_process_cpu_s":304.714,"owner_seed":558037,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":305.016,"floor":1.0,"owner_seed":558037,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":305.825,"floor":2.0,"owner_seed":558037,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":306.558,"owner_seed":558037,"stage":"cpu_checkpoint"}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":307.124,"floor":3.0,"owner_seed":558037,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":307.867,"owner_seed":558037,"potion":{"id":30,"id_label":"LiquidBronze","name":"Liquid Bronze","potion_index":1},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":307.867,"owner_seed":558037,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":307.87,"eligible_roots":32,"owner_seed":558037,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":307.871,"owner_seed":558038,"stage":"owner_started"}
+{"elapsed_process_cpu_s":307.873,"owner_seed":558038,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":308.089,"floor":1.0,"owner_seed":558038,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":308.783,"floor":3.0,"owner_seed":558038,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":309.259,"owner_seed":558038,"potion":{"id":39,"id_label":"SpeedPotion","name":"Speed Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":309.26,"owner_seed":558038,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":309.261,"eligible_roots":33,"owner_seed":558038,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":309.263,"owner_seed":558039,"stage":"owner_started"}
+{"elapsed_process_cpu_s":309.264,"owner_seed":558039,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":309.475,"floor":1.0,"owner_seed":558039,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":310.114,"floor":3.0,"owner_seed":558039,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":311.01,"floor":4.0,"owner_seed":558039,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":311.638,"owner_seed":558039,"stage":"cpu_checkpoint"}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":315.102,"floor":7.0,"owner_seed":558039,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":316.704,"owner_seed":558039,"stage":"cpu_checkpoint"}
+{"battle_number":5,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":317.294,"floor":8.0,"owner_seed":558039,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":321.842,"owner_seed":558039,"stage":"cpu_checkpoint"}
+{"battle_number":6,"battle_outcome":"PLAYER_LOSS","elapsed_process_cpu_s":322.818,"floor":10.0,"owner_seed":558039,"stage":"source_battle_exit","terminal":true}
+{"elapsed_process_cpu_s":322.823,"owner_seed":558039,"potion":null,"stage":"source_terminal_no_qualifying_use"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":322.826,"owner_seed":558039,"stage":"owner_completed"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":322.828,"eligible_roots":33,"owner_seed":558039,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":322.829,"owner_seed":558040,"stage":"owner_started"}
+{"elapsed_process_cpu_s":322.83,"owner_seed":558040,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":322.996,"floor":1.0,"owner_seed":558040,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":323.388,"owner_seed":558040,"potion":{"id":24,"id_label":"SteroidPotion","name":"Flex Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":323.389,"owner_seed":558040,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":323.391,"eligible_roots":34,"owner_seed":558040,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":323.392,"owner_seed":558041,"stage":"owner_started"}
+{"elapsed_process_cpu_s":323.393,"owner_seed":558041,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":323.411,"floor":1.0,"owner_seed":558041,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":323.467,"floor":2.0,"owner_seed":558041,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":323.693,"floor":4.0,"owner_seed":558041,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":324.08,"owner_seed":558041,"potion":{"id":23,"id_label":"Fire Potion","name":"Fire Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":324.081,"owner_seed":558041,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":324.083,"eligible_roots":35,"owner_seed":558041,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":324.085,"owner_seed":558042,"stage":"owner_started"}
+{"elapsed_process_cpu_s":324.086,"owner_seed":558042,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":324.347,"floor":1.0,"owner_seed":558042,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":324.94,"floor":2.0,"owner_seed":558042,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":326.036,"floor":3.0,"owner_seed":558042,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":326.918,"owner_seed":558042,"stage":"cpu_checkpoint"}
+{"battle_number":4,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":327.364,"floor":4.0,"owner_seed":558042,"stage":"source_battle_exit","terminal":false}
+{"battle_number":5,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":330.057,"floor":7.0,"owner_seed":558042,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":331.969,"owner_seed":558042,"stage":"cpu_checkpoint"}
+{"battle_number":6,"battle_outcome":"PLAYER_LOSS","elapsed_process_cpu_s":334.458,"floor":8.0,"owner_seed":558042,"stage":"source_battle_exit","terminal":true}
+{"elapsed_process_cpu_s":334.464,"owner_seed":558042,"potion":null,"stage":"source_terminal_no_qualifying_use"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":334.467,"owner_seed":558042,"stage":"owner_completed"}
+{"disposition":"source_terminal_no_qualifying_use","elapsed_process_cpu_s":334.469,"eligible_roots":35,"owner_seed":558042,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":334.471,"owner_seed":558043,"stage":"owner_started"}
+{"elapsed_process_cpu_s":334.472,"owner_seed":558043,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":334.673,"floor":1.0,"owner_seed":558043,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":335.034,"owner_seed":558043,"potion":{"id":6,"id_label":"Block Potion","name":"Block Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":335.035,"owner_seed":558043,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":335.037,"eligible_roots":36,"owner_seed":558043,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":335.039,"owner_seed":558044,"stage":"owner_started"}
+{"elapsed_process_cpu_s":335.04,"owner_seed":558044,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":335.405,"floor":1.0,"owner_seed":558044,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":336.016,"floor":2.0,"owner_seed":558044,"stage":"source_battle_exit","terminal":false}
+{"boundary":"source_battle_exit","elapsed_process_cpu_s":337.017,"owner_seed":558044,"stage":"cpu_checkpoint"}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":337.571,"floor":4.0,"owner_seed":558044,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":338.803,"owner_seed":558044,"potion":{"id":30,"id_label":"LiquidBronze","name":"Liquid Bronze","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":338.804,"owner_seed":558044,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":338.806,"eligible_roots":37,"owner_seed":558044,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":338.808,"owner_seed":558045,"stage":"owner_started"}
+{"elapsed_process_cpu_s":338.809,"owner_seed":558045,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":338.93,"floor":1.0,"owner_seed":558045,"stage":"source_battle_exit","terminal":false}
+{"battle_number":2,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":339.242,"floor":2.0,"owner_seed":558045,"stage":"source_battle_exit","terminal":false}
+{"battle_number":3,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":340.031,"floor":3.0,"owner_seed":558045,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":340.438,"owner_seed":558045,"potion":{"id":34,"id_label":"PowerPotion","name":"Power Potion","potion_index":0},"stage":"source_root_found"}
+{"branches":"not_run_after_intervention_gate","disposition":"eligible_root","elapsed_process_cpu_s":340.439,"owner_seed":558045,"stage":"owner_completed"}
+{"disposition":"eligible_root","elapsed_process_cpu_s":340.441,"eligible_roots":38,"owner_seed":558045,"preflight_qualified_owner_seeds":[558001,558002],"stage":"owner_result_durable"}
+{"elapsed_process_cpu_s":340.443,"owner_seed":558046,"stage":"owner_started"}
+{"elapsed_process_cpu_s":340.444,"owner_seed":558046,"stage":"source_started"}
+{"battle_number":1,"battle_outcome":"PLAYER_VICTORY","elapsed_process_cpu_s":340.658,"floor":1.0,"owner_seed":558046,"stage":"source_battle_exit","terminal":false}
+{"elapsed_process_cpu_s":341.251,"owner_seed":558046,"potion":null,"stage":"source_error"}
+{"disposition":"source_error","elapsed_process_cpu_s":341.252,"owner_seed":558046,"stage":"owner_completed"}
+{"elapsed_process_cpu_s":341.342,"eligible_owners":38,"owner_seed":null,"owners_processed":64,"stage":"summary_durable","terminal_disposition":"VALIDITY_FAILURE"}
