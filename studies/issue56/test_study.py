@@ -179,6 +179,20 @@ class StudyContractTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "owner ledger"):
                 verify_preflight_gate(path, producer)
 
+    def test_checked_in_preflight_passes_checked_in_formal_gate(self):
+        artifact_root = Path(__file__).resolve().parent
+        preflight_path = artifact_root / "preflight"
+        preflight_manifest = json.loads((preflight_path / "manifest.json").read_text(encoding="utf-8"))
+        formal_manifest = json.loads((artifact_root / "results" / "manifest.json").read_text(encoding="utf-8"))
+        producer = formal_manifest["producer_checkout"]
+        current_code_sha = sha256_file(Path(study.__file__).resolve())
+
+        self.assertEqual(preflight_manifest["producer_checkout"], producer)
+        self.assertEqual(preflight_manifest["study_code_sha256"], current_code_sha)
+        self.assertEqual(formal_manifest["study_code_sha256"], current_code_sha)
+        gate = verify_preflight_gate(preflight_path, producer)
+        self.assertEqual(gate["qualified_owner_seeds"], formal_manifest["preflight_gate"]["qualified_owner_seeds"])
+
 
 if __name__ == "__main__":
     unittest.main()
