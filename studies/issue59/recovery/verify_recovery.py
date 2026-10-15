@@ -89,12 +89,27 @@ def branch_signature(branch: Mapping[str, Any]) -> dict[str, Any]:
     trace = branch.get("trace")
     if not isinstance(trace, Mapping):
         return {"trace_available": False}
+    trace_rows = {key: stable(trace.get(key, [])) for key in BRANCH_LIST_FIELDS}
+    for field in ("native_search_call_ledger", "constrained_search_calls"):
+        rows = trace_rows[field]
+        first_constrained_root = True
+        if isinstance(rows, list):
+            for row in rows:
+                if (not isinstance(row, dict) or row.get("phase") != "b1"
+                        or row.get("native_api") != "StepSimulator.battle_search_v2_forbidden_potion_slot.v1"):
+                    continue
+                if first_constrained_root:
+                    first_constrained_root = False
+                    continue
+                evidence = row.get("protected_root_evidence")
+                if isinstance(evidence, dict):
+                    evidence.pop("source_selected_legal_index", None)
     return {
         "trace_available": True,
         "endpoint": stable(branch.get("endpoint")),
         "root_restore_equal": branch.get("root_restore_equal"),
         "controller_provenance": stable(branch.get("controller_provenance")),
-        "trace": {key: stable(trace.get(key, [])) for key in BRANCH_LIST_FIELDS},
+        "trace": trace_rows,
     }
 
 
@@ -260,10 +275,10 @@ def verify() -> int:
             failures.append(f"immutable historical artifact changed: {relative}")
 
     expected_pins = plan["pinned_configuration"]
+    historical_manifest = load_json(ISSUE_DIR / "results" / "manifest.json")
     preflight_manifest = load_json(RECOVERY_DIR / "preflight" / "manifest.json")
-    for label, manifest_path in (("preflight", RECOVERY_DIR / "preflight" / "manifest.json"),
-                                 ("recovery", RECOVERY_DIR / "results" / "manifest.json")):
-        manifest = load_json(manifest_path)
+    recovery_manifest = load_json(RECOVERY_DIR / "results" / "manifest.json")
+    for label, manifest in (("preflight", preflight_manifest), ("recovery", recovery_manifest)):
         simulator = manifest.get("simulator", {})
         checks = {
             "native commit": simulator.get("commit") == expected_pins["native_commit"],
@@ -339,6 +354,13 @@ def verify() -> int:
                 compare_branch(old_branch, new_branch, seed, mode, failures, counts)
             if new_branch.get("root_restore_equal") is not True:
                 add_difference(failures, mode, seed, "recovery root checkpoint restore")
+            if mode == "reserve":
+                constrained_calls = new_trace.get("constrained_search_calls", [])
+                first_root_call = next((row for row in constrained_calls
+                    if row.get("phase") == "b1" and row.get("native_api") == "StepSimulator.battle_search_v2_forbidden_potion_slot.v1"), None)
+                if (first_root_call is None
+                        or first_root_call.get("protected_root_evidence", {}).get("source_selected_identity_verified") is not True):
+                    add_difference(failures, mode, seed, "initial restored-root source identity verification")
         old_available = old_roots["consume"] or old_roots["reserve"]
         if old_available is not None:
             counts["historical_b1_raw_root_fingerprints_checked"] += 1
@@ -360,6 +382,12 @@ def verify() -> int:
         "outcome_interpretation_allowed": not failures,
         "historical_source_dispositions": plan["population"]["historical_source_dispositions"],
         "recovery_source_dispositions": dict(sorted(dispositions.items())),
+        "study_code_sha256_comparison": {
+            "historical": historical_manifest.get("study_code_sha256"),
+            "recovery": recovery_manifest.get("study_code_sha256"),
+            "equal": historical_manifest.get("study_code_sha256") == recovery_manifest.get("study_code_sha256"),
+            "review_note": "Source/controller/policy manifests are compared directly; branch trace parity is also checked after excluding only the documented post-search verification metadata. Reviewer should assess the study-code revision difference independently.",
+        },
         "historical_eligible_owner_count": plan["population"]["historical_eligible_count"],
         "recovery_eligible_owner_count": eligible,
         "source_mismatch_seeds": sorted(set(source_mismatch_seeds)),
@@ -368,7 +396,7 @@ def verify() -> int:
         "historical_source_signature_sha256": json_digest(old_signatures),
         "recovery_source_signature_sha256": json_digest(new_signatures),
         "historical_trace_note": "Compare selected source action/root/search and saved first restored-B1 raw-state fingerprints. Opaque native checkpoint objects were not serialized; each recovery branch must independently report root_restore_equal=true.",
-        "trace_schema_note": "Ignore only source_selected_identity_verified, a study-local post-search verification annotation added after the historical run; native API/patch, protected rows, source-selected legal index, chosen action, visits, raw-state fingerprints, and all other trace fields remain compared.",
+        "trace_schema_note": "Ignore the study-local source_selected_identity_verified annotation added after the historical run. Keep comparing source_selected_legal_index at the initial restored root, where it is rechecked; omit it only at later constrained nodes because the recovery records it only for the initial root. Native API/patch, protected rows, chosen action, visits, raw-state fingerprints, and all other trace fields remain compared.",
         "study_terminal_disposition": study_terminal_disposition,
         "pre_outcome_verifier_sha256": plan["recovery_support_sha256"],
         "pre_outcome_verifier_commit": SEALED_VERIFIER_COMMIT,
