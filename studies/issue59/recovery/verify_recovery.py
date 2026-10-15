@@ -8,6 +8,7 @@ from collections import Counter
 from pathlib import Path
 import shutil
 import sys
+import subprocess
 from typing import Any, Mapping
 
 
@@ -15,6 +16,8 @@ ISSUE_DIR = Path(__file__).resolve().parents[1]
 RECOVERY_DIR = Path(__file__).resolve().parent
 SEEDS = list(range(559001, 559065))
 VOLATILE_KEYS = {"wall_clock_time_s", "process_cpu_s", "elapsed_process_cpu_s"}
+SEALED_VERIFIER_COMMIT = "b34dacefec685eac8c4db625cb1b364b8b5fd802"
+SEALED_PRODUCER_COMMIT = "12de824ed8a3c7fcca817df13a8abda15190658a"
 SOURCE_FIELDS = (
     "seed", "source_disposition", "source_root_battle_number", "source_battles_before_root",
     "source_battle_exits", "source_smoke_uses_total", "source_terminal", "source_outcome",
@@ -41,6 +44,17 @@ def digest_bytes(data: bytes) -> str:
 def file_digest(path: Path) -> str:
     data = path.read_bytes()
     if path.suffix.lower() in {".py", ".json", ".jsonl"}:
+        data = data.replace(b"\r\n", b"\n")
+    return digest_bytes(data)
+
+
+def git(repo: Path, *args: str) -> str:
+    return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
+
+
+def git_file_digest(repo: Path, revision: str, relative_path: str) -> str:
+    data = subprocess.check_output(["git", "-C", str(repo), "show", f"{revision}:{relative_path}"])
+    if Path(relative_path).suffix.lower() in {".py", ".json", ".jsonl"}:
         data = data.replace(b"\r\n", b"\n")
     return digest_bytes(data)
 
@@ -232,8 +246,10 @@ def verify() -> int:
     plan = load_json(RECOVERY_DIR / "recovery_plan.json")
     failures: list[str] = []
     counts: Counter[str] = Counter()
-    if file_digest(Path(__file__).resolve()) != plan["recovery_support_sha256"]:
-        failures.append("recovery verifier differs from the version sealed before outcomes")
+    recovery_support_relative = "studies/issue59/recovery/verify_recovery.py"
+    if git_file_digest(ISSUE_DIR.parent.parent, SEALED_VERIFIER_COMMIT,
+                       recovery_support_relative) != plan["recovery_support_sha256"]:
+        failures.append("sealed pre-outcome recovery verifier does not match its pushed source commit")
     if file_digest(ISSUE_DIR / "study.py") != plan["study_code_sha256"]:
         failures.append("study implementation differs from the version sealed before outcomes")
     for relative, expected in plan["immutable_historical_artifacts"].items():
@@ -242,6 +258,7 @@ def verify() -> int:
             failures.append(f"immutable historical artifact changed: {relative}")
 
     expected_pins = plan["pinned_configuration"]
+    preflight_manifest = load_json(RECOVERY_DIR / "preflight" / "manifest.json")
     for label, manifest_path in (("preflight", RECOVERY_DIR / "preflight" / "manifest.json"),
                                  ("recovery", RECOVERY_DIR / "results" / "manifest.json")):
         manifest = load_json(manifest_path)
@@ -254,7 +271,8 @@ def verify() -> int:
             "controller": manifest.get("search") == expected_pins["controller"],
             "non-combat driver": manifest.get("non_combat_driver") == expected_pins["non_combat_driver"],
             "study code hash": manifest.get("study_code_sha256") == plan["study_code_sha256"],
-            "producer checkout": manifest.get("producer_checkout") == git(ISSUE_DIR.parent.parent, "rev-parse", "HEAD"),
+            "producer checkout": manifest.get("producer_checkout") == SEALED_PRODUCER_COMMIT,
+            "same producer checkout as retained preflight": manifest.get("producer_checkout") == preflight_manifest.get("producer_checkout"),
         }
         counts[f"{label}_manifest_pins_checked"] += len(checks)
         for name, passed in checks.items():
@@ -339,6 +357,10 @@ def verify() -> int:
         "historical_source_signature_sha256": json_digest(old_signatures),
         "recovery_source_signature_sha256": json_digest(new_signatures),
         "historical_trace_note": "Compare selected source action/root/search and saved first restored-B1 raw-state fingerprints. Opaque native checkpoint objects were not serialized; each recovery branch must independently report root_restore_equal=true.",
+        "pre_outcome_verifier_sha256": plan["recovery_support_sha256"],
+        "pre_outcome_verifier_commit": SEALED_VERIFIER_COMMIT,
+        "audit_verifier_revision_sha256": file_digest(Path(__file__).resolve()),
+        "audit_verifier_repair": "Added the missing stdlib git helper after the first audit launch failed before comparison; the sealed pre-outcome verifier blob is checked against the recovery plan above.",
         "failures": failures,
     }
     report_path = RECOVERY_DIR / "source_parity.json"
