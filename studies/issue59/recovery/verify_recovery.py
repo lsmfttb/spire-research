@@ -16,6 +16,7 @@ ISSUE_DIR = Path(__file__).resolve().parents[1]
 RECOVERY_DIR = Path(__file__).resolve().parent
 SEEDS = list(range(559001, 559065))
 VOLATILE_KEYS = {"wall_clock_time_s", "process_cpu_s", "elapsed_process_cpu_s"}
+TRACE_ANNOTATION_KEYS = {"source_selected_identity_verified"}
 SEALED_VERIFIER_COMMIT = "b34dacefec685eac8c4db625cb1b364b8b5fd802"
 SEALED_PRODUCER_COMMIT = "12de824ed8a3c7fcca817df13a8abda15190658a"
 SOURCE_FIELDS = (
@@ -31,7 +32,8 @@ BRANCH_LIST_FIELDS = (
 
 def stable(value: Any) -> Any:
     if isinstance(value, dict):
-        return {key: stable(item) for key, item in value.items() if key not in VOLATILE_KEYS}
+        ignored = VOLATILE_KEYS | TRACE_ANNOTATION_KEYS
+        return {key: stable(item) for key, item in value.items() if key not in ignored}
     if isinstance(value, list):
         return [stable(item) for item in value]
     return value
@@ -310,6 +312,15 @@ def verify() -> int:
     if len(new_sources_rows) != 64 or eligible != 55:
         failures.append(f"recovery population is not 64 owners / 55 eligible: count={len(new_sources_rows)}, eligible={eligible}")
 
+    recovery_run_directory = str((RECOVERY_DIR / "results").resolve())
+    study_terminal_disposition = None
+    for event in load_jsonl(RECOVERY_DIR / "budget_events.jsonl"):
+        if (event.get("run_directory") == recovery_run_directory
+                and event.get("stage") == "summary_durable"):
+            study_terminal_disposition = event.get("terminal_disposition")
+    if not study_terminal_disposition:
+        failures.append("recovery run's original study terminal disposition is missing from the durable ledger")
+
     fingerprint_mismatch_seeds: list[int] = []
     for seed in SEEDS:
         old, new = old_owners.get(seed, {}), new_owners.get(seed, {})
@@ -357,6 +368,8 @@ def verify() -> int:
         "historical_source_signature_sha256": json_digest(old_signatures),
         "recovery_source_signature_sha256": json_digest(new_signatures),
         "historical_trace_note": "Compare selected source action/root/search and saved first restored-B1 raw-state fingerprints. Opaque native checkpoint objects were not serialized; each recovery branch must independently report root_restore_equal=true.",
+        "trace_schema_note": "Ignore only source_selected_identity_verified, a study-local post-search verification annotation added after the historical run; native API/patch, protected rows, source-selected legal index, chosen action, visits, raw-state fingerprints, and all other trace fields remain compared.",
+        "study_terminal_disposition": study_terminal_disposition,
         "pre_outcome_verifier_sha256": plan["recovery_support_sha256"],
         "pre_outcome_verifier_commit": SEALED_VERIFIER_COMMIT,
         "audit_verifier_revision_sha256": file_digest(Path(__file__).resolve()),
@@ -371,10 +384,15 @@ def verify() -> int:
     report_hash = digest_bytes(json.dumps(report, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
     summary["recovery_source_parity"] = {"status": report["status"],
         "report_path": str(report_path), "report_sha256": report_hash}
+    summary["study_terminal_disposition"] = study_terminal_disposition
     summary["recovery_outcome_interpretation_allowed"] = not failures
     if failures:
         summary["terminal_disposition"] = "VALIDITY_FAILURE"
         summary.setdefault("limitations", []).append("source/root/trace parity failed; do not interpret or pool recovery outcomes")
+    else:
+        summary["terminal_disposition"] = study_terminal_disposition
+        summary["limitations"] = [item for item in summary.get("limitations", [])
+            if item != "source/root/trace parity failed; do not interpret or pool recovery outcomes"]
     temp = summary_path.with_suffix(".json.tmp")
     temp.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(temp, summary_path)
