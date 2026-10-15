@@ -1,0 +1,133 @@
+{
+  "b2_exposure_percent_of_eligible": 76.36363636363636,
+  "budget_events_sha256": "022a21725b4e22adcd24ca292e061663197b3847df6f8f304df5394012063c79",
+  "builder_all_in_process_cpu_s": 459.5,
+  "descriptive_public_strata": {
+    "minimum_owner_n": 5,
+    "predeclared_public_strata": [
+      "floor_band",
+      "visible_hp_fraction_band",
+      "source_potion_id_label"
+    ],
+    "reported": {
+      "floor_band": {
+        "act1_0_17": {
+          "complete_pair_n": 48,
+          "descriptive_complete_pair_difference": -0.041666666666666664,
+          "owner_n": 55
+        }
+      },
+      "hp_fraction_band": {},
+      "potion_id_label": {
+        "FearPotion": {
+          "complete_pair_n": 3,
+          "descriptive_complete_pair_difference": 0.0,
+          "owner_n": 5
+        }
+      }
+    }
+  },
+  "eligible_owner_denominator": 55,
+  "eligible_owner_fraction": 0.859375,
+  "eligible_owners_reaching_b2_any_branch": 52,
+  "eligible_owners_reaching_b2_both_branches": 42,
+  "fixed_source_owner_denominator": 64,
+  "intervention_failure_owner_seeds": [],
+  "issue": 59,
+  "issue_hard_process_cpu_s": 12000,
+  "limitations": [
+    "teacher-assisted privileged native Search-v2/400 study; no normal-public Battle-policy evidence",
+    "at most 64 independent source owners; no equivalence or powered full-run Heart claim",
+    "post-divergence maps/rewards/draws are authentic and are not synchronized",
+    "opaque native checkpoints and expert-driver RNG states are process-memory only",
+    "a missing B2 without an authentic terminal status is incomplete, never coded as a tie or death"
+  ],
+  "owners_jsonl_sha256": "77b6fddc526dde9d4edc8388a912f5c2471d19f0932f70ac24c390140b15c1b8",
+  "owners_processed": 64,
+  "paired_primary": {
+    "bootstrap_replicates": 10000,
+    "bootstrap_seed": 559099,
+    "complete_case_owner_bootstrap_percentile_95_ci": [
+      -0.14583333333333334,
+      0.0625
+    ],
+    "complete_case_paired_difference_consume_minus_reserve": -0.041666666666666664,
+    "complete_paired_owners": 48,
+    "discordant_pairs": {
+      "consume_only_success": 2,
+      "reserve_only_success": 4,
+      "ties": 42
+    },
+    "eligible_owner_denominator": 55,
+    "eligible_owners_with_any_branch_reaching_b2": 52,
+    "eligible_owners_with_both_branches_reaching_b2": 42,
+    "incomplete_or_invalid_pairs": 7,
+    "primary_estimator": "fixed-denominator worst-case bounds with owner-resampled paired bootstrap envelope",
+    "primary_fixed_denominator_difference_bounds": [
+      -0.03636363636363636,
+      0.09090909090909091
+    ],
+    "primary_owner_bootstrap_95_bound_envelope": [
+      [
+        -0.12727272727272726,
+        0.03636363636363636
+      ],
+      [
+        -0.03636363636363636,
+        0.21818181818181817
+      ]
+    ]
+  },
+  "pareto_resource_comparison": {
+    "b2_state_pair_candidates": 42,
+    "consume_resource_dominance": 0,
+    "equivalence_fields_required": [
+      "act",
+      "floor_num",
+      "gold",
+      "relics",
+      "battle_relics",
+      "deck",
+      "deck_summary",
+      "map_node",
+      "next_map_node",
+      "reward",
+      "rewards",
+      "keys"
+    ],
+    "hp_potion_tradeoffs_or_other_incomparables": 0,
+    "interpretation": "No dominance claim without same deck/relic/gold/map/floor/key state and componentwise HP plus potion inventory.",
+    "missing_fields": {
+      "battle_relics": 42,
+      "deck_summary": 42,
+      "keys": 42,
+      "map_node": 42,
+      "next_map_node": 42,
+      "reward": 42,
+      "rewards": 42
+    },
+    "pairs_missing_required_equivalence_fields": 42,
+    "reserve_resource_dominance": 0,
+    "same_context_pairs_assessed": 0
+  },
+  "producer_manifest_sha256": "182aa656ca45da26f09fb2359935ecdb43a71442451850743ca48be569eaf80f",
+  "reviewer_reserved_process_cpu_s": 1800,
+  "source_attempts_sha256": "51fe157950df3703e8b4c0155f53029678eed525664eaad653da645e26529e81",
+  "source_dispositions": {
+    "eligible_root": 55,
+    "source_terminal_no_qualifying_use": 9
+  },
+  "study_disposition": "STUDY_ONLY",
+  "terminal_disposition": "VALIDITY_FAILURE",
+  "unclassified_terminal_branches_before_b2": 0,
+  "unrun_fixed_seed_owners": 0,
+  "validity_failure_owner_seeds": [
+    559008,
+    559025,
+    559033,
+    559042,
+    559043,
+    559052,
+    559056
+  ]
+}
