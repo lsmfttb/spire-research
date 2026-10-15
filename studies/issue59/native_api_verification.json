@@ -1,0 +1,25 @@
+{
+  "issue": 59,
+  "native_repository": "lsmfttb/sts_lightspeed",
+  "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+  "native_api_test": {
+    "path": "scripts/test_battle_search_v2_forbidden_potion_slot.py",
+    "sha256": "ab453086a2903d324a8cf36dcec8dc6c9c76320f66d1ab12733a04f543aceec2",
+    "command": "python3 scripts/test_battle_search_v2_forbidden_potion_slot.py --build-dir /home/lsmft/stsrl-spikes/build-issue59-native-0990-py314 --simulations 400",
+    "exit_code": 0,
+    "stdout": "native Search-v2 forbidden potion slot API checks passed",
+    "process_cpu_seconds_user_system": 0.05
+  },
+  "native_extension": {
+    "path": "/home/lsmft/stsrl-spikes/build-issue59-native-0990-py314/slaythespire.cpython-314-x86_64-linux-gnu.so",
+    "sha256": "7ce07ec44abda2133742161d7812fa8286438b71ab83a163e328ac617a44f1e5"
+  },
+  "build": {
+    "python": "3.14.4",
+    "cmake": "4.2.3",
+    "compiler": "GNU g++ 15.2.0",
+    "configure_process_cpu_seconds_user_system": 0.57,
+    "compile_process_cpu_seconds_user_system": 83.37,
+    "cmake_policy_version_minimum": "3.5"
+  }
+}
