@@ -1,5 +1,12 @@
 {
-  "budget_events_sha256": "71790b036c934971c3ddea7423ae5578866ebec2e0b1d17714c30977214e3d3c",
+  "budget_events_sha256": "b15cfb7fd2c12f02584e88c85b7770855647c463e903ddd7ff80fa4734300ed0",
+  "budget_ledger_reconciliation": {
+    "basis": "canonical LF bytes through the recorded finalize-semantic-preflight boundary",
+    "cohort_owner_replayed": 0,
+    "historical_ledger_rows_rewritten": false,
+    "prefix_rows": 42,
+    "previous_summary_digest": "71790b036c934971c3ddea7423ae5578866ebec2e0b1d17714c30977214e3d3c"
+  },
   "builder_all_in_process_cpu_s": 129.365,
   "fixed_seed_order_scanned": [
     559001

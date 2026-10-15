@@ -15,6 +15,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from budget_ledger import ledger_path, sha256_jsonl
+
 DEFAULT_STSRL = ("/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c"
     if os.name == "posix" else r"D:\DeadlycatCoding\STSRL-issue59")
 STSRL = Path(os.environ.get("STSRL_ROOT", DEFAULT_STSRL))
@@ -161,7 +163,7 @@ class InterventionNotExecutable(RuntimeError):
 class EventJournal:
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
-        self.path = Path(os.environ.get("ISSUE59_BUDGET_LEDGER", "studies/issue59/budget_events.jsonl"))
+        self.path = ledger_path()
         self.cpu_started = time.process_time()
         self.prior_cpu_s = 0.0
         if self.path.exists():
@@ -206,8 +208,9 @@ class Root:
 
 def verify_protected_root_occurrences(
     raw_search: Mapping[str, Any], actions: Sequence[Any], slot: int, root: Root,
+    *, initial_restored_root: bool = True,
 ) -> dict[str, Any]:
-    """Prove Native omitted the exact protected root occurrences from search."""
+    """Prove current reserved-slot occurrences were omitted by Native Search."""
     if raw_search.get("native_api") != CONSTRAINED_SEARCH_API:
         raise RuntimeError("B1 did not use the forbidden-potion-slot Native API")
     if raw_search.get("patch_identity") != CONSTRAINED_SEARCH_PATCH:
@@ -245,10 +248,12 @@ def verify_protected_root_occurrences(
             raise RuntimeError("B1 protected legal occurrence was not retained as zero-visit/null-mean")
         protected.append((index, action, row))
 
-    from sts_combat_rl.sim.decision_record import find_action_index_by_identity
-    source_index = find_action_index_by_identity(actions, root.selected_identity)
-    if source_index not in {index for index, _, _ in protected}:
-        raise RuntimeError("source-selected legal potion occurrence is not protected at the restored root")
+    source_index = None
+    if initial_restored_root:
+        from sts_combat_rl.sim.decision_record import find_action_index_by_identity
+        source_index = find_action_index_by_identity(actions, root.selected_identity)
+        if source_index not in {index for index, _, _ in protected}:
+            raise RuntimeError("source-selected legal potion occurrence is not protected at the restored root")
     return {
         "protected_rows": [
             {"scope": row.get("scope"), "bits": row.get("bits"), "kind": row.get("kind"),
@@ -258,6 +263,7 @@ def verify_protected_root_occurrences(
             for _, _, row in protected
         ],
         "source_selected_legal_index": source_index,
+        "source_selected_identity_verified": initial_restored_root,
         "protected_legal_occurrence_count": len(protected),
         "tree_forbidden_potion_slot_exclusion_count": raw_search.get("tree_forbidden_potion_slot_exclusion_count"),
         "rollout_forbidden_potion_slot_exclusion_count": raw_search.get("rollout_forbidden_potion_slot_exclusion_count"),
@@ -335,8 +341,11 @@ class StudySearch:
             raise RuntimeError("native Search-v2 report invalid: " + "; ".join(report.problems))
         constrained_evidence = None
         if constrained and self.root is not None:
-            constrained_evidence = verify_protected_root_occurrences(raw, actions, int(slot), self.root)
-            if not constrained_evidence["protected_rows"] and not self.root_state.get("search_calls"):
+            constrained_evidence = verify_protected_root_occurrences(
+                raw, actions, int(slot), self.root,
+                initial_restored_root=self.root_state.get("b1_constrained_decisions") == 1)
+            if (not constrained_evidence["protected_rows"]
+                    and self.root_state.get("b1_constrained_decisions") == 1):
                 raise InterventionNotExecutable("the initial constrained root has no legal protected occurrence")
         try:
             target = select_oracle_root_action(report, selection_rule="highest_mean")
@@ -864,7 +873,7 @@ def is_ledger_prefix_sha256(path: Path, expected: str) -> bool:
         return True
     with path.open("rb") as handle:
         for line in handle:
-            digest.update(line)
+            digest.update(line.replace(b"\r\n", b"\n"))
             if digest.hexdigest() == expected:
                 return True
     return False
@@ -930,7 +939,7 @@ def source_manifest(output: Path, preflight_gate: Mapping[str, Any] | None = Non
             "reviewer_reserved_cpu_s": 1800},
         "limits": {"max_steps_per_cursor": MAX_STEPS, "no outcome-adaptive seed replacement": True,
             "native checkpoint": "opaque process-memory only; never serialized"},
-        "budget_event_ledger": "studies/issue59/budget_events.jsonl",
+        "budget_event_ledger": str(ledger_path()),
         "study_code_sha256": sha256_file(Path(__file__).resolve()),
         "producer_checkout": producer_commit,
     }
@@ -1289,7 +1298,7 @@ def verify_preflight_gate(preflight_path: Path, producer_commit: str) -> dict[st
         raise RuntimeError("preflight summary does not match its owner ledger")
     if summary.get("source_attempts_sha256") != sha256_file(source_path):
         raise RuntimeError("preflight summary does not match its source-attempt ledger")
-    budget_path = Path(os.environ.get("ISSUE59_BUDGET_LEDGER", "studies/issue59/budget_events.jsonl"))
+    budget_path = ledger_path()
     if not is_ledger_prefix_sha256(budget_path, str(summary.get("budget_events_sha256", ""))):
         raise RuntimeError("preflight summary does not identify an append-only budget-ledger prefix")
     owners = load_completed(owners_path)
@@ -1329,7 +1338,7 @@ def write_summary(output: Path, report: dict[str, Any], journal: EventJournal,
     report["source_attempts_sha256"] = sha256_file(source_attempts) if source_attempts.exists() else None
     journal.event(None, "summary_durable", terminal_disposition=report["terminal_disposition"],
         owners_processed=report.get("owners_processed"), eligible_owners=report.get("eligible_owner_denominator"))
-    report["budget_events_sha256"] = sha256_file(journal.path)
+    report["budget_events_sha256"] = sha256_jsonl(journal.path)
     (output / "summary.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     write_progress(output / "progress.json", journal, load_completed(owner_file), status=report["terminal_disposition"])
     return report

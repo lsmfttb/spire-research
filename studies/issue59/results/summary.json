@@ -1,6 +1,16 @@
 {
   "b2_exposure_percent_of_eligible": 76.36363636363636,
-  "budget_events_sha256": "022a21725b4e22adcd24ca292e061663197b3847df6f8f304df5394012063c79",
+  "budget_events_sha256": "06cb429d7fcc208beb6c27d294888f6e287f1d3d36a402b5f14120d8c9900878",
+  "budget_ledger_reconciliation": {
+    "basis": "canonical LF bytes of the committed append-only ledger",
+    "cohort_owner_replayed": 0,
+    "corrected_preflight_prefix_digest": "b15cfb7fd2c12f02584e88c85b7770855647c463e903ddd7ff80fa4734300ed0",
+    "corrected_results_ledger_digest": "06cb429d7fcc208beb6c27d294888f6e287f1d3d36a402b5f14120d8c9900878",
+    "historical_ledger_rows_rewritten": false,
+    "preflight_prefix_rows": 42,
+    "previous_preflight_summary_digest": "71790b036c934971c3ddea7423ae5578866ebec2e0b1d17714c30977214e3d3c",
+    "previous_results_summary_digest": "022a21725b4e22adcd24ca292e061663197b3847df6f8f304df5394012063c79"
+  },
   "builder_all_in_process_cpu_s": 459.5,
   "descriptive_public_strata": {
     "minimum_owner_n": 5,
@@ -110,7 +120,7 @@
     "reserve_resource_dominance": 0,
     "same_context_pairs_assessed": 0
   },
-  "producer_manifest_sha256": "182aa656ca45da26f09fb2359935ecdb43a71442451850743ca48be569eaf80f",
+  "producer_manifest_sha256": "6f51b3f7eb5ba5a825a27a1ccf71baf7460b505769d455d498f17e5394b867ac",
   "reviewer_reserved_process_cpu_s": 1800,
   "source_attempts_sha256": "51fe157950df3703e8b4c0155f53029678eed525664eaad653da645e26529e81",
   "source_dispositions": {

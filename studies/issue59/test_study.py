@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import study
+from budget_ledger import ledger_path, sha256_jsonl
 from study import (
     CONSTRAINED_SEARCH_API,
     CONSTRAINED_SEARCH_PATCH,
@@ -119,6 +120,98 @@ class StudyContractTests(unittest.TestCase):
         self.assertEqual(evidence["source_selected_legal_index"], 0)
         self.assertGreater(evidence["tree_forbidden_potion_slot_exclusion_count"], 0)
         self.assertGreater(evidence["rollout_forbidden_potion_slot_exclusion_count"], 0)
+
+    def test_later_constrained_decision_does_not_require_source_action_to_remain_legal(self):
+        later_actions = [self.actions[1], self.actions[2], self.actions[3]]
+        raw = self.native_rows()
+        raw["root_rows"] = raw["root_rows"][1:]
+
+        with self.assertRaisesRegex(ValueError, "action identity matched 0 legal actions"):
+            verify_protected_root_occurrences(raw, later_actions, 0, self.root)
+
+        evidence = verify_protected_root_occurrences(
+            raw, later_actions, 0, self.root, initial_restored_root=False)
+
+        self.assertEqual(evidence["protected_legal_occurrence_count"], 1)
+        self.assertIsNone(evidence["source_selected_legal_index"])
+        self.assertFalse(evidence["source_selected_identity_verified"])
+
+    def test_committed_budget_hashes_identify_the_canonical_ledger_and_preflight_prefix(self):
+        study_dir = Path(__file__).resolve().parent
+        ledger = study_dir / "budget_events.jsonl"
+        preflight = json.loads((study_dir / "preflight" / "summary.json").read_text(encoding="utf-8"))
+        results = json.loads((study_dir / "results" / "summary.json").read_text(encoding="utf-8"))
+        results_manifest_path = study_dir / "results" / "manifest.json"
+        results_manifest = json.loads(results_manifest_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(is_ledger_prefix_sha256(ledger, preflight["budget_events_sha256"]))
+        self.assertEqual(sha256_jsonl(ledger), results["budget_events_sha256"])
+        self.assertEqual(results["terminal_disposition"], "VALIDITY_FAILURE")
+        self.assertEqual(results_manifest["preflight_gate"]["budget_events_sha256"],
+            preflight["budget_events_sha256"])
+        self.assertEqual(results_manifest["preflight_gate"]["summary_sha256"],
+            sha256_file(study_dir / "preflight" / "summary.json"))
+        self.assertEqual(results["producer_manifest_sha256"], sha256_file(results_manifest_path))
+
+    def test_measured_runner_shares_ledger_path_with_child_and_hashes_appended_evidence(self):
+        if os.name != "posix":
+            self.skipTest("measured CPU runner uses POSIX child-process accounting")
+        runner = Path(__file__).resolve().with_name("run_measured_stage.py")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ledger = root / "nested" / "events.jsonl"
+            summary = root / "summary.json"
+            summary.write_text(json.dumps({"terminal_disposition": "TEST_ONLY"}), encoding="utf-8")
+            child = (
+                "import os; from pathlib import Path; "
+                "p=Path(os.environ['ISSUE59_BUDGET_LEDGER']); p.parent.mkdir(parents=True, exist_ok=True); "
+                "p.open('a', encoding='utf-8').write('{\\\"stage\\\":\\\"child\\\"}\\n')"
+            )
+            env = os.environ.copy()
+            env["ISSUE59_BUDGET_LEDGER"] = str(ledger)
+            completed = subprocess.run(
+                [sys.executable, str(runner), "--summary", str(summary), "ledger-path-test", "--",
+                 sys.executable, "-c", child],
+                cwd=root, env=env, check=False, capture_output=True, text=True)
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            rows = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([row["stage"] for row in rows], ["child", "ledger-path-test"])
+            self.assertEqual(json.loads(summary.read_text(encoding="utf-8"))["budget_events_sha256"],
+                sha256_jsonl(ledger))
+
+    def test_external_cpu_recorder_honors_the_shared_ledger_override(self):
+        recorder = Path(__file__).resolve().with_name("record_external_cpu.py")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ledger = root / "nested" / "events.jsonl"
+            env = os.environ.copy()
+            env["ISSUE59_BUDGET_LEDGER"] = str(ledger)
+            completed = subprocess.run(
+                [sys.executable, str(recorder), "metadata-repair", "0.25", "--conservative"],
+                cwd=root, env=env, check=False, capture_output=True, text=True)
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            rows = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["stage"], "metadata-repair")
+            self.assertEqual(rows[0]["elapsed_process_cpu_s"], 0.25)
+            self.assertFalse((root / "studies" / "issue59" / "budget_events.jsonl").exists())
+
+    def test_jsonl_hash_normalizes_git_checkout_newlines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lf = root / "lf.jsonl"
+            crlf = root / "crlf.jsonl"
+            lf.write_bytes(b'{"stage":"one"}\n{"stage":"two"}\n')
+            crlf.write_bytes(b'{"stage":"one"}\r\n{"stage":"two"}\r\n')
+            self.assertEqual(sha256_jsonl(lf), sha256_jsonl(crlf))
+            self.assertTrue(is_ledger_prefix_sha256(crlf, sha256_jsonl(lf)))
+
+    def test_relative_ledger_override_is_anchored_to_study_directory(self):
+        expected = (Path(__file__).resolve().parent / "custom" / "budget.jsonl").resolve()
+        with patch.dict(os.environ, {"ISSUE59_BUDGET_LEDGER": "custom/budget.jsonl"}):
+            self.assertEqual(ledger_path(), expected)
 
     def test_native_report_must_keep_zero_visit_null_value_rows(self):
         raw = self.native_rows()
