@@ -1,0 +1,39 @@
+{
+  "budget_events_sha256": "a540e3aa57a8a6f41036c6baf110243909aaf6bb4703858710fd1d3c4a8f7286",
+  "builder_all_in_process_cpu_s": 127.206,
+  "fixed_seed_order_scanned": [
+    559001
+  ],
+  "issue": 59,
+  "limitations": [
+    "preflight is an integration witness, not a cohort estimate",
+    "no B2, real reconvergence, or survival tie is required for semantic pass"
+  ],
+  "owners_jsonl_sha256": "e7bb688a0aec1ca503c3b403dab37dea4d5bb98e9f6d0e391adec54ed755e431",
+  "owners_scanned": 1,
+  "phase": "semantic_preflight",
+  "preflight_semantic_pass": true,
+  "producer_manifest_sha256": "4e62bdea472e101afb84f7dfd7644710e9e53a8b916b412dd5e30b6c50d75b5c",
+  "reviewer_reserved_process_cpu_s": 1800,
+  "source_attempts_sha256": "da2d665ee1f2e6b54418381d6ff479800c25c5b1c1121f6f77173652e8c60f0a",
+  "source_dispositions_in_scan": {
+    "eligible_root": 1
+  },
+  "study_disposition": "STUDY_ONLY",
+  "terminal_disposition": "SEMANTIC_PREFLIGHT_PASS",
+  "witness_checks": {
+    "b2_is_unmasked_if_reached": true,
+    "both_arms_restore_exact_root": true,
+    "constrained_native_api_and_patch_match": true,
+    "constrained_slot_matches_source_potion_identity": true,
+    "protected_legal_root_occurrences_are_unsearched": true,
+    "qualifies": true,
+    "reserve_never_uses_or_discards_source_potion_in_b1": true,
+    "reserve_search_constraint_ends_at_b1_exit": true,
+    "reserve_selects_a_visited_allowed_root_action": true,
+    "reserve_uses_constrained_native_search_during_b1": true,
+    "source_root_is_first_qualifying_use_in_later_battle": true
+  },
+  "witness_owner_seed": 559001,
+  "witness_source_battle_number": 2
+}

@@ -51,6 +51,12 @@ python3 studies/issue59/run_measured_stage.py --summary studies/issue59/results/
   -- python3 studies/issue59/study.py
 ```
 
+### Execution record
+
+The WSL run used a detached WSL-native repository worktree at `/home/lsmft/stsrl-spikes/spire-research-issue59-source-fe0a3fa`, commit `fe0a3faa218234dccfa8e93e9cecb0ecaaa866a2`; the Windows-created disposable worktree's `.git` pointer is not readable by WSL Git. The first preflight completed its seed 559001 paired witness at a later-battle source root and wrote `SEMANTIC_PREFLIGHT_PASS`, then the CLI failed while printing cohort-only fields absent from the preflight report. The print path was repaired and tested; the completed witness inputs were requalified under the corrected commit without replaying the owner. The initial manifest/summary are retained as `preflight/initial_attempt_manifest.json` and `preflight/initial_attempt_summary.json`.
+
+The fixed cohort ran once for all 64 owners and ended `VALIDITY_FAILURE`. Seven reserve branches (seeds 559008, 559025, 559033, 559042, 559043, 559052, 559056) stopped with `action identity matched 0 legal actions, expected 1`; these remain incomplete pairs in the fixed-denominator bounds. No seed was replaced and no branch was rerun. The summary records 55 eligible source roots, 48 complete pairs, all seven invalid seeds, and the process-CPU total.
+
 The study itself rechecks the loaded extension hash, pinned source commits and STSRL source hashes, producer commit, preflight code/source/ledger hashes, and current process-CPU ceiling. Native checkpoints and captured noncombat RNG are process-memory only; never serialize them. A missing B2 without a genuine terminal outcome is incomplete. No owner seed is replaced after observing results.
 
 ## Data handling
