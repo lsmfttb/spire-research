@@ -1594,8 +1594,8 @@ def main() -> int:
     except BudgetStop:
         return 2
     print(json.dumps({"terminal_disposition": report["terminal_disposition"],
-        "owners_processed": report["owners_processed"],
-        "eligible_owner_denominator": report["eligible_owner_denominator"],
+        "owners_processed": report.get("owners_processed", report.get("owners_scanned")),
+        "eligible_owner_denominator": report.get("eligible_owner_denominator"),
         "builder_all_in_process_cpu_s": report.get("builder_all_in_process_cpu_s"),
         "summary": str(output / "summary.json")}, sort_keys=True))
     if args.preflight and report.get("terminal_disposition") == "INTERVENTION_NOT_EXECUTABLE":
