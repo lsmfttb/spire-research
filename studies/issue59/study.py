@@ -861,8 +861,15 @@ EXPECTED_STSRL_HASHES = {
 }
 
 
+_TEXT_HASH_SUFFIXES = {".py", ".json", ".jsonl"}
+
+
 def sha256_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """Hash text artifacts with Git-style LF bytes and binaries byte-for-byte."""
+    content = path.read_bytes()
+    if path.suffix.lower() in _TEXT_HASH_SUFFIXES:
+        content = content.replace(b"\r\n", b"\n")
+    return hashlib.sha256(content).hexdigest()
 
 
 def is_ledger_prefix_sha256(path: Path, expected: str) -> bool:

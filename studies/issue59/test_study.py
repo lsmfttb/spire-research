@@ -208,6 +208,21 @@ class StudyContractTests(unittest.TestCase):
             self.assertEqual(sha256_jsonl(lf), sha256_jsonl(crlf))
             self.assertTrue(is_ledger_prefix_sha256(crlf, sha256_jsonl(lf)))
 
+    def test_sha256_file_normalizes_git_text_newlines_but_preserves_binary_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lf = root / "artifact.json"
+            crlf = root / "artifact-crlf.json"
+            binary_lf = root / "artifact.bin"
+            binary_crlf = root / "artifact-crlf.bin"
+            lf.write_bytes(b'{"value":1}\n')
+            crlf.write_bytes(b'{"value":1}\r\n')
+            binary_lf.write_bytes(b"\x00\x01\n\x02")
+            binary_crlf.write_bytes(b"\x00\x01\r\n\x02")
+
+            self.assertEqual(sha256_file(lf), sha256_file(crlf))
+            self.assertNotEqual(sha256_file(binary_lf), sha256_file(binary_crlf))
+
     def test_relative_ledger_override_is_anchored_to_study_directory(self):
         expected = (Path(__file__).resolve().parent / "custom" / "budget.jsonl").resolve()
         with patch.dict(os.environ, {"ISSUE59_BUDGET_LEDGER": "custom/budget.jsonl"}):
@@ -307,7 +322,7 @@ class StudyContractTests(unittest.TestCase):
         self.assertEqual(report["owners_processed"], 64)
         self.assertEqual(report["eligible_owner_denominator"], 0)
 
-    def test_formal_gate_checks_preflight_source_hashes_and_later_battle_witness(self):
+    def test_formal_gate_checks_preflight_source_hashes_and_later_battle_witness_in_crlf_checkout(self):
         producer = "a" * 40
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
@@ -323,7 +338,7 @@ class StudyContractTests(unittest.TestCase):
                 "producer_checkout": producer,
                 "simulator": {"module_sha256": NATIVE_MODULE_SHA256},
                 "executor_commit": EXPECTED_STSRL_COMMIT,
-            }), encoding="utf-8")
+            }, indent=2) + "\n", encoding="utf-8")
             owners_path.write_text(json.dumps(owner) + "\n", encoding="utf-8")
             source_path.write_text(json.dumps({"seed": 559001}) + "\n", encoding="utf-8")
             budget_path.write_text(json.dumps({"stage": "preflight", "elapsed_process_cpu_s": 5.0}) + "\n",
@@ -335,10 +350,21 @@ class StudyContractTests(unittest.TestCase):
                 "owners_jsonl_sha256": sha256_file(owners_path),
                 "source_attempts_sha256": sha256_file(source_path),
                 "budget_events_sha256": sha256_file(budget_path),
-            }), encoding="utf-8")
+            }, indent=2) + "\n", encoding="utf-8")
+            text_artifacts = (manifest_path, owners_path, source_path, summary_path, budget_path)
+            for artifact in text_artifacts:
+                artifact.write_bytes(artifact.read_bytes().replace(b"\r\n", b"\n"))
+            lf_hashes = {artifact: sha256_file(artifact) for artifact in text_artifacts}
+            for artifact in text_artifacts:
+                artifact.write_bytes(artifact.read_bytes().replace(b"\n", b"\r\n"))
+                self.assertIn(b"\r\n", artifact.read_bytes(), artifact.name)
             with patch.dict(os.environ, {"ISSUE59_BUDGET_LEDGER": str(budget_path)}):
                 gate = verify_preflight_gate(path, producer)
-                self.assertEqual(gate["budget_events_sha256"], sha256_file(budget_path))
+                self.assertEqual(gate["budget_events_sha256"], lf_hashes[budget_path])
+            self.assertEqual(gate["summary_sha256"], lf_hashes[summary_path])
+            self.assertEqual(gate["manifest_sha256"], lf_hashes[manifest_path])
+            self.assertEqual(gate["owners_jsonl_sha256"], lf_hashes[owners_path])
+            self.assertEqual(gate["source_attempts_sha256"], lf_hashes[source_path])
             self.assertEqual(gate["witness_owner_seed"], 559001)
             self.assertTrue(gate["semantic_witness"]["qualifies"])
             source_path.write_text(source_path.read_text(encoding="utf-8") + "{}\n", encoding="utf-8")
