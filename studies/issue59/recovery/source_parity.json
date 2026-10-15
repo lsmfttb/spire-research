@@ -1,0 +1,40 @@
+{
+  "audit_verifier_repair": "Added the missing stdlib git helper after the first audit launch failed before comparison; the sealed pre-outcome verifier blob is checked against the recovery plan above.",
+  "audit_verifier_revision_sha256": "620ae177fc7f2196dcddb0eab6c27a80233272a243e8c18ae21d635e4645bc52",
+  "b1_root_fingerprint_mismatch_seeds": [],
+  "checks": {
+    "eligible_roots_checked": 55,
+    "historical_b1_raw_root_fingerprints_checked": 55,
+    "historical_branch_traces_checked": 103,
+    "preflight_manifest_pins_checked": 9,
+    "recovery_manifest_pins_checked": 9
+  },
+  "failures": [],
+  "historical_eligible_owner_count": 55,
+  "historical_source_dispositions": {
+    "eligible_root": 55,
+    "source_terminal_no_qualifying_use": 9
+  },
+  "historical_source_signature_sha256": "4637663635de86ba95aa911d4936f922d10bec42a0f37b2bea560f52210cddf2",
+  "historical_trace_note": "Compare selected source action/root/search and saved first restored-B1 raw-state fingerprints. Opaque native checkpoint objects were not serialized; each recovery branch must independently report root_restore_equal=true.",
+  "issue": 59,
+  "outcome_interpretation_allowed": true,
+  "pre_outcome_verifier_commit": "b34dacefec685eac8c4db625cb1b364b8b5fd802",
+  "pre_outcome_verifier_sha256": "6511026a845b97f083f87fb934b68a75ba027d7652fd44405ceffe2548110f38",
+  "recovery_eligible_owner_count": 55,
+  "recovery_source_dispositions": {
+    "eligible_root": 55,
+    "source_terminal_no_qualifying_use": 9
+  },
+  "recovery_source_signature_sha256": "4637663635de86ba95aa911d4936f922d10bec42a0f37b2bea560f52210cddf2",
+  "source_mismatch_seeds": [],
+  "status": "PASS",
+  "study_code_sha256_comparison": {
+    "equal": false,
+    "historical": "611e9aa75b49dcd132bbddfa076f4e7370070b649e0b9981ff7cb427c71afad8",
+    "recovery": "9e1fcf2857091e11b40bb046787f7d3e4f403d8919709b2adf1a4feeb4a8ed5e",
+    "review_note": "Source/controller/policy manifests are compared directly; branch trace parity is also checked after excluding only the documented post-search verification metadata. Reviewer should assess the study-code revision difference independently."
+  },
+  "study_terminal_disposition": "TWO_BATTLE_VALUE_UNRESOLVED",
+  "trace_schema_note": "Ignore the study-local source_selected_identity_verified annotation added after the historical run. Keep comparing source_selected_legal_index at the initial restored root, where it is rechecked; omit it only at later constrained nodes because the recovery records it only for the initial root. Native API/patch, protected rows, chosen action, visits, raw-state fingerprints, and all other trace fields remain compared."
+}
