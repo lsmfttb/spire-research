@@ -31,6 +31,11 @@ from sts_combat_rl.sim.decision_record import action_identity_dicts_for_actions
 
 
 class StudyContractTests(unittest.TestCase):
+    def test_preflight_cli_reports_preflight_summary_schema(self):
+        report = {"terminal_disposition": "SEMANTIC_PREFLIGHT_PASS", "owners_scanned": 1}
+        with patch("study.run", return_value=report), patch.object(sys, "argv", ["study.py", "--preflight"]):
+            self.assertEqual(study.main(), 0)
+
     def test_pinned_executor_source_commit_and_hashes(self):
         self.assertEqual(study.git(study.STSRL, "rev-parse", "HEAD"), EXPECTED_STSRL_COMMIT)
         for name, expected in study.EXPECTED_STSRL_HASHES.items():
