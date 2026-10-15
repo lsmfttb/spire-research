@@ -1,9 +1,12 @@
+import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -36,6 +39,27 @@ class StudyContractTests(unittest.TestCase):
         report = {"terminal_disposition": "SEMANTIC_PREFLIGHT_PASS", "owners_scanned": 1}
         with patch("study.run", return_value=report), patch.object(sys, "argv", ["study.py", "--preflight"]):
             self.assertEqual(study.main(), 0)
+
+    def test_recovery_verifier_accepts_ledger_from_a_different_checkout_path(self):
+        from recovery import verify_recovery
+
+        original_recovery = verify_recovery.RECOVERY_DIR
+        original_summary = original_recovery / "results" / "summary.json"
+        original_summary_bytes = original_summary.read_bytes()
+        with tempfile.TemporaryDirectory(prefix="issue59-fresh-checkout-") as temp_dir:
+            checkout_root = Path(temp_dir) / "checkout-at-a-different-absolute-path"
+            copied_recovery = checkout_root / "studies" / "issue59" / "recovery"
+            shutil.copytree(original_recovery, copied_recovery)
+            with patch.object(verify_recovery, "RECOVERY_DIR", copied_recovery), redirect_stdout(io.StringIO()):
+                self.assertEqual(verify_recovery.verify(), 0)
+
+            report = json.loads((copied_recovery / "source_parity.json").read_text(encoding="utf-8"))
+            summary = json.loads((copied_recovery / "results" / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "PASS")
+            self.assertEqual(report["study_terminal_disposition"], "TWO_BATTLE_VALUE_UNRESOLVED")
+            self.assertEqual(summary["terminal_disposition"], "TWO_BATTLE_VALUE_UNRESOLVED")
+
+        self.assertEqual(original_summary.read_bytes(), original_summary_bytes)
 
     def test_pinned_executor_source_commit_and_hashes(self):
         self.assertEqual(study.git(study.STSRL, "rev-parse", "HEAD"), EXPECTED_STSRL_COMMIT)

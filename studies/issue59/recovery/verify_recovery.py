@@ -14,6 +14,8 @@ from typing import Any, Mapping
 
 ISSUE_DIR = Path(__file__).resolve().parents[1]
 RECOVERY_DIR = Path(__file__).resolve().parent
+REPOSITORY_ROOT = ISSUE_DIR.parent.parent
+RECOVERY_RESULTS_IDENTITY = (RECOVERY_DIR.relative_to(REPOSITORY_ROOT) / "results").as_posix()
 SEEDS = list(range(559001, 559065))
 VOLATILE_KEYS = {"wall_clock_time_s", "process_cpu_s", "elapsed_process_cpu_s"}
 TRACE_ANNOTATION_KEYS = {"source_selected_identity_verified"}
@@ -72,6 +74,15 @@ def load_json(path: Path) -> dict[str, Any]:
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def matches_run_identity(run_directory: Any, relative_identity: str) -> bool:
+    """Match a ledger path to its repository-relative run identity across checkouts."""
+    if not isinstance(run_directory, str):
+        return False
+    normalized = "/" + run_directory.replace("\\", "/").strip("/") + "/"
+    identity = "/" + relative_identity.replace("\\", "/").strip("/") + "/"
+    return normalized.endswith(identity)
 
 
 def source_signature(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -327,14 +338,19 @@ def verify() -> int:
     if len(new_sources_rows) != 64 or eligible != 55:
         failures.append(f"recovery population is not 64 owners / 55 eligible: count={len(new_sources_rows)}, eligible={eligible}")
 
-    recovery_run_directory = str((RECOVERY_DIR / "results").resolve())
+    recovery_summary_events = [event for event in load_jsonl(RECOVERY_DIR / "budget_events.jsonl")
+        if (event.get("stage") == "summary_durable"
+            and matches_run_identity(event.get("run_directory"), RECOVERY_RESULTS_IDENTITY))]
     study_terminal_disposition = None
-    for event in load_jsonl(RECOVERY_DIR / "budget_events.jsonl"):
-        if (event.get("run_directory") == recovery_run_directory
-                and event.get("stage") == "summary_durable"):
-            study_terminal_disposition = event.get("terminal_disposition")
-    if not study_terminal_disposition:
-        failures.append("recovery run's original study terminal disposition is missing from the durable ledger")
+    if len(recovery_summary_events) != 1:
+        failures.append(
+            "recovery run's durable ledger summary event is not unique for repository-relative "
+            f"run identity {RECOVERY_RESULTS_IDENTITY!r}: found {len(recovery_summary_events)}"
+        )
+    else:
+        study_terminal_disposition = recovery_summary_events[0].get("terminal_disposition")
+        if not study_terminal_disposition:
+            failures.append("recovery run's original study terminal disposition is missing from the durable ledger")
 
     fingerprint_mismatch_seeds: list[int] = []
     for seed in SEEDS:
