@@ -70,6 +70,12 @@ def can_dispatch(*, actual_cpu: float, builder_budget: float,
     return actual_cpu + active_or_pending_workers * max_game_cpu < builder_budget
 
 
+def stage_result_status(result: int, recorded_status: str | None) -> str:
+    if result == 75:
+        return "RESOURCE_BLOCKED"
+    return recorded_status or ("COMPLETE" if result == 0 else "FAILED")
+
+
 def ordered_result_items(keys: Sequence[tuple[str, int, str]],
                          results: Mapping[tuple[str, int, str], Any]) -> list[tuple[tuple[str, int, str], Any]]:
     if len(keys) != len(set(keys)):

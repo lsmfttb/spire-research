@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from parallel_execution import (
     aggregate_process_cpu, can_dispatch, choose_worker_count,
     ordered_result_items, ParallelGameDispatcher, ProcessCpuTracker,
+    stage_result_status,
 )
 
 
@@ -61,6 +62,12 @@ class ParallelExecutionTests(unittest.TestCase):
             actual_cpu=179_850, builder_budget=180_000,
             active_or_pending_workers=2, max_game_cpu=100,
         ))
+
+    def test_resource_stop_status_is_not_overwritten_by_fallback(self):
+        self.assertEqual(stage_result_status(75, "COMPLETE"), "RESOURCE_BLOCKED")
+        self.assertEqual(stage_result_status(0, "FAILED"), "FAILED")
+        self.assertEqual(stage_result_status(0, None), "COMPLETE")
+        self.assertEqual(stage_result_status(2, None), "FAILED")
 
     def test_worker_capacity_respects_cpu_memory_reserve_and_eight_worker_cap(self):
         selected = choose_worker_count(

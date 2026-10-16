@@ -22,7 +22,7 @@ from typing import Any
 from parallel_execution import (
     MAX_GAME_WORKERS, ParallelExecutionError, ParallelGameDispatcher,
     ProcessCpuTracker, can_dispatch, choose_worker_count, compare_replay, host_capacity,
-    profile_summary,
+    profile_summary, stage_result_status,
 )
 
 
@@ -123,8 +123,7 @@ def _stage_receipt(stage: str, *, stage_started_cpu: float,
                    stage_started_wall: float, status: str) -> dict[str, Any]:
     assert TRACKER is not None
     assert DISPATCHER is not None
-    finalization_started_cpu = time.process_time()
-    parent_cpu = max(0.0, finalization_started_cpu - stage_started_cpu)
+    parent_cpu = max(0.0, time.process_time() - stage_started_cpu)
     with TRACKER.completed_cpu.get_lock():
         worker_cpu = float(TRACKER.completed_cpu.value)
     aggregate_cpu = parent_cpu + worker_cpu
@@ -155,13 +154,6 @@ def _stage_receipt(stage: str, *, stage_started_cpu: float,
             "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "accounting": "wait4 child user+system CPU, each reaped worker exactly once",
         })
-    finalization_cpu = max(0.0, time.process_time() - finalization_started_cpu)
-    R2._append_ledger({
-        "stage": f"{stage}-parallel-receipt-finalization", "status": status,
-        "process_cpu_seconds": finalization_cpu + 0.1,
-        "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "accounting": "measured parent receipt work plus a 0.1s ledger-write margin",
-    })
     return record
 
 
@@ -182,16 +174,14 @@ def _install_runner_hooks() -> None:
         status = "FAILED"
         try:
             result = ORIGINAL_STAGE(stage, stage_start_cpu=stage_start_cpu)
-            if result == 75:
-                status = "RESOURCE_BLOCKED"
             status_path = EVIDENCE / "stage-status" / f"{stage}.json"
-            if status != "RESOURCE_BLOCKED" and status_path.is_file():
+            recorded_status = None
+            if status_path.is_file():
                 try:
-                    status = str(json.loads(status_path.read_text(encoding="utf-8")).get("status", "COMPLETE"))
+                    recorded_status = str(json.loads(status_path.read_text(encoding="utf-8")).get("status", "")) or None
                 except (OSError, json.JSONDecodeError):
-                    status = "COMPLETE" if result == 0 else "FAILED"
-            else:
-                status = "COMPLETE" if result == 0 else "FAILED"
+                    recorded_status = None
+            status = stage_result_status(result, recorded_status)
             return result
         finally:
             if DISPATCHER is not None:
