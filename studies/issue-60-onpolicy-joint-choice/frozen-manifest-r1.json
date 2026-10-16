@@ -1,0 +1,128 @@
+{
+  "amendment_config_sha256": "c57ac99b78e47927b8e820df73301a9edda81156cfa043a00de4100dfb6093dc",
+  "amendment_id": "R1",
+  "base_handoff_commit": "d42b04235f4a8fead844998428e8cc35d2d64f03",
+  "files": [
+    {
+      "path": "adapter_v47.py",
+      "sha256": "06a6f3edaec30ba2920093337cecedacbd02631b5091fb662e157de7ae2f9433"
+    },
+    {
+      "path": "bootstrap/A.json",
+      "sha256": "1deb6907b595c905b8c0d0559ddf18577dbbea17a22d2edee23be59370ae4ca1"
+    },
+    {
+      "path": "bootstrap_v47.py",
+      "sha256": "c3a8108c0f057c68b735a8decc3c8e73cb3edc422f9be7d78003a7dec6bd4ed8"
+    },
+    {
+      "path": "config.json",
+      "sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca"
+    },
+    {
+      "path": "controllers.py",
+      "sha256": "464746ba8753ca23b99e84fddcc69c28d0ae3b7d936f2453cf2b12723d04b916"
+    },
+    {
+      "path": "encoder.py",
+      "sha256": "1e670d156e1eb908458d520ca1de17b4bbe22f849452dd1fd3d6ca979916a5b8"
+    },
+    {
+      "path": "freeze_manifest.py",
+      "sha256": "129d225b62e70b440714da118b98bf4a8019dd0650ce0b6b23aa70c8226d8659"
+    },
+    {
+      "path": "freeze_manifest_r1.py",
+      "sha256": "9cb61416738fa4f0e33564f5fad2955130830e2ff4c51d0e06c00f233ba74a0f"
+    },
+    {
+      "path": "model.py",
+      "sha256": "60beb24e5f4a1605fea7471e74308554b65d0ec601d3bbe37eea6fd609d3e5cd"
+    },
+    {
+      "path": "normalizer_v49.py",
+      "sha256": "a32636291f76d27354f04263368168c790931efae25d6750544157ebbc06e953"
+    },
+    {
+      "path": "preflight_witness.py",
+      "sha256": "5cec2d8d4c1afa51c52f5bd24825aa0a7864b57e6a3f2142171a8ff39a950d8c"
+    },
+    {
+      "path": "prepare_resource_amendment_r1.py",
+      "sha256": "239d41e5f86be21e55b00d3ebe4e0305da6f2985ea827860ae1552633367ae96"
+    },
+    {
+      "path": "public_resources.py",
+      "sha256": "64c7b041dfdae2f777cf5195d7d33527618223cb1d48ab8bf0e054b5e0c25c23"
+    },
+    {
+      "path": "resource-amendment-r1.json",
+      "sha256": "c57ac99b78e47927b8e820df73301a9edda81156cfa043a00de4100dfb6093dc"
+    },
+    {
+      "path": "resource_amendment_r1.py",
+      "sha256": "9cba1d9223b869f2ed77a9481643c96cd39ee7a4cd03831bdfc3103e9f8d9fcd"
+    },
+    {
+      "path": "run_study.py",
+      "sha256": "b12b7ac626fbdda566c777513e11673751cca9649a9e0da5543257fc64d54dca"
+    },
+    {
+      "path": "test_resource_amendment_r1.py",
+      "sha256": "f300ec22f293e10fdbe4b4496faa381bdaca6581e25047ba3672aaadcabb1adb"
+    },
+    {
+      "path": "trainer.py",
+      "sha256": "7e1d978e17efc14cac10ad2c920b8525b62e63197713e65f2c14c6dc1c050b7e"
+    },
+    {
+      "path": "vocabulary.json",
+      "sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+    }
+  ],
+  "freeze_rule": "R1 changes resource authorization/provenance only; original study config and scientific source remain frozen.",
+  "implementation_commit": "d15aebbdbf1d17c1c802a8eb1bd2b80b1ddff6b6",
+  "issue": 60,
+  "original_config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+  "original_manifest_sha256": "f8ee786b64e04d3188080072f4bfe9b843f2fcc43120df75b0c9ee18eb1faa13",
+  "original_producer_commit": "a7e8593558e6817d2ed34a5cd6bd2d5bd0a98768",
+  "purpose": "STUDY_ONLY",
+  "runner_diff_path": "evidence/resource-amendment-r1/runner.patch",
+  "runner_diff_sha256": "dcbb67559b5a6c5ae5e468a9812ff57eb558028a9817f3e47f543c2bfa4d9224",
+  "schema_id": "issue60-resource-frozen-manifest-r1-v1",
+  "source_diff_whitelist": {
+    "added_paths": [
+      "resource_amendment_r1.py",
+      "resource-amendment-r1.json",
+      "prepare_resource_amendment_r1.py",
+      "freeze_manifest_r1.py",
+      "test_resource_amendment_r1.py"
+    ],
+    "deleted_paths": [],
+    "modified_paths": [
+      "run_study.py"
+    ],
+    "modified_runner_symbols": [
+      "REVIEWER_RESERVE",
+      "PROCESS_BUDGET",
+      "run_training",
+      "main"
+    ],
+    "permitted_runner_semantics": [
+      "change cumulative cap and review reserve constants only",
+      "replace the original RESOURCE_BLOCKED training consumer with a verified R1 gate consumer",
+      "add separate R1 resource-check/seal stages and route old preflight to a fail-closed stop",
+      "write repeat synthetic evidence to an R1-specific path, preserving the original witness"
+    ]
+  },
+  "source_pins": {
+    "adapter_v47_commit": "41484c97d7a7b294bcfe13a9b9864c1cabf10603",
+    "bootstrap_checkpoint_internal_sha256": "0ecb46dd7a39d2aa33a12d50c60be15d438a1c9cb3d9bc893183b9143d55f555",
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "normalizer_v49_commit": "8d32290beee53d7901a26ae1877333e9f94decf7",
+    "stsrl_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "vocabulary_schema": "issue60-fixed-category-vocab-v1",
+    "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+  }
+}
