@@ -20,6 +20,7 @@ from controllers import (
 from encoder import Vocabulary, encode
 from model import JointChoiceActorCritic
 from normalizer_v49 import mapped_action, normalize
+from public_resources import RESOURCE_FIELDS, boundary_resources
 from trainer import (
     DecisionRow, IncompleteRun, ppo_minibatch_loss, terminal_target,
 )
@@ -335,6 +336,61 @@ def witness_on_policy_and_terminal(directory: Path) -> dict[str, Any]:
     }
 
 
+def witness_boundary_inventory() -> dict[str, Any]:
+    """Prove boundary snapshots retain public inventory, not hidden ordering."""
+    resources = {
+        "current_hp": _available(51), "max_hp": _available(70),
+        "gold": _available(42), "potion_count": _available(2),
+        "potion_capacity": _available(3),
+        "deck": _available([
+            {"id_label": "STRIKE_RED", "name": "Strike", "type": "ATTACK",
+             "rarity": "BASIC", "upgraded": False, "upgrade_count": 0,
+             "misc": 0, "deck_index": 2, "draw_order": "PRIVATE"},
+            {"id_label": "STRIKE_RED", "name": "Strike", "type": "ATTACK",
+             "rarity": "BASIC", "upgraded": False, "upgrade_count": 0,
+             "misc": 0, "deck_index": 1, "future_rng": 1},
+        ]),
+        "relics": _available([
+            {"id_label": "BURNING_BLOOD", "name": "Burning Blood", "counter": 0,
+             "relic_index": 0, "private_payload": 1},
+        ]),
+        "potion_identities": _available([
+            {"potion_index": 1, "id_label": "FIRE_POTION", "name": "Fire Potion",
+             "private_payload": 1},
+        ]),
+        "keys": _available({"blue_key": False, "green_key": True, "red_key": False,
+                             "hidden_flag": True}),
+        "unknown_hidden_field": _available("PRIVATE"),
+    }
+    projection = {
+        "schema_id": "native-public-projection-v3",
+        "persistent_resources": _available(resources),
+        "unexposed_future": [1, 2, 3],
+    }
+    result = boundary_resources(projection)
+    assert tuple(result) == RESOURCE_FIELDS
+    assert len(result["deck"]["value"]) == 2
+    assert result["deck"]["value"][0] == result["deck"]["value"][1]
+    assert all("deck_index" not in row and "draw_order" not in row for row in result["deck"]["value"])
+    assert result["potion_identities"]["value"][0]["potion_index"] == 1
+    assert "hidden_flag" not in result["keys"]["value"]
+    assert "unknown_hidden_field" not in result
+
+    reordered = copy.deepcopy(projection)
+    reordered["persistent_resources"]["value"]["deck"]["value"].reverse()
+    assert boundary_resources(reordered) == result
+    unavailable = boundary_resources({"persistent_resources": {"availability": "unavailable"}})
+    assert all(row["availability"] == "unavailable" for row in unavailable.values())
+    return {
+        "passed": True, "resource_field_count": len(RESOURCE_FIELDS),
+        "exact_public_inventory_retained": True,
+        "deck_order_not_retained": True,
+        "duplicate_card_multiplicity_retained": True,
+        "potion_slots_retained": True,
+        "unknown_and_hidden_fields_dropped": True,
+    }
+
+
 def run_witnesses(directory: Path, output: Path | None = None) -> dict[str, Any]:
     torch.set_num_threads(1)
     torch.use_deterministic_algorithms(True)
@@ -346,6 +402,7 @@ def run_witnesses(directory: Path, output: Path | None = None) -> dict[str, Any]
     if config["architecture"]["trainable_parameter_cap"] != 200000:
         raise ValueError("unexpected parameter cap")
     public = witness_public_context(directory)
+    inventory = witness_boundary_inventory()
     on_policy = witness_on_policy_and_terminal(directory)
     result = {
         "schema_id": "issue60-synthetic-preflight-witness-v1",
@@ -353,8 +410,9 @@ def run_witnesses(directory: Path, output: Path | None = None) -> dict[str, Any]
         "vocabulary_sha256": _load_vocab(directory).sha256,
         "parameter_count": zero_residual_model(_load_vocab(directory), 660101).parameter_count(),
         "public_context_and_execution": public,
+        "boundary_inventory": inventory,
         "on_policy_and_terminal": on_policy,
-        "passed": True,
+        "passed": bool(public["passed"] and inventory["passed"] and on_policy["passed"]),
     }
     if result["parameter_count"] > 200000:
         raise ValueError("parameter cap exceeded")

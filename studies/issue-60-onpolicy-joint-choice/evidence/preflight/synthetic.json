@@ -1,5 +1,14 @@
 {
-  "config_sha256": "abd599e6f819096f5df9f02292d3ec4209f6b93a218991b3123d1a3c857fc116",
+  "boundary_inventory": {
+    "deck_order_not_retained": true,
+    "duplicate_card_multiplicity_retained": true,
+    "exact_public_inventory_retained": true,
+    "passed": true,
+    "potion_slots_retained": true,
+    "resource_field_count": 9,
+    "unknown_and_hidden_fields_dropped": true
+  },
+  "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
   "on_policy_and_terminal": {
     "bootstrap_file_sha256": "1deb6907b595c905b8c0d0559ddf18577dbbea17a22d2edee23be59370ae4ca1",
     "cap_and_error_targets_rejected": true,

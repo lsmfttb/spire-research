@@ -27,6 +27,7 @@ from controllers import (
 from encoder import Vocabulary
 from model import JointChoiceActorCritic
 from preflight_witness import run_witnesses
+from public_resources import RESOURCE_FIELDS, boundary_resources
 from trainer import DecisionRow, IncompleteRun, derive_seed, update_batch
 
 
@@ -36,7 +37,8 @@ EVIDENCE = HERE / "evidence"
 FROZEN_FILES = (
     "adapter_v47.py", "bootstrap_v47.py", "bootstrap/A.json", "config.json",
     "controllers.py", "encoder.py", "freeze_manifest.py", "model.py",
-    "normalizer_v49.py", "preflight_witness.py", "run_study.py", "trainer.py",
+    "normalizer_v49.py", "preflight_witness.py", "public_resources.py",
+    "run_study.py", "trainer.py",
     "vocabulary.json",
 )
 TRAINING_SEEDS = {
@@ -258,11 +260,12 @@ def _boundary_record(step: Any, *, boundary: str, raw: Mapping[str, Any]) -> dic
         "act": _number(raw.get("act")),
         "floor": _number(raw.get("floor_num", raw.get("floor"))),
         "room_type": raw.get("room_type") if isinstance(raw.get("room_type"), str) else None,
-        "player_hp": step.next_player_hp if boundary.endswith("exit") else step.player_hp,
-        "player_max_hp": step.next_player_max_hp if boundary.endswith("exit") else step.player_max_hp,
-        "gold": step.next_gold if boundary.endswith("exit") else step.gold,
-        "potion_count": step.next_potion_count if boundary.endswith("exit") else step.potion_count,
-        "battle_outcome": step.next_battle_outcome if boundary.endswith("exit") else step.battle_outcome,
+        # after_transition observes the post-step state for every boundary.
+        "player_hp": step.next_player_hp,
+        "player_max_hp": step.next_player_max_hp,
+        "gold": step.next_gold,
+        "potion_count": step.next_potion_count,
+        "battle_outcome": step.next_battle_outcome,
     }
 
 
@@ -406,24 +409,25 @@ def run_game(*, seed: int, mode: str, model: JointChoiceActorCritic | None,
         def after(step):
             nonlocal transitions, was_battle
             transitions += 1
-            if step.battle_active and not was_battle:
-                row = _boundary_record(step, boundary="battle_enter", raw=step.snapshot_raw)
+
+            def append_boundary(boundary: str, raw: Mapping[str, Any]) -> None:
+                row = _boundary_record(step, boundary=boundary, raw=raw)
+                row["public_resources"] = boundary_resources(
+                    adapter._sim.public_projection_v3()
+                )
                 row["heart_encounter"] = bool(
                     heart_entry_selected and row.get("act") == 4
                     and row.get("room_type") == "BOSS"
                 )
                 boundaries.append(row)
-            if step.battle_active and not step.next_battle_active:
-                boundaries.append(_boundary_record(step, boundary="battle_exit", raw=step.next_snapshot_raw))
+
+            if step.next_battle_active and not was_battle:
+                append_boundary("battle_enter", step.next_snapshot_raw)
+            if was_battle and not step.next_battle_active:
+                append_boundary("battle_exit", step.next_snapshot_raw)
             boss_screen_transition = ("BOSS" in step.screen_state) != ("BOSS" in step.next_screen_state)
             if boss_screen_transition:
-                raw = step.snapshot_raw if "BOSS" in step.screen_state else step.next_snapshot_raw
-                row = _boundary_record(step, boundary="boss_boundary", raw=raw)
-                row["heart_encounter"] = bool(
-                    heart_entry_selected and row.get("act") == 4
-                    and row.get("room_type") == "BOSS"
-                )
-                boundaries.append(row)
+                append_boundary("boss_boundary", step.next_snapshot_raw)
             was_battle = bool(step.next_battle_active)
 
         run = execute_controlled_run(
@@ -701,6 +705,19 @@ def run_preflight(config: Mapping[str, Any], runtime: Mapping[str, Any],
         atomic_json(witness_path, synthetic)
     if not synthetic["passed"]:
         raise RuntimeError("synthetic preflight witness failed")
+
+    started_path = EVIDENCE / "preflight" / "native-started.json"
+    if not started_path.exists():
+        atomic_json(started_path, {
+            "schema_id": "issue60-native-preflight-started-v1",
+            "config_sha256": config_sha(),
+            "manifest_implementation_commit": json.loads(
+                (HERE / "frozen-manifest.json").read_text(encoding="utf-8")
+            )["implementation_commit"],
+            "preflight_seeds": list(PRE_FLIGHT_SEEDS),
+            "first_game_may_start_after_this_marker": True,
+            "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        })
 
     summaries: list[dict[str, Any]] = []
     row_for_update: list[DecisionRow] = []
@@ -1150,6 +1167,17 @@ def analyze(config: Mapping[str, Any]) -> dict[str, Any]:
                 boss for row in rows for boss in row.get("visible_bosses_seen", [])
             }),
             "heart_entry_selected_runs": sum(row.get("heart_entry_selected", False) for row in rows),
+            "boundary_resource_availability": {
+                field: {
+                    state: sum(
+                        boundary.get("public_resources", {}).get(field, {}).get("availability") == state
+                        for row in rows for boundary in row["boundaries"]
+                        if boundary.get("boundary") in {"battle_enter", "battle_exit", "boss_boundary"}
+                    )
+                    for state in ("available", "unavailable", "unsupported", "not_applicable")
+                }
+                for field in RESOURCE_FIELDS
+            },
             "mean_terminal_floor": sum(float(row["terminal_floor"]) for row in rows) / 128,
             "supported_choices": sum(int(row["supported_choices"]) for row in rows),
             "bootstrap_shifts": sum(int(row["bootstrap_shifts"]) for row in rows),

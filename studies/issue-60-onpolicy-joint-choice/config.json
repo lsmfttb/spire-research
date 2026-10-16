@@ -213,6 +213,24 @@
   "retention": {
     "source_config_checkpoints_outcomes_public_decision_logprob_terminal_evidence": true,
     "review_delete_date": "2026-11-16",
-    "artifact_root": "evidence/"
+    "artifact_root": "evidence/",
+    "boundary_evidence": {
+      "source": "pinned native public_projection_v3 persistent_resources",
+      "fields": [
+        "current_hp",
+        "max_hp",
+        "gold",
+        "potion_count",
+        "potion_capacity",
+        "deck",
+        "relics",
+        "potion_identities",
+        "keys"
+      ],
+      "deck_and_relic_order": "canonical multiset; remove indices and ordering to avoid draw-order leakage",
+      "potion_slots": "retain public potion_index identity",
+      "unknown_nested_fields": "drop",
+      "unavailable_values": "retain explicit availability state"
+    }
   }
 }

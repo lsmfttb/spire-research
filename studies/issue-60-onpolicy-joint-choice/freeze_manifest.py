@@ -12,7 +12,8 @@ REPO_ROOT = HERE.parents[1]
 FILES = (
     "adapter_v47.py", "bootstrap_v47.py", "bootstrap/A.json", "config.json",
     "controllers.py", "encoder.py", "freeze_manifest.py", "model.py",
-    "normalizer_v49.py", "preflight_witness.py", "run_study.py", "trainer.py",
+    "normalizer_v49.py", "preflight_witness.py", "public_resources.py",
+    "run_study.py", "trainer.py",
     "vocabulary.json",
 )
 
@@ -51,8 +52,10 @@ def main() -> None:
         "freeze_rule": "No code, config, schema, vocabulary, or checkpoint bytes may change after a simulator preflight game.",
     }
     destination = HERE / "frozen-manifest.json"
-    if destination.exists():
-        raise SystemExit("a frozen manifest already exists; do not silently replace the registered program")
+    native_started = HERE / "evidence" / "preflight" / "native-started.json"
+    preflight_runs = HERE / "evidence" / "runs" / "preflight"
+    if destination.exists() and (native_started.exists() or preflight_runs.exists()):
+        raise SystemExit("native preflight has started; do not replace the registered program")
     payload = json.dumps(manifest, sort_keys=True, indent=2, allow_nan=False) + "\n"
     temp = destination.with_name(destination.name + ".tmp")
     with temp.open("w", encoding="utf-8", newline="\n") as stream:
