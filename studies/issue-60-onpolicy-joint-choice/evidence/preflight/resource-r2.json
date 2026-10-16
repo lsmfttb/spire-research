@@ -627,5 +627,25 @@
     "schema_id": "issue60-resource-amendment-r2-v1",
     "status": "PASS"
   },
-  "seal": null
+  "seal": {
+    "builder_budget_cpu_seconds": 180000.0,
+    "cpu_ledger_prefix_line_count": 18,
+    "cpu_ledger_prefix_sha256": "2719a52fe45861795d39790dc9b336a1a3a99e91d89f1bcec70977d14df3afb7",
+    "formal_grid_fixed": true,
+    "model_or_training_settings_changed": false,
+    "parent_handoff_commit": "b31f3f4e741f6ae4966ad1b75f0e24340d08f2bc",
+    "planner_decision_url": "https://github.com/lsmfttb/spire-research/issues/60#issuecomment-6210340781",
+    "preseal_receipt_sha256": "b2fa6b94e293cb5ad626697b336199bc6d5b5b5e751217aa06affa1624038e30",
+    "process_cpu_cap_seconds": 200000.0,
+    "r1_cpu_ledger_prefix": {
+      "line_count": 12,
+      "sha256": "c5c120a145a46f24e6fd266cfef7765b1eefdea6c6cb5f6d50de08bc2aa28097"
+    },
+    "r2_implementation_source_commit": "63e433b84fadcdcdd5ab90baf5de801d555c7260",
+    "reviewer_reserve_cpu_seconds": 20000.0,
+    "schema_id": "issue60-resource-gate-seal-r2-v1",
+    "seal_finalization_margin_cpu_seconds": 10.0,
+    "seal_stage_cpu_at_write_seconds": 2.342761293,
+    "status": "PASS"
+  }
 }
