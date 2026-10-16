@@ -503,11 +503,11 @@ class ParallelGameDispatcher:
                             f"fixed game {task_key} is INCOMPLETE: {failure}"
                         )
             else:
-                errors = sorted(Path(task["kwargs"]["output_dir"]).glob("parallel-worker-error-*.json"))
                 failure = "worker exited without a terminal run record"
-                if errors:
+                error_path = Path(task["kwargs"]["output_dir"]) / f"parallel-worker-error-{pid}.json"
+                if error_path.is_file():
                     try:
-                        failure = json.loads(errors[-1].read_text(encoding="utf-8")).get("failure", failure)
+                        failure = json.loads(error_path.read_text(encoding="utf-8")).get("failure", failure)
                     except (OSError, json.JSONDecodeError):
                         pass
                 self._mark_abnormal_attempt_incomplete(task, failure, child_cpu)
