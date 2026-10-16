@@ -1,0 +1,35 @@
+Traceback (most recent call last):
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 819, in main
+    result = _run_bridge(started=started)
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 528, in _run_bridge
+    _bridge_budget_start_record()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 94, in _bridge_budget_start_record
+    current_commit = git(HERE, "rev-parse", "HEAD")
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/prospective_cost_regime.py", line 55, in git
+    result = subprocess.run(
+        ["git", "-C", str(root), *args], check=True,
+        capture_output=True, text=True,
+    )
+  File "/home/lsmft/stsrl-spikes/py313-torch/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['git', '-C', '/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice', 'rev-parse', 'HEAD']' returned non-zero exit status 128.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 870, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 825, in main
+    source_commit = git(HERE, "rev-parse", "HEAD")
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/prospective_cost_regime.py", line 55, in git
+    result = subprocess.run(
+        ["git", "-C", str(root), *args], check=True,
+        capture_output=True, text=True,
+    )
+  File "/home/lsmft/stsrl-spikes/py313-torch/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['git', '-C', '/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice', 'rev-parse', 'HEAD']' returned non-zero exit status 128.

@@ -822,7 +822,7 @@ def main() -> int:
             if not any('"stage":"issue60-cached-cost-bridge"' in row for row in after[len(before):]):
                 blocked = "RESOURCE_BLOCKED" in str(exc)
                 charge = max(0.0, time.process_time() - started) + 0.2
-                source_commit = git(HERE, "rev-parse", "HEAD")
+                source_commit = PRODUCER_COMMIT or "unresolved-before-bridge-start"
                 baseline = 0.0
                 if BRIDGE_BUDGET_START.is_file():
                     budget_start = _read_json(BRIDGE_BUDGET_START)
