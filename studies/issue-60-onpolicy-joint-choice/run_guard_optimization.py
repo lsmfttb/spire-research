@@ -324,7 +324,7 @@ def main() -> int:
             "forecast": unchanged_forecast,
             "receipt_sha256": before_r2_receipt_sha,
             "seal_sha256": r2_receipt["seal"]["preseal_receipt_sha256"],
-            "retained_ledger_prefix_line_count": r2_receipt["seal"]["ledger_prefix_line_count"],
+            "retained_ledger_prefix_line_count": r2_receipt["seal"]["cpu_ledger_prefix_line_count"],
         }
         config, runtime, vocab, bootstrap, model, model_sha = run_study_parallel._load_validation_inputs()
         config_digest = run_study.config_sha()
