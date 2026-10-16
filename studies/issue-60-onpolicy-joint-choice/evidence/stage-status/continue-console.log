@@ -1,0 +1,30 @@
+{"r2_resource_guard": {"accounted_before_stage": 1673.1843055810004, "process_cpu_limit": {"hard_limit_process_cpu_seconds": 178328, "mechanism": "RLIMIT_CPU", "soft_limit_process_cpu_seconds": 178298, "soft_signal_grace_seconds": 30}, "remaining_allowance_at_launch": 178326.815282645, "stage": "train"}}
+Traceback (most recent call last):
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue-60-resource-amendment-r2/spire-research/studies/issue-60-onpolicy-joint-choice/run_study_r2.py", line 234, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue-60-resource-amendment-r2/spire-research/studies/issue-60-onpolicy-joint-choice/run_study_r2.py", line 226, in main
+    code = _run_original_stage(current, stage_start_cpu=time.process_time())
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue-60-resource-amendment-r2/spire-research/studies/issue-60-onpolicy-joint-choice/run_study_r2.py", line 124, in _run_original_stage
+    result = RUN_STUDY.main()
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue-60-resource-amendment-r2/spire-research/studies/issue-60-onpolicy-joint-choice/run_study.py", line 1248, in main
+    result = run_training(config, runtime, vocab, bootstrap, stage_started)
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue-60-resource-amendment-r2/spire-research/studies/issue-60-onpolicy-joint-choice/run_study.py", line 973, in run_training
+    block_results.append(train_block(block, config, vocab, bootstrap, runtime, stage_started))
+                         ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue-60-resource-amendment-r2/spire-research/studies/issue-60-onpolicy-joint-choice/run_study.py", line 878, in train_block
+    remaining_games=POST_PREFLIGHT_GAMES - _completed_run_count(),
+                                           ~~~~~~~~~~~~~~~~~~~~^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue-60-resource-amendment-r2/spire-research/studies/issue-60-onpolicy-joint-choice/run_study.py", line 564, in _completed_run_count
+    rows = _all_attempts("training") + _all_attempts("evaluation")
+           ~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue-60-resource-amendment-r2/spire-research/studies/issue-60-onpolicy-joint-choice/run_study.py", line 547, in _all_attempts
+    summaries.append(json.loads(path.read_text(encoding="utf-8")))
+                                ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/lsmft/stsrl-spikes/py313-torch/lib/python3.13/pathlib/_local.py", line 546, in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lsmft/stsrl-spikes/py313-torch/lib/python3.13/pathlib/_abc.py", line 632, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

@@ -1,6 +1,6 @@
 {
-  "failure": "RuntimeError: RESOURCE_BLOCKED before next fixed game: projected builder CPU 397325.588s exceeds 180000s",
-  "process_cpu_seconds": 544.9975447429999,
+  "failure": "KeyboardInterrupt: ",
+  "process_cpu_seconds": 1283.596056563,
   "runtime": {
     "deterministic_algorithms": true,
     "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
@@ -19,7 +19,7 @@
           "end_turn"
         ]
       },
-      "execute_controlled_run": "sts_combat_rl.sim.controlled_run"
+      "execute_controlled_run": "__main__"
     },
     "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
     "stsr_source": "/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c",
@@ -29,5 +29,5 @@
   "schema_id": "issue60-stage-status-v1",
   "stage": "train",
   "status": "FAILED",
-  "timestamp_utc": "2026-10-16T06:32:19Z"
+  "timestamp_utc": "2026-10-16T09:44:50Z"
 }

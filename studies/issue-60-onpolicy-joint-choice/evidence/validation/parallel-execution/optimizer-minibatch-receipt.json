@@ -1,0 +1,428 @@
+{
+  "batching_readout": "decision preprocessing and model forward are per row; one combined scalar loss is backpropagated and one optimizer step runs per minibatch",
+  "disposable_model_optimizer_only": true,
+  "host": {
+    "cpu_model": "AMD Ryzen 7 H 255 W/ Radeon 780M",
+    "cpu_quota_count": null,
+    "cpus_allowed_list": "0-15",
+    "effective_cpu_count": 16,
+    "effective_memory_available_bytes": 19825799168,
+    "logical_cpu_count": 16,
+    "memory_available_bytes": 19825799168,
+    "memory_current_bytes": 0,
+    "memory_limit_bytes": null,
+    "memory_total_bytes": 25199456256
+  },
+  "ledger_charge_cpu_seconds": 16.691256651,
+  "minibatch_rows": 256,
+  "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+  "preflight_decision_rows": 229,
+  "prior_failed_attempt": {
+    "path": "evidence/validation/parallel-execution/profiles/optimizer-minibatch-attempt-01.pstats",
+    "producer_commit": "9cdc668933cb88293ed5b932bcc5996b165322c2",
+    "receipt_failure": "direct git subprocess could not resolve Windows linked-worktree pointer; no simulation or optimizer state persisted",
+    "sha256": "4a632455690a37ea456b2a2008011b278501088c7459ce41a420769dad0bc6bf",
+    "timed_minibatch_process_cpu_seconds": 15.662546846999993,
+    "whole_command_cpu_charge_seconds": 25.0
+  },
+  "profile_path": "evidence/validation/parallel-execution/profiles/optimizer-minibatch-attempt-02.pstats",
+  "profile_sha256": "74fd707c9ff22c757cae157f783c8bade70cdc320f7e341f407fb6ff73ddf9cc",
+  "profiled_source_commit": "257e01d2e00e76c9557e78c95cc86a4a1d329a0a",
+  "runtime": {
+    "deterministic_algorithms": true,
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "native_module": "/home/lsmft/stsrl-spikes/issue60-runtime/build-issue60/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_source": "/home/lsmft/stsrl-spikes/sts_lightspeed-issue59",
+    "python": "3.13.13",
+    "runtime_api": {
+      "LightSpeedAdapter": "sts_combat_rl.sim.lightspeed",
+      "action_space": {
+        "allow_excluded_fallback": true,
+        "excluded_kinds": [],
+        "include_non_combat_potions": true,
+        "preferred_kinds": [
+          "card",
+          "end_turn"
+        ]
+      },
+      "execute_controlled_run": "sts_combat_rl.sim.controlled_run"
+    },
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsr_source": "/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c",
+    "torch": "2.12.0+cpu",
+    "torch_threads": 1
+  },
+  "schema_id": "issue60-optimizer-minibatch-profile-v1",
+  "source_files": {
+    "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+    "run_study_parallel.py": "7399044a23c1acc26b3a1ec857d7631511b013f8b9b19b8d646f806ff24d8ba3"
+  },
+  "status": "PASS",
+  "timed_minibatch_process_cpu_seconds": 15.50635492,
+  "timed_minibatch_wall_seconds": 15.646445888000017,
+  "top_functions": [
+    {
+      "calls": 1,
+      "exclusive_cpu_seconds": 0.035612616,
+      "file": "trainer.py",
+      "function": "ppo_minibatch_loss",
+      "inclusive_cpu_seconds": 12.749630599000001,
+      "line": 112,
+      "primitive_calls": 1
+    },
+    {
+      "calls": 256,
+      "exclusive_cpu_seconds": 0.37568780500000004,
+      "file": "encoder.py",
+      "function": "encode",
+      "inclusive_cpu_seconds": 7.453258001,
+      "line": 165,
+      "primitive_calls": 256
+    },
+    {
+      "calls": 177870,
+      "exclusive_cpu_seconds": 0.39305595800000004,
+      "file": "module.py",
+      "function": "_wrapped_call_impl",
+      "inclusive_cpu_seconds": 5.229161840000001,
+      "line": 1774,
+      "primitive_calls": 256
+    },
+    {
+      "calls": 177870,
+      "exclusive_cpu_seconds": 0.578606884,
+      "file": "module.py",
+      "function": "_call_impl",
+      "inclusive_cpu_seconds": 5.22794816,
+      "line": 1782,
+      "primitive_calls": 256
+    },
+    {
+      "calls": 256,
+      "exclusive_cpu_seconds": 0.027263543,
+      "file": "model.py",
+      "function": "forward",
+      "inclusive_cpu_seconds": 5.219023325,
+      "line": 106,
+      "primitive_calls": 256
+    },
+    {
+      "calls": 256,
+      "exclusive_cpu_seconds": 0.5584384370000001,
+      "file": "model.py",
+      "function": "_map_vectors",
+      "inclusive_cpu_seconds": 4.025607858,
+      "line": 73,
+      "primitive_calls": 256
+    },
+    {
+      "calls": 20709,
+      "exclusive_cpu_seconds": 0.8125477210000001,
+      "file": "encoder.py",
+      "function": "_entity",
+      "inclusive_cpu_seconds": 4.00816581,
+      "line": 109,
+      "primitive_calls": 20709
+    },
+    {
+      "calls": 20709,
+      "exclusive_cpu_seconds": 0.152985812,
+      "file": "model.py",
+      "function": "_entity_vector",
+      "inclusive_cpu_seconds": 3.2618827620000004,
+      "line": 65,
+      "primitive_calls": 20709
+    },
+    {
+      "calls": 925599,
+      "exclusive_cpu_seconds": 1.057570391,
+      "file": "~",
+      "function": "<built-in method builtins.isinstance>",
+      "inclusive_cpu_seconds": 3.247927819,
+      "line": 0,
+      "primitive_calls": 497827
+    },
+    {
+      "calls": 1,
+      "exclusive_cpu_seconds": 2.199e-05,
+      "file": "_tensor.py",
+      "function": "backward",
+      "inclusive_cpu_seconds": 2.7475567830000003,
+      "line": 576,
+      "primitive_calls": 1
+    },
+    {
+      "calls": 1,
+      "exclusive_cpu_seconds": 5.861800000000001e-05,
+      "file": "__init__.py",
+      "function": "backward",
+      "inclusive_cpu_seconds": 2.74753331,
+      "line": 253,
+      "primitive_calls": 1
+    },
+    {
+      "calls": 1,
+      "exclusive_cpu_seconds": 4.2949000000000005e-05,
+      "file": "graph.py",
+      "function": "_engine_run_backward",
+      "inclusive_cpu_seconds": 2.747292643,
+      "line": 869,
+      "primitive_calls": 1
+    },
+    {
+      "calls": 1,
+      "exclusive_cpu_seconds": 2.747217253,
+      "file": "~",
+      "function": "<method 'run_backward' of 'torch._C._EngineBase' objects>",
+      "inclusive_cpu_seconds": 2.747217253,
+      "line": 0,
+      "primitive_calls": 1
+    },
+    {
+      "calls": 37707,
+      "exclusive_cpu_seconds": 0.23799814800000002,
+      "file": "container.py",
+      "function": "forward",
+      "inclusive_cpu_seconds": 2.689332442,
+      "line": 248,
+      "primitive_calls": 37707
+    },
+    {
+      "calls": 170912,
+      "exclusive_cpu_seconds": 0.30481115200000003,
+      "file": "encoder.py",
+      "function": "_field",
+      "inclusive_cpu_seconds": 2.5528931590000004,
+      "line": 99,
+      "primitive_calls": 170912
+    },
+    {
+      "calls": 213886,
+      "exclusive_cpu_seconds": 0.38112933800000004,
+      "file": "typing.py",
+      "function": "__instancecheck__",
+      "inclusive_cpu_seconds": 2.424112328,
+      "line": 1389,
+      "primitive_calls": 213886
+    },
+    {
+      "calls": 213886,
+      "exclusive_cpu_seconds": 0.733099189,
+      "file": "typing.py",
+      "function": "__subclasscheck__",
+      "inclusive_cpu_seconds": 2.04298299,
+      "line": 1680,
+      "primitive_calls": 213886
+    },
+    {
+      "calls": 256,
+      "exclusive_cpu_seconds": 0.02889521,
+      "file": "normalizer_v49.py",
+      "function": "normalize",
+      "inclusive_cpu_seconds": 1.595404971,
+      "line": 132,
+      "primitive_calls": 256
+    },
+    {
+      "calls": 60268,
+      "exclusive_cpu_seconds": 0.24550750300000002,
+      "file": "linear.py",
+      "function": "forward",
+      "inclusive_cpu_seconds": 1.1437105440000002,
+      "line": 130,
+      "primitive_calls": 60268
+    },
+    {
+      "calls": 213886,
+      "exclusive_cpu_seconds": 0.392122821,
+      "file": "~",
+      "function": "<built-in method builtins.issubclass>",
+      "inclusive_cpu_seconds": 0.949833593,
+      "line": 0,
+      "primitive_calls": 213886
+    },
+    {
+      "calls": 20967,
+      "exclusive_cpu_seconds": 0.13604342,
+      "file": "model.py",
+      "function": "_category_sum",
+      "inclusive_cpu_seconds": 0.9150835220000001,
+      "line": 59,
+      "primitive_calls": 20967
+    },
+    {
+      "calls": 1689,
+      "exclusive_cpu_seconds": 0.012344027,
+      "file": "model.py",
+      "function": "_entity_pool",
+      "inclusive_cpu_seconds": 0.814899075,
+      "line": 70,
+      "primitive_calls": 1689
+    },
+    {
+      "calls": 60268,
+      "exclusive_cpu_seconds": 0.777751956,
+      "file": "~",
+      "function": "<built-in method torch._C._nn.linear>",
+      "inclusive_cpu_seconds": 0.777751956,
+      "line": 0,
+      "primitive_calls": 60268
+    },
+    {
+      "calls": 3474,
+      "exclusive_cpu_seconds": 0.007245764,
+      "file": "encoder.py",
+      "function": "<genexpr>",
+      "inclusive_cpu_seconds": 0.7525470550000001,
+      "line": 204,
+      "primitive_calls": 3474
+    },
+    {
+      "calls": 256,
+      "exclusive_cpu_seconds": 0.160087273,
+      "file": "normalizer_v49.py",
+      "function": "_map_graph",
+      "inclusive_cpu_seconds": 0.695280254,
+      "line": 89,
+      "primitive_calls": 256
+    },
+    {
+      "calls": 213946,
+      "exclusive_cpu_seconds": 0.360758181,
+      "file": "<frozen abc>",
+      "function": "__subclasscheck__",
+      "inclusive_cpu_seconds": 0.5581462,
+      "line": 121,
+      "primitive_calls": 213889
+    },
+    {
+      "calls": 577988,
+      "exclusive_cpu_seconds": 0.539986943,
+      "file": "~",
+      "function": "<method 'get' of 'dict' objects>",
+      "inclusive_cpu_seconds": 0.539986943,
+      "line": 0,
+      "primitive_calls": 577988
+    },
+    {
+      "calls": 34807,
+      "exclusive_cpu_seconds": 0.131386938,
+      "file": "~",
+      "function": "<built-in method builtins.any>",
+      "inclusive_cpu_seconds": 0.5152213090000001,
+      "line": 0,
+      "primitive_calls": 34807
+    },
+    {
+      "calls": 52963,
+      "exclusive_cpu_seconds": 0.22212167600000002,
+      "file": "copy.py",
+      "function": "deepcopy",
+      "inclusive_cpu_seconds": 0.444006381,
+      "line": 119,
+      "primitive_calls": 27385
+    },
+    {
+      "calls": 455920,
+      "exclusive_cpu_seconds": 0.408441783,
+      "file": "~",
+      "function": "<method 'append' of 'list' objects>",
+      "inclusive_cpu_seconds": 0.408441783,
+      "line": 0,
+      "primitive_calls": 455920
+    },
+    {
+      "calls": 58672,
+      "exclusive_cpu_seconds": 0.118336167,
+      "file": "activation.py",
+      "function": "forward",
+      "inclusive_cpu_seconds": 0.40619125,
+      "line": 428,
+      "primitive_calls": 58672
+    },
+    {
+      "calls": 20967,
+      "exclusive_cpu_seconds": 0.066212043,
+      "file": "sparse.py",
+      "function": "forward",
+      "inclusive_cpu_seconds": 0.37578294900000003,
+      "line": 188,
+      "primitive_calls": 20967
+    },
+    {
+      "calls": 17858,
+      "exclusive_cpu_seconds": 0.035383135,
+      "file": "normalizer_v49.py",
+      "function": "canonical",
+      "inclusive_cpu_seconds": 0.309509083,
+      "line": 14,
+      "primitive_calls": 17858
+    },
+    {
+      "calls": 59184,
+      "exclusive_cpu_seconds": 0.30334978100000004,
+      "file": "~",
+      "function": "<built-in method torch.tanh>",
+      "inclusive_cpu_seconds": 0.30334978100000004,
+      "line": 0,
+      "primitive_calls": 59184
+    },
+    {
+      "calls": 1117,
+      "exclusive_cpu_seconds": 0.018649024,
+      "file": "~",
+      "function": "<built-in method builtins.sorted>",
+      "inclusive_cpu_seconds": 0.290145955,
+      "line": 0,
+      "primitive_calls": 1117
+    },
+    {
+      "calls": 20967,
+      "exclusive_cpu_seconds": 0.066265161,
+      "file": "functional.py",
+      "function": "embedding",
+      "inclusive_cpu_seconds": 0.288420544,
+      "line": 2455,
+      "primitive_calls": 20967
+    },
+    {
+      "calls": 17858,
+      "exclusive_cpu_seconds": 0.060418073,
+      "file": "__init__.py",
+      "function": "dumps",
+      "inclusive_cpu_seconds": 0.274125948,
+      "line": 185,
+      "primitive_calls": 17858
+    },
+    {
+      "calls": 256,
+      "exclusive_cpu_seconds": 0.006938906000000001,
+      "file": "model.py",
+      "function": "_candidate_vectors",
+      "inclusive_cpu_seconds": 0.270225745,
+      "line": 98,
+      "primitive_calls": 256
+    },
+    {
+      "calls": 3856,
+      "exclusive_cpu_seconds": 0.037117662,
+      "file": "copy.py",
+      "function": "_deepcopy_dict",
+      "inclusive_cpu_seconds": 0.25807639800000004,
+      "line": 218,
+      "primitive_calls": 2447
+    },
+    {
+      "calls": 256,
+      "exclusive_cpu_seconds": 0.006320377,
+      "file": "normalizer_v49.py",
+      "function": "_resources",
+      "inclusive_cpu_seconds": 0.22994012900000002,
+      "line": 73,
+      "primitive_calls": 256
+    }
+  ],
+  "torch_rng_state_restored": true,
+  "whole_diagnostic_command_cpu_seconds": 16.591256651
+}

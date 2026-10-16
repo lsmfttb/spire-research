@@ -1,0 +1,947 @@
+{
+  "aggregate_validation_ledger_cpu_seconds_including_finalization_charge": 379.18876992200006,
+  "disposition": "STUDY_ONLY; formal grid cannot resume while the unchanged R2 cost projection remains above the 180000s Builder allowance",
+  "formal_grid_forecast_at_validation": {
+    "accounted_cpu_seconds": 3336.5235818620004,
+    "all_history": {
+      "mean": 24.598478716155842,
+      "n": 77,
+      "sample_sd": 28.83532966264987,
+      "upper": 34.45675108843367
+    },
+    "builder_budget_cpu_seconds": 180000.0,
+    "cost_rule": "max(all-history and recent-128 mean + 3 sample-SD/sqrt(n))",
+    "game_cost_multiplier": 1.5,
+    "interpretation": "fixed operational heuristic; not a calibrated confidence bound or cost guarantee",
+    "max_based_stress_game_projection_cpu_seconds": 856554.4242526026,
+    "max_observed_game_cpu_seconds_stress_only": 181.69666629599988,
+    "observed_complete_games": 77,
+    "optimizer_headroom_fraction": 0.2,
+    "process_cpu_cap_seconds": 200000.0,
+    "projected_all_in_cpu_seconds": 217974.02345082807,
+    "projected_builder_cpu_seconds": 197974.02345082807,
+    "projected_remaining_cpu_seconds": 194637.49986896606,
+    "projected_remaining_game_cpu_seconds_before_headroom": 135363.34665091167,
+    "projected_remaining_game_cpu_seconds_with_headroom": 162436.015981094,
+    "projected_remaining_optimizer_cpu_seconds_with_headroom": 32201.483887872047,
+    "recent_observed_games": 77,
+    "recent_window": {
+      "mean": 24.598478716155842,
+      "n": 77,
+      "sample_sd": 28.83532966264987,
+      "upper": 34.45675108843367
+    },
+    "recent_window_size": 128,
+    "remaining_games": 2619,
+    "remaining_optimizer_cpu_seconds_before_headroom": 26834.569906560042,
+    "reviewer_reserve_cpu_seconds": 20000.0,
+    "status": "RESOURCE_BLOCKED",
+    "unit_cost_cpu_seconds": 34.45675108843367
+  },
+  "formal_grid_forecast_initial_guard_message": "RESOURCE_BLOCKED: revised forecast projects 197599.670s Builder CPU against 180000s",
+  "host": {
+    "cpu_model": "AMD Ryzen 7 H 255 W/ Radeon 780M",
+    "cpu_quota_count": null,
+    "cpus_allowed_list": "0-15",
+    "effective_cpu_count": 16,
+    "effective_memory_available_bytes": 20415901696,
+    "logical_cpu_count": 16,
+    "memory_available_bytes": 20415901696,
+    "memory_current_bytes": 0,
+    "memory_limit_bytes": null,
+    "memory_total_bytes": 25199456256
+  },
+  "optimizer_minibatch_profile": {
+    "batching_readout": "decision preprocessing and model forward are per row; one combined scalar loss is backpropagated and one optimizer step runs per minibatch",
+    "disposable_model_optimizer_only": true,
+    "host": {
+      "cpu_model": "AMD Ryzen 7 H 255 W/ Radeon 780M",
+      "cpu_quota_count": null,
+      "cpus_allowed_list": "0-15",
+      "effective_cpu_count": 16,
+      "effective_memory_available_bytes": 19825799168,
+      "logical_cpu_count": 16,
+      "memory_available_bytes": 19825799168,
+      "memory_current_bytes": 0,
+      "memory_limit_bytes": null,
+      "memory_total_bytes": 25199456256
+    },
+    "ledger_charge_cpu_seconds": 16.691256651,
+    "minibatch_rows": 256,
+    "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+    "preflight_decision_rows": 229,
+    "prior_failed_attempt": {
+      "path": "evidence/validation/parallel-execution/profiles/optimizer-minibatch-attempt-01.pstats",
+      "producer_commit": "9cdc668933cb88293ed5b932bcc5996b165322c2",
+      "receipt_failure": "direct git subprocess could not resolve Windows linked-worktree pointer; no simulation or optimizer state persisted",
+      "sha256": "4a632455690a37ea456b2a2008011b278501088c7459ce41a420769dad0bc6bf",
+      "timed_minibatch_process_cpu_seconds": 15.662546846999993,
+      "whole_command_cpu_charge_seconds": 25.0
+    },
+    "profile_path": "evidence/validation/parallel-execution/profiles/optimizer-minibatch-attempt-02.pstats",
+    "profile_sha256": "74fd707c9ff22c757cae157f783c8bade70cdc320f7e341f407fb6ff73ddf9cc",
+    "profiled_source_commit": "257e01d2e00e76c9557e78c95cc86a4a1d329a0a",
+    "runtime": {
+      "deterministic_algorithms": true,
+      "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+      "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+      "native_module": "/home/lsmft/stsrl-spikes/issue60-runtime/build-issue60/slaythespire.cpython-313-x86_64-linux-gnu.so",
+      "native_source": "/home/lsmft/stsrl-spikes/sts_lightspeed-issue59",
+      "python": "3.13.13",
+      "runtime_api": {
+        "LightSpeedAdapter": "sts_combat_rl.sim.lightspeed",
+        "action_space": {
+          "allow_excluded_fallback": true,
+          "excluded_kinds": [],
+          "include_non_combat_potions": true,
+          "preferred_kinds": [
+            "card",
+            "end_turn"
+          ]
+        },
+        "execute_controlled_run": "sts_combat_rl.sim.controlled_run"
+      },
+      "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+      "stsr_source": "/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c",
+      "torch": "2.12.0+cpu",
+      "torch_threads": 1
+    },
+    "schema_id": "issue60-optimizer-minibatch-profile-v1",
+    "source_files": {
+      "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+      "run_study_parallel.py": "7399044a23c1acc26b3a1ec857d7631511b013f8b9b19b8d646f806ff24d8ba3"
+    },
+    "status": "PASS",
+    "timed_minibatch_process_cpu_seconds": 15.50635492,
+    "timed_minibatch_wall_seconds": 15.646445888000017,
+    "top_functions": [
+      {
+        "calls": 1,
+        "exclusive_cpu_seconds": 0.035612616,
+        "file": "trainer.py",
+        "function": "ppo_minibatch_loss",
+        "inclusive_cpu_seconds": 12.749630599000001,
+        "line": 112,
+        "primitive_calls": 1
+      },
+      {
+        "calls": 256,
+        "exclusive_cpu_seconds": 0.37568780500000004,
+        "file": "encoder.py",
+        "function": "encode",
+        "inclusive_cpu_seconds": 7.453258001,
+        "line": 165,
+        "primitive_calls": 256
+      },
+      {
+        "calls": 177870,
+        "exclusive_cpu_seconds": 0.39305595800000004,
+        "file": "module.py",
+        "function": "_wrapped_call_impl",
+        "inclusive_cpu_seconds": 5.229161840000001,
+        "line": 1774,
+        "primitive_calls": 256
+      },
+      {
+        "calls": 177870,
+        "exclusive_cpu_seconds": 0.578606884,
+        "file": "module.py",
+        "function": "_call_impl",
+        "inclusive_cpu_seconds": 5.22794816,
+        "line": 1782,
+        "primitive_calls": 256
+      },
+      {
+        "calls": 256,
+        "exclusive_cpu_seconds": 0.027263543,
+        "file": "model.py",
+        "function": "forward",
+        "inclusive_cpu_seconds": 5.219023325,
+        "line": 106,
+        "primitive_calls": 256
+      },
+      {
+        "calls": 256,
+        "exclusive_cpu_seconds": 0.5584384370000001,
+        "file": "model.py",
+        "function": "_map_vectors",
+        "inclusive_cpu_seconds": 4.025607858,
+        "line": 73,
+        "primitive_calls": 256
+      },
+      {
+        "calls": 20709,
+        "exclusive_cpu_seconds": 0.8125477210000001,
+        "file": "encoder.py",
+        "function": "_entity",
+        "inclusive_cpu_seconds": 4.00816581,
+        "line": 109,
+        "primitive_calls": 20709
+      },
+      {
+        "calls": 20709,
+        "exclusive_cpu_seconds": 0.152985812,
+        "file": "model.py",
+        "function": "_entity_vector",
+        "inclusive_cpu_seconds": 3.2618827620000004,
+        "line": 65,
+        "primitive_calls": 20709
+      },
+      {
+        "calls": 925599,
+        "exclusive_cpu_seconds": 1.057570391,
+        "file": "~",
+        "function": "<built-in method builtins.isinstance>",
+        "inclusive_cpu_seconds": 3.247927819,
+        "line": 0,
+        "primitive_calls": 497827
+      },
+      {
+        "calls": 1,
+        "exclusive_cpu_seconds": 2.199e-05,
+        "file": "_tensor.py",
+        "function": "backward",
+        "inclusive_cpu_seconds": 2.7475567830000003,
+        "line": 576,
+        "primitive_calls": 1
+      },
+      {
+        "calls": 1,
+        "exclusive_cpu_seconds": 5.861800000000001e-05,
+        "file": "__init__.py",
+        "function": "backward",
+        "inclusive_cpu_seconds": 2.74753331,
+        "line": 253,
+        "primitive_calls": 1
+      },
+      {
+        "calls": 1,
+        "exclusive_cpu_seconds": 4.2949000000000005e-05,
+        "file": "graph.py",
+        "function": "_engine_run_backward",
+        "inclusive_cpu_seconds": 2.747292643,
+        "line": 869,
+        "primitive_calls": 1
+      },
+      {
+        "calls": 1,
+        "exclusive_cpu_seconds": 2.747217253,
+        "file": "~",
+        "function": "<method 'run_backward' of 'torch._C._EngineBase' objects>",
+        "inclusive_cpu_seconds": 2.747217253,
+        "line": 0,
+        "primitive_calls": 1
+      },
+      {
+        "calls": 37707,
+        "exclusive_cpu_seconds": 0.23799814800000002,
+        "file": "container.py",
+        "function": "forward",
+        "inclusive_cpu_seconds": 2.689332442,
+        "line": 248,
+        "primitive_calls": 37707
+      },
+      {
+        "calls": 170912,
+        "exclusive_cpu_seconds": 0.30481115200000003,
+        "file": "encoder.py",
+        "function": "_field",
+        "inclusive_cpu_seconds": 2.5528931590000004,
+        "line": 99,
+        "primitive_calls": 170912
+      },
+      {
+        "calls": 213886,
+        "exclusive_cpu_seconds": 0.38112933800000004,
+        "file": "typing.py",
+        "function": "__instancecheck__",
+        "inclusive_cpu_seconds": 2.424112328,
+        "line": 1389,
+        "primitive_calls": 213886
+      },
+      {
+        "calls": 213886,
+        "exclusive_cpu_seconds": 0.733099189,
+        "file": "typing.py",
+        "function": "__subclasscheck__",
+        "inclusive_cpu_seconds": 2.04298299,
+        "line": 1680,
+        "primitive_calls": 213886
+      },
+      {
+        "calls": 256,
+        "exclusive_cpu_seconds": 0.02889521,
+        "file": "normalizer_v49.py",
+        "function": "normalize",
+        "inclusive_cpu_seconds": 1.595404971,
+        "line": 132,
+        "primitive_calls": 256
+      },
+      {
+        "calls": 60268,
+        "exclusive_cpu_seconds": 0.24550750300000002,
+        "file": "linear.py",
+        "function": "forward",
+        "inclusive_cpu_seconds": 1.1437105440000002,
+        "line": 130,
+        "primitive_calls": 60268
+      },
+      {
+        "calls": 213886,
+        "exclusive_cpu_seconds": 0.392122821,
+        "file": "~",
+        "function": "<built-in method builtins.issubclass>",
+        "inclusive_cpu_seconds": 0.949833593,
+        "line": 0,
+        "primitive_calls": 213886
+      },
+      {
+        "calls": 20967,
+        "exclusive_cpu_seconds": 0.13604342,
+        "file": "model.py",
+        "function": "_category_sum",
+        "inclusive_cpu_seconds": 0.9150835220000001,
+        "line": 59,
+        "primitive_calls": 20967
+      },
+      {
+        "calls": 1689,
+        "exclusive_cpu_seconds": 0.012344027,
+        "file": "model.py",
+        "function": "_entity_pool",
+        "inclusive_cpu_seconds": 0.814899075,
+        "line": 70,
+        "primitive_calls": 1689
+      },
+      {
+        "calls": 60268,
+        "exclusive_cpu_seconds": 0.777751956,
+        "file": "~",
+        "function": "<built-in method torch._C._nn.linear>",
+        "inclusive_cpu_seconds": 0.777751956,
+        "line": 0,
+        "primitive_calls": 60268
+      },
+      {
+        "calls": 3474,
+        "exclusive_cpu_seconds": 0.007245764,
+        "file": "encoder.py",
+        "function": "<genexpr>",
+        "inclusive_cpu_seconds": 0.7525470550000001,
+        "line": 204,
+        "primitive_calls": 3474
+      },
+      {
+        "calls": 256,
+        "exclusive_cpu_seconds": 0.160087273,
+        "file": "normalizer_v49.py",
+        "function": "_map_graph",
+        "inclusive_cpu_seconds": 0.695280254,
+        "line": 89,
+        "primitive_calls": 256
+      },
+      {
+        "calls": 213946,
+        "exclusive_cpu_seconds": 0.360758181,
+        "file": "<frozen abc>",
+        "function": "__subclasscheck__",
+        "inclusive_cpu_seconds": 0.5581462,
+        "line": 121,
+        "primitive_calls": 213889
+      },
+      {
+        "calls": 577988,
+        "exclusive_cpu_seconds": 0.539986943,
+        "file": "~",
+        "function": "<method 'get' of 'dict' objects>",
+        "inclusive_cpu_seconds": 0.539986943,
+        "line": 0,
+        "primitive_calls": 577988
+      },
+      {
+        "calls": 34807,
+        "exclusive_cpu_seconds": 0.131386938,
+        "file": "~",
+        "function": "<built-in method builtins.any>",
+        "inclusive_cpu_seconds": 0.5152213090000001,
+        "line": 0,
+        "primitive_calls": 34807
+      },
+      {
+        "calls": 52963,
+        "exclusive_cpu_seconds": 0.22212167600000002,
+        "file": "copy.py",
+        "function": "deepcopy",
+        "inclusive_cpu_seconds": 0.444006381,
+        "line": 119,
+        "primitive_calls": 27385
+      },
+      {
+        "calls": 455920,
+        "exclusive_cpu_seconds": 0.408441783,
+        "file": "~",
+        "function": "<method 'append' of 'list' objects>",
+        "inclusive_cpu_seconds": 0.408441783,
+        "line": 0,
+        "primitive_calls": 455920
+      },
+      {
+        "calls": 58672,
+        "exclusive_cpu_seconds": 0.118336167,
+        "file": "activation.py",
+        "function": "forward",
+        "inclusive_cpu_seconds": 0.40619125,
+        "line": 428,
+        "primitive_calls": 58672
+      },
+      {
+        "calls": 20967,
+        "exclusive_cpu_seconds": 0.066212043,
+        "file": "sparse.py",
+        "function": "forward",
+        "inclusive_cpu_seconds": 0.37578294900000003,
+        "line": 188,
+        "primitive_calls": 20967
+      },
+      {
+        "calls": 17858,
+        "exclusive_cpu_seconds": 0.035383135,
+        "file": "normalizer_v49.py",
+        "function": "canonical",
+        "inclusive_cpu_seconds": 0.309509083,
+        "line": 14,
+        "primitive_calls": 17858
+      },
+      {
+        "calls": 59184,
+        "exclusive_cpu_seconds": 0.30334978100000004,
+        "file": "~",
+        "function": "<built-in method torch.tanh>",
+        "inclusive_cpu_seconds": 0.30334978100000004,
+        "line": 0,
+        "primitive_calls": 59184
+      },
+      {
+        "calls": 1117,
+        "exclusive_cpu_seconds": 0.018649024,
+        "file": "~",
+        "function": "<built-in method builtins.sorted>",
+        "inclusive_cpu_seconds": 0.290145955,
+        "line": 0,
+        "primitive_calls": 1117
+      },
+      {
+        "calls": 20967,
+        "exclusive_cpu_seconds": 0.066265161,
+        "file": "functional.py",
+        "function": "embedding",
+        "inclusive_cpu_seconds": 0.288420544,
+        "line": 2455,
+        "primitive_calls": 20967
+      },
+      {
+        "calls": 17858,
+        "exclusive_cpu_seconds": 0.060418073,
+        "file": "__init__.py",
+        "function": "dumps",
+        "inclusive_cpu_seconds": 0.274125948,
+        "line": 185,
+        "primitive_calls": 17858
+      },
+      {
+        "calls": 256,
+        "exclusive_cpu_seconds": 0.006938906000000001,
+        "file": "model.py",
+        "function": "_candidate_vectors",
+        "inclusive_cpu_seconds": 0.270225745,
+        "line": 98,
+        "primitive_calls": 256
+      },
+      {
+        "calls": 3856,
+        "exclusive_cpu_seconds": 0.037117662,
+        "file": "copy.py",
+        "function": "_deepcopy_dict",
+        "inclusive_cpu_seconds": 0.25807639800000004,
+        "line": 218,
+        "primitive_calls": 2447
+      },
+      {
+        "calls": 256,
+        "exclusive_cpu_seconds": 0.006320377,
+        "file": "normalizer_v49.py",
+        "function": "_resources",
+        "inclusive_cpu_seconds": 0.22994012900000002,
+        "line": 73,
+        "primitive_calls": 256
+      }
+    ],
+    "torch_rng_state_restored": true,
+    "whole_diagnostic_command_cpu_seconds": 16.591256651
+  },
+  "optimizer_readout": "The frozen runner processes/forwards decision rows one at a time and applies one combined loss/backward/optimizer step per minibatch. The separate disposable 256-row profile is in optimizer_minibatch_receipt.json.",
+  "paired_replays": [
+    {
+      "attempt_path": "evidence/validation/parallel-execution/replays/seed-660001/attempt-0001",
+      "decision_prefix_matches_retained_original": true,
+      "decision_prefix_rows": 10,
+      "failure": "ResourceBudgetExceeded: RESOURCE_BLOCKED: parallel/profile validation exceeded 500 CPU-s",
+      "native_search_timer_cpu_seconds": 0.1994349559999855,
+      "partial_decisions_sha256": "8d62c792324926bd391a865c76b000f9e10d1a217cb1a5c319c8b83a0add0ab4",
+      "process_cpu_seconds": 63.488169,
+      "retained_original_decision_rows": 30,
+      "retained_original_decisions_sha256": "0f06a3536db36bbe98337187f917d9d0b754d5dafd12a18c72ef6d08ff327fe3",
+      "search_calls": 276,
+      "seed": 660001,
+      "status": "INCOMPLETE"
+    },
+    {
+      "attempt_path": "evidence/validation/parallel-execution/replays/seed-660046/attempt-0001",
+      "decision_prefix_matches_retained_original": true,
+      "decision_prefix_rows": 21,
+      "failure": "ResourceBudgetExceeded: RESOURCE_BLOCKED: parallel/profile validation exceeded 500 CPU-s",
+      "native_search_timer_cpu_seconds": 0.39229107599999713,
+      "partial_decisions_sha256": "d0401ac9e9da726d4e7ecb2191374af43c2c3d4e1fafd5a5d93eb08921bef460",
+      "process_cpu_seconds": 246.90635600000002,
+      "retained_original_decision_rows": 69,
+      "retained_original_decisions_sha256": "5e5097afd3b9fa4d5e73fea93e309dc03fbed293a5745c3c8fced338a4210bcb",
+      "search_calls": 990,
+      "seed": 660046,
+      "status": "INCOMPLETE"
+    }
+  ],
+  "parallel_execution": {
+    "aggregate_validation_ledger_cpu_seconds_before_receipt_finalization": 378.68617024400004,
+    "configured_workers": 2,
+    "conservative_profile_stage_cpu_charge_seconds": 320.39452500000004,
+    "max_active_workers": 2,
+    "parent_peak_rss_bytes": null,
+    "partial_worker_process_cpu_status_sum_seconds": 310.39452500000004,
+    "rss_limitation": "The interrupted first-pass runner did not persist its live RSS tracker values; no values were reconstructed or guessed.",
+    "worker_peak_rss_bytes": null
+  },
+  "planner_authorization": {
+    "comment_ids": [
+      6210979819,
+      6211078134
+    ],
+    "fixed_profile_keys": [
+      660001,
+      660046
+    ],
+    "maximum_additional_cpu_seconds": 500
+  },
+  "profile": {
+    "category_exclusive_cpu_seconds": {
+      "A bootstrap tokenization/hash/scoring": 3.6312015300000002,
+      "JSON/history/log serialization/compression": 10.314494084000001,
+      "native reset/step/snapshot/public projection and executor": 1.317882005,
+      "other Python/executor remainder": 194.7982465580001,
+      "public context/history and legacy feature construction": 99.063409329,
+      "residual normalization/encoding/forward": 0.851232129,
+      "search report/action mapping and policy dispatch": 0.006380432999999999
+    },
+    "category_inclusive_cpu_seconds_overlapping": {
+      "A bootstrap tokenization/hash/scoring": 21.687379416,
+      "JSON/history/log serialization/compression": 30.92795354,
+      "native reset/step/snapshot/public projection and executor": 15.508069149999999,
+      "other Python/executor remainder": 764.8457186340001,
+      "public context/history and legacy feature construction": 919.5510912749996,
+      "residual normalization/encoding/forward": 4.356112826,
+      "search report/action mapping and policy dispatch": 20.491171103000003
+    },
+    "cprofile_exclusive_sum_seconds": 309.9828460680001,
+    "native_search_cpu_seconds_from_existing_timer": 0.5917260319999826,
+    "partial_profiles_by_seed": [
+      {
+        "function_count": 694,
+        "path": "evidence/validation/parallel-execution/profiles/seed-660001.pstats",
+        "seed": 660001,
+        "sha256": "ab993ca5463b296d1a17b88c781d4fb21416eab436db87b1ac02c527e4fa737f",
+        "top_functions": [
+          {
+            "calls": 771,
+            "exclusive_cpu_seconds": 0.004437244,
+            "file": "public_run_context.py",
+            "function": "sanitize_public_run_context",
+            "inclusive_cpu_seconds": 34.244252586,
+            "line": 251
+          },
+          {
+            "calls": 106,
+            "exclusive_cpu_seconds": 0.004399109,
+            "file": "public_run_context.py",
+            "function": "build_public_run_context",
+            "inclusive_cpu_seconds": 32.93496417,
+            "line": 90
+          },
+          {
+            "calls": 771,
+            "exclusive_cpu_seconds": 0.0023194680000000003,
+            "file": "public_run_context.py",
+            "function": "forbidden_public_context_problems",
+            "inclusive_cpu_seconds": 29.507020134,
+            "line": 263
+          },
+          {
+            "calls": 651460,
+            "exclusive_cpu_seconds": 4.826989593,
+            "file": "public_run_context.py",
+            "function": "_append_forbidden_problems",
+            "inclusive_cpu_seconds": 29.504700666,
+            "line": 469
+          },
+          {
+            "calls": 36,
+            "exclusive_cpu_seconds": 0.000266887,
+            "file": "resource_amendment_r2.py",
+            "function": "wrapped",
+            "inclusive_cpu_seconds": 17.374530877,
+            "line": 521
+          },
+          {
+            "calls": 36,
+            "exclusive_cpu_seconds": 0.000198729,
+            "file": "run_study_r2.py",
+            "function": "<lambda>",
+            "inclusive_cpu_seconds": 17.37408603,
+            "line": 84
+          },
+          {
+            "calls": 36,
+            "exclusive_cpu_seconds": 0.20738466000000003,
+            "file": "run_study_r2.py",
+            "function": "guard",
+            "inclusive_cpu_seconds": 17.373887301,
+            "line": 50
+          },
+          {
+            "calls": 626704,
+            "exclusive_cpu_seconds": 8.705855603,
+            "file": "~",
+            "function": "<built-in method builtins.any>",
+            "inclusive_cpu_seconds": 16.769686335,
+            "line": 0
+          },
+          {
+            "calls": 4574351,
+            "exclusive_cpu_seconds": 6.273991725,
+            "file": "~",
+            "function": "<built-in method builtins.isinstance>",
+            "inclusive_cpu_seconds": 14.671973633,
+            "line": 0
+          },
+          {
+            "calls": 144,
+            "exclusive_cpu_seconds": 0.08627419800000001,
+            "file": "run_study.py",
+            "function": "_all_attempts",
+            "inclusive_cpu_seconds": 9.247134773,
+            "line": 540
+          },
+          {
+            "calls": 2194781,
+            "exclusive_cpu_seconds": 3.810914771,
+            "file": "<frozen abc>",
+            "function": "__instancecheck__",
+            "inclusive_cpu_seconds": 8.310517198000001,
+            "line": 117
+          },
+          {
+            "calls": 35,
+            "exclusive_cpu_seconds": 0.001355427,
+            "file": "public_run_context.py",
+            "function": "append_public_history_entry",
+            "inclusive_cpu_seconds": 8.294318853,
+            "line": 213
+          },
+          {
+            "calls": 9218205,
+            "exclusive_cpu_seconds": 7.84199463,
+            "file": "public_run_context.py",
+            "function": "<genexpr>",
+            "inclusive_cpu_seconds": 7.84199463,
+            "line": 474
+          },
+          {
+            "calls": 141,
+            "exclusive_cpu_seconds": 0.001089198,
+            "file": "public_run_context.py",
+            "function": "explicit_missing_paths",
+            "inclusive_cpu_seconds": 7.408267135000001,
+            "line": 271
+          },
+          {
+            "calls": 471655,
+            "exclusive_cpu_seconds": 2.2012545820000002,
+            "file": "public_run_context.py",
+            "function": "_append_missing_paths",
+            "inclusive_cpu_seconds": 7.404532961,
+            "line": 454
+          },
+          {
+            "calls": 36,
+            "exclusive_cpu_seconds": 0.28333640800000004,
+            "file": "resource_amendment_r2.py",
+            "function": "complete_game_costs",
+            "inclusive_cpu_seconds": 7.404219844000001,
+            "line": 185
+          },
+          {
+            "calls": 8172,
+            "exclusive_cpu_seconds": 0.087059335,
+            "file": "glob.py",
+            "function": "select_recursive",
+            "inclusive_cpu_seconds": 6.600257153,
+            "line": 498
+          },
+          {
+            "calls": 24660,
+            "exclusive_cpu_seconds": 2.018234483,
+            "file": "glob.py",
+            "function": "select_recursive_step",
+            "inclusive_cpu_seconds": 6.502258118,
+            "line": 507
+          },
+          {
+            "calls": 36,
+            "exclusive_cpu_seconds": 0.010959483,
+            "file": "run_study.py",
+            "function": "_completed_run_count",
+            "inclusive_cpu_seconds": 4.890570751,
+            "line": 563
+          },
+          {
+            "calls": 652598,
+            "exclusive_cpu_seconds": 2.757123881,
+            "file": "public_run_context.py",
+            "function": "_sanitize_json_value",
+            "inclusive_cpu_seconds": 4.735259169,
+            "line": 483
+          }
+        ]
+      },
+      {
+        "function_count": 699,
+        "path": "evidence/validation/parallel-execution/profiles/seed-660046.pstats",
+        "seed": 660046,
+        "sha256": "288590b1288e258ace7676e8d7863cef5f6886d1bd680e0d43356b960c0d19a6",
+        "top_functions": [
+          {
+            "calls": 2994,
+            "exclusive_cpu_seconds": 0.015431160000000001,
+            "file": "public_run_context.py",
+            "function": "sanitize_public_run_context",
+            "inclusive_cpu_seconds": 157.79197961,
+            "line": 251
+          },
+          {
+            "calls": 220,
+            "exclusive_cpu_seconds": 0.010903951,
+            "file": "public_run_context.py",
+            "function": "build_public_run_context",
+            "inclusive_cpu_seconds": 152.079428833,
+            "line": 90
+          },
+          {
+            "calls": 2994,
+            "exclusive_cpu_seconds": 0.007868974,
+            "file": "public_run_context.py",
+            "function": "forbidden_public_context_problems",
+            "inclusive_cpu_seconds": 136.09961273800002,
+            "line": 263
+          },
+          {
+            "calls": 3051060,
+            "exclusive_cpu_seconds": 22.222206164000003,
+            "file": "public_run_context.py",
+            "function": "_append_forbidden_problems",
+            "inclusive_cpu_seconds": 136.091743764,
+            "line": 469
+          },
+          {
+            "calls": 3022251,
+            "exclusive_cpu_seconds": 41.328606796,
+            "file": "~",
+            "function": "<built-in method builtins.any>",
+            "inclusive_cpu_seconds": 79.45369686000001,
+            "line": 0
+          },
+          {
+            "calls": 20171340,
+            "exclusive_cpu_seconds": 27.816891525000003,
+            "file": "~",
+            "function": "<built-in method builtins.isinstance>",
+            "inclusive_cpu_seconds": 66.621465496,
+            "line": 0
+          },
+          {
+            "calls": 74,
+            "exclusive_cpu_seconds": 0.000490328,
+            "file": "resource_amendment_r2.py",
+            "function": "wrapped",
+            "inclusive_cpu_seconds": 39.318041050000005,
+            "line": 521
+          },
+          {
+            "calls": 74,
+            "exclusive_cpu_seconds": 0.00035803200000000004,
+            "file": "run_study_r2.py",
+            "function": "<lambda>",
+            "inclusive_cpu_seconds": 39.317200419,
+            "line": 84
+          },
+          {
+            "calls": 74,
+            "exclusive_cpu_seconds": 0.439823342,
+            "file": "run_study_r2.py",
+            "function": "guard",
+            "inclusive_cpu_seconds": 39.316842387,
+            "line": 50
+          },
+          {
+            "calls": 73,
+            "exclusive_cpu_seconds": 0.00473069,
+            "file": "public_run_context.py",
+            "function": "append_public_history_entry",
+            "inclusive_cpu_seconds": 38.805218708000005,
+            "line": 213
+          },
+          {
+            "calls": 10367681,
+            "exclusive_cpu_seconds": 17.730274761,
+            "file": "<frozen abc>",
+            "function": "__instancecheck__",
+            "inclusive_cpu_seconds": 38.614969782,
+            "line": 117
+          },
+          {
+            "calls": 43285455,
+            "exclusive_cpu_seconds": 36.247786102,
+            "file": "public_run_context.py",
+            "function": "<genexpr>",
+            "inclusive_cpu_seconds": 36.247786102,
+            "line": 474
+          },
+          {
+            "calls": 293,
+            "exclusive_cpu_seconds": 0.002178522,
+            "file": "public_run_context.py",
+            "function": "explicit_missing_paths",
+            "inclusive_cpu_seconds": 34.066750926000005,
+            "line": 271
+          },
+          {
+            "calls": 2210710,
+            "exclusive_cpu_seconds": 10.107343760000001,
+            "file": "public_run_context.py",
+            "function": "_append_missing_paths",
+            "inclusive_cpu_seconds": 34.05561145,
+            "line": 454
+          },
+          {
+            "calls": 3053407,
+            "exclusive_cpu_seconds": 12.653127384000001,
+            "file": "public_run_context.py",
+            "function": "_sanitize_json_value",
+            "inclusive_cpu_seconds": 21.680715675000002,
+            "line": 483
+          },
+          {
+            "calls": 296,
+            "exclusive_cpu_seconds": 0.16691745900000002,
+            "file": "run_study.py",
+            "function": "_all_attempts",
+            "inclusive_cpu_seconds": 20.949350257000003,
+            "line": 540
+          },
+          {
+            "calls": 10367681,
+            "exclusive_cpu_seconds": 11.682337735,
+            "file": "~",
+            "function": "<built-in method _abc._abc_instancecheck>",
+            "inclusive_cpu_seconds": 20.884695021000002,
+            "line": 0
+          },
+          {
+            "calls": 74,
+            "exclusive_cpu_seconds": 0.5200385430000001,
+            "file": "resource_amendment_r2.py",
+            "function": "complete_game_costs",
+            "inclusive_cpu_seconds": 16.662945163,
+            "line": 185
+          },
+          {
+            "calls": 16798,
+            "exclusive_cpu_seconds": 0.173870148,
+            "file": "glob.py",
+            "function": "select_recursive",
+            "inclusive_cpu_seconds": 16.642412952,
+            "line": 498
+          },
+          {
+            "calls": 50690,
+            "exclusive_cpu_seconds": 4.548624791,
+            "file": "glob.py",
+            "function": "select_recursive_step",
+            "inclusive_cpu_seconds": 16.439695408000002,
+            "line": 507
+          }
+        ]
+      }
+    ],
+    "profiling_method": "cProfile; category exclusive seconds sum function self times, inclusive seconds sum cumulative times and may overlap",
+    "run_game_process_cpu_seconds": 310.39452500000004,
+    "scope": "partial same-key profiles; retained original complete games are the terminal baselines; profile replay terminal comparison unavailable because budget-safe attempts stopped incomplete",
+    "unaccounted_run_game_cpu_seconds": 0.4116789319999725
+  },
+  "r2_receipt_sha256": "ba0df76a9ee0aed8694efb3adbc835c436609ebb19ebc954febec6a160a09b64",
+  "r2_seal_preseal_sha256": "b2fa6b94e293cb5ad626697b336199bc6d5b5b5e751217aa06affa1624038e30",
+  "receipt_finalization_cpu_charge_seconds": 0.5025996779999997,
+  "runtime": {
+    "deterministic_algorithms": true,
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "native_module": "/home/lsmft/stsrl-spikes/issue60-runtime/build-issue60/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_source": "/home/lsmft/stsrl-spikes/sts_lightspeed-issue59",
+    "python": "3.13.13",
+    "runtime_api": {
+      "LightSpeedAdapter": "sts_combat_rl.sim.lightspeed",
+      "action_space": {
+        "allow_excluded_fallback": true,
+        "excluded_kinds": [],
+        "include_non_combat_potions": true,
+        "preferred_kinds": [
+          "card",
+          "end_turn"
+        ]
+      },
+      "execute_controlled_run": "sts_combat_rl.sim.controlled_run"
+    },
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsr_source": "/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c",
+    "torch": "2.12.0+cpu",
+    "torch_threads": 1
+  },
+  "schema_id": "issue60-parallel-execution-validation-v1",
+  "source_commit": "b90fb68c5dad68fbcc0e46cf956363317313e8aa",
+  "source_files": {
+    "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+    "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9"
+  },
+  "status": "RESOURCE_BLOCKED",
+  "training_progress": {
+    "complete_formal_games_at_profile_time": 69,
+    "evaluation_runs": 0,
+    "ppo_updates": 0,
+    "training_status": "FAILED after safe SIGINT at completed seed 660069; unchanged experiment remains incomplete"
+  },
+  "validated_execution_code_commit": "88f83eb2ebe90fc3455b8036fb614b935671c33b",
+  "validation": {
+    "reason": "profile workers could not reserve safe completion within the remaining aggregate diagnostic budget; both isolated replay attempts remain incomplete; no formal batch/update was run",
+    "status": "RESOURCE_BLOCKED",
+    "two_worker_full_replay": "NOT_PASS",
+    "two_worker_queue_unit_checks": "PASS"
+  },
+  "zero_update_model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb"
+}

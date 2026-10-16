@@ -1,0 +1,35 @@
+{
+  "accounting_note": "post-hoc conservative charge: per-attempt status CPU sum 310.394525s plus 10s parent/worker-finalization margin; the failed legacy receipt path did not persist live wait4 counters",
+  "aggregate_process_cpu_conservative_charge_seconds": 320.39452500000004,
+  "aggregate_process_cpu_exact": false,
+  "failure": "RESOURCE_BLOCKED: cannot reserve safe completion within remaining diagnostic CPU cap",
+  "host": {
+    "cpu_model": "AMD Ryzen 7 H 255 W/ Radeon 780M",
+    "cpu_quota_count": null,
+    "cpus_allowed_list": "0-15",
+    "effective_cpu_count": 16,
+    "effective_memory_available_bytes": 20415901696,
+    "logical_cpu_count": 16,
+    "memory_available_bytes": 20415901696,
+    "memory_current_bytes": 0,
+    "memory_limit_bytes": null,
+    "memory_total_bytes": 25199456256
+  },
+  "max_active_workers": 2,
+  "parent_process_cpu_seconds": null,
+  "profile_paths": [
+    "evidence/validation/parallel-execution/profiles/seed-660001.pstats",
+    "evidence/validation/parallel-execution/profiles/seed-660046.pstats"
+  ],
+  "schema_id": "issue60-parallel-stage-receipt-v1",
+  "source_commit": "b90fb68c5dad68fbcc0e46cf956363317313e8aa",
+  "source_files": {
+    "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+    "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9"
+  },
+  "stage": "parallel-validation",
+  "status": "RESOURCE_BLOCKED",
+  "wall_seconds": null,
+  "worker_count": 2,
+  "worker_process_cpu_status_sum_seconds": 310.39452500000004
+}
