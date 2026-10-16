@@ -1,0 +1,74 @@
+{
+  "amendment_config_sha256": "c57ac99b78e47927b8e820df73301a9edda81156cfa043a00de4100dfb6093dc",
+  "amendment_id": "R1",
+  "explicitly_unchanged": {
+    "no_new_native_preflight_game": true,
+    "old_RESOURCE_BLOCKED_receipt_must_not_be_relabelled": true,
+    "original_blocked_gate_path": "evidence/preflight/native.json",
+    "original_config_path": "config.json",
+    "original_cpu_ledger_prefix_is_immutable": true,
+    "original_eight_preflight_games_are_reused": true,
+    "original_manifest_path": "frozen-manifest.json"
+  },
+  "frozen_manifest_sha256": "f1e4e6a3f7f13b97519ba8a6028f6939b08b8536d034e184712a709b9994ef61",
+  "issue": 60,
+  "original_config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+  "original_cpu_ledger_prefix_sha256": "fc91df26fdd91ecbaa2ebe9b293b9e98ab9d0b06e6061e6ed3d76fc761982119",
+  "original_manifest_sha256": "f8ee786b64e04d3188080072f4bfe9b843f2fcc43120df75b0c9ee18eb1faa13",
+  "original_preflight_gate_sha256": "2fd4b2e6f96f0624b63889e0315c013bef7adddd7e30d6948a9309a209a263eb",
+  "original_producer_commit": "a7e8593558e6817d2ed34a5cd6bd2d5bd0a98768",
+  "parent_handoff_commit": "d42b04235f4a8fead844998428e8cc35d2d64f03",
+  "planner_decision_comment_id": 6208819496,
+  "planner_decision_url": "https://github.com/lsmfttb/spire-research/issues/60#issuecomment-6208819496",
+  "producer_commit": "d15aebbdbf1d17c1c802a8eb1bd2b80b1ddff6b6",
+  "resource": {
+    "builder_administration_allowance_seconds": 200.0,
+    "builder_allowance_seconds": 180000.0,
+    "forecast_headroom_fraction": 0.2,
+    "future_reviewer_reserve_seconds": 19000.0,
+    "game_cost_multiplier": 1.5,
+    "optimizer_cost_multiplier": 1.5,
+    "planner_administration_allowance_seconds": 200.0,
+    "prior_reviewer_allowance_seconds": 1000.0,
+    "process_cpu_cap_seconds": 200000.0,
+    "remaining_games": 2688,
+    "remaining_optimizer_minibatches": 1984,
+    "reviewer_reserve_seconds": 20000.0
+  },
+  "review_reserve_accounting": {
+    "prior_reviewer_allowance_basis": "conservative allowance pending exact independent-review process CPU; charged within the review reserve, not the Builder allowance",
+    "prior_reviewer_charge_or_conservative_allowance_cpu_seconds": 1000.0,
+    "remaining_future_reviewer_reserve_cpu_seconds": 19000.0,
+    "total_review_reserve_cpu_seconds": 20000.0
+  },
+  "runner_diff_path": "evidence/resource-amendment-r1/runner.patch",
+  "runner_diff_sha256": "dcbb67559b5a6c5ae5e468a9812ff57eb558028a9817f3e47f543c2bfa4d9224",
+  "schema_id": "issue60-resource-authorization-r1-v1",
+  "scientific_design_changes": [],
+  "source_diff_whitelist": {
+    "added_paths": [
+      "resource_amendment_r1.py",
+      "resource-amendment-r1.json",
+      "prepare_resource_amendment_r1.py",
+      "freeze_manifest_r1.py",
+      "test_resource_amendment_r1.py"
+    ],
+    "deleted_paths": [],
+    "modified_paths": [
+      "run_study.py"
+    ],
+    "modified_runner_symbols": [
+      "REVIEWER_RESERVE",
+      "PROCESS_BUDGET",
+      "run_training",
+      "main"
+    ],
+    "permitted_runner_semantics": [
+      "change cumulative cap and review reserve constants only",
+      "replace the original RESOURCE_BLOCKED training consumer with a verified R1 gate consumer",
+      "add separate R1 resource-check/seal stages and route old preflight to a fail-closed stop",
+      "write repeat synthetic evidence to an R1-specific path, preserving the original witness"
+    ]
+  },
+  "status": "PLANNER_AUTHORIZED_RESOURCE_ONLY_CONTINUATION"
+}
