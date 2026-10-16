@@ -654,7 +654,7 @@ def profile_summary(profile_paths: Sequence[Path], *, run_cpu: float,
                 category = "native reset/step/snapshot/public projection and executor"
             elif base in {"bootstrap_v47.py"}:
                 category = "A bootstrap tokenization/hash/scoring"
-            elif base in {"normalizer_v49.py", "adapter_v47.py"}:
+            elif base in {"normalizer_v49.py", "adapter_v47.py", "public_run_context.py"}:
                 category = "public context/history and legacy feature construction"
             elif base in {"encoder.py", "model.py"}:
                 category = "residual normalization/encoding/forward"

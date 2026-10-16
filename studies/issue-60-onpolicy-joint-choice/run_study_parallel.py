@@ -34,6 +34,7 @@ PARALLEL_SOURCE_FILES = ("parallel_execution.py", "run_study_parallel.py")
 MAX_VALIDATION_CPU_SECONDS = 500.0
 VALIDATION_COMMAND_CPU_START = 0.0
 VALIDATION_SETUP_CPU = 0.0
+VALIDATION_PRIOR_CPU = 0.0
 
 R2: Any = None
 RS: Any = None
@@ -105,14 +106,15 @@ def _runtime_hooks() -> None:
                 "RESOURCE_BLOCKED: stop dispatching with a full-game in-flight CPU reserve"
             )
         if STAGE == "parallel-validation" and not can_dispatch(
-            actual_cpu=VALIDATION_SETUP_CPU + current_stage_cpu,
+            actual_cpu=VALIDATION_PRIOR_CPU + VALIDATION_SETUP_CPU + current_stage_cpu,
             builder_budget=MAX_VALIDATION_CPU_SECONDS - 5.0,
             active_or_pending_workers=active,
             max_game_cpu=max_game,
         ):
             from resource_amendment_r2 import ResourceBudgetExceeded
             raise ResourceBudgetExceeded(
-                f"RESOURCE_BLOCKED: parallel/profile validation exceeded {MAX_VALIDATION_CPU_SECONDS:.0f} CPU-s"
+                "RESOURCE_BLOCKED: cannot reserve safe completion of live profile replay "
+                f"within the remaining {MAX_VALIDATION_CPU_SECONDS:.0f} aggregate CPU-s"
             )
         if STAGE == "parallel-validation":
             # Planner explicitly authorized up to 500 CPU-s of read-only
@@ -168,6 +170,182 @@ def _stage_receipt(stage: str, *, stage_started_cpu: float,
             "accounting": "wait4 child user+system CPU, each reaped worker exactly once",
         })
     return record
+
+
+def _validation_ledger_cpu() -> float:
+    path = EVIDENCE / "cpu-ledger.jsonl"
+    if not path.is_file():
+        return 0.0
+    total = 0.0
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+            stage = row.get("stage")
+            if stage in {"parallel-validation-setup", "parallel-validation-and-profile"}:
+                amount = float(row.get("process_cpu_seconds", 0.0))
+                if amount < 0:
+                    raise ValueError("negative CPU charge")
+                total += amount
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise ParallelExecutionError(f"invalid validation CPU ledger row {number}") from exc
+    return total
+
+
+def _partial_replay_record(run_study: Any, task: dict[str, Any]) -> dict[str, Any]:
+    output = Path(task["kwargs"]["output_dir"])
+    attempts = sorted(output.glob("attempt-*/status.json"))
+    if not attempts:
+        return {"seed": int(task["kwargs"]["seed"]), "status": "NOT_STARTED"}
+    status_path = attempts[-1]
+    attempt = status_path.parent
+    try:
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"seed": int(task["kwargs"]["seed"]), "status": "INVALID_STATUS", "failure": str(exc)}
+    replay_path = attempt / "decisions.jsonl.gz"
+    if not replay_path.is_file():
+        replay_path = attempt / "decisions.jsonl"
+    replay_rows = run_study.read_jsonl(replay_path) if replay_path.is_file() else []
+    original_attempt, _original_summary = task["original"]
+    original_path = original_attempt / "decisions.jsonl.gz"
+    original_rows = run_study.read_jsonl(original_path)
+    prefix_matches = len(replay_rows) <= len(original_rows) and replay_rows == original_rows[:len(replay_rows)]
+    search_path = attempt / "battle-search.jsonl"
+    search_cpu = 0.0
+    if search_path.is_file():
+        for line in search_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                search_cpu += float(json.loads(line).get("cpu_s", 0.0))
+    return {
+        "seed": int(task["kwargs"]["seed"]),
+        "status": str(status.get("status", "UNKNOWN")),
+        "failure": status.get("failure"),
+        "attempt_path": attempt.relative_to(HERE).as_posix(),
+        "process_cpu_seconds": float(status.get("process_cpu_seconds", 0.0)),
+        "decision_prefix_rows": len(replay_rows),
+        "retained_original_decision_rows": len(original_rows),
+        "decision_prefix_matches_retained_original": prefix_matches,
+        "search_calls": int(sum(int(json.loads(line).get("calls", 0)) for line in search_path.read_text(encoding="utf-8").splitlines() if line.strip())) if search_path.is_file() else 0,
+        "native_search_timer_cpu_seconds": search_cpu,
+        "partial_decisions_sha256": _sha256(replay_path),
+        "retained_original_decisions_sha256": _sha256(original_path),
+    }
+
+
+def _record_validation_failure(run_study: Any, runtime: dict[str, Any], model_sha: str,
+                               tasks: list[dict[str, Any]], profile_paths: list[Path],
+                               formal_grid_forecast: dict[str, Any], exc: BaseException,
+                               *, stage_started_cpu: float, stage_started_wall: float) -> None:
+    """Persist partial diagnostics and charge the aggregate exactly once on stop."""
+    assert TRACKER is not None and DISPATCHER is not None
+    with TRACKER.completed_cpu.get_lock():
+        worker_cpu = float(TRACKER.completed_cpu.value)
+    replays = [_partial_replay_record(run_study, task) for task in tasks]
+    usable_profiles = [path for path in profile_paths if path.is_file()]
+    run_cpu = sum(float(row.get("process_cpu_seconds", 0.0)) for row in replays)
+    search_cpu = sum(float(row.get("native_search_timer_cpu_seconds", 0.0)) for row in replays)
+    profile = profile_summary(usable_profiles, run_cpu=run_cpu, search_cpu=search_cpu)
+    blocked = "RESOURCE_BLOCKED" in str(exc)
+    status = "RESOURCE_BLOCKED" if blocked else "FAILED"
+    profile_summary_by_seed = []
+    for path in usable_profiles:
+        stats = pstats.Stats(str(path))
+        top = sorted(stats.stats.items(), key=lambda item: item[1][3], reverse=True)[:20]
+        profile_summary_by_seed.append({
+            "seed": int(path.stem.removeprefix("seed-")),
+            "path": path.relative_to(HERE).as_posix(),
+            "sha256": _sha256(path),
+            "function_count": len(stats.stats),
+            "top_functions": [{
+                "file": Path(key[0]).name, "line": int(key[1]), "function": key[2],
+                "primitive_calls": int(values[0]), "calls": int(values[1]),
+                "exclusive_cpu_seconds": float(values[2]),
+                "inclusive_cpu_seconds": float(values[3]),
+            } for key, values in top],
+        })
+    parent_cpu = max(0.0, time.process_time() - stage_started_cpu)
+    aggregate_cpu = parent_cpu + worker_cpu
+    receipt = {
+        "schema_id": "issue60-parallel-execution-validation-v1",
+        "status": status,
+        "planner_authorization": {
+            "comment_ids": [6210979819, 6211078134],
+            "profile_keys": [660001, 660046],
+            "additional_cpu_bound_seconds": MAX_VALIDATION_CPU_SECONDS,
+        },
+        "validation": {
+            "status": status,
+            "failure_type": type(exc).__name__,
+            "failure": str(exc),
+            "replays_are_partial": True,
+        },
+        "r2_receipt_sha256": _sha256(EVIDENCE / "preflight" / "resource-r2.json"),
+        "r2_seal_sha256": run_study_r2.verify_r2_receipt(HERE, require_seal=True)["seal"]["preseal_receipt_sha256"],
+        "zero_update_model_sha256": model_sha,
+        "formal_grid_forecast_at_validation": formal_grid_forecast,
+        "paired_replays": replays,
+        "profile": {**profile, "partial_profiles_by_seed": profile_summary_by_seed},
+        "optimizer_minibatch_profile": {
+            "status": "NOT_RUN_BEFORE_RESOURCE_STOP",
+            "decision_rows": 0, "minibatch_rows": 256,
+            "source_readout": "The retained runner preprocesses and forwards each decision row separately, then backpropagates one combined scalar loss per minibatch.",
+        },
+        "runtime": runtime,
+        "host": host_capacity(),
+        "parallel_validation": DISPATCHER.evidence(),
+        "worker_count": DISPATCHER.workers,
+        "prior_validation_cpu_seconds": VALIDATION_PRIOR_CPU,
+        "setup_validation_cpu_seconds": VALIDATION_SETUP_CPU,
+        "profile_and_replay_stage_cpu_seconds": aggregate_cpu,
+        "aggregate_validation_cpu_seconds_before_finalization": (
+            VALIDATION_PRIOR_CPU + VALIDATION_SETUP_CPU + aggregate_cpu
+        ),
+        "source_files": {path: _sha256(HERE / path) for path in PARALLEL_SOURCE_FILES},
+        "source_commit": subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=HERE.parents[1],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip(),
+    }
+    stage_record = {
+        "schema_id": "issue60-parallel-stage-receipt-v1",
+        "status": status, "stage": "parallel-validation",
+        "worker_count": DISPATCHER.workers,
+        "max_active_workers": DISPATCHER.max_active_workers,
+        "parent_process_cpu_seconds": parent_cpu,
+        "worker_process_cpu_seconds": worker_cpu,
+        "aggregate_process_cpu_seconds": aggregate_cpu,
+        "wall_seconds": max(0.0, time.monotonic() - stage_started_wall),
+        "host": receipt["host"],
+        "parallel_validation": DISPATCHER.evidence(),
+        "failure": str(exc),
+        "source_commit": receipt["source_commit"],
+        "source_files": receipt["source_files"],
+    }
+    parent_cpu = max(0.0, time.process_time() - stage_started_cpu)
+    aggregate_cpu = parent_cpu + worker_cpu
+    stage_record["parent_process_cpu_seconds"] = parent_cpu
+    stage_record["aggregate_process_cpu_seconds"] = aggregate_cpu
+    receipt["profile_and_replay_stage_cpu_seconds"] = aggregate_cpu
+    receipt["aggregate_validation_cpu_seconds_before_finalization"] = (
+        VALIDATION_PRIOR_CPU + VALIDATION_SETUP_CPU + aggregate_cpu
+    )
+    finalization_start = time.process_time()
+    R2._write_json(VALIDATION / "stages" / "parallel-validation.json", stage_record)
+    R2._write_json(PARALLEL_RECEIPT, receipt)
+    finalization_cpu = max(0.0, time.process_time() - finalization_start)
+    # A small write/ledger margin makes the failed-stage charge conservative.
+    charge = aggregate_cpu + finalization_cpu + 0.1
+    R2._append_ledger({
+        "stage": "parallel-validation-and-profile", "status": status,
+        "process_cpu_seconds": charge,
+        "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "accounting": "parent process_time plus every reaped worker wait4 user/system CPU once, plus 0.1s finalization margin",
+        "validation_receipt_sha256": _sha256(PARALLEL_RECEIPT),
+    })
+    receipt["ledger_cpu_charge_seconds"] = charge
+    R2._write_json(PARALLEL_RECEIPT, receipt)
 
 
 def _install_runner_hooks() -> None:
@@ -283,7 +461,7 @@ def _profile_fixed_optimizer_minibatch(run_study: Any, vocab: Any,
 
 def _profile_validation() -> dict[str, Any]:
     global R2, RS, TRACKER, DISPATCHER, STAGE, BASE_ENFORCE, ORIGINAL_INSTALL_HOOKS
-    global VALIDATION_SETUP_CPU
+    global VALIDATION_SETUP_CPU, VALIDATION_PRIOR_CPU
     import torch
     import run_study
     import run_study_r2
@@ -291,6 +469,7 @@ def _profile_validation() -> dict[str, Any]:
     RS = run_study
     R2 = run_study_r2
     STAGE = "parallel-validation"
+    VALIDATION_PRIOR_CPU = _validation_ledger_cpu()
     VALIDATION_SETUP_CPU = max(0.0, time.process_time() - VALIDATION_COMMAND_CPU_START)
     R2._append_ledger({
         "stage": "parallel-validation-setup", "status": "STARTED",
@@ -348,7 +527,15 @@ def _profile_validation() -> dict[str, Any]:
             "original": original,
         })
     profile_paths = [Path(task["profile_path"]) for task in tasks]
-    validation_results = DISPATCHER.run_jobs(tasks)
+    try:
+        validation_results = DISPATCHER.run_jobs(tasks)
+    except BaseException as exc:
+        _record_validation_failure(
+            run_study, runtime, model_sha, tasks, profile_paths,
+            formal_grid_forecast, exc,
+            stage_started_cpu=started_cpu, stage_started_wall=started_wall,
+        )
+        raise
     replay_checks = []
     replay_summaries = []
     for task in tasks:
@@ -397,7 +584,7 @@ def _profile_validation() -> dict[str, Any]:
         cap=MAX_GAME_WORKERS,
     )
     stage_cpu = TRACKER.current_stage_cpu()
-    total_validation_cpu = VALIDATION_SETUP_CPU + stage_cpu
+    total_validation_cpu = VALIDATION_PRIOR_CPU + VALIDATION_SETUP_CPU + stage_cpu
     receipt_write_cpu_start = time.process_time()
     if total_validation_cpu > MAX_VALIDATION_CPU_SECONDS - 5.0:
         raise ParallelExecutionError(
@@ -440,6 +627,7 @@ def _profile_validation() -> dict[str, Any]:
         ),
         "setup_validation_cpu_seconds": VALIDATION_SETUP_CPU,
         "profile_and_replay_stage_cpu_seconds": stage_cpu,
+        "prior_validation_cpu_seconds": VALIDATION_PRIOR_CPU,
         "aggregate_validation_cpu_seconds": total_validation_cpu,
         "validation_wall_seconds": max(0.0, time.monotonic() - started_wall),
         "source_files": {path: _sha256(HERE / path) for path in PARALLEL_SOURCE_FILES},
