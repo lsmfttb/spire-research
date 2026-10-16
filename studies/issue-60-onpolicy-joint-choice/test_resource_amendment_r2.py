@@ -36,8 +36,19 @@ class ResourceAmendmentR2Tests(unittest.TestCase):
         write_gate.assert_called_once_with(root, stage_started_cpu=0.0)
 
     def test_reference_54_game_history_matches_planner_arithmetic(self) -> None:
-        rows = complete_game_costs(HERE)
-        self.assertEqual(len(rows), 54)
+        retained = complete_game_costs(HERE)
+        # This fixed arithmetic witness is the original 8 preflight + 46-game prefix.
+        # Later retained fixed-key progress must not change the historical fixture.
+        self.assertGreaterEqual(len(retained), 54)
+        rows = retained[:54]
+        expected_keys = (
+            [("preflight", seed) for seed in range(668001, 668009)]
+            + [("block1:batch-01", seed) for seed in range(660001, 660047)]
+        )
+        self.assertEqual(
+            [(row["stage_key"], row["game_seed"]) for row in rows],
+            expected_keys,
+        )
         costs = [float(row["process_cpu_seconds"]) for row in rows]
         stats = upper_mean_plus_three_se(costs)
         self.assertAlmostEqual(stats["mean"], 11.808997913759262, places=9)
