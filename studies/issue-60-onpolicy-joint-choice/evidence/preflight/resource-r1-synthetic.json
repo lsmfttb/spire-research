@@ -1,0 +1,40 @@
+{
+  "boundary_inventory": {
+    "deck_order_not_retained": true,
+    "duplicate_card_multiplicity_retained": true,
+    "exact_public_inventory_retained": true,
+    "passed": true,
+    "potion_slots_retained": true,
+    "resource_field_count": 9,
+    "unknown_and_hidden_fields_dropped": true
+  },
+  "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+  "on_policy_and_terminal": {
+    "bootstrap_file_sha256": "1deb6907b595c905b8c0d0559ddf18577dbbea17a22d2edee23be59370ae4ca1",
+    "cap_and_error_targets_rejected": true,
+    "death_return": 0.1,
+    "no_change_checkpoint_replay": true,
+    "p0_exact_at_zero_residual": true,
+    "passed": true,
+    "ppo_reference_loss": -0.0065234375,
+    "single_action_critic_only": true
+  },
+  "parameter_count": 103970,
+  "passed": true,
+  "public_context_and_execution": {
+    "candidate_and_set_permutation_equivariance": true,
+    "candidate_count": 4,
+    "duplicate_multiplicity_preserved": true,
+    "group_sizes": [
+      2,
+      1
+    ],
+    "hidden_future_noninterference": true,
+    "map_node_count": 2,
+    "numeric_feature_count": 14,
+    "passed": true,
+    "stale_group_and_potion_mapping_rejected": true
+  },
+  "schema_id": "issue60-synthetic-preflight-witness-v1",
+  "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+}

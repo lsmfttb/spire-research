@@ -1,0 +1,245 @@
+{
+  "accounting": {
+    "accounted_cpu_ledger_line_count_before_gate": 11,
+    "all_in_projected_cpu_seconds": 172800.82245323027,
+    "builder_budget_seconds": 180000.0,
+    "builder_static_allowance_cpu_seconds": 600.0,
+    "future_reviewer_reserve_cpu_seconds": 19000.0,
+    "max_observed_game_cpu_seconds": 27.379626543000008,
+    "original_gate_vs_ledger_snapshot_difference_seconds": -0.006490235999990546,
+    "preflight_and_implementation_accounted_cpu_seconds": 1130.198915963,
+    "prior_reviewer_allowance_cpu_seconds": 1000.0,
+    "process_cpu_cap_seconds": 200000.0,
+    "projected_builder_cpu_seconds": 152800.82245323027,
+    "projected_optimizer_cpu_seconds_before_headroom": 15997.532059680025,
+    "projected_remaining_cpu_seconds_with_headroom": 151670.62353726727,
+    "projected_remaining_game_cpu_seconds_before_headroom": 110394.65422137604,
+    "reviewer_reserved_cpu_seconds": 20000.0,
+    "stage_current_cpu_seconds": 5.504632084000001,
+    "stage_finalization_margin_cpu_seconds": 10.0
+  },
+  "amendment_id": "R1",
+  "authorization_receipt_sha256": "be6fbdcdcc66446e84f83dc671c5a4e5b89f89c847ed611cae74169b43f25945",
+  "decision": "continue unchanged fixed grid",
+  "issue": 60,
+  "original_blocked_gate_sha256": "2fd4b2e6f96f0624b63889e0315c013bef7adddd7e30d6948a9309a209a263eb",
+  "original_config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+  "original_cpu_ledger_prefix_sha256": "fc91df26fdd91ecbaa2ebe9b293b9e98ab9d0b06e6061e6ed3d76fc761982119",
+  "original_manifest_sha256": "f8ee786b64e04d3188080072f4bfe9b843f2fcc43120df75b0c9ee18eb1faa13",
+  "original_preflight_runs": [
+    {
+      "battle_search_sha256": "ddd17434989944090334f90e92f44409076113da442083be8f1184c7bb3845f3",
+      "block": "block1",
+      "decisions_sha256": "a8bff14b1dc301dd357c919de8d94376067b3b2330feb69c597deae1467394a0",
+      "game_seed": 668001,
+      "process_cpu_seconds": 6.23603728,
+      "run_sha256": "c37ad4e6eac9fc66eadf32319bfa3c2b69e63e4af2323bd20e88a513a1fe5d87"
+    },
+    {
+      "battle_search_sha256": "f586770b9bffe05a038ec540096d7a4a2d343438433370fbd0590362ad7d30d7",
+      "block": "block2",
+      "decisions_sha256": "06fc5c742fed76b21581ac6b1446b860d845f1a9df54c4b647bb345e38ea40ee",
+      "game_seed": 668002,
+      "process_cpu_seconds": 12.661892768,
+      "run_sha256": "1f8a7824ed9ecb80613b77e6f782602d519816045836c3d22e7aa5b1ec903319"
+    },
+    {
+      "battle_search_sha256": "625b751997b766f4b7e2534e72fb74888200763455f2a062ab495768345d58c8",
+      "block": "block1",
+      "decisions_sha256": "fec0111404f898fb3d228468150de24529c5fa4f708ded53bf72bf590ef351a4",
+      "game_seed": 668003,
+      "process_cpu_seconds": 21.811510945,
+      "run_sha256": "f1fe73d59f5586660e7c74e35fecab2c65e848c1496116f85d8197eac84252da"
+    },
+    {
+      "battle_search_sha256": "3d3914567bad641fdecebbf1b9e544339ac4fb27aaf6d02c7a917e1adf13a78b",
+      "block": "block2",
+      "decisions_sha256": "2931304d296a8b0387e4a3a2d112edbdd4487bf9f5074174cec28531fe007221",
+      "game_seed": 668004,
+      "process_cpu_seconds": 27.379626543000008,
+      "run_sha256": "e267877145e1beae39e0ee7557d6efbeee8d06a9bd6f7e167aa0aca38896ec84"
+    },
+    {
+      "battle_search_sha256": "bdc47a931840856946695a99ed10ed5c5aa3c890aba735de071843eab22d16af",
+      "block": "block1",
+      "decisions_sha256": "8617c4e478fb4f001288e177cad1e43867878320d866c43b91261b704f74fa11",
+      "game_seed": 668005,
+      "process_cpu_seconds": 17.79327380000001,
+      "run_sha256": "c566e9c127108685050a619fcc957c2a3c6da5432adca3d62b24ef44d95bcd55"
+    },
+    {
+      "battle_search_sha256": "b79c4a1b4cdd575e0fd058cb66aa0f200d9a42d4a9fb5dc82f06ddc71d8a58d2",
+      "block": "block2",
+      "decisions_sha256": "efba48585e11b5ad1b2492b4ed152a1338bfdaa582ed55d530f5c74b0f2cb668",
+      "game_seed": 668006,
+      "process_cpu_seconds": 2.959632286999991,
+      "run_sha256": "531347cf6163f74f2e62973dc9fa1e0608285c89faae26f0a6ca8a264fc1d38f"
+    },
+    {
+      "battle_search_sha256": "c8c20a76ee9db6e62344384602efa07d4954b9ee290d6e0ffec37b3cf6e8d9c9",
+      "block": "block1",
+      "decisions_sha256": "da777810c5052b524360e2f864e3cd415da1d92f67c322acf58d2e42a58be6a0",
+      "game_seed": 668007,
+      "process_cpu_seconds": 6.14971225299999,
+      "run_sha256": "0030176ba5cd1361bedebdd8f17da8858d2df7acd4621eaeafca2ec92e642765"
+    },
+    {
+      "battle_search_sha256": "7ed027253e792da725c506e9f388e4ef7eb7dbbc7095feb56e292a0421a0ccf6",
+      "block": "block2",
+      "decisions_sha256": "d93622a827555f04ff2dd53f5425cb46ae954796122b43ea3f6e4e0c16eedea5",
+      "game_seed": 668008,
+      "process_cpu_seconds": 7.593754388999997,
+      "run_sha256": "6a4b6813b52399e0a872ece2e2d344c878b0d0b543abe1cbcad2ae432acf7fc3"
+    }
+  ],
+  "original_producer_commit": "a7e8593558e6817d2ed34a5cd6bd2d5bd0a98768",
+  "parent_handoff_commit": "d42b04235f4a8fead844998428e8cc35d2d64f03",
+  "r1_allowance_charges": [
+    {
+      "charge_id": "issue60-r1-planner-administration",
+      "cpu_seconds": 200.0,
+      "role": "planner"
+    },
+    {
+      "charge_id": "issue60-r1-builder-administration",
+      "cpu_seconds": 200.0,
+      "role": "builder"
+    }
+  ],
+  "r1_manifest_sha256": "f1e4e6a3f7f13b97519ba8a6028f6939b08b8536d034e184712a709b9994ef61",
+  "r1_producer_commit": "d15aebbdbf1d17c1c802a8eb1bd2b80b1ddff6b6",
+  "r1_source_change_whitelist": {
+    "changed_paths": {
+      "freeze_manifest_r1.py": "A",
+      "prepare_resource_amendment_r1.py": "A",
+      "resource-amendment-r1.json": "A",
+      "resource_amendment_r1.py": "A",
+      "run_study.py": "M",
+      "test_resource_amendment_r1.py": "A"
+    },
+    "changed_runner_symbols": [
+      "REVIEWER_RESERVE",
+      "PROCESS_BUDGET",
+      "run_training",
+      "main"
+    ],
+    "runner_ast_whitelist_passed": true
+  },
+  "resource_amendment_sha256": "c57ac99b78e47927b8e820df73301a9edda81156cfa043a00de4100dfb6093dc",
+  "retained_output_replay": {
+    "games": [
+      {
+        "game_seed": 668001,
+        "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+        "runtime_policy_seed": 3900827463337742631
+      },
+      {
+        "game_seed": 668002,
+        "model_sha256": "23a3ca68c5370944becbcf661d2f3df52e65785d31bb1dd530e3302f5e698e3f",
+        "runtime_policy_seed": 9621713220708373697
+      },
+      {
+        "game_seed": 668003,
+        "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+        "runtime_policy_seed": 16524058132513683913
+      },
+      {
+        "game_seed": 668004,
+        "model_sha256": "23a3ca68c5370944becbcf661d2f3df52e65785d31bb1dd530e3302f5e698e3f",
+        "runtime_policy_seed": 12122108120061489321
+      },
+      {
+        "game_seed": 668005,
+        "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+        "runtime_policy_seed": 7220042952669012950
+      },
+      {
+        "game_seed": 668006,
+        "model_sha256": "23a3ca68c5370944becbcf661d2f3df52e65785d31bb1dd530e3302f5e698e3f",
+        "runtime_policy_seed": 6230185407875157463
+      },
+      {
+        "game_seed": 668007,
+        "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+        "runtime_policy_seed": 4646299646260410760
+      },
+      {
+        "game_seed": 668008,
+        "model_sha256": "23a3ca68c5370944becbcf661d2f3df52e65785d31bb1dd530e3302f5e698e3f",
+        "runtime_policy_seed": 4881415721044673197
+      }
+    ],
+    "games_checked": 8,
+    "output_fingerprint_sha256": "81ffcff387913cf80922ae7bafc4f6edc6e216ee5cf8479612524528eb648007",
+    "passed": true,
+    "supported_decisions_checked": 229
+  },
+  "runtime_pins": {
+    "deterministic_algorithms": true,
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "native_module": "/tmp/issue60-lightspeed/build-issue60/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_source": "/tmp/issue60-lightspeed",
+    "python": "3.13.13",
+    "runtime_api": {
+      "LightSpeedAdapter": "sts_combat_rl.sim.lightspeed",
+      "action_space": {
+        "allow_excluded_fallback": true,
+        "excluded_kinds": [],
+        "include_non_combat_potions": true,
+        "preferred_kinds": [
+          "card",
+          "end_turn"
+        ]
+      },
+      "execute_controlled_run": "sts_combat_rl.sim.controlled_run"
+    },
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsr_source": "/tmp/issue60-stsrl",
+    "torch": "2.12.0+cpu",
+    "torch_threads": 1
+  },
+  "schema_id": "issue60-resource-gate-r1-v1",
+  "status": "PASS",
+  "synthetic_public_witness": {
+    "boundary_inventory": {
+      "deck_order_not_retained": true,
+      "duplicate_card_multiplicity_retained": true,
+      "exact_public_inventory_retained": true,
+      "passed": true,
+      "potion_slots_retained": true,
+      "resource_field_count": 9,
+      "unknown_and_hidden_fields_dropped": true
+    },
+    "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+    "on_policy_and_terminal": {
+      "bootstrap_file_sha256": "1deb6907b595c905b8c0d0559ddf18577dbbea17a22d2edee23be59370ae4ca1",
+      "cap_and_error_targets_rejected": true,
+      "death_return": 0.1,
+      "no_change_checkpoint_replay": true,
+      "p0_exact_at_zero_residual": true,
+      "passed": true,
+      "ppo_reference_loss": -0.0065234375,
+      "single_action_critic_only": true
+    },
+    "parameter_count": 103970,
+    "passed": true,
+    "public_context_and_execution": {
+      "candidate_and_set_permutation_equivariance": true,
+      "candidate_count": 4,
+      "duplicate_multiplicity_preserved": true,
+      "group_sizes": [
+        2,
+        1
+      ],
+      "hidden_future_noninterference": true,
+      "map_node_count": 2,
+      "numeric_feature_count": 14,
+      "passed": true,
+      "stale_group_and_potion_mapping_rejected": true
+    },
+    "schema_id": "issue60-synthetic-preflight-witness-v1",
+    "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+  },
+  "synthetic_public_witness_sha256": "fcc7edeab9aa0f21dfd501a336c7e6c59dbdc0c7f71f650502577d896fb81b0a"
+}
