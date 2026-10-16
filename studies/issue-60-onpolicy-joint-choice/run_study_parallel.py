@@ -259,7 +259,7 @@ def _profile_fixed_optimizer_minibatch(run_study: Any, vocab: Any,
         optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
         batch = [rows[index % len(rows)] for index in range(256)]
         advantages = centered_advantages(batch)
-        profiler = cProfile.Profile()
+        profiler = cProfile.Profile(time.process_time)
         wall_start = time.monotonic()
         cpu_start = time.process_time()
         profiler.enable()

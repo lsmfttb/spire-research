@@ -346,7 +346,7 @@ class ParallelGameDispatcher:
         profiler = None
         profile_path = task.get("profile_path")
         if profile_path is not None:
-            profiler = cProfile.Profile()
+            profiler = cProfile.Profile(time.process_time)
             profiler.enable()
         try:
             _, summary = self.raw_run_game(**kwargs)
@@ -623,11 +623,13 @@ class ParallelGameDispatcher:
 
     def evidence(self) -> dict[str, Any]:
         parent_rss = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) * 1024
+        parent_worker_rss_bound = parent_rss + self.max_worker_rss_bytes * self.max_active_workers
         return {
             "max_configured_workers": self.workers,
             "max_active_workers": self.max_active_workers,
             "parent_peak_rss_bytes": parent_rss,
             "worker_peak_rss_bytes": self.max_worker_rss_bytes,
+            "parent_plus_worker_peak_rss_upper_bound_bytes": parent_worker_rss_bound,
             "execution_count": len(self.executions),
             "executions": list(self.executions),
         }
