@@ -7,6 +7,7 @@ import json
 import math
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -31,6 +32,9 @@ BRIDGE_LATEST = PROSPECTIVE / "bridge-latest.json"
 FORECAST_INDEX = PROSPECTIVE / "cost-index.json"
 FORECAST_LATEST = PROSPECTIVE / "latest-forecast.json"
 FORECAST_EVENTS = PROSPECTIVE / "forecast-events.jsonl"
+ACCEPTED_TWO_WORKER_EVIDENCE = (
+    EVIDENCE / "validation" / "guard-optimization" / "attempt-0004" / "producer.json"
+)
 STATIC_ALLOWANCE = 600.0
 BRIDGE_START_CPU = 0.0
 BRIDGE_BASELINE_CPU = 0.0
@@ -53,11 +57,110 @@ _COST_TAG_ROWS: list[dict[str, Any]] | None = None
 TAG_FAILURE = PROSPECTIVE / "cost-tag-failure.json"
 
 
+def _bind_resource_git_to_windows_worktree() -> None:
+    """Work around WSL-style core.worktree config in the frozen R1 helper."""
+    import resource_amendment_r1
+
+    original = resource_amendment_r1._git_process
+    if getattr(original, "_issue60_windows_worktree_binding", False):
+        return
+
+    def git_process(study_root: Path, *args: str, text: bool = True) -> subprocess.CompletedProcess:
+        root = resource_amendment_r1._repo_root(study_root)
+        git_file = root / ".git"
+        if os.name != "nt" and git_file.is_file():
+            marker = git_file.read_text(encoding="utf-8").strip().removeprefix("gitdir:").strip()
+            if len(marker) >= 4 and marker[1:3] == ":/":
+                executable = shutil.which("git.exe")
+                if not executable:
+                    raise resource_amendment_r1.ResourceAmendmentError(
+                        "Windows worktree pointer requires git.exe inside WSL"
+                    )
+                win_root = subprocess.run(
+                    ["wslpath", "-w", str(root)], check=True,
+                    capture_output=True, text=True,
+                ).stdout.strip().replace("\\", "/")
+                win_git_dir = marker.replace("\\", "/")
+                command = [
+                    executable,
+                    f"--git-dir={win_git_dir}",
+                    f"--work-tree={win_root}",
+                    "-c", f"safe.directory={win_root}",
+                    "-C", win_root, *args,
+                ]
+                environment = os.environ.copy()
+                environment.pop("GIT_DIR", None)
+                environment.pop("GIT_WORK_TREE", None)
+                return subprocess.run(
+                    command, capture_output=True, text=text, env=environment,
+                )
+        return original(study_root, *args, text=text)
+
+    git_process._issue60_windows_worktree_binding = True  # type: ignore[attr-defined]
+    resource_amendment_r1._git_process = git_process
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise CostRegimeError(f"expected JSON object at {path}")
     return value
+
+
+def _read_historical_parallel_receipt(parallel_module: Any) -> dict[str, Any]:
+    """Read the retained blocked forecast without treating it as a new gate."""
+    path = Path(parallel_module.PARALLEL_RECEIPT)
+    receipt = _read_json(path)
+    expected_sources = {
+        relative: parallel_module._sha256(HERE / relative)
+        for relative in parallel_module.PARALLEL_SOURCE_FILES
+    }
+    if receipt.get("source_files") != expected_sources:
+        raise CostRegimeError("historical parallel receipt source files changed")
+    if receipt.get("status") != "RESOURCE_BLOCKED":
+        raise CostRegimeError("retained historical parallel receipt is not the expected blocked record")
+    forecast = receipt.get("formal_grid_forecast_at_validation")
+    if not isinstance(forecast, dict) or forecast.get("status") != "RESOURCE_BLOCKED":
+        raise CostRegimeError("retained historical parallel forecast is not the expected blocked record")
+    return receipt
+
+
+def _verify_accepted_two_worker_evidence() -> dict[str, Any]:
+    """Verify the Planner-accepted cached two-worker replay before dispatch."""
+    evidence = _read_json(ACCEPTED_TWO_WORKER_EVIDENCE)
+    if evidence.get("attempt") != "attempt-0004" or evidence.get("status") != "PASS":
+        raise CostRegimeError("accepted cached two-worker replay record is missing or not PASS")
+    for source_group in (evidence.get("producer_files", {}),
+                         evidence.get("comparison_source_files", {})):
+        if not isinstance(source_group, dict):
+            raise CostRegimeError("accepted replay source manifest is malformed")
+        for relative, expected in source_group.items():
+            path = HERE / relative
+            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+                raise CostRegimeError(f"accepted replay source changed: {relative}")
+    replay_groups = evidence.get("replays", {})
+    expected_seeds = {660001, 660046}
+    for variant in ("baseline_serial", "cached_serial", "cached_two_worker"):
+        rows = replay_groups.get(variant, [])
+        if {int(row.get("seed", -1)) for row in rows} != expected_seeds:
+            raise CostRegimeError(f"accepted {variant} replay population changed")
+        for row in rows:
+            if row.get("status") != "COMPLETE":
+                raise CostRegimeError(f"accepted {variant} replay is incomplete")
+            if variant != "cached_two_worker" and row.get("comparison_to_retained_original", {}).get("status") != "PASS":
+                raise CostRegimeError(f"accepted {variant} comparison to retained original failed")
+    dispatcher = evidence.get("two_worker_dispatcher_evidence", {})
+    if (dispatcher.get("execution_count") != 2
+            or dispatcher.get("max_active_workers") != 2
+            or dispatcher.get("max_configured_workers") != 2
+            or {int(row.get("task_key", [None, -1, None])[1])
+                for row in dispatcher.get("executions", [])} != expected_seeds):
+        raise CostRegimeError("accepted two-worker dispatcher witness changed")
+    comparisons = evidence.get("two_worker_parallel_comparisons_to_cached_serial", [])
+    if ({int(row.get("decision_rows", -1)) for row in comparisons} != {30, 69}
+            or any(row.get("status") != "PASS" for row in comparisons)):
+        raise CostRegimeError("accepted two-worker replay parity witness changed")
+    return evidence
 
 
 def _ledger_total() -> float:
@@ -443,11 +546,17 @@ def _bridge_start_record(run_study: Any, model_sha: str, config_sha: str) -> dic
     global PRODUCER_COMMIT
     manifest = producer_manifest(HERE)
     commit = git(HERE, "rev-parse", "HEAD")
+    _verify_accepted_two_worker_evidence()
+    accepted_two_worker_sha = hashlib.sha256(
+        ACCEPTED_TWO_WORKER_EVIDENCE.read_bytes()
+    ).hexdigest()
     if BRIDGE_START.is_file():
         record = _read_json(BRIDGE_START)
         producer_commit = str(record.get("producer_commit", ""))
         if producer_commit != PRODUCER_COMMIT or record.get("producer_files") != manifest:
             raise CostRegimeError("bridge cannot resume with modified producer source")
+        if record.get("accepted_two_worker_evidence_sha256") != accepted_two_worker_sha:
+            raise CostRegimeError("accepted two-worker validation evidence changed")
         try:
             git(HERE, "merge-base", "--is-ancestor", producer_commit, commit)
             for name, digest in manifest.items():
@@ -488,6 +597,11 @@ def _bridge_start_record(run_study: Any, model_sha: str, config_sha: str) -> dic
         "existing_complete_seeds": completed,
         "stage_key": BRIDGE_STAGE,
         "policy_updates_before_bridge_completion": 0,
+        "accepted_two_worker_evidence_path": str(
+            ACCEPTED_TWO_WORKER_EVIDENCE.relative_to(HERE)
+        ).replace("\\", "/"),
+        "accepted_two_worker_evidence_sha256": accepted_two_worker_sha,
+        "accepted_two_worker_evidence_authorization_comment_id": AUTHORIZATION_COMMENT_ID,
         "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     atomic_json(BRIDGE_START, record)
@@ -554,12 +668,18 @@ def _run_bridge(*, started: float | None = None) -> int:
     import trainer
 
     RUN_STUDY, R2, R2_MODULE, PARALLEL = run_study, run_study_r2, resource_amendment_r2, run_study_parallel
+    _bind_resource_git_to_windows_worktree()
     BRIDGE_START_CPU = started
 
     r1 = __import__("resource_amendment_r1").verify_resource_chain(HERE, require_gate_seal=True)
     r2_receipt = R2.verify_r2_receipt(HERE, require_seal=True)
     R2._read_json(EVIDENCE / "preflight" / "resource-r2.json")
-    parallel_receipt = PARALLEL._read_validation_receipt()
+    # The historical parallel/profile receipt remains RESOURCE_BLOCKED by its
+    # old regime forecast. The Planner accepted the later cached two-worker
+    # replay evidence in attempt-0004 for this bridge; verify that witness
+    # separately and retain the old blocked forecast as historical evidence.
+    parallel_receipt = _read_historical_parallel_receipt(PARALLEL)
+    _verify_accepted_two_worker_evidence()
     if r1.get("status") != "PASS" or r2_receipt.get("gate", {}).get("status") != "PASS":
         raise CostRegimeError("retained R1/R2 receipts do not verify")
     config, runtime, vocab, bootstrap, model, model_sha = PARALLEL._load_validation_inputs()
@@ -759,6 +879,7 @@ def _run_continue() -> int:
     from sts_combat_rl.sim import controlled_run
 
     RUN_STUDY, R2, R2_MODULE, PARALLEL = run_study, run_study_r2, resource_amendment_r2, run_study_parallel
+    _bind_resource_git_to_windows_worktree()
     current_commit = git(HERE, "rev-parse", "HEAD")
     current_hashes = producer_manifest(HERE)
     bridge = _read_json(BRIDGE_LATEST)

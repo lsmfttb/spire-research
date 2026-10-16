@@ -23,7 +23,8 @@ ARM_ORDER = ("final_block1", "final_block2", "p0", "A", "Expert")
 PRODUCER_FILES = (
     "prospective_cost_regime.py", "run_cost_bridge.py", "run_study_parallel.py",
     "parallel_execution.py", "guard_optimization.py", "run_study_r2.py",
-    "resource_amendment_r2.py", "run_study.py", "config.json",
+    "resource_amendment_r1.py", "resource_amendment_r2.py", "run_study.py",
+    "test_prospective_cost_regime.py", "config.json",
 )
 
 

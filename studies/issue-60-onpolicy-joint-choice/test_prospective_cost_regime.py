@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import prospective_cost_regime as regime
@@ -124,6 +125,79 @@ class ProspectiveCostRegimeTests(unittest.TestCase):
         for kwargs in cases:
             with self.assertRaises(regime.CostRegimeError):
                 regime.enforce_actual_caps(**kwargs)
+
+    def test_historical_blocked_parallel_forecast_keeps_source_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "run_study_parallel.py"
+            source.write_text("pinned parallel source\n", encoding="utf-8")
+            receipt = root / "receipt.json"
+            receipt.write_text(json.dumps({
+                "status": "RESOURCE_BLOCKED",
+                "source_files": {source.name: hashlib.sha256(source.read_bytes()).hexdigest()},
+                "formal_grid_forecast_at_validation": {"status": "RESOURCE_BLOCKED"},
+            }), encoding="utf-8")
+            parallel = SimpleNamespace(
+                PARALLEL_RECEIPT=receipt,
+                PARALLEL_SOURCE_FILES=(source.name,),
+                _sha256=lambda path: hashlib.sha256(path.read_bytes()).hexdigest(),
+            )
+            with patch.object(run_cost_bridge, "HERE", root):
+                self.assertEqual(
+                    run_cost_bridge._read_historical_parallel_receipt(parallel)["status"],
+                    "RESOURCE_BLOCKED",
+                )
+                source.write_text("changed source\n", encoding="utf-8")
+                with self.assertRaises(regime.CostRegimeError):
+                    run_cost_bridge._read_historical_parallel_receipt(parallel)
+
+    def test_cached_two_worker_gate_requires_full_accepted_replay_witness(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            producer = root / "guard_optimization.py"
+            comparison = root / "parallel_execution.py"
+            producer.write_text("cached producer\n", encoding="utf-8")
+            comparison.write_text("comparison producer\n", encoding="utf-8")
+            seeds = (660001, 660046)
+            replay_groups = {}
+            for variant in ("baseline_serial", "cached_serial", "cached_two_worker"):
+                replay_groups[variant] = [{
+                    "seed": seed, "status": "COMPLETE",
+                    **({"comparison_to_retained_original": {"status": "PASS"}}
+                       if variant != "cached_two_worker" else {}),
+                } for seed in seeds]
+            evidence = {
+                "attempt": "attempt-0004", "status": "PASS",
+                "producer_files": {
+                    producer.name: hashlib.sha256(producer.read_bytes()).hexdigest(),
+                },
+                "comparison_source_files": {
+                    comparison.name: hashlib.sha256(comparison.read_bytes()).hexdigest(),
+                },
+                "replays": replay_groups,
+                "two_worker_dispatcher_evidence": {
+                    "execution_count": 2, "max_active_workers": 2,
+                    "max_configured_workers": 2,
+                    "executions": [{"task_key": ["block1:batch-01", seed, "residual"]}
+                                   for seed in seeds],
+                },
+                "two_worker_parallel_comparisons_to_cached_serial": [
+                    {"decision_rows": count, "status": "PASS"} for count in (30, 69)
+                ],
+            }
+            evidence_path = root / "accepted.json"
+            evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+            with patch.object(run_cost_bridge, "HERE", root), patch.object(
+                run_cost_bridge, "ACCEPTED_TWO_WORKER_EVIDENCE", evidence_path,
+            ):
+                self.assertEqual(
+                    run_cost_bridge._verify_accepted_two_worker_evidence()["attempt"],
+                    "attempt-0004",
+                )
+                evidence["two_worker_parallel_comparisons_to_cached_serial"][0]["status"] = "INCOMPLETE"
+                evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+                with self.assertRaises(regime.CostRegimeError):
+                    run_cost_bridge._verify_accepted_two_worker_evidence()
 
 
 if __name__ == "__main__":
