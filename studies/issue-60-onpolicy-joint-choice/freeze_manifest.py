@@ -8,6 +8,7 @@ import subprocess
 
 
 HERE = Path(__file__).resolve().parent
+REPO_ROOT = HERE.parents[1]
 FILES = (
     "adapter_v47.py", "bootstrap_v47.py", "bootstrap/A.json", "config.json",
     "controllers.py", "encoder.py", "freeze_manifest.py", "model.py",
@@ -22,13 +23,13 @@ def _sha(path: Path) -> str:
 
 def main() -> None:
     status = subprocess.run(
-        ["git", "-c", f"safe.directory={HERE}", "-C", str(HERE), "status", "--porcelain"],
+        ["git", "-c", f"safe.directory={REPO_ROOT}", "-C", str(HERE), "status", "--porcelain"],
         check=True, capture_output=True, text=True,
     ).stdout
     if status:
         raise SystemExit("commit the complete source/config first; worktree must be clean before freezing")
     implementation_commit = subprocess.run(
-        ["git", "-c", f"safe.directory={HERE}", "-C", str(HERE), "rev-parse", "HEAD"],
+        ["git", "-c", f"safe.directory={REPO_ROOT}", "-C", str(HERE), "rev-parse", "HEAD"],
         check=True, capture_output=True, text=True,
     ).stdout.strip()
     config = json.loads((HERE / "config.json").read_text(encoding="utf-8"))
