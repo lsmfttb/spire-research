@@ -1,7 +1,7 @@
 {
   "authorization_comment_id": 6215441116,
   "bridge_cumulative_additional_cpu_seconds_before_finalization_charge": 1464.535130445,
-  "bridge_cumulative_additional_cpu_seconds_charged": 1495.5643995589996,
+  "bridge_cumulative_additional_cpu_seconds_charged": 1505.7694771029996,
   "bridge_limit_cpu_seconds": 5000.0,
   "completed_bridge_tag_count": 59,
   "continuation_accounting": [
@@ -20,6 +20,18 @@
     {
       "attempt": "issue60-continuation-validation-adapter-launch-0001",
       "process_cpu_seconds": 0.210405062,
+      "stage": "issue60-cached-cost-bridge-continuation-launch",
+      "status": "PASS"
+    },
+    {
+      "attempt": "issue60-continuation-pre-dispatch-retry-recovery-0001",
+      "process_cpu_seconds": 10.0,
+      "stage": "issue60-continuation-recovery-evidence-and-runtime-path-check",
+      "status": "PASS"
+    },
+    {
+      "attempt": "issue60-continuation-validation-adapter-launch-0002",
+      "process_cpu_seconds": 0.20507754400000017,
       "stage": "issue60-cached-cost-bridge-continuation-launch",
       "status": "PASS"
     }
