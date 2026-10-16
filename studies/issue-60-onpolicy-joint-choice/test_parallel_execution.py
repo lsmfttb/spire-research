@@ -41,6 +41,17 @@ class ParallelExecutionTests(unittest.TestCase):
         self.assertGreaterEqual(active, reaped)
         self.assertLessEqual(active - reaped, 0.02)
 
+    def test_reap_transfers_worker_cpu_from_live_to_reaped_atomically(self):
+        tracker = ProcessCpuTracker.start(time.process_time())
+        tracker.register_worker(0, 999_999_999)
+        self.assertEqual(tracker.active_worker_count(), 1)
+        self.assertEqual(tracker.reap_worker(999_999_999, 2.5), 0)
+        self.assertEqual(tracker.active_worker_count(), 0)
+        with tracker.active_pids.get_lock():
+            self.assertFalse(any(tracker.active_pids))
+        with tracker.completed_cpu.get_lock():
+            self.assertAlmostEqual(tracker.completed_cpu.value, 2.5)
+
     def test_dispatch_reserves_cpu_for_every_active_or_pending_game(self):
         self.assertTrue(can_dispatch(
             actual_cpu=1000, builder_budget=180_000,

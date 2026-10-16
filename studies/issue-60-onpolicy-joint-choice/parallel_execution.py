@@ -86,7 +86,8 @@ class ProcessCpuTracker:
     def __init__(self, *, parent_pid: int, process_group: int,
                  parent_start_cpu: float, parent_start_ticks: int,
                  clock_ticks: int, completed_cpu: Any, active_pids: Any,
-                 pending_workers: Any, max_game_cpu: Any):
+                 pending_workers: Any, max_game_cpu: Any,
+                 accounting_lock: Any):
         self.parent_pid = parent_pid
         self.process_group = process_group
         self.parent_start_cpu = parent_start_cpu
@@ -96,6 +97,7 @@ class ProcessCpuTracker:
         self.active_pids = active_pids
         self.pending_workers = pending_workers
         self.max_game_cpu = max_game_cpu
+        self.accounting_lock = accounting_lock
 
     @classmethod
     def start(cls, stage_started_cpu: float) -> "ProcessCpuTracker":
@@ -118,21 +120,46 @@ class ProcessCpuTracker:
             active_pids=context.Array("i", MAX_GAME_WORKERS, lock=True),
             pending_workers=context.Value("i", 0, lock=True),
             max_game_cpu=context.Value("d", 0.0, lock=True),
+            accounting_lock=context.RLock(),
         )
 
     def add_reaped_cpu(self, seconds: float) -> None:
-        with self.completed_cpu.get_lock():
-            self.completed_cpu.value += max(0.0, float(seconds))
+        with self.accounting_lock:
+            with self.completed_cpu.get_lock():
+                self.completed_cpu.value += max(0.0, float(seconds))
+
+    def set_pending_workers(self, count: int) -> None:
+        with self.accounting_lock:
+            with self.pending_workers.get_lock():
+                self.pending_workers.value = max(0, int(count))
+
+    def register_worker(self, slot: int, pid: int) -> None:
+        with self.accounting_lock:
+            with self.active_pids.get_lock():
+                self.active_pids[slot] = int(pid)
+
+    def reap_worker(self, pid: int, seconds: float) -> int | None:
+        """Atomically transfer a worker from live ticks to reaped CPU."""
+        with self.accounting_lock:
+            with self.active_pids.get_lock():
+                slot = next((index for index, active_pid in enumerate(self.active_pids)
+                             if int(active_pid) == int(pid)), None)
+                if slot is not None:
+                    self.active_pids[slot] = 0
+            with self.completed_cpu.get_lock():
+                self.completed_cpu.value += max(0.0, float(seconds))
+        return slot
 
     def observe_game_cpu(self, seconds: float) -> None:
         with self.max_game_cpu.get_lock():
             self.max_game_cpu.value = max(self.max_game_cpu.value, max(0.0, float(seconds)))
 
     def active_worker_count(self) -> int:
-        with self.active_pids.get_lock():
-            active = sum(bool(pid) for pid in self.active_pids)
-        with self.pending_workers.get_lock():
-            pending = int(self.pending_workers.value)
+        with self.accounting_lock:
+            with self.active_pids.get_lock():
+                active = sum(bool(pid) for pid in self.active_pids)
+            with self.pending_workers.get_lock():
+                pending = int(self.pending_workers.value)
         return active + pending
 
     def current_stage_cpu(self) -> float:
@@ -141,11 +168,12 @@ class ProcessCpuTracker:
             parent_cpu = max(0.0, time.process_time() - self.parent_start_cpu)
         else:
             parent_cpu = max(0, _proc_ticks(self.parent_pid) - self.parent_start_ticks) / self.clock_ticks
-        with self.completed_cpu.get_lock():
-            reaped = float(self.completed_cpu.value)
-        with self.active_pids.get_lock():
-            active = [int(pid) for pid in self.active_pids if pid]
-        live_workers_ticks = sum(_proc_ticks(pid) for pid in active)
+        with self.accounting_lock:
+            with self.completed_cpu.get_lock():
+                reaped = float(self.completed_cpu.value)
+            with self.active_pids.get_lock():
+                active = [int(pid) for pid in self.active_pids if pid]
+            live_workers_ticks = sum(_proc_ticks(pid) for pid in active)
         # Round the live /proc ticks upward and cover the tiny wait4/shared-value
         # handoff window conservatively, so a checkpoint cannot undercount CPU.
         return aggregate_process_cpu(
@@ -348,8 +376,7 @@ class ParallelGameDispatcher:
         pid = os.fork()
         if pid == 0:
             try:
-                with self.tracker.active_pids.get_lock():
-                    self.tracker.active_pids[slot] = os.getpid()
+                self.tracker.register_worker(slot, os.getpid())
                 self._child_run(task)
                 os._exit(0)
             except BaseException as exc:
@@ -358,6 +385,10 @@ class ParallelGameDispatcher:
                 except BaseException:
                     pass
                 os._exit(70)
+        # Register in the parent too, before clearing the pending dispatch
+        # reservation. This closes the interval where a child has been forked
+        # but an already-running worker could observe neither pending nor live.
+        self.tracker.register_worker(slot, pid)
         return pid
 
     def _budget_guard(self) -> None:
@@ -403,13 +434,11 @@ class ParallelGameDispatcher:
         while pending or active:
             while pending and len(active) < self.workers and stop_error is None:
                 try:
-                    with self.tracker.pending_workers.get_lock():
-                        self.tracker.pending_workers.value = 1
+                    self.tracker.set_pending_workers(1)
                     self._budget_guard()
                 except BaseException as exc:
                     stop_error = exc
-                    with self.tracker.pending_workers.get_lock():
-                        self.tracker.pending_workers.value = 0
+                    self.tracker.set_pending_workers(0)
                     break
                 task = pending.popleft()
                 start = time.monotonic()
@@ -417,13 +446,11 @@ class ParallelGameDispatcher:
                     slot = free_slots.popleft()
                     pid = self._fork_task(task, slot)
                 except OSError as exc:
-                    with self.tracker.pending_workers.get_lock():
-                        self.tracker.pending_workers.value = 0
+                    self.tracker.set_pending_workers(0)
                     stop_error = ParallelExecutionError(f"could not start fixed-key worker: {exc}")
                     pending.appendleft(task)
                     break
-                with self.tracker.pending_workers.get_lock():
-                    self.tracker.pending_workers.value = 0
+                self.tracker.set_pending_workers(0)
                 active[pid] = (task, start)
                 self.max_active_workers = max(self.max_active_workers, len(active))
             if not active:
@@ -438,14 +465,10 @@ class ParallelGameDispatcher:
                 stop_error = stop_error or ParallelExecutionError(f"reaped an unregistered child process {pid}")
                 continue
             task, started_wall = item
-            slot = next((index for index in range(self.workers)
-                         if int(self.tracker.active_pids[index]) == pid), None)
-            if slot is not None:
-                with self.tracker.active_pids.get_lock():
-                    self.tracker.active_pids[slot] = 0
-                free_slots.append(slot)
             child_cpu = float(usage.ru_utime + usage.ru_stime)
-            self.tracker.add_reaped_cpu(child_cpu)
+            slot = self.tracker.reap_worker(pid, child_cpu)
+            if slot is not None:
+                free_slots.append(slot)
             self.max_worker_rss_bytes = max(self.max_worker_rss_bytes, int(usage.ru_maxrss) * 1024)
             task_key = tuple(task["key"])
             summary_pair = _latest_run_summary(self.rs, task)
