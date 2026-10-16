@@ -1,0 +1,73 @@
+{
+  "base_commit": "9525d416b9488bb2455435699893b03fe19fe30a",
+  "config_sha256": "abd599e6f819096f5df9f02292d3ec4209f6b93a218991b3123d1a3c857fc116",
+  "files": [
+    {
+      "path": "adapter_v47.py",
+      "sha256": "06a6f3edaec30ba2920093337cecedacbd02631b5091fb662e157de7ae2f9433"
+    },
+    {
+      "path": "bootstrap_v47.py",
+      "sha256": "c3a8108c0f057c68b735a8decc3c8e73cb3edc422f9be7d78003a7dec6bd4ed8"
+    },
+    {
+      "path": "bootstrap/A.json",
+      "sha256": "1deb6907b595c905b8c0d0559ddf18577dbbea17a22d2edee23be59370ae4ca1"
+    },
+    {
+      "path": "config.json",
+      "sha256": "abd599e6f819096f5df9f02292d3ec4209f6b93a218991b3123d1a3c857fc116"
+    },
+    {
+      "path": "controllers.py",
+      "sha256": "464746ba8753ca23b99e84fddcc69c28d0ae3b7d936f2453cf2b12723d04b916"
+    },
+    {
+      "path": "encoder.py",
+      "sha256": "1e670d156e1eb908458d520ca1de17b4bbe22f849452dd1fd3d6ca979916a5b8"
+    },
+    {
+      "path": "freeze_manifest.py",
+      "sha256": "5e055bb563a60e526a0f9f3b427989b1b69e13c52eb069097267797c275b2fff"
+    },
+    {
+      "path": "model.py",
+      "sha256": "60beb24e5f4a1605fea7471e74308554b65d0ec601d3bbe37eea6fd609d3e5cd"
+    },
+    {
+      "path": "normalizer_v49.py",
+      "sha256": "a32636291f76d27354f04263368168c790931efae25d6750544157ebbc06e953"
+    },
+    {
+      "path": "preflight_witness.py",
+      "sha256": "2c3e6083d67e98d5fd764da9fe9d4bf48c1db455d7b4c1c38fbd2fe47b5e19bc"
+    },
+    {
+      "path": "run_study.py",
+      "sha256": "b00e351ce708d9e73bbecf77e3a64a0cb27050855f80a8572cd4b96b7886b4e1"
+    },
+    {
+      "path": "trainer.py",
+      "sha256": "7e1d978e17efc14cac10ad2c920b8525b62e63197713e65f2c14c6dc1c050b7e"
+    },
+    {
+      "path": "vocabulary.json",
+      "sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+    }
+  ],
+  "freeze_rule": "No code, config, schema, vocabulary, or checkpoint bytes may change after a simulator preflight game.",
+  "implementation_commit": "ab97f34c71c206d15f00cf4571050c0d67f63618",
+  "issue": 60,
+  "purpose": "STUDY_ONLY",
+  "schema_id": "issue60-frozen-manifest-v1",
+  "source_pins": {
+    "adapter_v47_commit": "41484c97d7a7b294bcfe13a9b9864c1cabf10603",
+    "bootstrap_checkpoint_internal_sha256": "0ecb46dd7a39d2aa33a12d50c60be15d438a1c9cb3d9bc893183b9143d55f555",
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "normalizer_v49_commit": "8d32290beee53d7901a26ae1877333e9f94decf7",
+    "stsrl_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "vocabulary_schema": "issue60-fixed-category-vocab-v1",
+    "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+  }
+}
