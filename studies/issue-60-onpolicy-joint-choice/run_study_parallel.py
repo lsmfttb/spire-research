@@ -183,7 +183,10 @@ def _validation_ledger_cpu() -> float:
         try:
             row = json.loads(line)
             stage = row.get("stage")
-            if stage in {"parallel-validation-setup", "parallel-validation-and-profile"}:
+            if stage in {
+                "parallel-validation-setup", "parallel-validation-and-profile",
+                "parallel-validation-optimizer-minibatch-profile",
+            }:
                 amount = float(row.get("process_cpu_seconds", 0.0))
                 if amount < 0:
                     raise ValueError("negative CPU charge")
