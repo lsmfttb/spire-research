@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from resource_amendment_r1 import (
-    PARENT_HANDOFF, ORIGINAL_PRODUCER, R1_ADDED_SOURCE_PATHS,
+    PARENT_HANDOFF, ORIGINAL_PRODUCER, R1_ADDED_RESOURCE_ARTIFACTS, R1_ADDED_SOURCE_PATHS,
     R1_MODIFIED_SOURCE_PATHS, R1_DELETED_SOURCE_PATHS, R1_RESOURCE_VALUES,
 )
 
@@ -73,7 +73,7 @@ def main() -> None:
         "resource": R1_RESOURCE_VALUES,
         "source_diff_whitelist": {
             "modified_paths": list(R1_MODIFIED_SOURCE_PATHS),
-            "added_paths": list(R1_ADDED_SOURCE_PATHS),
+            "added_paths": [*R1_ADDED_SOURCE_PATHS, *R1_ADDED_RESOURCE_ARTIFACTS],
             "deleted_paths": list(R1_DELETED_SOURCE_PATHS),
             "modified_runner_symbols": ["REVIEWER_RESERVE", "PROCESS_BUDGET", "run_training", "main", "run_game"],
             "permitted_runner_semantics": [

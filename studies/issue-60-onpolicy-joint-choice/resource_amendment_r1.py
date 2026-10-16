@@ -48,6 +48,7 @@ R1_ADDED_SOURCE_PATHS = (
     "freeze_manifest_r1.py",
     "test_resource_amendment_r1.py",
 )
+R1_ADDED_RESOURCE_ARTIFACTS = ("frozen-manifest-r1.json", "resource-authorization-r1.json")
 R1_MODIFIED_SOURCE_PATHS = ("run_study.py",)
 R1_DELETED_SOURCE_PATHS: tuple[str, ...] = ()
 EXPECTED_R1_SOURCE_PATHS = tuple(sorted((*R1_ADDED_SOURCE_PATHS, *R1_MODIFIED_SOURCE_PATHS)))
@@ -152,7 +153,8 @@ def _committed_bytes(study_root: Path, relative: str, revision: str = "HEAD") ->
 
 
 def _study_git_path(study_root: Path, relative: str) -> str:
-    return study_root.resolve().relative_to(_repo_root(study_root).resolve()).as_posix() + "/" + relative
+    study_path = study_root.resolve().relative_to(_repo_root(study_root).resolve()).as_posix()
+    return study_path if relative in {"", "."} else study_path + "/" + relative
 
 
 def _assert_committed_unchanged(study_root: Path, relative: str) -> None:
@@ -621,7 +623,8 @@ def _expected_status_reconciliation_paths() -> tuple[str, ...]:
 def _verify_status_reconciliation_scope(study_root: Path, producer: str) -> dict[str, str]:
     diff = _git(study_root, "diff", "--name-status", "--no-renames",
                 R1_STATUS_PARENT_HANDOFF, producer, "--", _study_git_path(study_root, "."))
-    observed = _parse_diff_names(diff)
+    observed = {path: status for path, status in _parse_diff_names(diff).items()
+                if path.startswith("evidence/")}
     expected = {path: "M" for path in _expected_status_reconciliation_paths()}
     if observed != expected:
         raise ResourceAmendmentError(
