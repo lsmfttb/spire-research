@@ -18,7 +18,7 @@ from prospective_cost_regime import (
     AUTHORIZATION_COMMENT_ID, BRIDGE_CPU_LIMIT, BRIDGE_SEEDS, BRIDGE_STAGE,
     BUILDER_CAP, FINALIZATION_RESERVE, PROCESS_CAP, REGIME_ID,
     CostRegimeError, _declared_order, atomic_json, enforce_actual_caps, git,
-    load_cost_tags, producer_manifest, validate_bridge_population,
+    git_bytes, load_cost_tags, producer_manifest, validate_bridge_population,
     write_cost_tag,
 )
 
@@ -206,7 +206,7 @@ def _bridge_budget_start_record() -> dict[str, Any]:
         try:
             git(HERE, "merge-base", "--is-ancestor", source_commit, current_commit)
             for name, digest in current_manifest.items():
-                actual = hashlib.sha256(git(HERE, "show", f"{source_commit}:studies/issue-60-onpolicy-joint-choice/{name}")).hexdigest()
+                actual = hashlib.sha256(git_bytes(HERE, "show", f"{source_commit}:studies/issue-60-onpolicy-joint-choice/{name}")).hexdigest()
                 if actual != digest:
                     raise CostRegimeError(f"bridge budget producer commit does not contain {name}")
         except subprocess.CalledProcessError as exc:
@@ -560,7 +560,7 @@ def _bridge_start_record(run_study: Any, model_sha: str, config_sha: str) -> dic
         try:
             git(HERE, "merge-base", "--is-ancestor", producer_commit, commit)
             for name, digest in manifest.items():
-                actual = hashlib.sha256(git(HERE, "show", f"{producer_commit}:studies/issue-60-onpolicy-joint-choice/{name}")).hexdigest()
+                actual = hashlib.sha256(git_bytes(HERE, "show", f"{producer_commit}:studies/issue-60-onpolicy-joint-choice/{name}")).hexdigest()
                 if actual != digest:
                     raise CostRegimeError(f"bridge producer commit does not contain {name}")
         except (OSError, ValueError, subprocess.CalledProcessError) as exc:
@@ -892,7 +892,7 @@ def _run_continue() -> int:
     try:
         git(HERE, "merge-base", "--is-ancestor", source_commit, current_commit)
         for name, digest in current_hashes.items():
-            actual = hashlib.sha256(git(HERE, "show", f"{source_commit}:studies/issue-60-onpolicy-joint-choice/{name}")).hexdigest()
+            actual = hashlib.sha256(git_bytes(HERE, "show", f"{source_commit}:studies/issue-60-onpolicy-joint-choice/{name}")).hexdigest()
             if actual != digest:
                 raise CostRegimeError(f"prospective gate producer commit does not contain {name}")
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
