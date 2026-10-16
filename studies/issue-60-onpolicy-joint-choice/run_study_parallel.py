@@ -14,7 +14,6 @@ import os
 from pathlib import Path
 import pstats
 import resource
-import subprocess
 import sys
 import time
 from typing import Any
@@ -24,6 +23,7 @@ from parallel_execution import (
     ProcessCpuTracker, can_dispatch, choose_worker_count, compare_replay, host_capacity,
     profile_summary, stage_result_status,
 )
+from resource_amendment_r1 import _git as study_git
 
 
 HERE = Path(__file__).resolve().parent
@@ -154,10 +154,7 @@ def _stage_receipt(stage: str, *, stage_started_cpu: float,
         "wall_seconds": max(0.0, time.monotonic() - stage_started_wall),
         "host": host_capacity(),
         **DISPATCHER.evidence(),
-        "source_commit": subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=HERE.parents[1],
-            check=True, capture_output=True, text=True,
-        ).stdout.strip(),
+        "source_commit": study_git(HERE, "rev-parse", "HEAD"),
         "source_files": {path: _sha256(HERE / path) for path in PARALLEL_SOURCE_FILES},
     }
     receipt_path = VALIDATION / "stages" / f"{stage}.json"
@@ -306,10 +303,7 @@ def _record_validation_failure(run_study: Any, runtime: dict[str, Any], model_sh
             VALIDATION_PRIOR_CPU + VALIDATION_SETUP_CPU + aggregate_cpu
         ),
         "source_files": {path: _sha256(HERE / path) for path in PARALLEL_SOURCE_FILES},
-        "source_commit": subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=HERE.parents[1],
-            check=True, capture_output=True, text=True,
-        ).stdout.strip(),
+        "source_commit": study_git(HERE, "rev-parse", "HEAD"),
     }
     stage_record = {
         "schema_id": "issue60-parallel-stage-receipt-v1",
