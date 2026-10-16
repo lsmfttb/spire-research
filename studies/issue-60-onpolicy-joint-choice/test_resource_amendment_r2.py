@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import unittest
+import tempfile
+from unittest import mock
 
 from resource_amendment_r2 import (
     BUILDER_BUDGET_SECONDS, ResourceBudgetExceeded, build_forecast,
@@ -16,6 +18,23 @@ HERE = Path(__file__).resolve().parent
 
 
 class ResourceAmendmentR2Tests(unittest.TestCase):
+    def test_resource_gate_stage_persists_gate_before_reporting_pass(self) -> None:
+        import run_study_r2
+
+        result = {"status": "PASS", "decision": "continue the unchanged fixed grid"}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                mock.patch.object(run_study_r2, "HERE", root),
+                mock.patch.object(run_study_r2, "install_process_cpu_limit", return_value={}),
+                mock.patch.object(run_study_r2, "write_resource_gate", return_value=result) as write_gate,
+                mock.patch.object(run_study_r2, "_write_json"),
+                mock.patch.object(run_study_r2, "_append_ledger"),
+            ):
+                status = run_study_r2._run_r2_receipt_stage("resource-r2", stage_start_cpu=0.0)
+        self.assertEqual(status, 0)
+        write_gate.assert_called_once_with(root, stage_started_cpu=0.0)
+
     def test_reference_54_game_history_matches_planner_arithmetic(self) -> None:
         rows = complete_game_costs(HERE)
         self.assertEqual(len(rows), 54)

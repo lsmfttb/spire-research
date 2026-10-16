@@ -14,9 +14,9 @@ from resource_amendment_r2 import (
     BUILDER_BUDGET_SECONDS, CPU_LEDGER, ResourceBudgetExceeded,
     ResourceAmendmentErrorR2, _ledger_total, _read_json, _write_json,
     complete_game_costs, enforce_budget, install_process_cpu_limit,
-    make_resource_gate, remaining_optimizer_projection, seal_resource_gate,
+    remaining_optimizer_projection, seal_resource_gate,
     verify_r2_receipt, wrap_before_decision, wrap_minibatch_loss,
-    write_budget_stop,
+    write_budget_stop, write_resource_gate,
 )
 
 
@@ -168,7 +168,7 @@ def _run_r2_receipt_stage(stage: str, *, stage_start_cpu: float) -> int:
     error = None
     try:
         if stage == "resource-r2":
-            result = make_resource_gate(HERE, stage_started_cpu=stage_start_cpu)
+            result = write_resource_gate(HERE, stage_started_cpu=stage_start_cpu)
             _write_json(HERE / "evidence" / "stage-status" / "resource-r2.json", {
                 "schema_id": "issue60-stage-status-r2-v1", "stage": stage,
                 "status": result["status"],
