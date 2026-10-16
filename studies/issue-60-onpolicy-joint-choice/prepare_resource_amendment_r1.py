@@ -75,12 +75,13 @@ def main() -> None:
             "modified_paths": list(R1_MODIFIED_SOURCE_PATHS),
             "added_paths": list(R1_ADDED_SOURCE_PATHS),
             "deleted_paths": list(R1_DELETED_SOURCE_PATHS),
-            "modified_runner_symbols": ["REVIEWER_RESERVE", "PROCESS_BUDGET", "run_training", "main"],
+            "modified_runner_symbols": ["REVIEWER_RESERVE", "PROCESS_BUDGET", "run_training", "main", "run_game"],
             "permitted_runner_semantics": [
                 "change cumulative cap and review reserve constants only",
                 "replace the original RESOURCE_BLOCKED training consumer with a verified R1 gate consumer",
                 "add separate R1 resource-check/seal stages and route old preflight to a fail-closed stop",
                 "write repeat synthetic evidence to an R1-specific path, preserving the original witness",
+                "finalize each attempt status from its terminal run summary without changing game or training decisions",
             ],
         },
         "preservation_rules": {

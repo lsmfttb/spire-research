@@ -9,7 +9,8 @@ from pathlib import Path
 from resource_amendment_r1 import (
     ORIGINAL_MANIFEST, PARENT_HANDOFF, R1_ADDED_SOURCE_PATHS,
     R1_AUTHORIZATION, R1_MANIFEST,
-    _git, _git_bytes, _study_git_path, verify_runner_whitelist,
+    _git, _git_bytes, _study_git_path, _verify_status_reconciliation_scope,
+    verify_runner_whitelist,
 )
 
 
@@ -41,9 +42,16 @@ def freeze_manifest() -> dict:
     actual = {}
     for line in actual_diff.splitlines():
         status, path = line.split("\t", 1)
-        actual[path.removeprefix(_study_git_path(HERE, ".").removesuffix("/." ) + "/")] = status
+        relative = path.removeprefix(_study_git_path(HERE, ".").removesuffix("/." ) + "/")
+        if relative.startswith("evidence/"):
+            continue
+        actual[relative] = status
     if actual != expected:
         raise SystemExit(f"resource-only path whitelist mismatch: expected {expected}, observed {actual}")
+    try:
+        _verify_status_reconciliation_scope(HERE, producer)
+    except Exception as exc:
+        raise SystemExit(f"post-stop status evidence is outside the 46-attempt repair scope: {exc}") from exc
 
     old_runner = _git_bytes(HERE, "show", f"{PARENT_HANDOFF}:{_study_git_path(HERE, 'run_study.py')}")
     current_runner = (HERE / "run_study.py").read_bytes()

@@ -492,6 +492,8 @@ def run_game(*, seed: int, mode: str, model: JointChoiceActorCritic | None,
     summary["search_log_file"] = "battle-search.jsonl.gz"
     summary["completed_cpu_seconds"] = time.process_time()
     atomic_json(attempt_dir / "run.json", summary)
+    from attempt_lifecycle import finalized_attempt_status
+    atomic_json(attempt_dir / "status.json", finalized_attempt_status(status, summary))
     return attempt_dir, summary
 
 

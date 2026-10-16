@@ -22,6 +22,7 @@ from typing import Any, Mapping
 
 ISSUE = 60
 PARENT_HANDOFF = "d42b04235f4a8fead844998428e8cc35d2d64f03"
+R1_STATUS_PARENT_HANDOFF = "25916a05e959e359b8aa63be28891f2ac1e4c43f"
 ORIGINAL_PRODUCER = "a7e8593558e6817d2ed34a5cd6bd2d5bd0a98768"
 ORIGINAL_CONFIG_SHA256 = "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca"
 ORIGINAL_GATE = "evidence/preflight/native.json"
@@ -32,13 +33,15 @@ R1_AUTHORIZATION = "resource-authorization-r1.json"
 R1_GATE = "evidence/preflight/resource-r1.json"
 R1_SEAL = "evidence/preflight/resource-r1-seal.json"
 R1_SYNTHETIC = "evidence/preflight/resource-r1-synthetic.json"
+R1_STATUS_RECONCILIATION = "evidence/attempt-status-r1-reconciliation.json"
 CPU_LEDGER = "evidence/cpu-ledger.jsonl"
 R1_ALLOWANCES = (
     ("issue60-r1-planner-administration", "planner", 200.0),
     ("issue60-r1-builder-administration", "builder", 200.0),
 )
-R1_RUNNER_SYMBOLS = ("REVIEWER_RESERVE", "PROCESS_BUDGET", "run_training", "main")
+R1_RUNNER_SYMBOLS = ("REVIEWER_RESERVE", "PROCESS_BUDGET", "run_training", "main", "run_game")
 R1_ADDED_SOURCE_PATHS = (
+    "attempt_lifecycle.py",
     "resource_amendment_r1.py",
     "resource-amendment-r1.json",
     "prepare_resource_amendment_r1.py",
@@ -197,6 +200,27 @@ def _expected_ast_statements(source: str) -> list[ast.stmt]:
     return ast.parse(source).body
 
 
+def _without_terminal_status_write(function: ast.FunctionDef) -> list[ast.stmt]:
+    body = copy.deepcopy(function.body)
+    expected = _expected_ast_statements("""
+from attempt_lifecycle import finalized_attempt_status
+atomic_json(attempt_dir / "status.json", finalized_attempt_status(status, summary))
+""")
+    wanted = ast.dump(ast.Module(body=expected, type_ignores=[]), include_attributes=False)
+    matches = []
+    for index in range(len(body) - len(expected) + 1):
+        candidate = body[index:index + len(expected)]
+        if ast.dump(ast.Module(body=candidate, type_ignores=[]), include_attributes=False) == wanted:
+            matches.append(index)
+    if len(matches) != 1:
+        raise ResourceAmendmentError("R1 runner must add exactly one terminal attempt-status write")
+    index = matches[0]
+    if index + len(expected) != len(body) - 1 or not isinstance(body[-1], ast.Return):
+        raise ResourceAmendmentError("terminal attempt-status write must follow run.json and precede return")
+    body[index:index + len(expected)] = []
+    return body
+
+
 def _nested_statement_lists(node: ast.AST | list[ast.stmt]):
     if isinstance(node, list):
         if node and all(isinstance(value, ast.stmt) for value in node):
@@ -343,7 +367,7 @@ def verify_runner_whitelist(original_source: bytes, r1_source: bytes) -> None:
     new_nodes = _source_nodes(amended)
     if [name for name, _ in old_nodes] != [name for name, _ in new_nodes]:
         raise ResourceAmendmentError("R1 runner added, removed, or reordered top-level declarations")
-    permitted = {"assignment:REVIEWER_RESERVE", "assignment:PROCESS_BUDGET", "run_training", "main"}
+    permitted = {"assignment:REVIEWER_RESERVE", "assignment:PROCESS_BUDGET", "run_training", "main", "run_game"}
     for (name, old), (_, new) in zip(old_nodes, new_nodes):
         if name not in permitted and ast.dump(old, include_attributes=False) != ast.dump(new, include_attributes=False):
             raise ResourceAmendmentError(f"R1 changed non-whitelisted runner declaration: {name}")
@@ -377,6 +401,12 @@ require_training_gate(HERE, config)
                 raise ResourceAmendmentError("R1 training gate differs from the authorized chain consumer")
             if ast.dump(ast.Module(body=old_function.body[4:], type_ignores=[]), include_attributes=False) != ast.dump(ast.Module(body=new_function.body[2:], type_ignores=[]), include_attributes=False):
                 raise ResourceAmendmentError("R1 altered training behavior beyond the resource gate")
+        if name == "run_game":
+            if not (isinstance(old, ast.FunctionDef) and isinstance(new, ast.FunctionDef)):
+                raise ResourceAmendmentError("R1 game runner declaration changed type")
+            if ast.dump(ast.Module(body=old.body, type_ignores=[]), include_attributes=False) != ast.dump(
+                    ast.Module(body=_without_terminal_status_write(new), type_ignores=[]), include_attributes=False):
+                raise ResourceAmendmentError("R1 changed game behavior beyond terminal status serialization")
     old_main = _normalize_main(original, is_r1=False)
     new_main = _normalize_main(amended, is_r1=True)
     if ast.dump(ast.Module(body=old_main, type_ignores=[]), include_attributes=False) != ast.dump(ast.Module(body=new_main, type_ignores=[]), include_attributes=False):
@@ -581,16 +611,37 @@ def _parse_diff_names(output: str) -> dict[str, str]:
     return result
 
 
+def _expected_status_reconciliation_paths() -> tuple[str, ...]:
+    return tuple(
+        f"evidence/runs/training/block1/batch-01/seed-{seed}/attempt-0001/status.json"
+        for seed in range(660001, 660047)
+    )
+
+
+def _verify_status_reconciliation_scope(study_root: Path, producer: str) -> dict[str, str]:
+    diff = _git(study_root, "diff", "--name-status", "--no-renames",
+                R1_STATUS_PARENT_HANDOFF, producer, "--", _study_git_path(study_root, "."))
+    observed = _parse_diff_names(diff)
+    expected = {path: "M" for path in _expected_status_reconciliation_paths()}
+    if observed != expected:
+        raise ResourceAmendmentError(
+            "post-stop evidence changes must be exactly the 46 finalized training attempt status files"
+        )
+    return observed
+
+
 def _verify_whitelist(study_root: Path, amendment: Mapping[str, Any], producer: str,
                       original_runner: bytes) -> dict[str, Any]:
     diff = _git(study_root, "diff", "--name-status", "--no-renames", PARENT_HANDOFF,
                 producer, "--", _study_git_path(study_root, "."))
-    actual = _parse_diff_names(diff)
+    actual = {path: status for path, status in _parse_diff_names(diff).items()
+              if not path.startswith("evidence/")}
     expected = {path: "M" for path in amendment["source_diff_whitelist"]["modified_paths"]}
     expected.update({path: "A" for path in amendment["source_diff_whitelist"]["added_paths"]})
     expected.update({path: "D" for path in amendment["source_diff_whitelist"]["deleted_paths"]})
     if actual != expected:
         raise ResourceAmendmentError(f"R1 source path whitelist mismatch; expected {expected}, observed {actual}")
+    _verify_status_reconciliation_scope(study_root, producer)
     amended_runner = (study_root / ORIGINAL_RUNNER).read_bytes()
     verify_runner_whitelist(original_runner, amended_runner)
     # The committed patch is generated by freeze_manifest_r1.py from the same
@@ -598,6 +649,139 @@ def _verify_whitelist(study_root: Path, amendment: Mapping[str, Any], producer: 
     return {"changed_paths": actual,
             "changed_runner_symbols": list(R1_RUNNER_SYMBOLS),
             "runner_ast_whitelist_passed": True}
+
+
+def _verify_status_reconciliation(study_root: Path, manifest_info: Mapping[str, Any],
+                                  auth_info: Mapping[str, Any], gate_bytes: bytes,
+                                  seal_bytes: bytes, amendment: Mapping[str, Any]) -> dict[str, Any]:
+    """Verify the post-stop lifecycle correction without rewriting the sealed R1 forecast."""
+    path = R1_STATUS_RECONCILIATION
+    note_bytes = (study_root / path).read_bytes()
+    note = json.loads(note_bytes)
+    if note.get("schema_id") != "issue60-attempt-status-reconciliation-r1-v1":
+        raise ResourceAmendmentError("attempt status reconciliation schema is unexpected")
+    if note.get("parent_handoff_commit") != R1_STATUS_PARENT_HANDOFF:
+        raise ResourceAmendmentError("attempt status reconciliation has the wrong pre-run handoff anchor")
+    if note.get("current_manifest_sha256") != manifest_info["manifest_sha256"]:
+        raise ResourceAmendmentError("attempt status reconciliation does not bind the current R1 manifest")
+    if note.get("current_authorization_sha256") != auth_info["receipt_sha256"]:
+        raise ResourceAmendmentError("attempt status reconciliation does not bind the current authorization")
+    amendment_bytes = (study_root / "resource-amendment-r1.json").read_bytes()
+    if note.get("current_amendment_sha256") != sha256_bytes(amendment_bytes):
+        raise ResourceAmendmentError("attempt status reconciliation does not bind the current amendment")
+
+    old_manifest_bytes = _committed_bytes(study_root, R1_MANIFEST, R1_STATUS_PARENT_HANDOFF)
+    old_auth_bytes = _committed_bytes(study_root, R1_AUTHORIZATION, R1_STATUS_PARENT_HANDOFF)
+    old_amendment_bytes = _committed_bytes(study_root, "resource-amendment-r1.json", R1_STATUS_PARENT_HANDOFF)
+    old_gate_bytes = _committed_bytes(study_root, R1_GATE, R1_STATUS_PARENT_HANDOFF)
+    old_seal_bytes = _committed_bytes(study_root, R1_SEAL, R1_STATUS_PARENT_HANDOFF)
+    for key, value in (
+        ("previous_manifest_sha256", sha256_bytes(old_manifest_bytes)),
+        ("previous_authorization_sha256", sha256_bytes(old_auth_bytes)),
+        ("previous_amendment_sha256", sha256_bytes(old_amendment_bytes)),
+        ("sealed_resource_gate_sha256", sha256_bytes(old_gate_bytes)),
+        ("sealed_resource_seal_sha256", sha256_bytes(old_seal_bytes)),
+    ):
+        if note.get(key) != value:
+            raise ResourceAmendmentError(f"attempt status reconciliation does not preserve {key}")
+    if gate_bytes != old_gate_bytes or seal_bytes != old_seal_bytes:
+        raise ResourceAmendmentError("attempt status reconciliation must preserve the original sealed forecast bytes")
+    old_gate = json.loads(old_gate_bytes)
+    old_seal = json.loads(old_seal_bytes)
+    old_amendment = json.loads(old_amendment_bytes)
+    if (old_gate.get("resource_amendment_sha256") != sha256_bytes(old_amendment_bytes)
+            or old_gate.get("r1_manifest_sha256") != sha256_bytes(old_manifest_bytes)
+            or old_gate.get("authorization_receipt_sha256") != sha256_bytes(old_auth_bytes)
+            or old_seal.get("resource_gate_sha256") != sha256_bytes(old_gate_bytes)
+            or old_seal.get("frozen_manifest_sha256") != sha256_bytes(old_manifest_bytes)
+            or old_seal.get("authorization_receipt_sha256") != sha256_bytes(old_auth_bytes)):
+        raise ResourceAmendmentError("pre-run R1 forecast/seal is internally inconsistent at its handoff anchor")
+    if old_amendment.get("original_cpu_ledger_prefix_sha256") != amendment.get("original_cpu_ledger_prefix_sha256"):
+        raise ResourceAmendmentError("attempt status reconciliation changed the sealed CPU ledger prefix")
+
+    attempts = note.get("attempts")
+    expected_paths = _expected_status_reconciliation_paths()
+    if (not isinstance(attempts, list) or any(not isinstance(row, Mapping) for row in attempts)
+            or [row.get("status_path") for row in attempts] != list(expected_paths)):
+        raise ResourceAmendmentError("attempt status reconciliation must enumerate the exact 46 stopped training attempts")
+    from attempt_lifecycle import finalized_attempt_status
+    for row, status_relative in zip(attempts, expected_paths):
+        run_relative = status_relative.removesuffix("status.json") + "run.json"
+        old_status_bytes = _committed_bytes(study_root, status_relative, R1_STATUS_PARENT_HANDOFF)
+        old_run_bytes = _committed_bytes(study_root, run_relative, R1_STATUS_PARENT_HANDOFF)
+        current_status_bytes = (study_root / status_relative).read_bytes()
+        current_run_bytes = (study_root / run_relative).read_bytes()
+        if (row.get("previous_status_sha256") != sha256_bytes(old_status_bytes)
+                or row.get("run_summary_sha256") != sha256_bytes(old_run_bytes)
+                or row.get("terminal_status_sha256") != sha256_bytes(current_status_bytes)
+                or row.get("run_path") != run_relative):
+            raise ResourceAmendmentError(f"attempt status reconciliation hash mismatch: {status_relative}")
+        if current_run_bytes != old_run_bytes:
+            raise ResourceAmendmentError(f"attempt status reconciliation changed a scientific run summary: {run_relative}")
+        started = json.loads(old_status_bytes)
+        summary = json.loads(current_run_bytes)
+        terminal = json.loads(current_status_bytes)
+        if started.get("status") != "RUNNING" or terminal != finalized_attempt_status(started, summary):
+            raise ResourceAmendmentError(f"attempt status does not match its terminal run summary: {status_relative}")
+    if len(attempts) != len(expected_paths):
+        raise ResourceAmendmentError("attempt status reconciliation has extra or missing attempt rows")
+    _assert_committed_unchanged(study_root, path)
+    return {"schema_id": note["schema_id"], "attempt_count": len(attempts),
+            "status_reconciliation_sha256": sha256_bytes(note_bytes)}
+
+
+def write_attempt_status_reconciliation(study_root: Path) -> dict[str, Any]:
+    """Record the narrow post-stop correction while preserving the sealed forecast."""
+    study_root = study_root.resolve()
+    old_manifest = _committed_bytes(study_root, R1_MANIFEST, R1_STATUS_PARENT_HANDOFF)
+    old_auth = _committed_bytes(study_root, R1_AUTHORIZATION, R1_STATUS_PARENT_HANDOFF)
+    old_amendment = _committed_bytes(study_root, "resource-amendment-r1.json", R1_STATUS_PARENT_HANDOFF)
+    old_gate = _committed_bytes(study_root, R1_GATE, R1_STATUS_PARENT_HANDOFF)
+    old_seal = _committed_bytes(study_root, R1_SEAL, R1_STATUS_PARENT_HANDOFF)
+    if ((study_root / R1_GATE).read_bytes() != old_gate
+            or (study_root / R1_SEAL).read_bytes() != old_seal):
+        raise ResourceAmendmentError("post-stop status repair may not rewrite the resource gate or seal")
+    attempts = []
+    from attempt_lifecycle import finalized_attempt_status
+    for status_relative in _expected_status_reconciliation_paths():
+        run_relative = status_relative.removesuffix("status.json") + "run.json"
+        old_status = _committed_bytes(study_root, status_relative, R1_STATUS_PARENT_HANDOFF)
+        old_run = _committed_bytes(study_root, run_relative, R1_STATUS_PARENT_HANDOFF)
+        status_path = study_root / status_relative
+        run_path = study_root / run_relative
+        current_status = status_path.read_bytes()
+        current_run = run_path.read_bytes()
+        started = json.loads(old_status)
+        summary = json.loads(current_run)
+        terminal = json.loads(current_status)
+        if started.get("status") != "RUNNING" or old_run != current_run:
+            raise ResourceAmendmentError(f"post-stop repair changed the run summary or lacks a RUNNING marker: {run_relative}")
+        if terminal != finalized_attempt_status(started, summary):
+            raise ResourceAmendmentError(f"post-stop status is not the terminal summary state: {status_relative}")
+        attempts.append({
+            "status_path": status_relative,
+            "run_path": run_relative,
+            "previous_status_sha256": sha256_bytes(old_status),
+            "run_summary_sha256": sha256_bytes(old_run),
+            "terminal_status_sha256": sha256_bytes(current_status),
+        })
+    record = {
+        "schema_id": "issue60-attempt-status-reconciliation-r1-v1",
+        "parent_handoff_commit": R1_STATUS_PARENT_HANDOFF,
+        "current_manifest_sha256": sha256_bytes((study_root / R1_MANIFEST).read_bytes()),
+        "current_authorization_sha256": sha256_bytes((study_root / R1_AUTHORIZATION).read_bytes()),
+        "current_amendment_sha256": sha256_bytes((study_root / "resource-amendment-r1.json").read_bytes()),
+        "previous_manifest_sha256": sha256_bytes(old_manifest),
+        "previous_authorization_sha256": sha256_bytes(old_auth),
+        "previous_amendment_sha256": sha256_bytes(old_amendment),
+        "sealed_resource_gate_sha256": sha256_bytes(old_gate),
+        "sealed_resource_seal_sha256": sha256_bytes(old_seal),
+        "attempts": attempts,
+    }
+    current_manifest = _read_json(study_root / R1_MANIFEST)
+    _verify_status_reconciliation_scope(study_root, str(current_manifest.get("implementation_commit", "")))
+    _atomic_json(study_root / R1_STATUS_RECONCILIATION, record)
+    return record
 
 
 def _verify_authorization_receipt(study_root: Path, amendment: Mapping[str, Any],
@@ -660,12 +844,17 @@ def _verify_gate_and_seal(study_root: Path, amendment: Mapping[str, Any],
         raise ResourceAmendmentError("R1 resource gate seal has an unexpected schema")
     if seal.get("resource_gate_sha256") != sha256_bytes(gate_bytes):
         raise ResourceAmendmentError("R1 gate seal does not match the passing resource gate")
-    if seal.get("authorization_receipt_sha256") != auth_info["receipt_sha256"]:
-        raise ResourceAmendmentError("R1 gate seal does not match the resource authorization receipt")
-    if seal.get("frozen_manifest_sha256") != manifest_info["manifest_sha256"]:
-        raise ResourceAmendmentError("R1 gate seal does not match the source manifest")
-    if gate.get("resource_amendment_sha256") != sha256_bytes((study_root / "resource-amendment-r1.json").read_bytes()):
-        raise ResourceAmendmentError("R1 gate does not match the amendment config")
+    current_amendment_sha = sha256_bytes((study_root / "resource-amendment-r1.json").read_bytes())
+    bindings_match = (
+        seal.get("authorization_receipt_sha256") == auth_info["receipt_sha256"]
+        and seal.get("frozen_manifest_sha256") == manifest_info["manifest_sha256"]
+        and gate.get("resource_amendment_sha256") == current_amendment_sha
+    )
+    reconciliation = None
+    if not bindings_match:
+        reconciliation = _verify_status_reconciliation(
+            study_root, manifest_info, auth_info, gate_bytes, seal_bytes, amendment
+        )
     synthetic_path = study_root / R1_SYNTHETIC
     synthetic = json.loads(synthetic_path.read_text(encoding="utf-8"))
     if (synthetic.get("passed") is not True
@@ -712,7 +901,8 @@ def _verify_gate_and_seal(study_root: Path, amendment: Mapping[str, Any],
         raise ResourceAmendmentError("CPU ledger differs within its sealed pre-training prefix")
     _assert_committed_unchanged(study_root, R1_AUTHORIZATION)
     return {"gate": gate, "gate_sha256": sha256_bytes(gate_bytes), "seal": seal,
-            "seal_sha256": sha256_bytes(seal_bytes)}
+            "seal_sha256": sha256_bytes(seal_bytes),
+            "status_reconciliation": reconciliation}
 
 
 def verify_resource_chain(study_root: Path, *, require_no_formal_runs: bool = False,

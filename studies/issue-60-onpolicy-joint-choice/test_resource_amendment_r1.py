@@ -11,12 +11,40 @@ from resource_amendment_r1 import (
     _check_config_identity, _git, _git_bytes, _study_git_path,
     assert_resource_projection, verify_runner_whitelist,
 )
+from attempt_lifecycle import finalized_attempt_status
 
 
 HERE = Path(__file__).resolve().parent
 
 
 class ResourceAmendmentR1Tests(unittest.TestCase):
+    def test_attempt_status_advances_to_the_run_summary_terminal_state(self) -> None:
+        started = {
+            "schema_id": "issue60-game-attempt-v1", "status": "RUNNING",
+            "game_seed": 660001, "mode": "residual", "block": "block1",
+            "stage_key": "block1:batch-01", "arm": "residual",
+            "runtime_policy_seed": 17, "model_sha256": "model", "config_sha256": "config",
+            "pid": 1, "started_cpu_seconds": 10.0,
+        }
+        complete = finalized_attempt_status(started, {
+            **started, "status": "COMPLETE", "process_cpu_seconds": 4.0,
+            "completed_cpu_seconds": 14.0, "failure": None,
+        })
+        self.assertEqual(complete["status"], "COMPLETE")
+        self.assertEqual(complete["process_cpu_seconds"], 4.0)
+        self.assertEqual(complete["completed_cpu_seconds"], 14.0)
+        self.assertNotIn("failure", complete)
+
+        incomplete = finalized_attempt_status(started, {
+            **started, "status": "INCOMPLETE", "process_cpu_seconds": 2.0,
+            "completed_cpu_seconds": 12.0, "failure": "executor cap",
+        })
+        self.assertEqual(incomplete["status"], "INCOMPLETE")
+        self.assertEqual(incomplete["failure"], "executor cap")
+
+        with self.assertRaisesRegex(ValueError, "terminal lifecycle state"):
+            finalized_attempt_status(started, {**started, "status": "RUNNING"})
+
     def test_runner_diff_contains_only_approved_resource_gates(self) -> None:
         producer = _git(HERE, "rev-parse", "HEAD")
         original = _git_bytes(HERE, "show", f"{PARENT_HANDOFF}:{_study_git_path(HERE, 'run_study.py')}")
