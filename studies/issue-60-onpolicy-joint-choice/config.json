@@ -1,0 +1,218 @@
+{
+  "schema_id": "issue60-frozen-study-config-v1",
+  "purpose": "STUDY_ONLY",
+  "base": {
+    "remote": "origin/main",
+    "commit": "9525d416b9488bb2455435699893b03fe19fe30a"
+  },
+  "sources": {
+    "stsrl_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "adapter_v47_commit": "41484c97d7a7b294bcfe13a9b9864c1cabf10603",
+    "normalizer_v49_commit": "8d32290beee53d7901a26ae1877333e9f94decf7",
+    "bootstrap_checkpoint_internal_sha256": "0ecb46dd7a39d2aa33a12d50c60be15d438a1c9cb3d9bc893183b9143d55f555",
+    "vocabulary_schema": "issue60-fixed-category-vocab-v1",
+    "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+  },
+  "runtime": {
+    "python": "3.13.13",
+    "torch": "2.12.0+cpu",
+    "torch_threads": 1,
+    "device": "cpu",
+    "dtype": "float32",
+    "deterministic_algorithms": true
+  },
+  "environment": {
+    "player_class": "IRONCLAD",
+    "ascension": 20,
+    "start": "native standard start",
+    "run_to_terminal": true,
+    "max_executor_steps": 20000,
+    "action_space": "ActionSpaceConfig.include_all()",
+    "battle_teacher": {
+      "native_api": "StepSimulator.battle_search_v2.v1",
+      "simulations": 400,
+      "include_potions": true,
+      "root_selection_rule": "highest_mean",
+      "policy_prior_callback": null,
+      "leaf_value_callback": null,
+      "information_regime": "full_simulator_state_oracle_like"
+    },
+    "other_noncombat_controller": "expert_non_combat_v1",
+    "expert_driver_seed": 660099,
+    "supported_policy_screens": [
+      "MAP_SCREEN",
+      "REWARDS"
+    ],
+    "unsupported_policy_screens": "explicit seeded expert_non_combat_v1 fallback",
+    "supported_screen_errors": "fail closed; run incomplete"
+  },
+  "bootstrap": {
+    "checkpoint": "bootstrap/A.json",
+    "feature_source": "bootstrap_v47.py at adapter_v47_commit",
+    "behavior": "exact issue47 student.py feature/history/visible treatment and ordinal argmax",
+    "status": "unpromoted simulator-outcome-trained bootstrap",
+    "tie_break": "lowest legal ordinal from original max(range(n), key=score)"
+  },
+  "policy": {
+    "baseline_probability_mass": 0.9,
+    "uniform_probability_mass": 0.1,
+    "distribution": "p0(a|I) * exp(f_theta(I,a)) normalized over current legal choices",
+    "residual_initialization": "exactly zero output; initial actor equals p0",
+    "sampling": "sample during training and primary evaluation; no greedy substitution",
+    "single_action_state": "probability 1; critic may update, actor mask 0",
+    "bootstrap_is_frozen": true,
+    "kl_constraint": null,
+    "candidate_ordinal_is_residual_feature": false
+  },
+  "input_schema": {
+    "schema_id": "issue60-typed-joint-choice-v1",
+    "normalization": "issue49 normalize/mapped_action semantics with explicit Singing Bowl and unavailable-attribute extension",
+    "public_state_allowlist": [
+      "screen",
+      "persistent_resources",
+      "visible_act_boss",
+      "map_graph",
+      "current_map_node",
+      "screen_context",
+      "history",
+      "ordinary_location"
+    ],
+    "availability_tags": true,
+    "exclude_native_handles_bits_seed_private_rng_future_rewards_and_draw_order": true,
+    "exclude_action_labels_native_action_indices_and_candidate_ordinal_from_residual": true,
+    "categories": "vocabulary.json; sorted namespaced enum table, index 0 is UNK",
+    "entity_embedding_width": 16,
+    "entity_numeric_fields": [
+      "cost",
+      "damage",
+      "block",
+      "upgrade_count",
+      "misc",
+      "counter",
+      "max_hp_gain",
+      "gold"
+    ],
+    "numeric_normalization": "sign(x) * log1p(abs(x)) / 10; each field has a separate availability mask",
+    "global_numeric_fields": [
+      "current_hp",
+      "max_hp",
+      "gold",
+      "potion_count",
+      "potion_capacity",
+      "hp_ratio",
+      "act",
+      "floor",
+      "blue_key",
+      "green_key",
+      "red_key",
+      "deck_count",
+      "relic_count",
+      "potion_slot_count"
+    ],
+    "known_reward_card_missing_fields": [
+      "misc",
+      "upgrade_count"
+    ],
+    "missing_values": "unavailable tag and mask 0; never infer zero or a simulator default",
+    "set_pooling": "sum; preserves multiplicity and is permutation invariant",
+    "reward_groups": "sum card entities within each group, then sum group entities; candidate receives its content-derived group embedding",
+    "other_choices": "sum candidate encodings excluding target candidate",
+    "map_graph": "directed public edges; two outgoing-neighbor sum message-passing layers; candidate receives destination node embedding",
+    "map_coordinates": "x / 6 and y / 15; boss-entry is a separate category",
+    "history": "retained in public evidence and issue47 bootstrap input; omitted from residual encoder",
+    "availability_encoding": "field-specific namespaced availability category for each allowlisted public projection field"
+  },
+  "architecture": {
+    "kind": "shared typed entity/group/directed-map encoder with candidate-conditioned actor residual and action-independent critic",
+    "width": 64,
+    "categorical_embedding_width": 16,
+    "map_message_passing_layers": 2,
+    "trainable_parameter_cap": 200000,
+    "global_context_head": "Linear(492,64)-Tanh-Linear(64,64)-Tanh",
+    "candidate_score_head": "Linear(320,64)-Tanh-Linear(64,1)",
+    "value_head": "Linear(64,1) from public global context"
+  },
+  "training": {
+    "model_seeds": [
+      660101,
+      660102
+    ],
+    "block1_seeds": [
+      660001,
+      661024
+    ],
+    "block2_seeds": [
+      662001,
+      663024
+    ],
+    "batch_size_games": 128,
+    "batches_per_block": 8,
+    "policy_frozen_within_batch": true,
+    "ppo_epochs": 4,
+    "minibatch_decision_rows": 256,
+    "include_partial_final_minibatch": true,
+    "optimizer": "Adam",
+    "learning_rate": 0.0003,
+    "ratio_clip": 0.2,
+    "value_mse_coefficient": 0.5,
+    "entropy_coefficient": 0.0,
+    "global_gradient_norm_cap": 0.5,
+    "loss_weighting": "sum decision losses per game, averaged across 128 games; no per-episode length normalization; each minibatch sums its rows / 128",
+    "advantage": "Monte Carlo ((actual terminal floor - current floor) / 60) - pre-update public value; batch-wide mean center and population standard-deviation scale with epsilon 1e-8; fixed before any preflight game",
+    "value_target": "same Monte Carlo normalized floor progress",
+    "no_value_bootstrap_on_error_or_cap": true,
+    "no_stale_or_off_policy_batch_reuse": true,
+    "runtime_policy_rng": "SHA256-derived from block, game seed and batch ID; per-game stream",
+    "optimizer_rng": "separate deterministic stream derived from block seed, batch ID and epoch",
+    "environment_rng": "native game seed only; game IDs never model inputs"
+  },
+  "preflight": {
+    "seeds": [
+      668001,
+      668008
+    ],
+    "alternating_model_seeds": [
+      660101,
+      660102
+    ],
+    "must_complete_all_eight": true,
+    "must_pass_public_context_and_execution_witness": true,
+    "must_pass_on_policy_and_terminal_witness": true,
+    "runtime_cost_multiplier_on_max_observed_game": 1.5,
+    "explicit_headroom_fraction": 0.2,
+    "minimum_remaining_cpu_for_reviewer": 12000,
+    "process_cpu_budget": 120000,
+    "builder_cpu_budget_after_review_reserve": 108000,
+    "implementation_build_static_check_allowance": 600,
+    "resource_blocked_action": "stop before formal training/evaluation; do not change cohort or updates"
+  },
+  "evaluation": {
+    "seeds": [
+      669001,
+      669128
+    ],
+    "owners": 128,
+    "arms_per_owner": [
+      "final_block1",
+      "final_block2",
+      "p0",
+      "A",
+      "Expert"
+    ],
+    "run_count": 640,
+    "stochastic_arms_share_owner_sampling_seed": true,
+    "expert_driver_seed": 660099,
+    "bootstrap_replicates": 10000,
+    "bootstrap_seed": 669999,
+    "primary": "owner-paired ((floor_final_block1 + floor_final_block2)/2 - floor_p0); mean, signs, percentile 95% paired-owner bootstrap interval",
+    "secondary": "same paired contrast vs deterministic A and Expert",
+    "no_seed_expansion_or_automatic_second_program": true
+  },
+  "retention": {
+    "source_config_checkpoints_outcomes_public_decision_logprob_terminal_evidence": true,
+    "review_delete_date": "2026-11-16",
+    "artifact_root": "evidence/"
+  }
+}
