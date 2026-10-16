@@ -1,11 +1,19 @@
 {
-  "amendment_config_sha256": "c57ac99b78e47927b8e820df73301a9edda81156cfa043a00de4100dfb6093dc",
+  "amendment_config_sha256": "2e2650c9cd2669d1b2932be4d8fdf7209ce1417841787f22ad4488d4c899cb74",
   "amendment_id": "R1",
   "base_handoff_commit": "d42b04235f4a8fead844998428e8cc35d2d64f03",
   "files": [
     {
+      "path": ".gitattributes",
+      "sha256": "177a64097399870ade1a5e340051f2e1d3cebe00270f90a49c4a0914fb756a06"
+    },
+    {
       "path": "adapter_v47.py",
       "sha256": "06a6f3edaec30ba2920093337cecedacbd02631b5091fb662e157de7ae2f9433"
+    },
+    {
+      "path": "attempt_lifecycle.py",
+      "sha256": "686cff420a147d3d0460a6883dfe5f12001aef31766f69fde0799b5350e928ed"
     },
     {
       "path": "bootstrap/A.json",
@@ -33,7 +41,7 @@
     },
     {
       "path": "freeze_manifest_r1.py",
-      "sha256": "9cb61416738fa4f0e33564f5fad2955130830e2ff4c51d0e06c00f233ba74a0f"
+      "sha256": "783f1774f2472991fc5553a12b5ad0a1cd334c5e0c3e50ca2060b4a816b7dfd0"
     },
     {
       "path": "model.py",
@@ -49,7 +57,7 @@
     },
     {
       "path": "prepare_resource_amendment_r1.py",
-      "sha256": "239d41e5f86be21e55b00d3ebe4e0305da6f2985ea827860ae1552633367ae96"
+      "sha256": "0f529049201b72820d1a46c502feb1f6a7a2c62987858b2a7de2f32ac70e7c85"
     },
     {
       "path": "public_resources.py",
@@ -57,19 +65,19 @@
     },
     {
       "path": "resource-amendment-r1.json",
-      "sha256": "c57ac99b78e47927b8e820df73301a9edda81156cfa043a00de4100dfb6093dc"
+      "sha256": "2e2650c9cd2669d1b2932be4d8fdf7209ce1417841787f22ad4488d4c899cb74"
     },
     {
       "path": "resource_amendment_r1.py",
-      "sha256": "9cba1d9223b869f2ed77a9481643c96cd39ee7a4cd03831bdfc3103e9f8d9fcd"
+      "sha256": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb"
     },
     {
       "path": "run_study.py",
-      "sha256": "b12b7ac626fbdda566c777513e11673751cca9649a9e0da5543257fc64d54dca"
+      "sha256": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6"
     },
     {
       "path": "test_resource_amendment_r1.py",
-      "sha256": "f300ec22f293e10fdbe4b4496faa381bdaca6581e25047ba3672aaadcabb1adb"
+      "sha256": "f41e5d7511c25b9badb532b15485bca09a2b8995aa40d3388b6f36d127dd3286"
     },
     {
       "path": "trainer.py",
@@ -81,38 +89,44 @@
     }
   ],
   "freeze_rule": "R1 changes resource authorization/provenance only; original study config and scientific source remain frozen.",
-  "implementation_commit": "d15aebbdbf1d17c1c802a8eb1bd2b80b1ddff6b6",
+  "implementation_commit": "4596b36014cde8236d17bbb068af956df5b65c92",
   "issue": 60,
   "original_config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
   "original_manifest_sha256": "f8ee786b64e04d3188080072f4bfe9b843f2fcc43120df75b0c9ee18eb1faa13",
   "original_producer_commit": "a7e8593558e6817d2ed34a5cd6bd2d5bd0a98768",
   "purpose": "STUDY_ONLY",
   "runner_diff_path": "evidence/resource-amendment-r1/runner.patch",
-  "runner_diff_sha256": "dcbb67559b5a6c5ae5e468a9812ff57eb558028a9817f3e47f543c2bfa4d9224",
+  "runner_diff_sha256": "6728dd0b575852cf154ac76aac81333ab894036668505ce07a7ca78b15e5b692",
   "schema_id": "issue60-resource-frozen-manifest-r1-v1",
   "source_diff_whitelist": {
     "added_paths": [
+      "attempt_lifecycle.py",
       "resource_amendment_r1.py",
       "resource-amendment-r1.json",
       "prepare_resource_amendment_r1.py",
       "freeze_manifest_r1.py",
-      "test_resource_amendment_r1.py"
+      "test_resource_amendment_r1.py",
+      "frozen-manifest-r1.json",
+      "resource-authorization-r1.json"
     ],
     "deleted_paths": [],
     "modified_paths": [
-      "run_study.py"
+      "run_study.py",
+      ".gitattributes"
     ],
     "modified_runner_symbols": [
       "REVIEWER_RESERVE",
       "PROCESS_BUDGET",
       "run_training",
-      "main"
+      "main",
+      "run_game"
     ],
     "permitted_runner_semantics": [
       "change cumulative cap and review reserve constants only",
       "replace the original RESOURCE_BLOCKED training consumer with a verified R1 gate consumer",
       "add separate R1 resource-check/seal stages and route old preflight to a fail-closed stop",
-      "write repeat synthetic evidence to an R1-specific path, preserving the original witness"
+      "write repeat synthetic evidence to an R1-specific path, preserving the original witness",
+      "finalize each attempt status from its terminal run summary without changing game or training decisions"
     ]
   },
   "source_pins": {

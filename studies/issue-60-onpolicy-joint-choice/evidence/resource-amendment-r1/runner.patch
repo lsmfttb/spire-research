@@ -1,5 +1,5 @@
 diff --git a/studies/issue-60-onpolicy-joint-choice/run_study.py b/studies/issue-60-onpolicy-joint-choice/run_study.py
-index fe7d430..200d0ce 100644
+index fe7d430..e277278 100644
 --- a/studies/issue-60-onpolicy-joint-choice/run_study.py
 +++ b/studies/issue-60-onpolicy-joint-choice/run_study.py
 @@ -52,8 +52,8 @@ EVAL_ARMS = ("final_block1", "final_block2", "p0", "A", "Expert")
@@ -13,7 +13,16 @@ index fe7d430..200d0ce 100644
  BUILDER_BUDGET = PROCESS_BUDGET - REVIEWER_RESERVE
  POST_PREFLIGHT_GAMES = 2048 + 640
  
-@@ -964,12 +964,8 @@ def train_block(block: str, config: Mapping[str, Any], vocab: Vocabulary,
+@@ -492,6 +492,8 @@ def run_game(*, seed: int, mode: str, model: JointChoiceActorCritic | None,
+     summary["search_log_file"] = "battle-search.jsonl.gz"
+     summary["completed_cpu_seconds"] = time.process_time()
+     atomic_json(attempt_dir / "run.json", summary)
++    from attempt_lifecycle import finalized_attempt_status
++    atomic_json(attempt_dir / "status.json", finalized_attempt_status(status, summary))
+     return attempt_dir, summary
+ 
+ 
+@@ -964,12 +966,8 @@ def train_block(block: str, config: Mapping[str, Any], vocab: Vocabulary,
  def run_training(config: Mapping[str, Any], runtime: Mapping[str, Any],
                   vocab: Vocabulary, bootstrap: Scorer,
                   stage_started: float) -> dict[str, Any]:
@@ -28,7 +37,7 @@ index fe7d430..200d0ce 100644
      block_results = []
      for block in ("block1", "block2"):
          block_results.append(train_block(block, config, vocab, bootstrap, runtime, stage_started))
-@@ -1203,8 +1199,10 @@ def analyze(config: Mapping[str, Any]) -> dict[str, Any]:
+@@ -1203,8 +1201,10 @@ def analyze(config: Mapping[str, Any]) -> dict[str, Any]:
  
  def main() -> int:
      parser = argparse.ArgumentParser()
@@ -40,7 +49,7 @@ index fe7d430..200d0ce 100644
      config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
      validate_config(config)
      stage_started = time.process_time()
-@@ -1212,12 +1210,20 @@ def main() -> int:
+@@ -1212,12 +1212,20 @@ def main() -> int:
      failure: str | None = None
      runtime: dict[str, Any] = {}
      try:
