@@ -52,8 +52,8 @@ EVAL_ARMS = ("final_block1", "final_block2", "p0", "A", "Expert")
 EXPERT_SEED = 660099
 MAX_STEPS = 20000
 BUILD_AND_STATIC_ALLOWANCE = 600.0
-REVIEWER_RESERVE = 12000.0
-PROCESS_BUDGET = 120000.0
+REVIEWER_RESERVE = 20000.0
+PROCESS_BUDGET = 200000.0
 BUILDER_BUDGET = PROCESS_BUDGET - REVIEWER_RESERVE
 POST_PREFLIGHT_GAMES = 2048 + 640
 
@@ -964,12 +964,8 @@ def train_block(block: str, config: Mapping[str, Any], vocab: Vocabulary,
 def run_training(config: Mapping[str, Any], runtime: Mapping[str, Any],
                  vocab: Vocabulary, bootstrap: Scorer,
                  stage_started: float) -> dict[str, Any]:
-    gate_path = EVIDENCE / "preflight" / "native.json"
-    if not gate_path.exists():
-        raise RuntimeError("native preflight gate is missing")
-    gate = json.loads(gate_path.read_text(encoding="utf-8"))
-    if gate.get("status") != "PASS" or gate.get("config_sha256") != config_sha():
-        raise RuntimeError("fixed preflight has not authorized this exact config")
+    from resource_amendment_r1 import require_training_gate
+    require_training_gate(HERE, config)
     block_results = []
     for block in ("block1", "block2"):
         block_results.append(train_block(block, config, vocab, bootstrap, runtime, stage_started))
@@ -1203,8 +1199,10 @@ def analyze(config: Mapping[str, Any]) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", choices=("synthetic", "verify", "preflight", "train", "evaluate", "analyze"), required=True)
+    parser.add_argument("--stage", choices=("synthetic", "verify", "preflight", "resource-r1", "seal-resource-r1", "train", "evaluate", "analyze"), required=True)
     args = parser.parse_args()
+    if args.stage in {"synthetic", "preflight"}:
+        parser.error("original evidence-producing stages are immutable; use the R1 resource stage")
     config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     validate_config(config)
     stage_started = time.process_time()
@@ -1212,12 +1210,20 @@ def main() -> int:
     failure: str | None = None
     runtime: dict[str, Any] = {}
     try:
-        if args.stage == "synthetic":
-            result = run_witnesses(HERE, EVIDENCE / "preflight" / "synthetic.json")
+        if args.stage in {"resource-r1", "seal-resource-r1"}:
+            from resource_amendment_r1 import run_resource_stage, seal_resource_gate
+            if args.stage == "resource-r1":
+                result = run_resource_stage(HERE, stage_started)
+            else:
+                result = seal_resource_gate(HERE, stage_started)
             print(json.dumps(result, indent=2))
             status = "COMPLETE"
             return 0
-        verify_frozen_manifest()
+        from resource_amendment_r1 import verify_resource_chain
+        verify_resource_chain(
+            HERE,
+            require_gate_seal=args.stage in {"verify", "train", "evaluate", "analyze"},
+        )
         if args.stage == "verify":
             runtime = verify_runtime(config)
             print(json.dumps({"status": "PASS", "config_sha256": config_sha(),

@@ -1,0 +1,86 @@
+{
+  "amendment_id": "R1",
+  "issue": 60,
+  "original_config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+  "original_cpu_ledger_line_count": 8,
+  "original_cpu_ledger_prefix_bytes": 1802,
+  "original_cpu_ledger_prefix_sha256": "fc91df26fdd91ecbaa2ebe9b293b9e98ab9d0b06e6061e6ed3d76fc761982119",
+  "original_manifest_sha256": "f8ee786b64e04d3188080072f4bfe9b843f2fcc43120df75b0c9ee18eb1faa13",
+  "original_preflight_gate_sha256": "2fd4b2e6f96f0624b63889e0315c013bef7adddd7e30d6948a9309a209a263eb",
+  "original_preflight_stage_status_sha256": "78312aec76363e1416624bbf7d96a9b0015ebc83144bf2f1280bb73c0853c976",
+  "original_producer_commit": "a7e8593558e6817d2ed34a5cd6bd2d5bd0a98768",
+  "original_runner_sha256": "91559cddb2e2758d19aa1c5e063d03189b9b29f15c9616ba51e6f0a57c425c16",
+  "original_synthetic_stage_status_sha256": "99281a3683f0b8cf58d7aa8300ec4a0f6180df66fcb00ee183a9a30af67c2700",
+  "original_synthetic_witness_sha256": "fcc7edeab9aa0f21dfd501a336c7e6c59dbdc0c7f71f650502577d896fb81b0a",
+  "parent_handoff_commit": "d42b04235f4a8fead844998428e8cc35d2d64f03",
+  "planner_decision": {
+    "comment_id": 6208819496,
+    "status": "ORIGINAL_RESOURCE_BLOCKED_STOP_ACCEPTED_R1_CONTINUATION_AUTHORIZED",
+    "study_disposition": "STUDY_ONLY",
+    "url": "https://github.com/lsmfttb/spire-research/issues/60#issuecomment-6208819496"
+  },
+  "preservation_rules": {
+    "no_new_native_preflight_game": true,
+    "old_RESOURCE_BLOCKED_receipt_must_not_be_relabelled": true,
+    "original_blocked_gate_path": "evidence/preflight/native.json",
+    "original_config_path": "config.json",
+    "original_cpu_ledger_prefix_is_immutable": true,
+    "original_eight_preflight_games_are_reused": true,
+    "original_manifest_path": "frozen-manifest.json"
+  },
+  "resource": {
+    "builder_administration_allowance_seconds": 200.0,
+    "builder_allowance_seconds": 180000.0,
+    "forecast_headroom_fraction": 0.2,
+    "future_reviewer_reserve_seconds": 19000.0,
+    "game_cost_multiplier": 1.5,
+    "optimizer_cost_multiplier": 1.5,
+    "planner_administration_allowance_seconds": 200.0,
+    "prior_reviewer_allowance_seconds": 1000.0,
+    "process_cpu_cap_seconds": 200000.0,
+    "remaining_games": 2688,
+    "remaining_optimizer_minibatches": 1984,
+    "reviewer_reserve_seconds": 20000.0
+  },
+  "schema_id": "issue60-resource-amendment-r1-v1",
+  "source_diff_whitelist": {
+    "added_paths": [
+      "resource_amendment_r1.py",
+      "resource-amendment-r1.json",
+      "prepare_resource_amendment_r1.py",
+      "freeze_manifest_r1.py",
+      "test_resource_amendment_r1.py"
+    ],
+    "deleted_paths": [],
+    "modified_paths": [
+      "run_study.py"
+    ],
+    "modified_runner_symbols": [
+      "REVIEWER_RESERVE",
+      "PROCESS_BUDGET",
+      "run_training",
+      "main"
+    ],
+    "permitted_runner_semantics": [
+      "change cumulative cap and review reserve constants only",
+      "replace the original RESOURCE_BLOCKED training consumer with a verified R1 gate consumer",
+      "add separate R1 resource-check/seal stages and route old preflight to a fail-closed stop",
+      "write repeat synthetic evidence to an R1-specific path, preserving the original witness"
+    ]
+  },
+  "unchanged_scientific_files": [
+    "adapter_v47.py",
+    "bootstrap_v47.py",
+    "bootstrap/A.json",
+    "config.json",
+    "controllers.py",
+    "encoder.py",
+    "freeze_manifest.py",
+    "model.py",
+    "normalizer_v49.py",
+    "preflight_witness.py",
+    "public_resources.py",
+    "trainer.py",
+    "vocabulary.json"
+  ]
+}
