@@ -1,0 +1,10 @@
+{
+  "schema_id": "issue60-guard-optimization-validation-v1",
+  "status": "FAILED",
+  "attempt": "attempt-0001",
+  "source_commit": "afc22b24bea4a9f55ce5180f8b22112ca334c683",
+  "failure": "Pinned WSL Python could not resolve the Windows worktree Git metadata for git rev-parse HEAD; corrected by passing the verified Windows producer SHA explicitly.",
+  "diagnostic_cpu_charge_seconds": 2.0,
+  "simulation_started": false,
+  "formal_sampling_ppo_evaluation": "PAUSED"
+}

@@ -1,0 +1,38 @@
+{
+  "additional_cpu_bound_seconds": 1000.0,
+  "additional_cpu_seconds_this_attempt_including_finalization": 3.778891067,
+  "aggregate_diagnostic_cpu_seconds_including_prior_attempts": 5.778891067,
+  "attempt": "attempt-0002",
+  "comparison_source_files": {
+    "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+    "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+    "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+    "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+    "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf"
+  },
+  "completed_utc": "2026-10-16T11:40:51Z",
+  "created_utc": "2026-10-16T11:40:25Z",
+  "cumulative_builder_budget_seconds": 180000.0,
+  "cumulative_total_process_cap_seconds": 200000.0,
+  "failure": "KeyError: 'ledger_prefix_line_count'",
+  "focused_keys": [
+    660001,
+    660046
+  ],
+  "formal_sampling_ppo_evaluation": "PAUSED",
+  "planner_authorization_comment": 6213786268,
+  "producer_files": {
+    "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+    "run_guard_optimization.py": "ee368d3bef0ec924aee0f137704f35ca8c63e8d467b09aa3170128741342ba0a",
+    "test_guard_optimization.py": "8f6ef78aa21f155d5fb877320891903f8031bf0076821078ea658a5a3b3f2a9e"
+  },
+  "replays": {
+    "baseline_serial": [],
+    "cached_serial": [],
+    "cached_two_worker": []
+  },
+  "reviewer_reserve_seconds": 20000.0,
+  "schema_id": "issue60-guard-optimization-validation-v1",
+  "source_commit": "51d0ec44a41f60bfb4b514b005669a0c32765bc0",
+  "status": "FAILED"
+}

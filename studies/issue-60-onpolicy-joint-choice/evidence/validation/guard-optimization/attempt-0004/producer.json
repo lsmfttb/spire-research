@@ -1,0 +1,1089 @@
+{
+  "additional_cpu_bound_seconds": 1000.0,
+  "additional_cpu_seconds_this_attempt_including_finalization": 505.532328966,
+  "aggregate_additional_cpu_seconds_this_attempt_before_finalization": 504.119148612,
+  "aggregate_diagnostic_cpu_seconds_including_prior_attempts": 517.670394081,
+  "attempt": "attempt-0004",
+  "comparison_source_files": {
+    "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+    "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+    "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+    "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+    "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf"
+  },
+  "completed_utc": "2026-10-16T12:13:33Z",
+  "created_utc": "2026-10-16T11:43:19Z",
+  "cumulative_builder_budget_seconds": 180000.0,
+  "cumulative_total_process_cap_seconds": 200000.0,
+  "focused_keys": [
+    660001,
+    660046
+  ],
+  "focused_unit_tests": {
+    "errors": [],
+    "failures": [],
+    "output": "test_completion_batch_and_ledger_events_update_authoritative_cache (test_guard_optimization.GuardOptimizationTests.test_completion_batch_and_ledger_events_update_authoritative_cache) ... ok\ntest_startup_cache_matches_existing_r2_views (test_guard_optimization.GuardOptimizationTests.test_startup_cache_matches_existing_r2_views) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 5.347s\n\nOK\n",
+    "status": "PASS",
+    "tests_run": 2
+  },
+  "formal_sampling_ppo_evaluation": "PAUSED",
+  "history_hotspot": {
+    "call_path": [
+      "pinned STSRL public_run_context.sanitize_public_run_context",
+      "pinned STSRL public_run_context.forbidden_public_context_problems",
+      "study bootstrap_v47.with_public_history",
+      "pinned STSRL append_public_history_entry copies/sanitizes prior history"
+    ],
+    "observed_functions": [
+      {
+        "exclusive_cpu_seconds": 0.004437244,
+        "file": "public_run_context.py",
+        "function": "sanitize_public_run_context",
+        "inclusive_cpu_seconds": 34.244252586
+      },
+      {
+        "exclusive_cpu_seconds": 0.0023194680000000003,
+        "file": "public_run_context.py",
+        "function": "forbidden_public_context_problems",
+        "inclusive_cpu_seconds": 29.507020134
+      },
+      {
+        "exclusive_cpu_seconds": 4.826989593,
+        "file": "public_run_context.py",
+        "function": "_append_forbidden_problems",
+        "inclusive_cpu_seconds": 29.504700666
+      },
+      {
+        "exclusive_cpu_seconds": 0.001355427,
+        "file": "public_run_context.py",
+        "function": "append_public_history_entry",
+        "inclusive_cpu_seconds": 8.294318853
+      },
+      {
+        "exclusive_cpu_seconds": 0.015431160000000001,
+        "file": "public_run_context.py",
+        "function": "sanitize_public_run_context",
+        "inclusive_cpu_seconds": 157.79197961
+      },
+      {
+        "exclusive_cpu_seconds": 0.007868974,
+        "file": "public_run_context.py",
+        "function": "forbidden_public_context_problems",
+        "inclusive_cpu_seconds": 136.09961273800002
+      },
+      {
+        "exclusive_cpu_seconds": 22.222206164000003,
+        "file": "public_run_context.py",
+        "function": "_append_forbidden_problems",
+        "inclusive_cpu_seconds": 136.091743764
+      },
+      {
+        "exclusive_cpu_seconds": 0.00473069,
+        "file": "public_run_context.py",
+        "function": "append_public_history_entry",
+        "inclusive_cpu_seconds": 38.805218708000005
+      }
+    ],
+    "profile_source": "evidence/validation/parallel-execution/receipt.json",
+    "reason": "the retained profile identifies repeated walks, but immutability and exact rejection-equivalence have not been established; no caching or validation weakening was applied",
+    "source_changes": [],
+    "status": "DEFERRED_IMMUTABILITY_NOT_ESTABLISHED"
+  },
+  "latest_unchanged_r2_forecast": {
+    "forecast": {
+      "accounted_cpu_seconds": 3336.5235818620004,
+      "all_history": {
+        "mean": 24.598478716155842,
+        "n": 77,
+        "sample_sd": 28.83532966264987,
+        "upper": 34.45675108843367
+      },
+      "builder_budget_cpu_seconds": 180000.0,
+      "cost_rule": "max(all-history and recent-128 mean + 3 sample-SD/sqrt(n))",
+      "game_cost_multiplier": 1.5,
+      "interpretation": "fixed operational heuristic; not a calibrated confidence bound or cost guarantee",
+      "max_based_stress_game_projection_cpu_seconds": 856554.4242526026,
+      "max_observed_game_cpu_seconds_stress_only": 181.69666629599988,
+      "observed_complete_games": 77,
+      "optimizer_headroom_fraction": 0.2,
+      "process_cpu_cap_seconds": 200000.0,
+      "projected_all_in_cpu_seconds": 217974.02345082807,
+      "projected_builder_cpu_seconds": 197974.02345082807,
+      "projected_remaining_cpu_seconds": 194637.49986896606,
+      "projected_remaining_game_cpu_seconds_before_headroom": 135363.34665091167,
+      "projected_remaining_game_cpu_seconds_with_headroom": 162436.015981094,
+      "projected_remaining_optimizer_cpu_seconds_with_headroom": 32201.483887872047,
+      "recent_observed_games": 77,
+      "recent_window": {
+        "mean": 24.598478716155842,
+        "n": 77,
+        "sample_sd": 28.83532966264987,
+        "upper": 34.45675108843367
+      },
+      "recent_window_size": 128,
+      "remaining_games": 2619,
+      "remaining_optimizer_cpu_seconds_before_headroom": 26834.569906560042,
+      "reviewer_reserve_cpu_seconds": 20000.0,
+      "status": "RESOURCE_BLOCKED",
+      "unit_cost_cpu_seconds": 34.45675108843367
+    },
+    "receipt_sha256": "1e00c8de6cc9f80ca9923bdc7c659ce7fa63943973eea5bd9a009e57f29d9042",
+    "source": "evidence/validation/parallel-execution/receipt.json",
+    "status": "RESOURCE_BLOCKED; unchanged R2 arithmetic at the last formal forecast snapshot; not a new measured run cost"
+  },
+  "measured_cached_serial_throughput": {
+    "complete_games": 2,
+    "label": "measured two-key zero-update replay only; not a formal-grid cost forecast",
+    "mean_executor_transitions": 202.0,
+    "mean_process_cpu_seconds_per_game": 47.17501605199999,
+    "mean_supported_choices": 49.5,
+    "mean_wall_seconds_per_game": 48.938281561499934
+  },
+  "planner_authorization_comment": 6213786268,
+  "process_cpu_limit": {
+    "hard_limit_process_cpu_seconds": 972,
+    "mechanism": "RLIMIT_CPU",
+    "soft_limit_process_cpu_seconds": 942,
+    "soft_signal_grace_seconds": 30
+  },
+  "producer_files": {
+    "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+    "run_guard_optimization.py": "a6bc798dea3f0a687d4530f49ecdcf30a6192265e5e38dede2afa2363c4ae656",
+    "test_guard_optimization.py": "8f6ef78aa21f155d5fb877320891903f8031bf0076821078ea658a5a3b3f2a9e"
+  },
+  "r2_receipt": {
+    "decision": "continue the unchanged fixed grid",
+    "forecast": {
+      "accounted_cpu_seconds": 1680.8358653810003,
+      "all_history": {
+        "mean": 11.808997913759262,
+        "n": 54,
+        "sample_sd": 11.549124100408989,
+        "upper": 16.523908084106232
+      },
+      "builder_budget_cpu_seconds": 180000.0,
+      "cost_rule": "max(all-history and recent-128 mean + 3 sample-SD/sqrt(n))",
+      "game_cost_multiplier": 1.5,
+      "interpretation": "fixed operational heuristic; not a calibrated confidence bound or cost guarantee",
+      "max_based_stress_game_projection_cpu_seconds": 363456.9708374413,
+      "max_observed_game_cpu_seconds_stress_only": 76.42715342700001,
+      "observed_complete_games": 54,
+      "optimizer_headroom_fraction": 0.2,
+      "process_cpu_cap_seconds": 200000.0,
+      "projected_all_in_cpu_seconds": 132463.41703802865,
+      "projected_builder_cpu_seconds": 112463.41703802864,
+      "projected_remaining_cpu_seconds": 110782.58117264764,
+      "projected_remaining_game_cpu_seconds_before_headroom": 65484.247737312995,
+      "projected_remaining_game_cpu_seconds_with_headroom": 78581.09728477559,
+      "projected_remaining_optimizer_cpu_seconds_with_headroom": 32201.483887872047,
+      "recent_observed_games": 54,
+      "recent_window": {
+        "mean": 11.808997913759262,
+        "n": 54,
+        "sample_sd": 11.549124100408989,
+        "upper": 16.523908084106232
+      },
+      "recent_window_size": 128,
+      "remaining_games": 2642,
+      "remaining_optimizer_cpu_seconds_before_headroom": 26834.569906560042,
+      "reviewer_reserve_cpu_seconds": 20000.0,
+      "status": "PASS",
+      "unit_cost_cpu_seconds": 16.523908084106232
+    },
+    "receipt_sha256": "84c6f8cdcdd26f1c3cec20d8f320a57a4b0391524b74b02e0dc739488263864d",
+    "retained_ledger_prefix_line_count": 18,
+    "seal_sha256": "842afa1538b104e6d0ae0fa199dad0b510a4aaa100bb240dfe5a970ec53cfcb8",
+    "status": "PASS"
+  },
+  "r2_unchanged_check": {
+    "cached_historical_cost_rows_match_r2": true,
+    "cached_optimizer_projection_matches_r2": true,
+    "receipt_bytes_unchanged": true,
+    "receipt_sha256_after": "84c6f8cdcdd26f1c3cec20d8f320a57a4b0391524b74b02e0dc739488263864d",
+    "receipt_sha256_before": "84c6f8cdcdd26f1c3cec20d8f320a57a4b0391524b74b02e0dc739488263864d",
+    "seal_sha256_after": "842afa1538b104e6d0ae0fa199dad0b510a4aaa100bb240dfe5a970ec53cfcb8",
+    "sealed_prefix_still_verifies": true
+  },
+  "replays": {
+    "baseline_serial": [
+      {
+        "attempt_path": "evidence/validation/guard-optimization/attempt-0004/replays/baseline_serial/seed-660001/attempt-0001",
+        "comparison_to_retained_original": {
+          "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+          "decision_rows": 30,
+          "status": "PASS",
+          "summary_fields_compared": [
+            "status",
+            "game_seed",
+            "mode",
+            "block",
+            "stage_key",
+            "arm",
+            "runtime_policy_seed",
+            "model_sha256",
+            "config_sha256",
+            "terminal",
+            "outcome",
+            "terminal_floor",
+            "terminal_public_location",
+            "death_location",
+            "supported_choices",
+            "bootstrap_shifts",
+            "visible_bosses_seen",
+            "heart_entry_selected",
+            "screen_counts",
+            "transitions",
+            "boundaries",
+            "problems"
+          ],
+          "timing_path_pid_metadata_excluded": true
+        },
+        "decision_file_sha256": "67d3cbe5b5bf34b98f117b56ecce7ad5b5c8e528e4ce2dd5aaef9dbc4dc9a796",
+        "decision_rows": 30,
+        "executor_transitions": 113,
+        "parent_peak_rss_bytes": 338223104,
+        "process_cpu_seconds_including_runner_guard": 70.002938264,
+        "reused_prior_attempt": false,
+        "run_process_cpu_seconds": 69.971812414,
+        "seed": 660001,
+        "status": "COMPLETE",
+        "supported_choices": 30,
+        "terminal_summary": {
+          "death_location": {
+            "act": 1,
+            "floor": 14,
+            "room_type": "MONSTER"
+          },
+          "outcome": "PLAYER_LOSS",
+          "problems": [],
+          "status": "COMPLETE",
+          "terminal": true,
+          "terminal_floor": 14.0,
+          "terminal_public_location": {
+            "act": 1,
+            "floor": 14,
+            "room_type": "MONSTER"
+          }
+        },
+        "variant": "baseline_serial",
+        "wall_seconds": 419.93091609899966
+      },
+      {
+        "attempt_path": "evidence/validation/guard-optimization/attempt-0004/replays/baseline_serial/seed-660046/attempt-0001",
+        "comparison_to_retained_original": {
+          "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+          "decision_rows": 69,
+          "status": "PASS",
+          "summary_fields_compared": [
+            "status",
+            "game_seed",
+            "mode",
+            "block",
+            "stage_key",
+            "arm",
+            "runtime_policy_seed",
+            "model_sha256",
+            "config_sha256",
+            "terminal",
+            "outcome",
+            "terminal_floor",
+            "terminal_public_location",
+            "death_location",
+            "supported_choices",
+            "bootstrap_shifts",
+            "visible_bosses_seen",
+            "heart_entry_selected",
+            "screen_counts",
+            "transitions",
+            "boundaries",
+            "problems"
+          ],
+          "timing_path_pid_metadata_excluded": true
+        },
+        "decision_file_sha256": "132d3f2369e1964e29dbacb894c863b393ba74a5e7996c5e75da91c0b44bc198",
+        "decision_rows": 69,
+        "executor_transitions": 291,
+        "parent_peak_rss_bytes": 371122176,
+        "process_cpu_seconds_including_runner_guard": 238.770393795,
+        "reused_prior_attempt": false,
+        "run_process_cpu_seconds": 238.67792424799998,
+        "seed": 660046,
+        "status": "COMPLETE",
+        "supported_choices": 69,
+        "terminal_summary": {
+          "death_location": {
+            "act": 2,
+            "floor": 23,
+            "room_type": "ELITE"
+          },
+          "outcome": "PLAYER_LOSS",
+          "problems": [],
+          "status": "COMPLETE",
+          "terminal": true,
+          "terminal_floor": 23.0,
+          "terminal_public_location": {
+            "act": 2,
+            "floor": 23,
+            "room_type": "ELITE"
+          }
+        },
+        "variant": "baseline_serial",
+        "wall_seconds": 1160.6209409000003
+      }
+    ],
+    "cached_serial": [
+      {
+        "attempt_path": "evidence/validation/guard-optimization/attempt-0004/replays/cached_serial/seed-660001/attempt-0001",
+        "comparison_to_retained_original": {
+          "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+          "decision_rows": 30,
+          "status": "PASS",
+          "summary_fields_compared": [
+            "status",
+            "game_seed",
+            "mode",
+            "block",
+            "stage_key",
+            "arm",
+            "runtime_policy_seed",
+            "model_sha256",
+            "config_sha256",
+            "terminal",
+            "outcome",
+            "terminal_floor",
+            "terminal_public_location",
+            "death_location",
+            "supported_choices",
+            "bootstrap_shifts",
+            "visible_bosses_seen",
+            "heart_entry_selected",
+            "screen_counts",
+            "transitions",
+            "boundaries",
+            "problems"
+          ],
+          "timing_path_pid_metadata_excluded": true
+        },
+        "comparison_to_uncached_baseline": {
+          "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+          "decision_rows": 30,
+          "status": "PASS",
+          "summary_fields_compared": [
+            "status",
+            "game_seed",
+            "mode",
+            "block",
+            "stage_key",
+            "arm",
+            "runtime_policy_seed",
+            "model_sha256",
+            "config_sha256",
+            "terminal",
+            "outcome",
+            "terminal_floor",
+            "terminal_public_location",
+            "death_location",
+            "supported_choices",
+            "bootstrap_shifts",
+            "visible_bosses_seen",
+            "heart_entry_selected",
+            "screen_counts",
+            "transitions",
+            "boundaries",
+            "problems"
+          ],
+          "timing_path_pid_metadata_excluded": true
+        },
+        "decision_file_sha256": "9c79d604d8a5fb42aa932df553c2ba6693e95232b5a10db06ad299d3302ba9fe",
+        "decision_rows": 30,
+        "executor_transitions": 113,
+        "parent_peak_rss_bytes": 371122176,
+        "process_cpu_seconds_including_runner_guard": 13.148971166000024,
+        "reused_prior_attempt": false,
+        "run_process_cpu_seconds": 13.109146198000019,
+        "seed": 660001,
+        "status": "COMPLETE",
+        "supported_choices": 30,
+        "terminal_summary": {
+          "death_location": {
+            "act": 1,
+            "floor": 14,
+            "room_type": "MONSTER"
+          },
+          "outcome": "PLAYER_LOSS",
+          "problems": [],
+          "status": "COMPLETE",
+          "terminal": true,
+          "terminal_floor": 14.0,
+          "terminal_public_location": {
+            "act": 1,
+            "floor": 14,
+            "room_type": "MONSTER"
+          }
+        },
+        "variant": "cached_serial",
+        "wall_seconds": 14.113766299000417
+      },
+      {
+        "attempt_path": "evidence/validation/guard-optimization/attempt-0004/replays/cached_serial/seed-660046/attempt-0001",
+        "comparison_to_retained_original": {
+          "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+          "decision_rows": 69,
+          "status": "PASS",
+          "summary_fields_compared": [
+            "status",
+            "game_seed",
+            "mode",
+            "block",
+            "stage_key",
+            "arm",
+            "runtime_policy_seed",
+            "model_sha256",
+            "config_sha256",
+            "terminal",
+            "outcome",
+            "terminal_floor",
+            "terminal_public_location",
+            "death_location",
+            "supported_choices",
+            "bootstrap_shifts",
+            "visible_bosses_seen",
+            "heart_entry_selected",
+            "screen_counts",
+            "transitions",
+            "boundaries",
+            "problems"
+          ],
+          "timing_path_pid_metadata_excluded": true
+        },
+        "comparison_to_uncached_baseline": {
+          "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+          "decision_rows": 69,
+          "status": "PASS",
+          "summary_fields_compared": [
+            "status",
+            "game_seed",
+            "mode",
+            "block",
+            "stage_key",
+            "arm",
+            "runtime_policy_seed",
+            "model_sha256",
+            "config_sha256",
+            "terminal",
+            "outcome",
+            "terminal_floor",
+            "terminal_public_location",
+            "death_location",
+            "supported_choices",
+            "bootstrap_shifts",
+            "visible_bosses_seen",
+            "heart_entry_selected",
+            "screen_counts",
+            "transitions",
+            "boundaries",
+            "problems"
+          ],
+          "timing_path_pid_metadata_excluded": true
+        },
+        "decision_file_sha256": "f063fb00a591a4a34c4decef0495ac338b1b76c21e4e4ceb42464cfc23098215",
+        "decision_rows": 69,
+        "executor_transitions": 291,
+        "parent_peak_rss_bytes": 371122176,
+        "process_cpu_seconds_including_runner_guard": 81.33966684799998,
+        "reused_prior_attempt": false,
+        "run_process_cpu_seconds": 81.24088590599996,
+        "seed": 660046,
+        "status": "COMPLETE",
+        "supported_choices": 69,
+        "terminal_summary": {
+          "death_location": {
+            "act": 2,
+            "floor": 23,
+            "room_type": "ELITE"
+          },
+          "outcome": "PLAYER_LOSS",
+          "problems": [],
+          "status": "COMPLETE",
+          "terminal": true,
+          "terminal_floor": 23.0,
+          "terminal_public_location": {
+            "act": 2,
+            "floor": 23,
+            "room_type": "ELITE"
+          }
+        },
+        "variant": "cached_serial",
+        "wall_seconds": 83.76279682399945
+      }
+    ],
+    "cached_two_worker": [
+      {
+        "attempt_path": "evidence/validation/guard-optimization/attempt-0004/replays/cached_two_worker/seed-660001/attempt-0001",
+        "comparison_to_retained_original": {
+          "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+          "decision_rows": 30,
+          "status": "PASS",
+          "summary_fields_compared": [
+            "status",
+            "game_seed",
+            "mode",
+            "block",
+            "stage_key",
+            "arm",
+            "runtime_policy_seed",
+            "model_sha256",
+            "config_sha256",
+            "terminal",
+            "outcome",
+            "terminal_floor",
+            "terminal_public_location",
+            "death_location",
+            "supported_choices",
+            "bootstrap_shifts",
+            "visible_bosses_seen",
+            "heart_entry_selected",
+            "screen_counts",
+            "transitions",
+            "boundaries",
+            "problems"
+          ],
+          "timing_path_pid_metadata_excluded": true
+        },
+        "decision_file_sha256": "af3b9ca35ccf7d6a8689118a5c1e9b56e3f4271794370e25d6e046ad5d4ac108",
+        "decision_rows": 30,
+        "executor_transitions": 113,
+        "parent_process_cpu_seconds_for_pair": 0.04605683299996599,
+        "run_process_cpu_seconds": 12.528527844,
+        "seed": 660001,
+        "status": "COMPLETE",
+        "supported_choices": 30,
+        "terminal_summary": {
+          "death_location": {
+            "act": 1,
+            "floor": 14,
+            "room_type": "MONSTER"
+          },
+          "outcome": "PLAYER_LOSS",
+          "problems": [],
+          "status": "COMPLETE",
+          "terminal": true,
+          "terminal_floor": 14.0,
+          "terminal_public_location": {
+            "act": 1,
+            "floor": 14,
+            "room_type": "MONSTER"
+          }
+        },
+        "variant": "cached_two_worker",
+        "worker_peak_rss_bytes": 283815936,
+        "worker_process_cpu_seconds_including_setup": 12.556734,
+        "worker_wall_seconds": 13.292529028998615
+      },
+      {
+        "attempt_path": "evidence/validation/guard-optimization/attempt-0004/replays/cached_two_worker/seed-660046/attempt-0001",
+        "comparison_to_retained_original": {
+          "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+          "decision_rows": 69,
+          "status": "PASS",
+          "summary_fields_compared": [
+            "status",
+            "game_seed",
+            "mode",
+            "block",
+            "stage_key",
+            "arm",
+            "runtime_policy_seed",
+            "model_sha256",
+            "config_sha256",
+            "terminal",
+            "outcome",
+            "terminal_floor",
+            "terminal_public_location",
+            "death_location",
+            "supported_choices",
+            "bootstrap_shifts",
+            "visible_bosses_seen",
+            "heart_entry_selected",
+            "screen_counts",
+            "transitions",
+            "boundaries",
+            "problems"
+          ],
+          "timing_path_pid_metadata_excluded": true
+        },
+        "decision_file_sha256": "376ba2b0ceb95100d2ebd28d92b1d803df304f724a573c10250ea41df2805490",
+        "decision_rows": 69,
+        "executor_transitions": 291,
+        "parent_process_cpu_seconds_for_pair": 0.13009506200000942,
+        "run_process_cpu_seconds": 81.88086946899999,
+        "seed": 660046,
+        "status": "COMPLETE",
+        "supported_choices": 69,
+        "terminal_summary": {
+          "death_location": {
+            "act": 2,
+            "floor": 23,
+            "room_type": "ELITE"
+          },
+          "outcome": "PLAYER_LOSS",
+          "problems": [],
+          "status": "COMPLETE",
+          "terminal": true,
+          "terminal_floor": 23.0,
+          "terminal_public_location": {
+            "act": 2,
+            "floor": 23,
+            "room_type": "ELITE"
+          }
+        },
+        "variant": "cached_two_worker",
+        "worker_peak_rss_bytes": 285913088,
+        "worker_process_cpu_seconds_including_setup": 81.920702,
+        "worker_wall_seconds": 83.97095325300143
+      }
+    ]
+  },
+  "resource_chain": {
+    "amendment_id": "R1",
+    "authorization_receipt_sha256": "5105fef2608de5fd8bb73938111b81e6f6028c69148adb5dd3c6f65dffb8cece",
+    "frozen_manifest_sha256": "cd9491cdd0211ea4a2a418b293f94f6bfd81f5827b7a85a86b3e5fed2a3f42a5",
+    "gate_seal": {
+      "gate": {
+        "accounting": {
+          "accounted_cpu_ledger_line_count_before_gate": 11,
+          "all_in_projected_cpu_seconds": 172800.82245323027,
+          "builder_budget_seconds": 180000.0,
+          "builder_static_allowance_cpu_seconds": 600.0,
+          "future_reviewer_reserve_cpu_seconds": 19000.0,
+          "max_observed_game_cpu_seconds": 27.379626543000008,
+          "original_gate_vs_ledger_snapshot_difference_seconds": -0.006490235999990546,
+          "preflight_and_implementation_accounted_cpu_seconds": 1130.198915963,
+          "prior_reviewer_allowance_cpu_seconds": 1000.0,
+          "process_cpu_cap_seconds": 200000.0,
+          "projected_builder_cpu_seconds": 152800.82245323027,
+          "projected_optimizer_cpu_seconds_before_headroom": 15997.532059680025,
+          "projected_remaining_cpu_seconds_with_headroom": 151670.62353726727,
+          "projected_remaining_game_cpu_seconds_before_headroom": 110394.65422137604,
+          "reviewer_reserved_cpu_seconds": 20000.0,
+          "stage_current_cpu_seconds": 5.504632084000001,
+          "stage_finalization_margin_cpu_seconds": 10.0
+        },
+        "amendment_id": "R1",
+        "authorization_receipt_sha256": "be6fbdcdcc66446e84f83dc671c5a4e5b89f89c847ed611cae74169b43f25945",
+        "decision": "continue unchanged fixed grid",
+        "issue": 60,
+        "original_blocked_gate_sha256": "2fd4b2e6f96f0624b63889e0315c013bef7adddd7e30d6948a9309a209a263eb",
+        "original_config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+        "original_cpu_ledger_prefix_sha256": "fc91df26fdd91ecbaa2ebe9b293b9e98ab9d0b06e6061e6ed3d76fc761982119",
+        "original_manifest_sha256": "f8ee786b64e04d3188080072f4bfe9b843f2fcc43120df75b0c9ee18eb1faa13",
+        "original_preflight_runs": [
+          {
+            "battle_search_sha256": "ddd17434989944090334f90e92f44409076113da442083be8f1184c7bb3845f3",
+            "block": "block1",
+            "decisions_sha256": "a8bff14b1dc301dd357c919de8d94376067b3b2330feb69c597deae1467394a0",
+            "game_seed": 668001,
+            "process_cpu_seconds": 6.23603728,
+            "run_sha256": "c37ad4e6eac9fc66eadf32319bfa3c2b69e63e4af2323bd20e88a513a1fe5d87"
+          },
+          {
+            "battle_search_sha256": "f586770b9bffe05a038ec540096d7a4a2d343438433370fbd0590362ad7d30d7",
+            "block": "block2",
+            "decisions_sha256": "06fc5c742fed76b21581ac6b1446b860d845f1a9df54c4b647bb345e38ea40ee",
+            "game_seed": 668002,
+            "process_cpu_seconds": 12.661892768,
+            "run_sha256": "1f8a7824ed9ecb80613b77e6f782602d519816045836c3d22e7aa5b1ec903319"
+          },
+          {
+            "battle_search_sha256": "625b751997b766f4b7e2534e72fb74888200763455f2a062ab495768345d58c8",
+            "block": "block1",
+            "decisions_sha256": "fec0111404f898fb3d228468150de24529c5fa4f708ded53bf72bf590ef351a4",
+            "game_seed": 668003,
+            "process_cpu_seconds": 21.811510945,
+            "run_sha256": "f1fe73d59f5586660e7c74e35fecab2c65e848c1496116f85d8197eac84252da"
+          },
+          {
+            "battle_search_sha256": "3d3914567bad641fdecebbf1b9e544339ac4fb27aaf6d02c7a917e1adf13a78b",
+            "block": "block2",
+            "decisions_sha256": "2931304d296a8b0387e4a3a2d112edbdd4487bf9f5074174cec28531fe007221",
+            "game_seed": 668004,
+            "process_cpu_seconds": 27.379626543000008,
+            "run_sha256": "e267877145e1beae39e0ee7557d6efbeee8d06a9bd6f7e167aa0aca38896ec84"
+          },
+          {
+            "battle_search_sha256": "bdc47a931840856946695a99ed10ed5c5aa3c890aba735de071843eab22d16af",
+            "block": "block1",
+            "decisions_sha256": "8617c4e478fb4f001288e177cad1e43867878320d866c43b91261b704f74fa11",
+            "game_seed": 668005,
+            "process_cpu_seconds": 17.79327380000001,
+            "run_sha256": "c566e9c127108685050a619fcc957c2a3c6da5432adca3d62b24ef44d95bcd55"
+          },
+          {
+            "battle_search_sha256": "b79c4a1b4cdd575e0fd058cb66aa0f200d9a42d4a9fb5dc82f06ddc71d8a58d2",
+            "block": "block2",
+            "decisions_sha256": "efba48585e11b5ad1b2492b4ed152a1338bfdaa582ed55d530f5c74b0f2cb668",
+            "game_seed": 668006,
+            "process_cpu_seconds": 2.959632286999991,
+            "run_sha256": "531347cf6163f74f2e62973dc9fa1e0608285c89faae26f0a6ca8a264fc1d38f"
+          },
+          {
+            "battle_search_sha256": "c8c20a76ee9db6e62344384602efa07d4954b9ee290d6e0ffec37b3cf6e8d9c9",
+            "block": "block1",
+            "decisions_sha256": "da777810c5052b524360e2f864e3cd415da1d92f67c322acf58d2e42a58be6a0",
+            "game_seed": 668007,
+            "process_cpu_seconds": 6.14971225299999,
+            "run_sha256": "0030176ba5cd1361bedebdd8f17da8858d2df7acd4621eaeafca2ec92e642765"
+          },
+          {
+            "battle_search_sha256": "7ed027253e792da725c506e9f388e4ef7eb7dbbc7095feb56e292a0421a0ccf6",
+            "block": "block2",
+            "decisions_sha256": "d93622a827555f04ff2dd53f5425cb46ae954796122b43ea3f6e4e0c16eedea5",
+            "game_seed": 668008,
+            "process_cpu_seconds": 7.593754388999997,
+            "run_sha256": "6a4b6813b52399e0a872ece2e2d344c878b0d0b543abe1cbcad2ae432acf7fc3"
+          }
+        ],
+        "original_producer_commit": "a7e8593558e6817d2ed34a5cd6bd2d5bd0a98768",
+        "parent_handoff_commit": "d42b04235f4a8fead844998428e8cc35d2d64f03",
+        "r1_allowance_charges": [
+          {
+            "charge_id": "issue60-r1-planner-administration",
+            "cpu_seconds": 200.0,
+            "role": "planner"
+          },
+          {
+            "charge_id": "issue60-r1-builder-administration",
+            "cpu_seconds": 200.0,
+            "role": "builder"
+          }
+        ],
+        "r1_manifest_sha256": "f1e4e6a3f7f13b97519ba8a6028f6939b08b8536d034e184712a709b9994ef61",
+        "r1_producer_commit": "d15aebbdbf1d17c1c802a8eb1bd2b80b1ddff6b6",
+        "r1_source_change_whitelist": {
+          "changed_paths": {
+            "freeze_manifest_r1.py": "A",
+            "prepare_resource_amendment_r1.py": "A",
+            "resource-amendment-r1.json": "A",
+            "resource_amendment_r1.py": "A",
+            "run_study.py": "M",
+            "test_resource_amendment_r1.py": "A"
+          },
+          "changed_runner_symbols": [
+            "REVIEWER_RESERVE",
+            "PROCESS_BUDGET",
+            "run_training",
+            "main"
+          ],
+          "runner_ast_whitelist_passed": true
+        },
+        "resource_amendment_sha256": "c57ac99b78e47927b8e820df73301a9edda81156cfa043a00de4100dfb6093dc",
+        "retained_output_replay": {
+          "games": [
+            {
+              "game_seed": 668001,
+              "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+              "runtime_policy_seed": 3900827463337742631
+            },
+            {
+              "game_seed": 668002,
+              "model_sha256": "23a3ca68c5370944becbcf661d2f3df52e65785d31bb1dd530e3302f5e698e3f",
+              "runtime_policy_seed": 9621713220708373697
+            },
+            {
+              "game_seed": 668003,
+              "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+              "runtime_policy_seed": 16524058132513683913
+            },
+            {
+              "game_seed": 668004,
+              "model_sha256": "23a3ca68c5370944becbcf661d2f3df52e65785d31bb1dd530e3302f5e698e3f",
+              "runtime_policy_seed": 12122108120061489321
+            },
+            {
+              "game_seed": 668005,
+              "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+              "runtime_policy_seed": 7220042952669012950
+            },
+            {
+              "game_seed": 668006,
+              "model_sha256": "23a3ca68c5370944becbcf661d2f3df52e65785d31bb1dd530e3302f5e698e3f",
+              "runtime_policy_seed": 6230185407875157463
+            },
+            {
+              "game_seed": 668007,
+              "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+              "runtime_policy_seed": 4646299646260410760
+            },
+            {
+              "game_seed": 668008,
+              "model_sha256": "23a3ca68c5370944becbcf661d2f3df52e65785d31bb1dd530e3302f5e698e3f",
+              "runtime_policy_seed": 4881415721044673197
+            }
+          ],
+          "games_checked": 8,
+          "output_fingerprint_sha256": "81ffcff387913cf80922ae7bafc4f6edc6e216ee5cf8479612524528eb648007",
+          "passed": true,
+          "supported_decisions_checked": 229
+        },
+        "runtime_pins": {
+          "deterministic_algorithms": true,
+          "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+          "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+          "native_module": "/tmp/issue60-lightspeed/build-issue60/slaythespire.cpython-313-x86_64-linux-gnu.so",
+          "native_source": "/tmp/issue60-lightspeed",
+          "python": "3.13.13",
+          "runtime_api": {
+            "LightSpeedAdapter": "sts_combat_rl.sim.lightspeed",
+            "action_space": {
+              "allow_excluded_fallback": true,
+              "excluded_kinds": [],
+              "include_non_combat_potions": true,
+              "preferred_kinds": [
+                "card",
+                "end_turn"
+              ]
+            },
+            "execute_controlled_run": "sts_combat_rl.sim.controlled_run"
+          },
+          "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+          "stsr_source": "/tmp/issue60-stsrl",
+          "torch": "2.12.0+cpu",
+          "torch_threads": 1
+        },
+        "schema_id": "issue60-resource-gate-r1-v1",
+        "status": "PASS",
+        "synthetic_public_witness": {
+          "boundary_inventory": {
+            "deck_order_not_retained": true,
+            "duplicate_card_multiplicity_retained": true,
+            "exact_public_inventory_retained": true,
+            "passed": true,
+            "potion_slots_retained": true,
+            "resource_field_count": 9,
+            "unknown_and_hidden_fields_dropped": true
+          },
+          "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+          "on_policy_and_terminal": {
+            "bootstrap_file_sha256": "1deb6907b595c905b8c0d0559ddf18577dbbea17a22d2edee23be59370ae4ca1",
+            "cap_and_error_targets_rejected": true,
+            "death_return": 0.1,
+            "no_change_checkpoint_replay": true,
+            "p0_exact_at_zero_residual": true,
+            "passed": true,
+            "ppo_reference_loss": -0.0065234375,
+            "single_action_critic_only": true
+          },
+          "parameter_count": 103970,
+          "passed": true,
+          "public_context_and_execution": {
+            "candidate_and_set_permutation_equivariance": true,
+            "candidate_count": 4,
+            "duplicate_multiplicity_preserved": true,
+            "group_sizes": [
+              2,
+              1
+            ],
+            "hidden_future_noninterference": true,
+            "map_node_count": 2,
+            "numeric_feature_count": 14,
+            "passed": true,
+            "stale_group_and_potion_mapping_rejected": true
+          },
+          "schema_id": "issue60-synthetic-preflight-witness-v1",
+          "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+        },
+        "synthetic_public_witness_sha256": "fcc7edeab9aa0f21dfd501a336c7e6c59dbdc0c7f71f650502577d896fb81b0a"
+      },
+      "gate_sha256": "9f76410d3856a47afa2be79e6d0df4117e1cb40a7eb31c31472f52b23496387b",
+      "seal": {
+        "amendment_id": "R1",
+        "authorization_receipt_sha256": "be6fbdcdcc66446e84f83dc671c5a4e5b89f89c847ed611cae74169b43f25945",
+        "builder_allowance_seconds": 180000.0,
+        "cpu_ledger_prefix_bytes": 2834,
+        "cpu_ledger_prefix_line_count": 12,
+        "cpu_ledger_prefix_sha256": "c5c120a145a46f24e6fd266cfef7765b1eefdea6c6cb5f6d50de08bc2aa28097",
+        "formal_training_or_evaluation_started": false,
+        "frozen_manifest_sha256": "f1e4e6a3f7f13b97519ba8a6028f6939b08b8536d034e184712a709b9994ef61",
+        "future_reviewer_reserve_cpu_seconds": 19000.0,
+        "parent_handoff_commit": "d42b04235f4a8fead844998428e8cc35d2d64f03",
+        "prior_reviewer_allowance_cpu_seconds": 1000.0,
+        "process_cpu_cap_seconds": 200000.0,
+        "r1_producer_commit": "d15aebbdbf1d17c1c802a8eb1bd2b80b1ddff6b6",
+        "resource_gate_sha256": "9f76410d3856a47afa2be79e6d0df4117e1cb40a7eb31c31472f52b23496387b",
+        "reviewer_reserved_cpu_seconds": 20000.0,
+        "schema_id": "issue60-resource-gate-seal-r1-v1",
+        "seal_margin_cpu_seconds": 10.0,
+        "seal_stage_cpu_at_write_seconds": 0.362567195,
+        "status": "PASS"
+      },
+      "seal_sha256": "b61937257b3968ab1e858d51feecebc78068794c60044c5bbd8e66789d441762",
+      "status_reconciliation": {
+        "attempt_count": 46,
+        "schema_id": "issue60-attempt-status-reconciliation-r1-v1",
+        "status_reconciliation_sha256": "79d72d89763d3090cc7f165259d7523b49417c4f9db96f9f97377cc9f78e9733"
+      }
+    },
+    "original_blocked_gate_sha256": "2fd4b2e6f96f0624b63889e0315c013bef7adddd7e30d6948a9309a209a263eb",
+    "original_config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+    "producer_commit": "4596b36014cde8236d17bbb068af956df5b65c92",
+    "source_change_whitelist": {
+      "changed_paths": {
+        ".gitattributes": "M",
+        "attempt_lifecycle.py": "A",
+        "freeze_manifest_r1.py": "A",
+        "frozen-manifest-r1.json": "A",
+        "prepare_resource_amendment_r1.py": "A",
+        "resource-amendment-r1.json": "A",
+        "resource-authorization-r1.json": "A",
+        "resource_amendment_r1.py": "A",
+        "run_study.py": "M",
+        "test_resource_amendment_r1.py": "A"
+      },
+      "changed_runner_symbols": [
+        "REVIEWER_RESERVE",
+        "PROCESS_BUDGET",
+        "run_training",
+        "main",
+        "run_game"
+      ],
+      "runner_ast_whitelist_passed": true
+    },
+    "status": "PASS"
+  },
+  "reviewer_reserve_seconds": 20000.0,
+  "runtime": {
+    "deterministic_algorithms": true,
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "native_module": "/home/lsmft/stsrl-spikes/issue60-runtime/build-issue60/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_source": "/tmp/issue60-lightspeed-source",
+    "python": "3.13.13",
+    "runtime_api": {
+      "LightSpeedAdapter": "sts_combat_rl.sim.lightspeed",
+      "action_space": {
+        "allow_excluded_fallback": true,
+        "excluded_kinds": [],
+        "include_non_combat_potions": true,
+        "preferred_kinds": [
+          "card",
+          "end_turn"
+        ]
+      },
+      "execute_controlled_run": "sts_combat_rl.sim.controlled_run"
+    },
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsr_source": "/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c",
+    "torch": "2.12.0+cpu",
+    "torch_threads": 1
+  },
+  "schema_id": "issue60-guard-optimization-validation-v1",
+  "source_commit": "eac3c57fe9e0f3b6ac176944544881e2d3307433",
+  "status": "PASS",
+  "two_worker_dispatcher_evidence": {
+    "execution_count": 2,
+    "executions": [
+      {
+        "attempt": "evidence/validation/guard-optimization/attempt-0004/replays/cached_two_worker/seed-660001/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 283815936,
+        "pid": 20414,
+        "process_cpu_seconds_including_worker_setup": 12.556734,
+        "run_game_cpu_seconds": 12.528527844,
+        "task_key": [
+          "block1:batch-01",
+          660001,
+          "residual"
+        ],
+        "wall_seconds": 13.292529028998615
+      },
+      {
+        "attempt": "evidence/validation/guard-optimization/attempt-0004/replays/cached_two_worker/seed-660046/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 285913088,
+        "pid": 20415,
+        "process_cpu_seconds_including_worker_setup": 81.920702,
+        "run_game_cpu_seconds": 81.88086946899999,
+        "task_key": [
+          "block1:batch-01",
+          660046,
+          "residual"
+        ],
+        "wall_seconds": 83.97095325300143
+      }
+    ],
+    "max_active_workers": 2,
+    "max_configured_workers": 2,
+    "parent_peak_rss_bytes": 371122176,
+    "parent_plus_worker_peak_rss_upper_bound_bytes": 942948352,
+    "worker_peak_rss_bytes": 285913088
+  },
+  "two_worker_parallel_comparisons_to_cached_serial": [
+    {
+      "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+      "decision_rows": 30,
+      "status": "PASS",
+      "summary_fields_compared": [
+        "status",
+        "game_seed",
+        "mode",
+        "block",
+        "stage_key",
+        "arm",
+        "runtime_policy_seed",
+        "model_sha256",
+        "config_sha256",
+        "terminal",
+        "outcome",
+        "terminal_floor",
+        "terminal_public_location",
+        "death_location",
+        "supported_choices",
+        "bootstrap_shifts",
+        "visible_bosses_seen",
+        "heart_entry_selected",
+        "screen_counts",
+        "transitions",
+        "boundaries",
+        "problems"
+      ],
+      "timing_path_pid_metadata_excluded": true
+    },
+    {
+      "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+      "decision_rows": 69,
+      "status": "PASS",
+      "summary_fields_compared": [
+        "status",
+        "game_seed",
+        "mode",
+        "block",
+        "stage_key",
+        "arm",
+        "runtime_policy_seed",
+        "model_sha256",
+        "config_sha256",
+        "terminal",
+        "outcome",
+        "terminal_floor",
+        "terminal_public_location",
+        "death_location",
+        "supported_choices",
+        "bootstrap_shifts",
+        "visible_bosses_seen",
+        "heart_entry_selected",
+        "screen_counts",
+        "transitions",
+        "boundaries",
+        "problems"
+      ],
+      "timing_path_pid_metadata_excluded": true
+    }
+  ],
+  "two_worker_wall_seconds_for_pair": 84.17992057799893,
+  "zero_update_checkpoint": {
+    "checkpoint": "evidence/training/block1/latest.pt",
+    "completed_batches": 0,
+    "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+    "model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb"
+  }
+}
