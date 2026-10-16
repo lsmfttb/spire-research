@@ -63,3 +63,20 @@ resource_amendment_r1.ResourceAmendmentError: git show d42b04235f4a8fead84499842
 BRIDGE_EXIT=0
 
 PRE-DISPATCH REPAIR: two launch checks stopped before workers. The R1/R2 chain verifies; the old parallel receipt remains RESOURCE_BLOCKED by its historical forecast. The Planner-accepted cached attempt-0004 two-worker witness passes source and parity checks. Rebound only the producer metadata to the repaired commit while preserving previous_actual_builder_cpu_seconds and previous_ledger_line_count; all failed/check charges remain append-accounted.
+Traceback (most recent call last):
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 1002, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 951, in main
+    result = _run_bridge(started=started)
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 653, in _run_bridge
+    _bridge_budget_start_record()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 209, in _bridge_budget_start_record
+    actual = hashlib.sha256(git(HERE, "show", f"{source_commit}:studies/issue-60-onpolicy-joint-choice/{name}")).hexdigest()
+             ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Strings must be encoded before hashing
+
+BRIDGE_EXIT=
+
+PRE-DISPATCH REPAIR: a byte/string hashing mismatch stopped before bridge start. Charged by the append-only ledger; replaced committed-source hashing with git_bytes and passed all eight focused tests. Preserved the original cumulative baseline and updated the producer source chain without dispatching any bridge game.
