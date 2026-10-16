@@ -183,6 +183,7 @@ def _validation_ledger_cpu() -> float:
             if stage in {
                 "parallel-validation-setup", "parallel-validation-and-profile",
                 "parallel-validation-optimizer-minibatch-profile",
+                "parallel-validation-profile-finalization",
             }:
                 amount = float(row.get("process_cpu_seconds", 0.0))
                 if amount < 0:
