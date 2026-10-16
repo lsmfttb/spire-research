@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from resource_amendment_r1 import (
-    ORIGINAL_MANIFEST, PARENT_HANDOFF, R1_ADDED_SOURCE_PATHS,
+    ORIGINAL_MANIFEST, PARENT_HANDOFF, R1_SOURCE_MANIFEST_ADDITIONS,
     R1_AUTHORIZATION, R1_MANIFEST,
     _git, _git_bytes, _study_git_path, _verify_status_reconciliation_scope,
     verify_runner_whitelist,
@@ -25,7 +25,7 @@ def sha(value: bytes) -> str:
 def _source_paths() -> tuple[str, ...]:
     original = json.loads((HERE / ORIGINAL_MANIFEST).read_text(encoding="utf-8"))
     return tuple(sorted({entry["path"] for entry in original["files"]}
-                        | set(R1_ADDED_SOURCE_PATHS)))
+                        | set(R1_SOURCE_MANIFEST_ADDITIONS)))
 
 
 def freeze_manifest() -> dict:

@@ -49,7 +49,8 @@ R1_ADDED_SOURCE_PATHS = (
     "test_resource_amendment_r1.py",
 )
 R1_ADDED_RESOURCE_ARTIFACTS = ("frozen-manifest-r1.json", "resource-authorization-r1.json")
-R1_MODIFIED_SOURCE_PATHS = ("run_study.py",)
+R1_SOURCE_MANIFEST_ADDITIONS = (*R1_ADDED_SOURCE_PATHS, ".gitattributes")
+R1_MODIFIED_SOURCE_PATHS = ("run_study.py", ".gitattributes")
 R1_DELETED_SOURCE_PATHS: tuple[str, ...] = ()
 EXPECTED_R1_SOURCE_PATHS = tuple(sorted((*R1_ADDED_SOURCE_PATHS, *R1_MODIFIED_SOURCE_PATHS)))
 R1_RESOURCE_VALUES = {
@@ -576,7 +577,7 @@ def _verify_source_manifest(study_root: Path, amendment: Mapping[str, Any]) -> d
     if len(paths) != len(entries) or len(paths) != len(set(paths)):
         raise ResourceAmendmentError("R1 frozen file list is malformed or duplicated")
     original_manifest = json.loads((study_root / ORIGINAL_MANIFEST).read_text(encoding="utf-8"))
-    expected_paths = {entry["path"] for entry in original_manifest["files"]} | set(R1_ADDED_SOURCE_PATHS)
+    expected_paths = {entry["path"] for entry in original_manifest["files"]} | set(R1_SOURCE_MANIFEST_ADDITIONS)
     if set(paths) != expected_paths:
         raise ResourceAmendmentError("R1 frozen source file set is incomplete or contains an unapproved path")
     if manifest.get("source_diff_whitelist") != amendment.get("source_diff_whitelist"):
