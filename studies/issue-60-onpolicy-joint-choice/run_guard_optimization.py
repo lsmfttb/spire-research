@@ -450,6 +450,11 @@ def main() -> int:
                 status = "FAILED"
                 try:
                     result = run_study.run_game(**validation_kwargs(seed, output))
+                    if result[1].get("status") != "COMPLETE":
+                        failure = str(result[1].get("failure") or result[1].get("problems") or "incomplete replay")
+                        if "RESOURCE_BLOCKED" in failure:
+                            raise r2.ResourceBudgetExceeded(failure)
+                        raise RuntimeError(f"fixed retained-key replay is INCOMPLETE: {failure}")
                     row = compare_one(variant, seed, result)
                     row.update({
                         "reused_prior_attempt": False,
