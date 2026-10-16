@@ -1,11 +1,3339 @@
 {
   "authorization_comment_id": 6215441116,
-  "bridge_cumulative_additional_cpu_seconds_charged": 96.26991594499987,
+  "bridge_cumulative_additional_cpu_seconds_before_finalization_charge": 1464.535130445,
+  "bridge_cumulative_additional_cpu_seconds_charged": 1495.5643995589996,
   "bridge_limit_cpu_seconds": 5000.0,
-  "failure": "TypeError: Strings must be encoded before hashing",
-  "process_cpu_seconds": 0.21406855400000002,
+  "completed_bridge_tag_count": 59,
+  "continuation_accounting": [
+    {
+      "attempt": "issue60-prior-automatic-continuation-receipt-block-0001",
+      "process_cpu_seconds": 0.2,
+      "stage": "issue60-cached-cost-bridge-continuation-precondition-failure",
+      "status": "FAILED"
+    },
+    {
+      "attempt": "issue60-continuation-validation-adapter-repair-0001",
+      "process_cpu_seconds": 30.0,
+      "stage": "issue60-cached-cost-bridge-continuation-repair-validation",
+      "status": "PASS"
+    },
+    {
+      "attempt": "issue60-continuation-validation-adapter-launch-0001",
+      "process_cpu_seconds": 0.210405062,
+      "stage": "issue60-cached-cost-bridge-continuation-launch",
+      "status": "PASS"
+    }
+  ],
+  "dispatcher": {
+    "execution_count": 59,
+    "executions": [
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660070/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 269594624,
+        "pid": 41673,
+        "process_cpu_seconds_including_worker_setup": 9.659566,
+        "run_game_cpu_seconds": 9.623640476,
+        "task_key": [
+          "block1:batch-01",
+          660070,
+          "residual"
+        ],
+        "wall_seconds": 10.575924644999759
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660071/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 272240640,
+        "pid": 41674,
+        "process_cpu_seconds_including_worker_setup": 16.592716,
+        "run_game_cpu_seconds": 16.549721845,
+        "task_key": [
+          "block1:batch-01",
+          660071,
+          "residual"
+        ],
+        "wall_seconds": 17.727771486002894
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660073/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 275415040,
+        "pid": 41676,
+        "process_cpu_seconds_including_worker_setup": 21.80773,
+        "run_game_cpu_seconds": 21.762197108000002,
+        "task_key": [
+          "block1:batch-01",
+          660073,
+          "residual"
+        ],
+        "wall_seconds": 23.021232677001535
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660072/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 279171072,
+        "pid": 41675,
+        "process_cpu_seconds_including_worker_setup": 43.268913000000005,
+        "run_game_cpu_seconds": 43.223806563000004,
+        "task_key": [
+          "block1:batch-01",
+          660072,
+          "residual"
+        ],
+        "wall_seconds": 45.0567738719983
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660075/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 270651392,
+        "pid": 41703,
+        "process_cpu_seconds_including_worker_setup": 9.843852,
+        "run_game_cpu_seconds": 9.802021852,
+        "task_key": [
+          "block1:batch-01",
+          660075,
+          "residual"
+        ],
+        "wall_seconds": 10.683283906000725
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660074/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 278974464,
+        "pid": 41698,
+        "process_cpu_seconds_including_worker_setup": 40.732373,
+        "run_game_cpu_seconds": 40.685235952,
+        "task_key": [
+          "block1:batch-01",
+          660074,
+          "residual"
+        ],
+        "wall_seconds": 42.33190135000041
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660076/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 272711680,
+        "pid": 41704,
+        "process_cpu_seconds_including_worker_setup": 16.604771,
+        "run_game_cpu_seconds": 16.555727286,
+        "task_key": [
+          "block1:batch-01",
+          660076,
+          "residual"
+        ],
+        "wall_seconds": 17.800668995001615
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660077/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 275533824,
+        "pid": 41705,
+        "process_cpu_seconds_including_worker_setup": 25.482444,
+        "run_game_cpu_seconds": 25.435919819,
+        "task_key": [
+          "block1:batch-01",
+          660077,
+          "residual"
+        ],
+        "wall_seconds": 26.870028648001608
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660078/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 275693568,
+        "pid": 41706,
+        "process_cpu_seconds_including_worker_setup": 24.734972,
+        "run_game_cpu_seconds": 24.696050626999998,
+        "task_key": [
+          "block1:batch-01",
+          660078,
+          "residual"
+        ],
+        "wall_seconds": 27.530939893000323
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660080/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 277590016,
+        "pid": 41708,
+        "process_cpu_seconds_including_worker_setup": 31.035792,
+        "run_game_cpu_seconds": 30.994617035,
+        "task_key": [
+          "block1:batch-01",
+          660080,
+          "residual"
+        ],
+        "wall_seconds": 32.607505732998106
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660081/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 270565376,
+        "pid": 41733,
+        "process_cpu_seconds_including_worker_setup": 6.714454,
+        "run_game_cpu_seconds": 6.668755757,
+        "task_key": [
+          "block1:batch-01",
+          660081,
+          "residual"
+        ],
+        "wall_seconds": 7.459115648001898
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660079/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 282669056,
+        "pid": 41707,
+        "process_cpu_seconds_including_worker_setup": 54.32973,
+        "run_game_cpu_seconds": 54.288179449000005,
+        "task_key": [
+          "block1:batch-01",
+          660079,
+          "residual"
+        ],
+        "wall_seconds": 56.25444809799956
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660083/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 277172224,
+        "pid": 41739,
+        "process_cpu_seconds_including_worker_setup": 28.050174000000002,
+        "run_game_cpu_seconds": 28.013957686,
+        "task_key": [
+          "block1:batch-01",
+          660083,
+          "residual"
+        ],
+        "wall_seconds": 29.48060154399718
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660082/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 284393472,
+        "pid": 41738,
+        "process_cpu_seconds_including_worker_setup": 62.853410000000004,
+        "run_game_cpu_seconds": 62.805677683,
+        "task_key": [
+          "block1:batch-01",
+          660082,
+          "residual"
+        ],
+        "wall_seconds": 64.9897652159998
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660085/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 273653760,
+        "pid": 41741,
+        "process_cpu_seconds_including_worker_setup": 9.52004,
+        "run_game_cpu_seconds": 9.479626648,
+        "task_key": [
+          "block1:batch-01",
+          660085,
+          "residual"
+        ],
+        "wall_seconds": 10.427262820001488
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660086/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 273747968,
+        "pid": 41743,
+        "process_cpu_seconds_including_worker_setup": 12.870045,
+        "run_game_cpu_seconds": 12.8203976,
+        "task_key": [
+          "block1:batch-01",
+          660086,
+          "residual"
+        ],
+        "wall_seconds": 13.959380305997911
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660087/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 275054592,
+        "pid": 41778,
+        "process_cpu_seconds_including_worker_setup": 20.931597,
+        "run_game_cpu_seconds": 20.875899536,
+        "task_key": [
+          "block1:batch-01",
+          660087,
+          "residual"
+        ],
+        "wall_seconds": 22.31607444799738
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660084/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 285863936,
+        "pid": 41740,
+        "process_cpu_seconds_including_worker_setup": 81.777687,
+        "run_game_cpu_seconds": 81.719305575,
+        "task_key": [
+          "block1:batch-01",
+          660084,
+          "residual"
+        ],
+        "wall_seconds": 84.11424519600041
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660089/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 273035264,
+        "pid": 41780,
+        "process_cpu_seconds_including_worker_setup": 12.775505,
+        "run_game_cpu_seconds": 12.711347920000001,
+        "task_key": [
+          "block1:batch-01",
+          660089,
+          "residual"
+        ],
+        "wall_seconds": 13.87053417199786
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660088/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 279121920,
+        "pid": 41779,
+        "process_cpu_seconds_including_worker_setup": 39.035342,
+        "run_game_cpu_seconds": 38.979586463,
+        "task_key": [
+          "block1:batch-01",
+          660088,
+          "residual"
+        ],
+        "wall_seconds": 40.800589000999025
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660090/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 273526784,
+        "pid": 41781,
+        "process_cpu_seconds_including_worker_setup": 12.956541999999999,
+        "run_game_cpu_seconds": 12.911539859,
+        "task_key": [
+          "block1:batch-01",
+          660090,
+          "residual"
+        ],
+        "wall_seconds": 14.01123592300064
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660091/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 276729856,
+        "pid": 41782,
+        "process_cpu_seconds_including_worker_setup": 19.243502,
+        "run_game_cpu_seconds": 19.197155588,
+        "task_key": [
+          "block1:batch-01",
+          660091,
+          "residual"
+        ],
+        "wall_seconds": 20.438335071001347
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660092/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 278425600,
+        "pid": 41783,
+        "process_cpu_seconds_including_worker_setup": 24.134099000000003,
+        "run_game_cpu_seconds": 24.094512265000002,
+        "task_key": [
+          "block1:batch-01",
+          660092,
+          "residual"
+        ],
+        "wall_seconds": 25.427735152999958
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660094/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 274776064,
+        "pid": 41806,
+        "process_cpu_seconds_including_worker_setup": 14.767032,
+        "run_game_cpu_seconds": 14.718053737,
+        "task_key": [
+          "block1:batch-01",
+          660094,
+          "residual"
+        ],
+        "wall_seconds": 15.9436216590002
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660093/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 279937024,
+        "pid": 41784,
+        "process_cpu_seconds_including_worker_setup": 35.567440000000005,
+        "run_game_cpu_seconds": 35.515367452,
+        "task_key": [
+          "block1:batch-01",
+          660093,
+          "residual"
+        ],
+        "wall_seconds": 37.14361628700135
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660095/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 276860928,
+        "pid": 41814,
+        "process_cpu_seconds_including_worker_setup": 17.202626000000002,
+        "run_game_cpu_seconds": 17.159682825,
+        "task_key": [
+          "block1:batch-01",
+          660095,
+          "residual"
+        ],
+        "wall_seconds": 18.25317089999953
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660097/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 275156992,
+        "pid": 41816,
+        "process_cpu_seconds_including_worker_setup": 13.17172,
+        "run_game_cpu_seconds": 13.138241856,
+        "task_key": [
+          "block1:batch-01",
+          660097,
+          "residual"
+        ],
+        "wall_seconds": 14.187031934998231
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660098/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 273203200,
+        "pid": 41817,
+        "process_cpu_seconds_including_worker_setup": 6.759638000000001,
+        "run_game_cpu_seconds": 6.722286614000001,
+        "task_key": [
+          "block1:batch-01",
+          660098,
+          "residual"
+        ],
+        "wall_seconds": 7.5397612859997025
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660099/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 278552576,
+        "pid": 41818,
+        "process_cpu_seconds_including_worker_setup": 19.222876999999997,
+        "run_game_cpu_seconds": 19.169798645999997,
+        "task_key": [
+          "block1:batch-01",
+          660099,
+          "residual"
+        ],
+        "wall_seconds": 20.51202335600101
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660096/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 284721152,
+        "pid": 41815,
+        "process_cpu_seconds_including_worker_setup": 49.054466,
+        "run_game_cpu_seconds": 49.009995702,
+        "task_key": [
+          "block1:batch-01",
+          660096,
+          "residual"
+        ],
+        "wall_seconds": 50.82588756900077
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660101/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 273641472,
+        "pid": 41820,
+        "process_cpu_seconds_including_worker_setup": 5.037875,
+        "run_game_cpu_seconds": 5.00423962,
+        "task_key": [
+          "block1:batch-01",
+          660101,
+          "residual"
+        ],
+        "wall_seconds": 5.636322903999826
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660102/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 278593536,
+        "pid": 41842,
+        "process_cpu_seconds_including_worker_setup": 20.06985,
+        "run_game_cpu_seconds": 20.022352453,
+        "task_key": [
+          "block1:batch-01",
+          660102,
+          "residual"
+        ],
+        "wall_seconds": 21.315222478999203
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660103/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 275730432,
+        "pid": 41847,
+        "process_cpu_seconds_including_worker_setup": 11.749781,
+        "run_game_cpu_seconds": 11.716423577,
+        "task_key": [
+          "block1:batch-01",
+          660103,
+          "residual"
+        ],
+        "wall_seconds": 12.78825084899654
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660104/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 275591168,
+        "pid": 41848,
+        "process_cpu_seconds_including_worker_setup": 10.866278000000001,
+        "run_game_cpu_seconds": 10.821139318999998,
+        "task_key": [
+          "block1:batch-01",
+          660104,
+          "residual"
+        ],
+        "wall_seconds": 11.784864491997723
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660100/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 287207424,
+        "pid": 41819,
+        "process_cpu_seconds_including_worker_setup": 61.894585,
+        "run_game_cpu_seconds": 61.84578707,
+        "task_key": [
+          "block1:batch-01",
+          660100,
+          "residual"
+        ],
+        "wall_seconds": 63.95606156399663
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660105/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 275181568,
+        "pid": 41849,
+        "process_cpu_seconds_including_worker_setup": 7.090572,
+        "run_game_cpu_seconds": 7.047419067000001,
+        "task_key": [
+          "block1:batch-01",
+          660105,
+          "residual"
+        ],
+        "wall_seconds": 8.949886196998705
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660106/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 277504000,
+        "pid": 41850,
+        "process_cpu_seconds_including_worker_setup": 15.004265,
+        "run_game_cpu_seconds": 14.970374388,
+        "task_key": [
+          "block1:batch-01",
+          660106,
+          "residual"
+        ],
+        "wall_seconds": 16.040390902999206
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660107/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 278933504,
+        "pid": 41851,
+        "process_cpu_seconds_including_worker_setup": 18.146865000000002,
+        "run_game_cpu_seconds": 18.102384496000003,
+        "task_key": [
+          "block1:batch-01",
+          660107,
+          "residual"
+        ],
+        "wall_seconds": 19.304295722999086
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660108/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 276828160,
+        "pid": 41852,
+        "process_cpu_seconds_including_worker_setup": 12.488305,
+        "run_game_cpu_seconds": 12.447839344,
+        "task_key": [
+          "block1:batch-01",
+          660108,
+          "residual"
+        ],
+        "wall_seconds": 13.53038027099683
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660110/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 273211392,
+        "pid": 41875,
+        "process_cpu_seconds_including_worker_setup": 4.061236,
+        "run_game_cpu_seconds": 4.030904124999999,
+        "task_key": [
+          "block1:batch-01",
+          660110,
+          "residual"
+        ],
+        "wall_seconds": 4.663847729003464
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660111/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 283234304,
+        "pid": 41880,
+        "process_cpu_seconds_including_worker_setup": 34.207446000000004,
+        "run_game_cpu_seconds": 34.162781162,
+        "task_key": [
+          "block1:batch-01",
+          660111,
+          "residual"
+        ],
+        "wall_seconds": 35.80624295000234
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660109/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 288239616,
+        "pid": 41853,
+        "process_cpu_seconds_including_worker_setup": 60.372828,
+        "run_game_cpu_seconds": 60.330676263,
+        "task_key": [
+          "block1:batch-01",
+          660109,
+          "residual"
+        ],
+        "wall_seconds": 62.42466987899752
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660112/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 282480640,
+        "pid": 41882,
+        "process_cpu_seconds_including_worker_setup": 24.553243000000002,
+        "run_game_cpu_seconds": 24.51951713,
+        "task_key": [
+          "block1:batch-01",
+          660112,
+          "residual"
+        ],
+        "wall_seconds": 25.848655669000436
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660114/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 276381696,
+        "pid": 41884,
+        "process_cpu_seconds_including_worker_setup": 9.194668,
+        "run_game_cpu_seconds": 9.146825239,
+        "task_key": [
+          "block1:batch-01",
+          660114,
+          "residual"
+        ],
+        "wall_seconds": 10.094759348998195
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660113/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 282103808,
+        "pid": 41883,
+        "process_cpu_seconds_including_worker_setup": 28.012924,
+        "run_game_cpu_seconds": 27.974448564,
+        "task_key": [
+          "block1:batch-01",
+          660113,
+          "residual"
+        ],
+        "wall_seconds": 29.41179906099933
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660115/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 278831104,
+        "pid": 41906,
+        "process_cpu_seconds_including_worker_setup": 13.184157,
+        "run_game_cpu_seconds": 13.14670201,
+        "task_key": [
+          "block1:batch-01",
+          660115,
+          "residual"
+        ],
+        "wall_seconds": 14.237020843997016
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660116/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 279658496,
+        "pid": 41907,
+        "process_cpu_seconds_including_worker_setup": 16.367268000000003,
+        "run_game_cpu_seconds": 16.323382577999997,
+        "task_key": [
+          "block1:batch-01",
+          660116,
+          "residual"
+        ],
+        "wall_seconds": 17.452580883000337
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660118/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 277872640,
+        "pid": 41937,
+        "process_cpu_seconds_including_worker_setup": 10.165785,
+        "run_game_cpu_seconds": 10.127420152000001,
+        "task_key": [
+          "block1:batch-01",
+          660118,
+          "residual"
+        ],
+        "wall_seconds": 11.000825776998681
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660117/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 285589504,
+        "pid": 41912,
+        "process_cpu_seconds_including_worker_setup": 41.11508,
+        "run_game_cpu_seconds": 41.067055542000006,
+        "task_key": [
+          "block1:batch-01",
+          660117,
+          "residual"
+        ],
+        "wall_seconds": 42.88764706800066
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660119/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 284151808,
+        "pid": 41942,
+        "process_cpu_seconds_including_worker_setup": 30.134654,
+        "run_game_cpu_seconds": 30.095193494,
+        "task_key": [
+          "block1:batch-01",
+          660119,
+          "residual"
+        ],
+        "wall_seconds": 31.692347465002968
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660120/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 278200320,
+        "pid": 41962,
+        "process_cpu_seconds_including_worker_setup": 7.244524,
+        "run_game_cpu_seconds": 7.210290801,
+        "task_key": [
+          "block1:batch-01",
+          660120,
+          "residual"
+        ],
+        "wall_seconds": 7.952450240001781
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660121/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 277204992,
+        "pid": 41963,
+        "process_cpu_seconds_including_worker_setup": 5.595315,
+        "run_game_cpu_seconds": 5.561466643,
+        "task_key": [
+          "block1:batch-01",
+          660121,
+          "residual"
+        ],
+        "wall_seconds": 6.259196799997881
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660123/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 276066304,
+        "pid": 41965,
+        "process_cpu_seconds_including_worker_setup": 4.86057,
+        "run_game_cpu_seconds": 4.818865165,
+        "task_key": [
+          "block1:batch-01",
+          660123,
+          "residual"
+        ],
+        "wall_seconds": 5.491186799998104
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660122/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 279138304,
+        "pid": 41964,
+        "process_cpu_seconds_including_worker_setup": 11.260137,
+        "run_game_cpu_seconds": 11.214293564999998,
+        "task_key": [
+          "block1:batch-01",
+          660122,
+          "residual"
+        ],
+        "wall_seconds": 12.383372470001632
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660124/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 277614592,
+        "pid": 41966,
+        "process_cpu_seconds_including_worker_setup": 6.201664,
+        "run_game_cpu_seconds": 6.156585184,
+        "task_key": [
+          "block1:batch-01",
+          660124,
+          "residual"
+        ],
+        "wall_seconds": 6.9638183300012315
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660125/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 279715840,
+        "pid": 41967,
+        "process_cpu_seconds_including_worker_setup": 10.900419,
+        "run_game_cpu_seconds": 10.858278544,
+        "task_key": [
+          "block1:batch-01",
+          660125,
+          "residual"
+        ],
+        "wall_seconds": 11.829842233997624
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660127/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 280551424,
+        "pid": 41969,
+        "process_cpu_seconds_including_worker_setup": 13.498139,
+        "run_game_cpu_seconds": 13.465421244,
+        "task_key": [
+          "block1:batch-01",
+          660127,
+          "residual"
+        ],
+        "wall_seconds": 14.481730768002308
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660126/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 282550272,
+        "pid": 41968,
+        "process_cpu_seconds_including_worker_setup": 21.654321,
+        "run_game_cpu_seconds": 21.611704477,
+        "task_key": [
+          "block1:batch-01",
+          660126,
+          "residual"
+        ],
+        "wall_seconds": 22.970077148998826
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-01/seed-660128/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 282918912,
+        "pid": 41991,
+        "process_cpu_seconds_including_worker_setup": 19.010869,
+        "run_game_cpu_seconds": 18.965882767,
+        "task_key": [
+          "block1:batch-01",
+          660128,
+          "residual"
+        ],
+        "wall_seconds": 20.249851774999115
+      }
+    ],
+    "max_active_workers": 2,
+    "max_configured_workers": 2,
+    "parent_peak_rss_bytes": 329846784,
+    "parent_plus_worker_peak_rss_upper_bound_bytes": 906326016,
+    "worker_peak_rss_bytes": 288239616
+  },
+  "failure": null,
+  "finalization_reserve_seconds": 30.0,
+  "forecast_gate": {
+    "authorization_comment_id": 6215441116,
+    "bridge": {
+      "completed_games": 59,
+      "cost_observations": [
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660070/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660070,
+          "process_cpu_seconds": 9.623640476,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "210d4170afdefff6ac64fceaa2b9b28200b6084991f9d4a5d9d205702a0c0984",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660071/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660071,
+          "process_cpu_seconds": 16.549721845,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "332d535847edf1aaee028d5026abd5e2e363ac2988120b04f071feb9fe49cafa",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660072/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660072,
+          "process_cpu_seconds": 43.223806563000004,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "ae6444cf843a4a5f90616a8dd7e4eba49d6566e9d677421ef32cf3b170c49444",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660073/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660073,
+          "process_cpu_seconds": 21.762197108000002,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "8060a21d461d70af09eb0de90f7e4d4e2f332de306990f3bed79793c6da2d1cc",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660074/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660074,
+          "process_cpu_seconds": 40.685235952,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "c1691ec3946280d1a063dfef43efc7756f1a8f8a562616585599650bf8fdbac7",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660075/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660075,
+          "process_cpu_seconds": 9.802021852,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "c2858930a9ad466bae2536ff1f6ecb613f131c3f8c8b70d6f465f3f45b278665",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660076/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660076,
+          "process_cpu_seconds": 16.555727286,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "7ed95388b183a9971b79763d693e08b13db0889c8806528a17c7362529fba367",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660077/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660077,
+          "process_cpu_seconds": 25.435919819,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "bfff8154e76aec014731d7709d3fe3fe262016335b95817dab5f84b675d40e2b",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660078/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660078,
+          "process_cpu_seconds": 24.696050626999998,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "733473bc60153631f9cb732a49a67db027761897481a236e42ca15f64da3ab48",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660079/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660079,
+          "process_cpu_seconds": 54.288179449000005,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "33c109b7095f9467a8a32306dedabe6372df0199b89298acab7fb462ef272532",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660080/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660080,
+          "process_cpu_seconds": 30.994617035,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "ba95c992c6d68925c89cfd813ce80bc4a8925fe0eae103750a4bcf60019a0e06",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660081/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660081,
+          "process_cpu_seconds": 6.668755757,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "16125636b27d098dbacd829456291d66f5fcc7d4c52cf16614d51afe2d8b8ba3",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660082/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660082,
+          "process_cpu_seconds": 62.805677683,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "9911e91593fdf8fe72824441cc5898b166b5b7f0f605a2e2ed9d1aba13798a50",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660083/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660083,
+          "process_cpu_seconds": 28.013957686,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "8d55597d653db77998232851f5f3dff77f66eef97a6eb15390a4d997979f1f82",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660084/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660084,
+          "process_cpu_seconds": 81.719305575,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "80a594fa98fcdfd59eedda3d30bff3e8504cdb754321deb10c9fd0816072d98e",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660085/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660085,
+          "process_cpu_seconds": 9.479626648,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "73d2cfc4f690d9878c7c2a772b9b1b4cc77982af488a1672f943cb404f8280b8",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660086/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660086,
+          "process_cpu_seconds": 12.8203976,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "299e839965a9052ad0395772a1c565cc173802aca3ff160e42722592584757ec",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660087/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660087,
+          "process_cpu_seconds": 20.875899536,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "e6d72bbd014bb565ede41d2712aad1d13f9f0f81d3609de4554a9dcb14a214c4",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660088/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660088,
+          "process_cpu_seconds": 38.979586463,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "644936cb80bc5fbd23a939c817e14831f4b635ce7da0c111ebf8b74e1036b815",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660089/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660089,
+          "process_cpu_seconds": 12.711347920000001,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "664bed15f309fdc62747f7c8a47211b3507c1fb5b539987546289c41dfa6c06b",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660090/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660090,
+          "process_cpu_seconds": 12.911539859,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "095a6f703b39844b12799f739adc4a40b5af7a7b47f2af345a094862566eddd2",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660091/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660091,
+          "process_cpu_seconds": 19.197155588,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "787f128b6f2293418948d1e71e5e77a15d30818d490b76f185416362adc275c9",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660092/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660092,
+          "process_cpu_seconds": 24.094512265000002,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "4389921ec4f43918c759072bd9d169b9e7f70c0e0b8c157359dd4793bcf65f87",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660093/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660093,
+          "process_cpu_seconds": 35.515367452,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "f86e7fdb00612dd82a373b77ac750b2a4c5ec6b67c6b9ec40f13d53a45e1de64",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660094/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660094,
+          "process_cpu_seconds": 14.718053737,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "01e84a31cb1f32778d384a0ab6ecd214b7b537b4c7ec2c0d5a83d8c105043b6d",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660095/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660095,
+          "process_cpu_seconds": 17.159682825,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "0ece1a3d46198b92cf5d0a07fc5624bb897e09876ff2ee1a04a1272f73ca8d92",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660096/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660096,
+          "process_cpu_seconds": 49.009995702,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "5f4fcd67e1a9caa143c6cb63af492cd6889c27afe7b1af5b90c09d24bc5798ba",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660097/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660097,
+          "process_cpu_seconds": 13.138241856,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "321e6e83b24c15b959e78f89bd42923b2a97fcccd80ae171a6c21ce523f6d5e7",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660098/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660098,
+          "process_cpu_seconds": 6.722286614000001,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "8124280a14d2e8b630a33352d25b8f4642238d8f689ea610c90dd74f83fb533d",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660099/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660099,
+          "process_cpu_seconds": 19.169798645999997,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "5a05d31b506d1f3b570081555bd396915fb4588c16b535b1541c7f198e80a688",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660100/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660100,
+          "process_cpu_seconds": 61.84578707,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "1a5df48405a75c3143367c40f14ab351f7ba37bf989c65fa93e6b53beb77a693",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660101/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660101,
+          "process_cpu_seconds": 5.00423962,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "58efd9f51aed62e83bf0c64c96bf55b032a2dc9a7cc56f42fae5103d9a0a3aaf",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660102/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660102,
+          "process_cpu_seconds": 20.022352453,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "6619c2e5b2e12082409cd3e2f186d73a72074b32e4fdbc3371d835a65fb8bf37",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660103/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660103,
+          "process_cpu_seconds": 11.716423577,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "b53a42e1f10d5874809641aee231ef9de2fd0bb4c2b7d3089c41742c254121d4",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660104/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660104,
+          "process_cpu_seconds": 10.821139318999998,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "28fcdef10243c54c56b3c197db335b037a5002ca907883351dd9e148da0c5e08",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660105/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660105,
+          "process_cpu_seconds": 7.047419067000001,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "2fed6ecb64ff7599456b8f3f0016f2538dbd19f682fdb0db7b96f424a332375f",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660106/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660106,
+          "process_cpu_seconds": 14.970374388,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "b6fc559699d51c932c6dc904ff7c4ac0b4f25faea59eefac7edd711b401791ad",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660107/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660107,
+          "process_cpu_seconds": 18.102384496000003,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "518f3ef5fc83184e9bcb265fc3e3b527e3fe8db403aef9d16b16065d83fcc9d6",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660108/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660108,
+          "process_cpu_seconds": 12.447839344,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "19846ed999edc29988363c3b9203d02eaf0b7c2f03fcdf4a4432d49e5440c9b7",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660109/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660109,
+          "process_cpu_seconds": 60.330676263,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "f6ad7c95def6f8525327a3add48d41ea4893c6576d2906c28c379a0c8073f65e",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660110/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660110,
+          "process_cpu_seconds": 4.030904124999999,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "9421297b27ddda5dc24fef0e8b1a8e7deb065677bb4c7d2720d4d4e09aa40433",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660111/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660111,
+          "process_cpu_seconds": 34.162781162,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "bcfb3284d7f75e1130c2f83461bb13a3c332408ea3dee16133548b3fc0f6fe24",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660112/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660112,
+          "process_cpu_seconds": 24.51951713,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "4bc0e93a5272f592f22dc574b99c97eb870e0b62680f8790aebf49c96724bc89",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660113/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660113,
+          "process_cpu_seconds": 27.974448564,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "aaba2abc8a70e1a98a446ca694358311c121f59222c541fb4982e5053c457c57",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660114/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660114,
+          "process_cpu_seconds": 9.146825239,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "510188d52c0d000fe1b3fe8b7de53b6948c4f795fc5d89766e974c9afeb7184c",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660115/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660115,
+          "process_cpu_seconds": 13.14670201,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "a365aa4489c9f4e20c03a6ecbb0be1811907822ea7fd17dce221f253c5e2f6cf",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660116/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660116,
+          "process_cpu_seconds": 16.323382577999997,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "83e7189d1fbae1665b5ca5ec670cb12c1d479052f3b1e6abce82765576d31e8b",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660117/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660117,
+          "process_cpu_seconds": 41.067055542000006,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "8474fea299236befe4114d236d9417e0f01f5e3e8588cc57dad6cce49afc388a",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660118/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660118,
+          "process_cpu_seconds": 10.127420152000001,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "95bab59bc62f35ee1f31418ec0eaf3fbe913dd654c40f8957b97e518c3515773",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660119/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660119,
+          "process_cpu_seconds": 30.095193494,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "57e8572419ebe7193053436c993265c661f1015602f3b0895cd0461307833aee",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660120/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660120,
+          "process_cpu_seconds": 7.210290801,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "a2329bcf3d18d3d940198ea4e2c0d4395763634f5788b5365c55db813ebd8163",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660121/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660121,
+          "process_cpu_seconds": 5.561466643,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "6a343bd9737920d9825af0a7154ceb4b3ab30b9bf19d9024c3e24cd03c4aaf37",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660122/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660122,
+          "process_cpu_seconds": 11.214293564999998,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "049eea811fc76dd6fc6e46c390d291f42f87e881ac7c49e11494c339ee671710",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660123/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660123,
+          "process_cpu_seconds": 4.818865165,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "13ba40aeb7bb77ccc7f01165653665f9efeae007212c6ecb6378247789aca800",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660124/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660124,
+          "process_cpu_seconds": 6.156585184,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "09fe1902af5bc96db79af53c3517eeadb501703fa410a82320bf4e137c356ddd",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660125/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660125,
+          "process_cpu_seconds": 10.858278544,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "4fcf51e58d52535b1b8c2af458ac447b6a504ce7befabd8b04002ed8a53855cc",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660126/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660126,
+          "process_cpu_seconds": 21.611704477,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "5af21fcb56cec09dd5a11f6320bd7c0cd920ecc2f444aadf20a103f2008e6b4f",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660127/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660127,
+          "process_cpu_seconds": 13.465421244,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "5ec4c0c0b45b02a5becad1dd048cecf5de1e4b2bb6ecbed8936fce3e7a309860",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-01/seed-660128/attempt-0001",
+          "authorization_comment_id": 6215441116,
+          "game_seed": 660128,
+          "process_cpu_seconds": 18.965882767,
+          "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+          "producer_files": {
+            "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+            "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+            "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+            "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+            "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+            "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+            "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+            "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+            "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+            "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+            "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+          },
+          "regime_id": "issue60-cached-guard-v1",
+          "run_json_sha256": "b66324ba9c3f42d840b1adf26651bc4f5889c07e962123d62f4bcd6b5ad80733",
+          "schema_id": "issue60-prospective-cost-tag-v1",
+          "stage_key": "block1:batch-01"
+        }
+      ],
+      "execution_evidence": {
+        "execution_count": 59,
+        "executions": [
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660070/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 269594624,
+            "pid": 41673,
+            "process_cpu_seconds_including_worker_setup": 9.659566,
+            "run_game_cpu_seconds": 9.623640476,
+            "task_key": [
+              "block1:batch-01",
+              660070,
+              "residual"
+            ],
+            "wall_seconds": 10.575924644999759
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660071/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 272240640,
+            "pid": 41674,
+            "process_cpu_seconds_including_worker_setup": 16.592716,
+            "run_game_cpu_seconds": 16.549721845,
+            "task_key": [
+              "block1:batch-01",
+              660071,
+              "residual"
+            ],
+            "wall_seconds": 17.727771486002894
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660073/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 275415040,
+            "pid": 41676,
+            "process_cpu_seconds_including_worker_setup": 21.80773,
+            "run_game_cpu_seconds": 21.762197108000002,
+            "task_key": [
+              "block1:batch-01",
+              660073,
+              "residual"
+            ],
+            "wall_seconds": 23.021232677001535
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660072/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 279171072,
+            "pid": 41675,
+            "process_cpu_seconds_including_worker_setup": 43.268913000000005,
+            "run_game_cpu_seconds": 43.223806563000004,
+            "task_key": [
+              "block1:batch-01",
+              660072,
+              "residual"
+            ],
+            "wall_seconds": 45.0567738719983
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660075/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 270651392,
+            "pid": 41703,
+            "process_cpu_seconds_including_worker_setup": 9.843852,
+            "run_game_cpu_seconds": 9.802021852,
+            "task_key": [
+              "block1:batch-01",
+              660075,
+              "residual"
+            ],
+            "wall_seconds": 10.683283906000725
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660074/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 278974464,
+            "pid": 41698,
+            "process_cpu_seconds_including_worker_setup": 40.732373,
+            "run_game_cpu_seconds": 40.685235952,
+            "task_key": [
+              "block1:batch-01",
+              660074,
+              "residual"
+            ],
+            "wall_seconds": 42.33190135000041
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660076/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 272711680,
+            "pid": 41704,
+            "process_cpu_seconds_including_worker_setup": 16.604771,
+            "run_game_cpu_seconds": 16.555727286,
+            "task_key": [
+              "block1:batch-01",
+              660076,
+              "residual"
+            ],
+            "wall_seconds": 17.800668995001615
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660077/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 275533824,
+            "pid": 41705,
+            "process_cpu_seconds_including_worker_setup": 25.482444,
+            "run_game_cpu_seconds": 25.435919819,
+            "task_key": [
+              "block1:batch-01",
+              660077,
+              "residual"
+            ],
+            "wall_seconds": 26.870028648001608
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660078/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 275693568,
+            "pid": 41706,
+            "process_cpu_seconds_including_worker_setup": 24.734972,
+            "run_game_cpu_seconds": 24.696050626999998,
+            "task_key": [
+              "block1:batch-01",
+              660078,
+              "residual"
+            ],
+            "wall_seconds": 27.530939893000323
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660080/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 277590016,
+            "pid": 41708,
+            "process_cpu_seconds_including_worker_setup": 31.035792,
+            "run_game_cpu_seconds": 30.994617035,
+            "task_key": [
+              "block1:batch-01",
+              660080,
+              "residual"
+            ],
+            "wall_seconds": 32.607505732998106
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660081/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 270565376,
+            "pid": 41733,
+            "process_cpu_seconds_including_worker_setup": 6.714454,
+            "run_game_cpu_seconds": 6.668755757,
+            "task_key": [
+              "block1:batch-01",
+              660081,
+              "residual"
+            ],
+            "wall_seconds": 7.459115648001898
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660079/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 282669056,
+            "pid": 41707,
+            "process_cpu_seconds_including_worker_setup": 54.32973,
+            "run_game_cpu_seconds": 54.288179449000005,
+            "task_key": [
+              "block1:batch-01",
+              660079,
+              "residual"
+            ],
+            "wall_seconds": 56.25444809799956
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660083/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 277172224,
+            "pid": 41739,
+            "process_cpu_seconds_including_worker_setup": 28.050174000000002,
+            "run_game_cpu_seconds": 28.013957686,
+            "task_key": [
+              "block1:batch-01",
+              660083,
+              "residual"
+            ],
+            "wall_seconds": 29.48060154399718
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660082/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 284393472,
+            "pid": 41738,
+            "process_cpu_seconds_including_worker_setup": 62.853410000000004,
+            "run_game_cpu_seconds": 62.805677683,
+            "task_key": [
+              "block1:batch-01",
+              660082,
+              "residual"
+            ],
+            "wall_seconds": 64.9897652159998
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660085/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 273653760,
+            "pid": 41741,
+            "process_cpu_seconds_including_worker_setup": 9.52004,
+            "run_game_cpu_seconds": 9.479626648,
+            "task_key": [
+              "block1:batch-01",
+              660085,
+              "residual"
+            ],
+            "wall_seconds": 10.427262820001488
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660086/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 273747968,
+            "pid": 41743,
+            "process_cpu_seconds_including_worker_setup": 12.870045,
+            "run_game_cpu_seconds": 12.8203976,
+            "task_key": [
+              "block1:batch-01",
+              660086,
+              "residual"
+            ],
+            "wall_seconds": 13.959380305997911
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660087/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 275054592,
+            "pid": 41778,
+            "process_cpu_seconds_including_worker_setup": 20.931597,
+            "run_game_cpu_seconds": 20.875899536,
+            "task_key": [
+              "block1:batch-01",
+              660087,
+              "residual"
+            ],
+            "wall_seconds": 22.31607444799738
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660084/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 285863936,
+            "pid": 41740,
+            "process_cpu_seconds_including_worker_setup": 81.777687,
+            "run_game_cpu_seconds": 81.719305575,
+            "task_key": [
+              "block1:batch-01",
+              660084,
+              "residual"
+            ],
+            "wall_seconds": 84.11424519600041
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660089/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 273035264,
+            "pid": 41780,
+            "process_cpu_seconds_including_worker_setup": 12.775505,
+            "run_game_cpu_seconds": 12.711347920000001,
+            "task_key": [
+              "block1:batch-01",
+              660089,
+              "residual"
+            ],
+            "wall_seconds": 13.87053417199786
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660088/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 279121920,
+            "pid": 41779,
+            "process_cpu_seconds_including_worker_setup": 39.035342,
+            "run_game_cpu_seconds": 38.979586463,
+            "task_key": [
+              "block1:batch-01",
+              660088,
+              "residual"
+            ],
+            "wall_seconds": 40.800589000999025
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660090/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 273526784,
+            "pid": 41781,
+            "process_cpu_seconds_including_worker_setup": 12.956541999999999,
+            "run_game_cpu_seconds": 12.911539859,
+            "task_key": [
+              "block1:batch-01",
+              660090,
+              "residual"
+            ],
+            "wall_seconds": 14.01123592300064
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660091/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 276729856,
+            "pid": 41782,
+            "process_cpu_seconds_including_worker_setup": 19.243502,
+            "run_game_cpu_seconds": 19.197155588,
+            "task_key": [
+              "block1:batch-01",
+              660091,
+              "residual"
+            ],
+            "wall_seconds": 20.438335071001347
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660092/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 278425600,
+            "pid": 41783,
+            "process_cpu_seconds_including_worker_setup": 24.134099000000003,
+            "run_game_cpu_seconds": 24.094512265000002,
+            "task_key": [
+              "block1:batch-01",
+              660092,
+              "residual"
+            ],
+            "wall_seconds": 25.427735152999958
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660094/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 274776064,
+            "pid": 41806,
+            "process_cpu_seconds_including_worker_setup": 14.767032,
+            "run_game_cpu_seconds": 14.718053737,
+            "task_key": [
+              "block1:batch-01",
+              660094,
+              "residual"
+            ],
+            "wall_seconds": 15.9436216590002
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660093/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 279937024,
+            "pid": 41784,
+            "process_cpu_seconds_including_worker_setup": 35.567440000000005,
+            "run_game_cpu_seconds": 35.515367452,
+            "task_key": [
+              "block1:batch-01",
+              660093,
+              "residual"
+            ],
+            "wall_seconds": 37.14361628700135
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660095/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 276860928,
+            "pid": 41814,
+            "process_cpu_seconds_including_worker_setup": 17.202626000000002,
+            "run_game_cpu_seconds": 17.159682825,
+            "task_key": [
+              "block1:batch-01",
+              660095,
+              "residual"
+            ],
+            "wall_seconds": 18.25317089999953
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660097/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 275156992,
+            "pid": 41816,
+            "process_cpu_seconds_including_worker_setup": 13.17172,
+            "run_game_cpu_seconds": 13.138241856,
+            "task_key": [
+              "block1:batch-01",
+              660097,
+              "residual"
+            ],
+            "wall_seconds": 14.187031934998231
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660098/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 273203200,
+            "pid": 41817,
+            "process_cpu_seconds_including_worker_setup": 6.759638000000001,
+            "run_game_cpu_seconds": 6.722286614000001,
+            "task_key": [
+              "block1:batch-01",
+              660098,
+              "residual"
+            ],
+            "wall_seconds": 7.5397612859997025
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660099/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 278552576,
+            "pid": 41818,
+            "process_cpu_seconds_including_worker_setup": 19.222876999999997,
+            "run_game_cpu_seconds": 19.169798645999997,
+            "task_key": [
+              "block1:batch-01",
+              660099,
+              "residual"
+            ],
+            "wall_seconds": 20.51202335600101
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660096/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 284721152,
+            "pid": 41815,
+            "process_cpu_seconds_including_worker_setup": 49.054466,
+            "run_game_cpu_seconds": 49.009995702,
+            "task_key": [
+              "block1:batch-01",
+              660096,
+              "residual"
+            ],
+            "wall_seconds": 50.82588756900077
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660101/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 273641472,
+            "pid": 41820,
+            "process_cpu_seconds_including_worker_setup": 5.037875,
+            "run_game_cpu_seconds": 5.00423962,
+            "task_key": [
+              "block1:batch-01",
+              660101,
+              "residual"
+            ],
+            "wall_seconds": 5.636322903999826
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660102/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 278593536,
+            "pid": 41842,
+            "process_cpu_seconds_including_worker_setup": 20.06985,
+            "run_game_cpu_seconds": 20.022352453,
+            "task_key": [
+              "block1:batch-01",
+              660102,
+              "residual"
+            ],
+            "wall_seconds": 21.315222478999203
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660103/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 275730432,
+            "pid": 41847,
+            "process_cpu_seconds_including_worker_setup": 11.749781,
+            "run_game_cpu_seconds": 11.716423577,
+            "task_key": [
+              "block1:batch-01",
+              660103,
+              "residual"
+            ],
+            "wall_seconds": 12.78825084899654
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660104/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 275591168,
+            "pid": 41848,
+            "process_cpu_seconds_including_worker_setup": 10.866278000000001,
+            "run_game_cpu_seconds": 10.821139318999998,
+            "task_key": [
+              "block1:batch-01",
+              660104,
+              "residual"
+            ],
+            "wall_seconds": 11.784864491997723
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660100/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 287207424,
+            "pid": 41819,
+            "process_cpu_seconds_including_worker_setup": 61.894585,
+            "run_game_cpu_seconds": 61.84578707,
+            "task_key": [
+              "block1:batch-01",
+              660100,
+              "residual"
+            ],
+            "wall_seconds": 63.95606156399663
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660105/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 275181568,
+            "pid": 41849,
+            "process_cpu_seconds_including_worker_setup": 7.090572,
+            "run_game_cpu_seconds": 7.047419067000001,
+            "task_key": [
+              "block1:batch-01",
+              660105,
+              "residual"
+            ],
+            "wall_seconds": 8.949886196998705
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660106/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 277504000,
+            "pid": 41850,
+            "process_cpu_seconds_including_worker_setup": 15.004265,
+            "run_game_cpu_seconds": 14.970374388,
+            "task_key": [
+              "block1:batch-01",
+              660106,
+              "residual"
+            ],
+            "wall_seconds": 16.040390902999206
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660107/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 278933504,
+            "pid": 41851,
+            "process_cpu_seconds_including_worker_setup": 18.146865000000002,
+            "run_game_cpu_seconds": 18.102384496000003,
+            "task_key": [
+              "block1:batch-01",
+              660107,
+              "residual"
+            ],
+            "wall_seconds": 19.304295722999086
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660108/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 276828160,
+            "pid": 41852,
+            "process_cpu_seconds_including_worker_setup": 12.488305,
+            "run_game_cpu_seconds": 12.447839344,
+            "task_key": [
+              "block1:batch-01",
+              660108,
+              "residual"
+            ],
+            "wall_seconds": 13.53038027099683
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660110/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 273211392,
+            "pid": 41875,
+            "process_cpu_seconds_including_worker_setup": 4.061236,
+            "run_game_cpu_seconds": 4.030904124999999,
+            "task_key": [
+              "block1:batch-01",
+              660110,
+              "residual"
+            ],
+            "wall_seconds": 4.663847729003464
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660111/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 283234304,
+            "pid": 41880,
+            "process_cpu_seconds_including_worker_setup": 34.207446000000004,
+            "run_game_cpu_seconds": 34.162781162,
+            "task_key": [
+              "block1:batch-01",
+              660111,
+              "residual"
+            ],
+            "wall_seconds": 35.80624295000234
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660109/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 288239616,
+            "pid": 41853,
+            "process_cpu_seconds_including_worker_setup": 60.372828,
+            "run_game_cpu_seconds": 60.330676263,
+            "task_key": [
+              "block1:batch-01",
+              660109,
+              "residual"
+            ],
+            "wall_seconds": 62.42466987899752
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660112/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 282480640,
+            "pid": 41882,
+            "process_cpu_seconds_including_worker_setup": 24.553243000000002,
+            "run_game_cpu_seconds": 24.51951713,
+            "task_key": [
+              "block1:batch-01",
+              660112,
+              "residual"
+            ],
+            "wall_seconds": 25.848655669000436
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660114/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 276381696,
+            "pid": 41884,
+            "process_cpu_seconds_including_worker_setup": 9.194668,
+            "run_game_cpu_seconds": 9.146825239,
+            "task_key": [
+              "block1:batch-01",
+              660114,
+              "residual"
+            ],
+            "wall_seconds": 10.094759348998195
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660113/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 282103808,
+            "pid": 41883,
+            "process_cpu_seconds_including_worker_setup": 28.012924,
+            "run_game_cpu_seconds": 27.974448564,
+            "task_key": [
+              "block1:batch-01",
+              660113,
+              "residual"
+            ],
+            "wall_seconds": 29.41179906099933
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660115/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 278831104,
+            "pid": 41906,
+            "process_cpu_seconds_including_worker_setup": 13.184157,
+            "run_game_cpu_seconds": 13.14670201,
+            "task_key": [
+              "block1:batch-01",
+              660115,
+              "residual"
+            ],
+            "wall_seconds": 14.237020843997016
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660116/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 279658496,
+            "pid": 41907,
+            "process_cpu_seconds_including_worker_setup": 16.367268000000003,
+            "run_game_cpu_seconds": 16.323382577999997,
+            "task_key": [
+              "block1:batch-01",
+              660116,
+              "residual"
+            ],
+            "wall_seconds": 17.452580883000337
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660118/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 277872640,
+            "pid": 41937,
+            "process_cpu_seconds_including_worker_setup": 10.165785,
+            "run_game_cpu_seconds": 10.127420152000001,
+            "task_key": [
+              "block1:batch-01",
+              660118,
+              "residual"
+            ],
+            "wall_seconds": 11.000825776998681
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660117/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 285589504,
+            "pid": 41912,
+            "process_cpu_seconds_including_worker_setup": 41.11508,
+            "run_game_cpu_seconds": 41.067055542000006,
+            "task_key": [
+              "block1:batch-01",
+              660117,
+              "residual"
+            ],
+            "wall_seconds": 42.88764706800066
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660119/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 284151808,
+            "pid": 41942,
+            "process_cpu_seconds_including_worker_setup": 30.134654,
+            "run_game_cpu_seconds": 30.095193494,
+            "task_key": [
+              "block1:batch-01",
+              660119,
+              "residual"
+            ],
+            "wall_seconds": 31.692347465002968
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660120/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 278200320,
+            "pid": 41962,
+            "process_cpu_seconds_including_worker_setup": 7.244524,
+            "run_game_cpu_seconds": 7.210290801,
+            "task_key": [
+              "block1:batch-01",
+              660120,
+              "residual"
+            ],
+            "wall_seconds": 7.952450240001781
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660121/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 277204992,
+            "pid": 41963,
+            "process_cpu_seconds_including_worker_setup": 5.595315,
+            "run_game_cpu_seconds": 5.561466643,
+            "task_key": [
+              "block1:batch-01",
+              660121,
+              "residual"
+            ],
+            "wall_seconds": 6.259196799997881
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660123/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 276066304,
+            "pid": 41965,
+            "process_cpu_seconds_including_worker_setup": 4.86057,
+            "run_game_cpu_seconds": 4.818865165,
+            "task_key": [
+              "block1:batch-01",
+              660123,
+              "residual"
+            ],
+            "wall_seconds": 5.491186799998104
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660122/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 279138304,
+            "pid": 41964,
+            "process_cpu_seconds_including_worker_setup": 11.260137,
+            "run_game_cpu_seconds": 11.214293564999998,
+            "task_key": [
+              "block1:batch-01",
+              660122,
+              "residual"
+            ],
+            "wall_seconds": 12.383372470001632
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660124/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 277614592,
+            "pid": 41966,
+            "process_cpu_seconds_including_worker_setup": 6.201664,
+            "run_game_cpu_seconds": 6.156585184,
+            "task_key": [
+              "block1:batch-01",
+              660124,
+              "residual"
+            ],
+            "wall_seconds": 6.9638183300012315
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660125/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 279715840,
+            "pid": 41967,
+            "process_cpu_seconds_including_worker_setup": 10.900419,
+            "run_game_cpu_seconds": 10.858278544,
+            "task_key": [
+              "block1:batch-01",
+              660125,
+              "residual"
+            ],
+            "wall_seconds": 11.829842233997624
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660127/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 280551424,
+            "pid": 41969,
+            "process_cpu_seconds_including_worker_setup": 13.498139,
+            "run_game_cpu_seconds": 13.465421244,
+            "task_key": [
+              "block1:batch-01",
+              660127,
+              "residual"
+            ],
+            "wall_seconds": 14.481730768002308
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660126/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 282550272,
+            "pid": 41968,
+            "process_cpu_seconds_including_worker_setup": 21.654321,
+            "run_game_cpu_seconds": 21.611704477,
+            "task_key": [
+              "block1:batch-01",
+              660126,
+              "residual"
+            ],
+            "wall_seconds": 22.970077148998826
+          },
+          {
+            "attempt": "evidence/runs/training/block1/batch-01/seed-660128/attempt-0001",
+            "exit_code": 0,
+            "peak_rss_bytes": 282918912,
+            "pid": 41991,
+            "process_cpu_seconds_including_worker_setup": 19.010869,
+            "run_game_cpu_seconds": 18.965882767,
+            "task_key": [
+              "block1:batch-01",
+              660128,
+              "residual"
+            ],
+            "wall_seconds": 20.249851774999115
+          }
+        ],
+        "max_active_workers": 2,
+        "max_configured_workers": 2,
+        "parent_peak_rss_bytes": 329453568,
+        "parent_plus_worker_peak_rss_upper_bound_bytes": 905932800,
+        "worker_peak_rss_bytes": 288239616
+      },
+      "focused_tests": {
+        "status": "PASS",
+        "test_count": 6
+      },
+      "policy_updates_before_gate": 0,
+      "required_games": 59,
+      "seeds": [
+        660070,
+        660071,
+        660072,
+        660073,
+        660074,
+        660075,
+        660076,
+        660077,
+        660078,
+        660079,
+        660080,
+        660081,
+        660082,
+        660083,
+        660084,
+        660085,
+        660086,
+        660087,
+        660088,
+        660089,
+        660090,
+        660091,
+        660092,
+        660093,
+        660094,
+        660095,
+        660096,
+        660097,
+        660098,
+        660099,
+        660100,
+        660101,
+        660102,
+        660103,
+        660104,
+        660105,
+        660106,
+        660107,
+        660108,
+        660109,
+        660110,
+        660111,
+        660112,
+        660113,
+        660114,
+        660115,
+        660116,
+        660117,
+        660118,
+        660119,
+        660120,
+        660121,
+        660122,
+        660123,
+        660124,
+        660125,
+        660126,
+        660127,
+        660128
+      ],
+      "stage_key": "block1:batch-01",
+      "worker_count": 2
+    },
+    "bridge_start_sha256": "d4ea58fcc8d86bc477bea8c0bd58e10c0f8b6319971b7064644782ca8b245559",
+    "decision": "continue unchanged program automatically",
+    "forecast": {
+      "accounted_cpu_seconds": 5348.232962185,
+      "all_history": {
+        "mean": 22.23888070181356,
+        "n": 59,
+        "sample_sd": 16.86637287133601,
+        "upper": 28.8263248507608
+      },
+      "builder_budget_cpu_seconds": 180000.0,
+      "cost_rule": "max(all-history and recent-128 mean + 3 sample-SD/sqrt(n))",
+      "game_cost_multiplier": 1.5,
+      "interpretation": "fixed operational heuristic; not a calibrated confidence bound or cost guarantee",
+      "max_based_stress_game_projection_cpu_seconds": 376562.56008960004,
+      "max_observed_game_cpu_seconds_stress_only": 81.719305575,
+      "observed_complete_games": 59,
+      "optimizer_headroom_fraction": 0.2,
+      "process_cpu_cap_seconds": 200000.0,
+      "projected_all_in_cpu_seconds": 190381.4217623628,
+      "projected_builder_cpu_seconds": 170381.4217623628,
+      "projected_remaining_cpu_seconds": 165033.1888001778,
+      "projected_remaining_game_cpu_seconds_before_headroom": 110693.08742692145,
+      "projected_remaining_game_cpu_seconds_with_headroom": 132831.70491230575,
+      "projected_remaining_optimizer_cpu_seconds_with_headroom": 32201.483887872047,
+      "recent_observed_games": 59,
+      "recent_window": {
+        "mean": 22.23888070181356,
+        "n": 59,
+        "sample_sd": 16.86637287133601,
+        "upper": 28.8263248507608
+      },
+      "recent_window_size": 128,
+      "remaining_games": 2560,
+      "remaining_optimizer_cpu_seconds_before_headroom": 26834.569906560042,
+      "reviewer_reserve_cpu_seconds": 20000.0,
+      "status": "PASS",
+      "unit_cost_cpu_seconds": 28.8263248507608
+    },
+    "gate_role": "prospective cached-regime unit-cost gate; operational heuristic, not guarantee",
+    "old_r2_forecast": {
+      "projected_all_in_cpu_seconds": 217974.02345082807,
+      "projected_builder_cpu_seconds": 197974.02345082807,
+      "receipt_sha256": "1e00c8de6cc9f80ca9923bdc7c659ce7fa63943973eea5bd9a009e57f29d9042",
+      "role": "historical/comparative only; unchanged",
+      "status": "RESOURCE_BLOCKED"
+    },
+    "parallel_receipt_sha256": "1e00c8de6cc9f80ca9923bdc7c659ce7fa63943973eea5bd9a009e57f29d9042",
+    "remaining_optimizer_projection": 26834.569906560042,
+    "schema_id": "issue60-prospective-bridge-gate-v1",
+    "source_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+    "source_files": {
+      "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+      "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+      "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+      "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+      "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+      "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+      "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+      "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+      "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+      "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+    },
+    "status": "PASS",
+    "unchanged_remaining_grid_games": 2560,
+    "updated_utc": "2026-10-16T15:09:57Z"
+  },
+  "process_cpu_seconds": 1338.2652145,
+  "process_cpu_seconds_charged": 1338.8840785520001,
+  "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+  "producer_files": {
+    "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+    "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+    "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+    "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+    "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+    "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+    "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+    "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+    "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+    "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+    "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+  },
   "schema_id": "issue60-cost-bridge-stage-v1",
-  "source_commit": "bd2360385dc9cc073384dd290625a496ccc71039",
-  "status": "FAILED",
-  "updated_utc": "2026-10-16T14:48:02Z"
+  "status": "COMPLETE",
+  "updated_utc": "2026-10-16T15:10:13Z"
 }

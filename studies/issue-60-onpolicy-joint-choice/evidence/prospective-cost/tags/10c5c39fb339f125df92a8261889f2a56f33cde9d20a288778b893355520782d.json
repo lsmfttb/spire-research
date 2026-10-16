@@ -1,0 +1,25 @@
+{
+  "arm": "residual",
+  "attempt_path": "evidence/runs/training/block1/batch-01/seed-660121/attempt-0001",
+  "authorization_comment_id": 6215441116,
+  "game_seed": 660121,
+  "process_cpu_seconds": 5.561466643,
+  "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+  "producer_files": {
+    "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+    "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+    "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+    "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+    "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+    "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+    "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+    "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+    "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+    "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+    "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+  },
+  "regime_id": "issue60-cached-guard-v1",
+  "run_json_sha256": "6a343bd9737920d9825af0a7154ceb4b3ab30b9bf19d9024c3e24cd03c4aaf37",
+  "schema_id": "issue60-prospective-cost-tag-v1",
+  "stage_key": "block1:batch-01"
+}

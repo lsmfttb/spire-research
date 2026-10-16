@@ -53,10 +53,38 @@
       "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
     },
     "remaining_games": 2560,
+    "runtime": {
+      "deterministic_algorithms": true,
+      "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+      "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+      "native_source": "/home/lsmft/stsrl-spikes/sts_lightspeed-issue59",
+      "python": "3.13.13",
+      "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+      "stsr_source": "/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c",
+      "torch": "2.12.0+cpu",
+      "torch_threads": 1
+    },
     "selected_worker_count": 2
   },
-  "launcher_sha256": "cfda1cf05f5d00a84561c458ffea8d38f36ad62ef3d69e2dfa557147b52141d7",
+  "launcher_sha256": "29bcec3714c60c8f9f187ae0aec389e7f9a962027d4310ad504d29f7efb798df",
+  "recovery_basis": {
+    "archived_attempt_records": [
+      {
+        "path": "evidence/validation/parallel-execution/stages/train-pre-dispatch-failure-0001.json",
+        "sha256": "3777ef6b39a9b3f947d6f3e3987d71412115fa17b06156fb73cb88750fbfc6d1"
+      },
+      {
+        "path": "evidence/stage-status/train-pre-dispatch-failure-0001.json",
+        "sha256": "68c8e985e9633abddec2bc76ed5890275fb1457aae65bb80099ca439429b98cb"
+      }
+    ],
+    "failure": "CalledProcessError: Command '['git', '-C', '/home/lsmft/sts_lightspeed-issue59', 'rev-parse', 'HEAD']' returned non-zero exit status 128.",
+    "no_game_or_update_dispatched": true,
+    "parallel_execution_count": 0,
+    "parallel_stage_status": "FAILED",
+    "worker_process_cpu_seconds": 0.0
+  },
   "schema_id": "issue60-continuation-validation-binding-v1",
   "status": "PASS",
-  "validated_utc": "2026-10-16T15:22:37Z"
+  "validated_utc": "2026-10-16T17:30:17Z"
 }

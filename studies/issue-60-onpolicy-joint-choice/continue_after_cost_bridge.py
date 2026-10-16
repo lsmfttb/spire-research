@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import time
 from typing import Any
@@ -34,6 +35,7 @@ def _sha256(path: Path) -> str:
 
 
 def _facts() -> dict[str, Any]:
+    import run_study
     latest = bridge._read_json(bridge.BRIDGE_LATEST)
     gate = bridge._read_json(PROSPECTIVE / "bridge-gate.json")
     start = bridge._read_json(bridge.BRIDGE_START)
@@ -63,6 +65,10 @@ def _facts() -> dict[str, Any]:
         raise bridge.CostRegimeError("historical R3 receipt indicates an unexpected PPO update")
     if accepted.get("status") != "PASS":
         raise bridge.CostRegimeError("Planner-accepted two-worker evidence no longer passes")
+
+    config = json.loads(run_study.CONFIG_PATH.read_text(encoding="utf-8"))
+    run_study.validate_config(config)
+    runtime = run_study.verify_runtime(config)
 
     bridge.PRODUCER_COMMIT = str(gate["source_commit"])
     bridge.PRODUCER_HASHES = source_hashes
@@ -101,6 +107,13 @@ def _facts() -> dict[str, Any]:
         "historical_r3_receipt_status": historical.get("status"),
         "historical_r3_validation_status": historical.get("validation", {}).get("status"),
         "execution_source_files": runner_hashes,
+        "runtime": {
+            key: runtime.get(key) for key in (
+                "python", "torch", "torch_threads", "deterministic_algorithms",
+                "stsr_source", "stsr_commit", "native_source", "native_commit",
+                "native_binary_sha256",
+            )
+        },
         "selected_worker_count": 2,
         "remaining_games": 2560,
         "forecast_projected_builder_cpu_seconds": forecast.get("projected_builder_cpu_seconds"),
@@ -114,13 +127,58 @@ def _facts() -> dict[str, Any]:
     }
 
 
-def _write_binding(facts: dict[str, Any]) -> dict[str, Any]:
+def _recovery_basis() -> dict[str, Any] | None:
+    if not LIFECYCLE.is_file() or not LIFECYCLE.read_text(encoding="utf-8").strip():
+        return None
+    rows = [json.loads(line) for line in LIFECYCLE.read_text(encoding="utf-8").splitlines() if line]
+    if (len(rows) != 2 or rows[0].get("state") != "STARTED"
+            or rows[1].get("state") != "FAILED"):
+        raise bridge.CostRegimeError("prior continuation state is not a single recoverable pre-dispatch failure")
+    failure = str(rows[1].get("failure", ""))
+    expected_failure = "CalledProcessError: Command '['git', '-C', '/home/lsmft/sts_lightspeed-issue59'"
+    stage_path = EVIDENCE / "validation" / "parallel-execution" / "stages" / "train.json"
+    status_path = EVIDENCE / "stage-status" / "train.json"
+    stage = bridge._read_json(stage_path)
+    status = bridge._read_json(status_path)
+    if (not failure.startswith(expected_failure)
+            or stage.get("status") != "FAILED" or stage.get("execution_count") != 0
+            or stage.get("worker_process_cpu_seconds") != 0.0
+            or status.get("status") != "FAILED"
+            or "/home/lsmft/sts_lightspeed-issue59" not in str(status.get("failure", ""))):
+        raise bridge.CostRegimeError("prior failed stage is not the verified no-dispatch runtime-path failure")
+    archived = []
+    for source, destination in (
+        (stage_path, stage_path.with_name("train-pre-dispatch-failure-0001.json")),
+        (status_path, status_path.with_name("train-pre-dispatch-failure-0001.json")),
+    ):
+        if destination.exists():
+            if destination.read_bytes() != source.read_bytes():
+                raise bridge.CostRegimeError(f"pre-dispatch failure archive already differs: {destination}")
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+        archived.append({
+            "path": destination.relative_to(HERE).as_posix(),
+            "sha256": _sha256(destination),
+        })
+    return {
+        "failure": failure,
+        "parallel_stage_status": stage.get("status"),
+        "parallel_execution_count": stage.get("execution_count"),
+        "worker_process_cpu_seconds": stage.get("worker_process_cpu_seconds"),
+        "archived_attempt_records": archived,
+        "no_game_or_update_dispatched": True,
+    }
+
+
+def _write_binding(facts: dict[str, Any], recovery: dict[str, Any] | None) -> dict[str, Any]:
     record = {
         "schema_id": "issue60-continuation-validation-binding-v1",
         "status": "PASS",
         "validated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "launcher_sha256": _sha256(Path(__file__)),
         "facts": facts,
+        "recovery_basis": recovery,
     }
     bridge.atomic_json(BINDING, record)
     return record
@@ -193,7 +251,7 @@ def main() -> int:
         parser.error("select exactly one of --verify-only or --continue")
     if args.verify_only:
         historical_before = _sha256(parallel.PARALLEL_RECEIPT)
-        record = _write_binding(_facts())
+        record = _write_binding(_facts(), _recovery_basis())
         parallel._read_validation_receipt = _validation_receipt
         receipt = parallel._read_validation_receipt()
         if (receipt.get("status") != "PASS"
@@ -211,8 +269,10 @@ def main() -> int:
         return 0
 
     binding = _verified_binding()
-    if LIFECYCLE.is_file() and LIFECYCLE.read_text(encoding="utf-8").strip():
-        raise bridge.CostRegimeError("continuation was already launched; inspect lifecycle before any retry")
+    recovery = _recovery_basis()
+    if binding.get("recovery_basis") != recovery:
+        raise bridge.CostRegimeError("retry recovery evidence changed after continuation validation")
+    attempt_number = 2 if recovery is not None else 1
     prior_receipt_sha = binding["facts"]["historical_r3_receipt_sha256"]
     started = time.process_time()
     _record_bridge_charge(
@@ -233,10 +293,28 @@ def main() -> int:
         accounting=("conservative implementation, focused binding verification and commit-preparation "
                     "charge for the study-local adapter; no simulation or PPO update"),
     )
+    if recovery is not None:
+        _append_lifecycle({
+            "schema_id": "issue60-continuation-lifecycle-v1",
+            "state": "RETRY_AUTHORIZED",
+            "authorization_comment_id": AUTHORIZATION,
+            "attempt_number": attempt_number,
+            "recovery_basis": recovery,
+            "authorized_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        })
+        _record_bridge_charge(
+            attempt="issue60-continuation-pre-dispatch-retry-recovery-0001",
+            stage="issue60-continuation-recovery-evidence-and-runtime-path-check",
+            seconds=10.0,
+            status="PASS",
+            source_commit=binding["facts"]["producer_commit"],
+            accounting=("conservative charge for archiving the verified zero-dispatch failed attempt, "
+                        "correcting the runtime checkout path and revalidating pinned runtime; no simulation"),
+        )
     parallel._read_validation_receipt = _validation_receipt
     launch_charge = max(0.0, time.process_time() - started) + 0.2
     _record_bridge_charge(
-        attempt="issue60-continuation-validation-adapter-launch-0001",
+        attempt=f"issue60-continuation-validation-adapter-launch-{attempt_number:04d}",
         stage="issue60-cached-cost-bridge-continuation-launch",
         seconds=launch_charge,
         status="PASS",
@@ -250,6 +328,7 @@ def main() -> int:
         "binding_sha256": _sha256(BINDING),
         "historical_r3_receipt_sha256_preserved": prior_receipt_sha,
         "worker_count": 2,
+        "attempt_number": attempt_number,
         "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     })
     ledger = EVIDENCE / "cpu-ledger.jsonl"
@@ -261,7 +340,7 @@ def main() -> int:
         ledger_lines_after_runner = len(ledger.read_text(encoding="utf-8").splitlines()) if ledger.is_file() else 0
         if ledger_lines_after_runner == ledger_lines_before_runner:
             _record_bridge_charge(
-                attempt="issue60-continuation-runtime-failure-0001",
+                attempt=f"issue60-continuation-runtime-failure-{attempt_number:04d}",
                 stage="issue60-authorized-continuation-failure",
                 seconds=max(0.0, time.process_time() - runner_started) + 0.2,
                 status="FAILED",
@@ -272,6 +351,7 @@ def main() -> int:
             "schema_id": "issue60-continuation-lifecycle-v1",
             "state": "FAILED",
             "authorization_comment_id": AUTHORIZATION,
+            "attempt_number": attempt_number,
             "failure": f"{type(exc).__name__}: {exc}",
             "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         })
@@ -279,7 +359,7 @@ def main() -> int:
     ledger_lines_after_runner = len(ledger.read_text(encoding="utf-8").splitlines()) if ledger.is_file() else 0
     if exit_code != 0 and ledger_lines_after_runner == ledger_lines_before_runner:
         _record_bridge_charge(
-            attempt="issue60-continuation-runtime-stop-0001",
+            attempt=f"issue60-continuation-runtime-stop-{attempt_number:04d}",
             stage="issue60-authorized-continuation-stop",
             seconds=max(0.0, time.process_time() - runner_started) + 0.2,
             status="RESOURCE_BLOCKED" if exit_code == 75 else "FAILED",
@@ -290,6 +370,7 @@ def main() -> int:
         "schema_id": "issue60-continuation-lifecycle-v1",
         "state": "EXITED",
         "authorization_comment_id": AUTHORIZATION,
+        "attempt_number": attempt_number,
         "exit_code": exit_code,
         "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     })

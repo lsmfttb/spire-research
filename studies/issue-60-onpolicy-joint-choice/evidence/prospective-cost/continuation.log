@@ -1,0 +1,38 @@
+{"r2_resource_guard": {"accounted_before_stage": 5350.26097518, "process_cpu_limit": {"hard_limit_process_cpu_seconds": 174656, "mechanism": "RLIMIT_CPU", "soft_limit_process_cpu_seconds": 174626, "soft_signal_grace_seconds": 30}, "remaining_allowance_at_launch": 174649.25662123802, "stage": "train"}}
+Traceback (most recent call last):
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/continue_after_cost_bridge.py", line 300, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/continue_after_cost_bridge.py", line 259, in main
+    exit_code = int(bridge._run_continue())
+                    ~~~~~~~~~~~~~~~~~~~~^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 937, in _run_continue
+    return int(PARALLEL.main())
+               ~~~~~~~~~~~~~^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_study_parallel.py", line 677, in main
+    return R2.main()
+           ~~~~~~~^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_study_r2.py", line 226, in main
+    code = _run_original_stage(current, stage_start_cpu=time.process_time())
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_study_parallel.py", line 365, in tracked_stage
+    result = ORIGINAL_STAGE(stage, stage_start_cpu=stage_start_cpu)
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_cost_bridge.py", line 921, in reset_each_stage
+    return raw_stage(stage, stage_start_cpu=stage_start_cpu)
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_study_r2.py", line 124, in _run_original_stage
+    result = RUN_STUDY.main()
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_study.py", line 1240, in main
+    runtime = verify_runtime(config)
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_study.py", line 187, in verify_runtime
+    if _repo_head(native) != config["sources"]["native_commit"]:
+       ~~~~~~~~~~^^^^^^^^
+  File "/mnt/c/Users/lsmft/.codex/worktrees/issue60-cost-bridge/spire-research/studies/issue-60-onpolicy-joint-choice/run_study.py", line 166, in _repo_head
+    result = subprocess.run(
+        ["git", "-C", path, "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    )
+  File "/home/lsmft/stsrl-spikes/py313-torch/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['git', '-C', '/home/lsmft/sts_lightspeed-issue59', 'rev-parse', 'HEAD']' returned non-zero exit status 128.
+
+CONTINUATION_EXIT=
