@@ -12,6 +12,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -176,10 +177,14 @@ def main() -> int:
     prior_diagnostic_cpu = _prior_diagnostic_cpu(old_rows)
     producer_hashes = {name: _sha256(HERE / name) for name in PRODUCER_FILES}
     source_hashes = {name: _sha256(HERE / name) for name in COMPARISON_FILES}
-    source_commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=HERE, check=True,
-        capture_output=True, text=True,
-    ).stdout.strip()
+    source_commit = os.environ.get("ISSUE60_PRODUCER_COMMIT")
+    if source_commit is None:
+        source_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=HERE, check=True,
+            capture_output=True, text=True,
+        ).stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+        raise RuntimeError("ISSUE60_PRODUCER_COMMIT must name the exact 40-character producer commit")
     record: dict[str, Any] = {
         "schema_id": "issue60-guard-optimization-validation-v1",
         "status": "RUNNING", "attempt": attempt.name,
