@@ -342,6 +342,7 @@ def main() -> int:
         # these fixed diagnostic replays only, check actual cumulative limits
         # and safe in-flight completion reserves at each existing boundary.
         r2.enforce_budget = actual_budget_guard
+        run_study_r2.enforce_budget = actual_budget_guard
         run_study.budget_guard = lambda **kwargs: actual_budget_guard(**kwargs)
 
         original_r2_costs = r2.complete_game_costs
