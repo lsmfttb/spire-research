@@ -114,6 +114,19 @@ def _runtime_hooks() -> None:
             raise ResourceBudgetExceeded(
                 f"RESOURCE_BLOCKED: parallel/profile validation exceeded {MAX_VALIDATION_CPU_SECONDS:.0f} CPU-s"
             )
+        if STAGE == "parallel-validation":
+            # Planner explicitly authorized up to 500 CPU-s of read-only
+            # fixed-key profiling even when the unchanged future-grid forecast
+            # blocks formal training. The cumulative actual Builder cap and
+            # validation-specific in-flight reserve above still apply.
+            return {
+                "status": "PASS",
+                "scope": "bounded read-only parallel/profile validation",
+                "actual_builder_cpu_seconds": accounted,
+                "builder_budget_cpu_seconds": float(kwargs.get("builder_budget", 180_000.0)),
+                "validation_cpu_limit_seconds": MAX_VALIDATION_CPU_SECONDS,
+                "formal_grid_forecast_enforced": False,
+            }
         return BASE_ENFORCE(**kwargs)
 
     R2.enforce_budget = aggregate_enforce
@@ -295,6 +308,21 @@ def _profile_validation() -> dict[str, Any]:
     BASE_ENFORCE = R2.enforce_budget
     _runtime_hooks()
     assert DISPATCHER is not None
+    from resource_amendment_r2 import (
+        BUILDER_BUDGET_SECONDS, FORMAL_GAME_COUNT, STATIC_ALLOWANCE_SECONDS,
+        _ledger_total, build_forecast, complete_game_costs,
+    )
+    formal_observations = complete_game_costs(HERE)
+    completed_formal_games = sum(row["stage_key"] != "preflight" for row in formal_observations)
+    formal_optimizer = run_study._remaining_optimizer_projection()
+    formal_grid_forecast = build_forecast(
+        costs=[float(row["process_cpu_seconds"]) for row in formal_observations],
+        remaining_games=max(0, FORMAL_GAME_COUNT - completed_formal_games),
+        remaining_optimizer_cpu=float(formal_optimizer),
+        accounted_cpu=(STATIC_ALLOWANCE_SECONDS + _ledger_total(HERE)
+                       + TRACKER.current_stage_cpu()),
+        builder_budget=BUILDER_BUDGET_SECONDS,
+    )
     config_digest = run_study.config_sha()
     tasks = []
     for seed in (660001, 660046):
@@ -405,6 +433,11 @@ def _profile_validation() -> dict[str, Any]:
         "host": runtime_host,
         "parallel_validation": DISPATCHER.evidence(),
         "worker_selection": worker_selection,
+        "formal_grid_forecast_at_validation": formal_grid_forecast,
+        "formal_grid_forecast_policy": (
+            "reported but not enforced for this explicitly authorized bounded diagnostic; "
+            "formal training/evaluation stages still enforce the complete-grid forecast"
+        ),
         "setup_validation_cpu_seconds": VALIDATION_SETUP_CPU,
         "profile_and_replay_stage_cpu_seconds": stage_cpu,
         "aggregate_validation_cpu_seconds": total_validation_cpu,
