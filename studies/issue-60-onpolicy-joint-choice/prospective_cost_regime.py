@@ -54,9 +54,32 @@ def sha256(path: Path) -> str:
 def git(root: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", "-C", str(root), *args], check=True,
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=_git_environment(root),
     )
     return result.stdout.strip()
+
+
+def _git_environment(root: Path) -> dict[str, str]:
+    """Keep WSL worktree overrides local to Git calls for this checkout."""
+    environment = os.environ.copy()
+    environment.pop("GIT_DIR", None)
+    environment.pop("GIT_WORK_TREE", None)
+    if os.name != "posix":
+        return environment
+    for candidate in (root, *root.parents):
+        git_file = candidate / ".git"
+        if not git_file.is_file():
+            continue
+        marker = git_file.read_text(encoding="utf-8").strip().removeprefix("gitdir:").strip()
+        if len(marker) >= 4 and marker[1:3] == ":/":
+            worktree_git_dir = subprocess.run(
+                ["wslpath", "-u", marker], check=True,
+                capture_output=True, text=True,
+            ).stdout.strip()
+            environment["GIT_DIR"] = worktree_git_dir
+            environment["GIT_WORK_TREE"] = str(candidate)
+        break
+    return environment
 
 
 def producer_manifest(root: Path) -> dict[str, str]:
@@ -179,7 +202,10 @@ def load_cost_tags(root: Path, *, current_manifest: Mapping[str, str]) -> list[d
 
 
 def git_bytes(root: Path, *args: str) -> bytes:
-    result = subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+    result = subprocess.run(
+        ["git", "-C", str(root), *args], check=True, capture_output=True,
+        env=_git_environment(root),
+    )
     return result.stdout
 
 
