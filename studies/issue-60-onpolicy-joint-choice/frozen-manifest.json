@@ -1,6 +1,6 @@
 {
   "base_commit": "9525d416b9488bb2455435699893b03fe19fe30a",
-  "config_sha256": "abd599e6f819096f5df9f02292d3ec4209f6b93a218991b3123d1a3c857fc116",
+  "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
   "files": [
     {
       "path": "adapter_v47.py",
@@ -16,7 +16,7 @@
     },
     {
       "path": "config.json",
-      "sha256": "abd599e6f819096f5df9f02292d3ec4209f6b93a218991b3123d1a3c857fc116"
+      "sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca"
     },
     {
       "path": "controllers.py",
@@ -28,7 +28,7 @@
     },
     {
       "path": "freeze_manifest.py",
-      "sha256": "5e055bb563a60e526a0f9f3b427989b1b69e13c52eb069097267797c275b2fff"
+      "sha256": "129d225b62e70b440714da118b98bf4a8019dd0650ce0b6b23aa70c8226d8659"
     },
     {
       "path": "model.py",
@@ -40,11 +40,15 @@
     },
     {
       "path": "preflight_witness.py",
-      "sha256": "2c3e6083d67e98d5fd764da9fe9d4bf48c1db455d7b4c1c38fbd2fe47b5e19bc"
+      "sha256": "5cec2d8d4c1afa51c52f5bd24825aa0a7864b57e6a3f2142171a8ff39a950d8c"
+    },
+    {
+      "path": "public_resources.py",
+      "sha256": "64c7b041dfdae2f777cf5195d7d33527618223cb1d48ab8bf0e054b5e0c25c23"
     },
     {
       "path": "run_study.py",
-      "sha256": "b00e351ce708d9e73bbecf77e3a64a0cb27050855f80a8572cd4b96b7886b4e1"
+      "sha256": "91559cddb2e2758d19aa1c5e063d03189b9b29f15c9616ba51e6f0a57c425c16"
     },
     {
       "path": "trainer.py",
@@ -56,7 +60,7 @@
     }
   ],
   "freeze_rule": "No code, config, schema, vocabulary, or checkpoint bytes may change after a simulator preflight game.",
-  "implementation_commit": "ab97f34c71c206d15f00cf4571050c0d67f63618",
+  "implementation_commit": "a7e8593558e6817d2ed34a5cd6bd2d5bd0a98768",
   "issue": 60,
   "purpose": "STUDY_ONLY",
   "schema_id": "issue60-frozen-manifest-v1",
