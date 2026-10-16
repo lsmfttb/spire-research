@@ -22,13 +22,13 @@ def _sha(path: Path) -> str:
 
 def main() -> None:
     status = subprocess.run(
-        ["git", "-C", str(HERE), "status", "--porcelain"],
+        ["git", "-c", f"safe.directory={HERE}", "-C", str(HERE), "status", "--porcelain"],
         check=True, capture_output=True, text=True,
     ).stdout
     if status:
         raise SystemExit("commit the complete source/config first; worktree must be clean before freezing")
     implementation_commit = subprocess.run(
-        ["git", "-C", str(HERE), "rev-parse", "HEAD"],
+        ["git", "-c", f"safe.directory={HERE}", "-C", str(HERE), "rev-parse", "HEAD"],
         check=True, capture_output=True, text=True,
     ).stdout.strip()
     config = json.loads((HERE / "config.json").read_text(encoding="utf-8"))
