@@ -496,8 +496,19 @@ def _bridge_start_record(run_study: Any, model_sha: str, config_sha: str) -> dic
 
 def _run_focused_tests() -> dict[str, Any]:
     import test_prospective_cost_regime
-    suite = unittest.defaultTestLoader.loadTestsFromModule(test_prospective_cost_regime)
-    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    # The runner may need GIT_DIR/GIT_WORK_TREE to compensate for this
+    # Windows-managed worktree's metadata path when running under WSL.  Tests
+    # create temporary fixture repositories, so isolate those subprocesses
+    # from the active checkout's Git environment.
+    saved_git_env = {name: os.environ.pop(name, None)
+                     for name in ("GIT_DIR", "GIT_WORK_TREE")}
+    try:
+        suite = unittest.defaultTestLoader.loadTestsFromModule(test_prospective_cost_regime)
+        result = unittest.TextTestRunner(verbosity=2).run(suite)
+    finally:
+        for name, value in saved_git_env.items():
+            if value is not None:
+                os.environ[name] = value
     if not result.wasSuccessful():
         raise CostRegimeError("focused prospective cost-regime tests failed")
     return {"status": "PASS", "test_count": result.testsRun}
