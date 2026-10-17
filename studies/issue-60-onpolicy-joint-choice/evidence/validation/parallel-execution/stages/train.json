@@ -1,34 +1,1657 @@
 {
-  "aggregate_process_cpu_seconds": 3.1683871970000004,
-  "execution_count": 0,
-  "executions": [],
+  "aggregate_process_cpu_seconds": 18046.250646092005,
+  "execution_count": 116,
+  "executions": [
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660129/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1563795456,
+      "pid": 2133,
+      "process_cpu_seconds_including_worker_setup": 68.172575,
+      "run_game_cpu_seconds": 68.12820986599999,
+      "task_key": [
+        "block1:batch-02",
+        660129,
+        "residual"
+      ],
+      "wall_seconds": 348.4015482580003
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660130/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1565499392,
+      "pid": 2134,
+      "process_cpu_seconds_including_worker_setup": 87.955555,
+      "run_game_cpu_seconds": 87.908145283,
+      "task_key": [
+        "block1:batch-02",
+        660130,
+        "residual"
+      ],
+      "wall_seconds": 446.52402527899994
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660132/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1564704768,
+      "pid": 3644,
+      "process_cpu_seconds_including_worker_setup": 79.656808,
+      "run_game_cpu_seconds": 79.612362722,
+      "task_key": [
+        "block1:batch-02",
+        660132,
+        "residual"
+      ],
+      "wall_seconds": 419.49478634299976
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660131/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1567735808,
+      "pid": 3199,
+      "process_cpu_seconds_including_worker_setup": 124.751841,
+      "run_game_cpu_seconds": 124.70545640300001,
+      "task_key": [
+        "block1:batch-02",
+        660131,
+        "residual"
+      ],
+      "wall_seconds": 625.8442965300001
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660133/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1566154752,
+      "pid": 7722,
+      "process_cpu_seconds_including_worker_setup": 92.946708,
+      "run_game_cpu_seconds": 92.90175628300001,
+      "task_key": [
+        "block1:batch-02",
+        660133,
+        "residual"
+      ],
+      "wall_seconds": 473.70460605300013
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660134/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1566679040,
+      "pid": 7945,
+      "process_cpu_seconds_including_worker_setup": 94.46001000000001,
+      "run_game_cpu_seconds": 94.409750098,
+      "task_key": [
+        "block1:batch-02",
+        660134,
+        "residual"
+      ],
+      "wall_seconds": 471.86902695100025
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660135/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1569169408,
+      "pid": 9626,
+      "process_cpu_seconds_including_worker_setup": 130.316968,
+      "run_game_cpu_seconds": 130.269118029,
+      "task_key": [
+        "block1:batch-02",
+        660135,
+        "residual"
+      ],
+      "wall_seconds": 658.6820135610001
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660136/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1570742272,
+      "pid": 10397,
+      "process_cpu_seconds_including_worker_setup": 167.618843,
+      "run_game_cpu_seconds": 167.561491302,
+      "task_key": [
+        "block1:batch-02",
+        660136,
+        "residual"
+      ],
+      "wall_seconds": 836.0763900190004
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660137/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1566392320,
+      "pid": 11496,
+      "process_cpu_seconds_including_worker_setup": 92.051504,
+      "run_game_cpu_seconds": 92.008852741,
+      "task_key": [
+        "block1:batch-02",
+        660137,
+        "residual"
+      ],
+      "wall_seconds": 509.37522029699994
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660138/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1565040640,
+      "pid": 12772,
+      "process_cpu_seconds_including_worker_setup": 57.53717400000001,
+      "run_game_cpu_seconds": 57.492792314,
+      "task_key": [
+        "block1:batch-02",
+        660138,
+        "residual"
+      ],
+      "wall_seconds": 322.7106295120002
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660139/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1565708288,
+      "pid": 13722,
+      "process_cpu_seconds_including_worker_setup": 57.306599000000006,
+      "run_game_cpu_seconds": 57.256928289,
+      "task_key": [
+        "block1:batch-02",
+        660139,
+        "residual"
+      ],
+      "wall_seconds": 302.39515769800073
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660141/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1568956416,
+      "pid": 14265,
+      "process_cpu_seconds_including_worker_setup": 101.84201300000001,
+      "run_game_cpu_seconds": 101.796681506,
+      "task_key": [
+        "block1:batch-02",
+        660141,
+        "residual"
+      ],
+      "wall_seconds": 512.5852251030001
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660140/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1570541568,
+      "pid": 13868,
+      "process_cpu_seconds_including_worker_setup": 154.635672,
+      "run_game_cpu_seconds": 154.590508973,
+      "task_key": [
+        "block1:batch-02",
+        660140,
+        "residual"
+      ],
+      "wall_seconds": 758.3030147989994
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660142/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1571381248,
+      "pid": 14444,
+      "process_cpu_seconds_including_worker_setup": 118.13733099999999,
+      "run_game_cpu_seconds": 118.090886174,
+      "task_key": [
+        "block1:batch-02",
+        660142,
+        "residual"
+      ],
+      "wall_seconds": 586.2302475059996
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660143/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1571553280,
+      "pid": 14445,
+      "process_cpu_seconds_including_worker_setup": 138.838063,
+      "run_game_cpu_seconds": 138.79292746000002,
+      "task_key": [
+        "block1:batch-02",
+        660143,
+        "residual"
+      ],
+      "wall_seconds": 690.8950548160001
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660144/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1568833536,
+      "pid": 14483,
+      "process_cpu_seconds_including_worker_setup": 88.185809,
+      "run_game_cpu_seconds": 88.141275562,
+      "task_key": [
+        "block1:batch-02",
+        660144,
+        "residual"
+      ],
+      "wall_seconds": 454.26603759200043
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660145/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1571667968,
+      "pid": 14484,
+      "process_cpu_seconds_including_worker_setup": 128.934905,
+      "run_game_cpu_seconds": 128.888992676,
+      "task_key": [
+        "block1:batch-02",
+        660145,
+        "residual"
+      ],
+      "wall_seconds": 647.0713115529998
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660146/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1571205120,
+      "pid": 14493,
+      "process_cpu_seconds_including_worker_setup": 131.68683299999998,
+      "run_game_cpu_seconds": 131.64130483099999,
+      "task_key": [
+        "block1:batch-02",
+        660146,
+        "residual"
+      ],
+      "wall_seconds": 678.5288858630001
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660147/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1571172352,
+      "pid": 14723,
+      "process_cpu_seconds_including_worker_setup": 113.73084599999999,
+      "run_game_cpu_seconds": 113.682280261,
+      "task_key": [
+        "block1:batch-02",
+        660147,
+        "residual"
+      ],
+      "wall_seconds": 592.9621842080005
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660148/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1568481280,
+      "pid": 15733,
+      "process_cpu_seconds_including_worker_setup": 73.594806,
+      "run_game_cpu_seconds": 73.550238841,
+      "task_key": [
+        "block1:batch-02",
+        660148,
+        "residual"
+      ],
+      "wall_seconds": 385.8163313969999
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660150/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1570664448,
+      "pid": 16062,
+      "process_cpu_seconds_including_worker_setup": 96.38802899999999,
+      "run_game_cpu_seconds": 96.345780894,
+      "task_key": [
+        "block1:batch-02",
+        660150,
+        "residual"
+      ],
+      "wall_seconds": 503.9241867110004
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660149/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1572450304,
+      "pid": 16003,
+      "process_cpu_seconds_including_worker_setup": 149.741007,
+      "run_game_cpu_seconds": 149.696474979,
+      "task_key": [
+        "block1:batch-02",
+        660149,
+        "residual"
+      ],
+      "wall_seconds": 757.6305419190003
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660152/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1570447360,
+      "pid": 16069,
+      "process_cpu_seconds_including_worker_setup": 79.318067,
+      "run_game_cpu_seconds": 79.277021232,
+      "task_key": [
+        "block1:batch-02",
+        660152,
+        "residual"
+      ],
+      "wall_seconds": 421.87175061699963
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660151/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1573388288,
+      "pid": 16064,
+      "process_cpu_seconds_including_worker_setup": 120.70230000000001,
+      "run_game_cpu_seconds": 120.655964985,
+      "task_key": [
+        "block1:batch-02",
+        660151,
+        "residual"
+      ],
+      "wall_seconds": 619.5710667390003
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660154/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1571000320,
+      "pid": 16095,
+      "process_cpu_seconds_including_worker_setup": 72.73257100000001,
+      "run_game_cpu_seconds": 72.688178175,
+      "task_key": [
+        "block1:batch-02",
+        660154,
+        "residual"
+      ],
+      "wall_seconds": 384.5877398970006
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660153/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1571725312,
+      "pid": 16094,
+      "process_cpu_seconds_including_worker_setup": 91.451939,
+      "run_game_cpu_seconds": 91.40556787,
+      "task_key": [
+        "block1:batch-02",
+        660153,
+        "residual"
+      ],
+      "wall_seconds": 482.9847100679999
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660156/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1570934784,
+      "pid": 16097,
+      "process_cpu_seconds_including_worker_setup": 71.03277299999999,
+      "run_game_cpu_seconds": 70.987628415,
+      "task_key": [
+        "block1:batch-02",
+        660156,
+        "residual"
+      ],
+      "wall_seconds": 383.209802106001
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660155/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1573736448,
+      "pid": 16096,
+      "process_cpu_seconds_including_worker_setup": 119.286249,
+      "run_game_cpu_seconds": 119.23919318600001,
+      "task_key": [
+        "block1:batch-02",
+        660155,
+        "residual"
+      ],
+      "wall_seconds": 617.189099403
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660157/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1570070528,
+      "pid": 16125,
+      "process_cpu_seconds_including_worker_setup": 54.866803000000004,
+      "run_game_cpu_seconds": 54.824932146,
+      "task_key": [
+        "block1:batch-02",
+        660157,
+        "residual"
+      ],
+      "wall_seconds": 300.42117000299913
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660158/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1575354368,
+      "pid": 16127,
+      "process_cpu_seconds_including_worker_setup": 200.50741399999998,
+      "run_game_cpu_seconds": 200.458769178,
+      "task_key": [
+        "block1:batch-02",
+        660158,
+        "residual"
+      ],
+      "wall_seconds": 972.398401026001
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660159/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1577242624,
+      "pid": 16128,
+      "process_cpu_seconds_including_worker_setup": 234.653009,
+      "run_game_cpu_seconds": 234.60797005,
+      "task_key": [
+        "block1:batch-02",
+        660159,
+        "residual"
+      ],
+      "wall_seconds": 1130.268848617001
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660160/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1575219200,
+      "pid": 16160,
+      "process_cpu_seconds_including_worker_setup": 143.663023,
+      "run_game_cpu_seconds": 143.61821275,
+      "task_key": [
+        "block1:batch-02",
+        660160,
+        "residual"
+      ],
+      "wall_seconds": 731.6875447719995
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660161/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1576067072,
+      "pid": 16161,
+      "process_cpu_seconds_including_worker_setup": 171.519272,
+      "run_game_cpu_seconds": 171.47215617999998,
+      "task_key": [
+        "block1:batch-02",
+        660161,
+        "residual"
+      ],
+      "wall_seconds": 861.3830365470003
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660162/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1576570880,
+      "pid": 16189,
+      "process_cpu_seconds_including_worker_setup": 137.239521,
+      "run_game_cpu_seconds": 137.191761487,
+      "task_key": [
+        "block1:batch-02",
+        660162,
+        "residual"
+      ],
+      "wall_seconds": 708.1014820359997
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660164/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1574354944,
+      "pid": 16197,
+      "process_cpu_seconds_including_worker_setup": 82.316918,
+      "run_game_cpu_seconds": 82.271436432,
+      "task_key": [
+        "block1:batch-02",
+        660164,
+        "residual"
+      ],
+      "wall_seconds": 439.1653739320009
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660163/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1577234432,
+      "pid": 16191,
+      "process_cpu_seconds_including_worker_setup": 221.354626,
+      "run_game_cpu_seconds": 221.305542211,
+      "task_key": [
+        "block1:batch-02",
+        660163,
+        "residual"
+      ],
+      "wall_seconds": 1101.7386011199997
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660165/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1574707200,
+      "pid": 16220,
+      "process_cpu_seconds_including_worker_setup": 91.800506,
+      "run_game_cpu_seconds": 91.757780756,
+      "task_key": [
+        "block1:batch-02",
+        660165,
+        "residual"
+      ],
+      "wall_seconds": 490.54957828700026
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660166/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1576124416,
+      "pid": 16221,
+      "process_cpu_seconds_including_worker_setup": 99.730695,
+      "run_game_cpu_seconds": 99.68860502,
+      "task_key": [
+        "block1:batch-02",
+        660166,
+        "residual"
+      ],
+      "wall_seconds": 524.5485218949998
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660168/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1574678528,
+      "pid": 16256,
+      "process_cpu_seconds_including_worker_setup": 75.346165,
+      "run_game_cpu_seconds": 75.302099924,
+      "task_key": [
+        "block1:batch-02",
+        660168,
+        "residual"
+      ],
+      "wall_seconds": 404.0232306079997
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660167/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1577541632,
+      "pid": 16250,
+      "process_cpu_seconds_including_worker_setup": 151.010586,
+      "run_game_cpu_seconds": 150.96687378800002,
+      "task_key": [
+        "block1:batch-02",
+        660167,
+        "residual"
+      ],
+      "wall_seconds": 772.6439191629997
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660169/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1577070592,
+      "pid": 16261,
+      "process_cpu_seconds_including_worker_setup": 95.318326,
+      "run_game_cpu_seconds": 95.270613691,
+      "task_key": [
+        "block1:batch-02",
+        660169,
+        "residual"
+      ],
+      "wall_seconds": 473.7330111580013
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660170/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1578065920,
+      "pid": 16262,
+      "process_cpu_seconds_including_worker_setup": 105.967606,
+      "run_game_cpu_seconds": 105.925838488,
+      "task_key": [
+        "block1:batch-02",
+        660170,
+        "residual"
+      ],
+      "wall_seconds": 529.459077862999
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660172/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1577578496,
+      "pid": 16287,
+      "process_cpu_seconds_including_worker_setup": 154.972385,
+      "run_game_cpu_seconds": 154.929477113,
+      "task_key": [
+        "block1:batch-02",
+        660172,
+        "residual"
+      ],
+      "wall_seconds": 798.7439457199998
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660171/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1580515328,
+      "pid": 16286,
+      "process_cpu_seconds_including_worker_setup": 235.885153,
+      "run_game_cpu_seconds": 235.834878756,
+      "task_key": [
+        "block1:batch-02",
+        660171,
+        "residual"
+      ],
+      "wall_seconds": 1160.1828921190008
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660173/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1576251392,
+      "pid": 16315,
+      "process_cpu_seconds_including_worker_setup": 68.011196,
+      "run_game_cpu_seconds": 67.96707579699999,
+      "task_key": [
+        "block1:batch-02",
+        660173,
+        "residual"
+      ],
+      "wall_seconds": 371.20670900700134
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660174/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1577734144,
+      "pid": 16317,
+      "process_cpu_seconds_including_worker_setup": 86.303416,
+      "run_game_cpu_seconds": 86.26196987399999,
+      "task_key": [
+        "block1:batch-02",
+        660174,
+        "residual"
+      ],
+      "wall_seconds": 453.9620537030005
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660175/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1579429888,
+      "pid": 16319,
+      "process_cpu_seconds_including_worker_setup": 129.414754,
+      "run_game_cpu_seconds": 129.36509655799998,
+      "task_key": [
+        "block1:batch-02",
+        660175,
+        "residual"
+      ],
+      "wall_seconds": 668.7052254169994
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660176/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1579466752,
+      "pid": 16346,
+      "process_cpu_seconds_including_worker_setup": 142.200725,
+      "run_game_cpu_seconds": 142.15446500500002,
+      "task_key": [
+        "block1:batch-02",
+        660176,
+        "residual"
+      ],
+      "wall_seconds": 740.188239502002
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660178/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1578258432,
+      "pid": 16348,
+      "process_cpu_seconds_including_worker_setup": 97.687569,
+      "run_game_cpu_seconds": 97.642287063,
+      "task_key": [
+        "block1:batch-02",
+        660178,
+        "residual"
+      ],
+      "wall_seconds": 522.1819527029984
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660177/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1579802624,
+      "pid": 16347,
+      "process_cpu_seconds_including_worker_setup": 206.417589,
+      "run_game_cpu_seconds": 206.369209388,
+      "task_key": [
+        "block1:batch-02",
+        660177,
+        "residual"
+      ],
+      "wall_seconds": 1044.851519953998
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660179/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1579593728,
+      "pid": 16381,
+      "process_cpu_seconds_including_worker_setup": 108.113056,
+      "run_game_cpu_seconds": 108.073087547,
+      "task_key": [
+        "block1:batch-02",
+        660179,
+        "residual"
+      ],
+      "wall_seconds": 572.9850408919992
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660180/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1580425216,
+      "pid": 16382,
+      "process_cpu_seconds_including_worker_setup": 157.337415,
+      "run_game_cpu_seconds": 157.293093881,
+      "task_key": [
+        "block1:batch-02",
+        660180,
+        "residual"
+      ],
+      "wall_seconds": 817.0514745379987
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660181/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1580134400,
+      "pid": 16421,
+      "process_cpu_seconds_including_worker_setup": 108.135922,
+      "run_game_cpu_seconds": 108.090457639,
+      "task_key": [
+        "block1:batch-02",
+        660181,
+        "residual"
+      ],
+      "wall_seconds": 575.7004008920012
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660182/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1580584960,
+      "pid": 16437,
+      "process_cpu_seconds_including_worker_setup": 123.16036,
+      "run_game_cpu_seconds": 123.113060151,
+      "task_key": [
+        "block1:batch-02",
+        660182,
+        "residual"
+      ],
+      "wall_seconds": 646.767478062
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660183/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1580310528,
+      "pid": 16438,
+      "process_cpu_seconds_including_worker_setup": 114.591261,
+      "run_game_cpu_seconds": 114.549607518,
+      "task_key": [
+        "block1:batch-02",
+        660183,
+        "residual"
+      ],
+      "wall_seconds": 609.2173169659982
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660184/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1581772800,
+      "pid": 16574,
+      "process_cpu_seconds_including_worker_setup": 123.13772499999999,
+      "run_game_cpu_seconds": 123.09193476,
+      "task_key": [
+        "block1:batch-02",
+        660184,
+        "residual"
+      ],
+      "wall_seconds": 644.5417134889976
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660185/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1581977600,
+      "pid": 16575,
+      "process_cpu_seconds_including_worker_setup": 177.148643,
+      "run_game_cpu_seconds": 177.105330228,
+      "task_key": [
+        "block1:batch-02",
+        660185,
+        "residual"
+      ],
+      "wall_seconds": 905.506199012998
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660186/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1581850624,
+      "pid": 16601,
+      "process_cpu_seconds_including_worker_setup": 112.195831,
+      "run_game_cpu_seconds": 112.153048074,
+      "task_key": [
+        "block1:batch-02",
+        660186,
+        "residual"
+      ],
+      "wall_seconds": 595.4212359390003
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660188/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1581240320,
+      "pid": 16604,
+      "process_cpu_seconds_including_worker_setup": 100.681201,
+      "run_game_cpu_seconds": 100.634176332,
+      "task_key": [
+        "block1:batch-02",
+        660188,
+        "residual"
+      ],
+      "wall_seconds": 533.0083621319973
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660187/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1581879296,
+      "pid": 16603,
+      "process_cpu_seconds_including_worker_setup": 178.58801599999998,
+      "run_game_cpu_seconds": 178.537054955,
+      "task_key": [
+        "block1:batch-02",
+        660187,
+        "residual"
+      ],
+      "wall_seconds": 911.7211206189968
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660189/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1582133248,
+      "pid": 16632,
+      "process_cpu_seconds_including_worker_setup": 140.179895,
+      "run_game_cpu_seconds": 140.13421990199998,
+      "task_key": [
+        "block1:batch-02",
+        660189,
+        "residual"
+      ],
+      "wall_seconds": 730.1215026409991
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660190/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1582845952,
+      "pid": 16638,
+      "process_cpu_seconds_including_worker_setup": 143.775944,
+      "run_game_cpu_seconds": 143.73117568199999,
+      "task_key": [
+        "block1:batch-02",
+        660190,
+        "residual"
+      ],
+      "wall_seconds": 745.2382898770011
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660191/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1582432256,
+      "pid": 16665,
+      "process_cpu_seconds_including_worker_setup": 129.8207,
+      "run_game_cpu_seconds": 129.77808548399997,
+      "task_key": [
+        "block1:batch-02",
+        660191,
+        "residual"
+      ],
+      "wall_seconds": 687.7184967520006
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660192/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1582690304,
+      "pid": 16667,
+      "process_cpu_seconds_including_worker_setup": 148.48002200000002,
+      "run_game_cpu_seconds": 148.43842225999998,
+      "task_key": [
+        "block1:batch-02",
+        660192,
+        "residual"
+      ],
+      "wall_seconds": 781.0397607389968
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660194/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1582985216,
+      "pid": 16669,
+      "process_cpu_seconds_including_worker_setup": 90.551309,
+      "run_game_cpu_seconds": 90.50607120000001,
+      "task_key": [
+        "block1:batch-02",
+        660194,
+        "residual"
+      ],
+      "wall_seconds": 487.0483192950014
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660193/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1585033216,
+      "pid": 16668,
+      "process_cpu_seconds_including_worker_setup": 197.581346,
+      "run_game_cpu_seconds": 197.531068997,
+      "task_key": [
+        "block1:batch-02",
+        660193,
+        "residual"
+      ],
+      "wall_seconds": 1012.5264504859988
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660196/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1583529984,
+      "pid": 16722,
+      "process_cpu_seconds_including_worker_setup": 134.333887,
+      "run_game_cpu_seconds": 134.28675281000002,
+      "task_key": [
+        "block1:batch-02",
+        660196,
+        "residual"
+      ],
+      "wall_seconds": 718.6953104990025
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660195/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1585197056,
+      "pid": 16698,
+      "process_cpu_seconds_including_worker_setup": 209.200684,
+      "run_game_cpu_seconds": 209.151469749,
+      "task_key": [
+        "block1:batch-02",
+        660195,
+        "residual"
+      ],
+      "wall_seconds": 1074.7023198140014
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660197/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1584947200,
+      "pid": 16727,
+      "process_cpu_seconds_including_worker_setup": 99.99903900000001,
+      "run_game_cpu_seconds": 99.954836051,
+      "task_key": [
+        "block1:batch-02",
+        660197,
+        "residual"
+      ],
+      "wall_seconds": 533.3779404259985
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660198/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1584631808,
+      "pid": 16728,
+      "process_cpu_seconds_including_worker_setup": 137.1792,
+      "run_game_cpu_seconds": 137.131493674,
+      "task_key": [
+        "block1:batch-02",
+        660198,
+        "residual"
+      ],
+      "wall_seconds": 721.8356738549992
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660199/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1589133312,
+      "pid": 16761,
+      "process_cpu_seconds_including_worker_setup": 262.992549,
+      "run_game_cpu_seconds": 262.946005846,
+      "task_key": [
+        "block1:batch-02",
+        660199,
+        "residual"
+      ],
+      "wall_seconds": 1322.9134341360004
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660200/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1587441664,
+      "pid": 16763,
+      "process_cpu_seconds_including_worker_setup": 233.960033,
+      "run_game_cpu_seconds": 233.909767305,
+      "task_key": [
+        "block1:batch-02",
+        660200,
+        "residual"
+      ],
+      "wall_seconds": 1192.0892339180027
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660201/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1585799168,
+      "pid": 16791,
+      "process_cpu_seconds_including_worker_setup": 93.457617,
+      "run_game_cpu_seconds": 93.412334718,
+      "task_key": [
+        "block1:batch-02",
+        660201,
+        "residual"
+      ],
+      "wall_seconds": 503.4292309250013
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660202/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1588920320,
+      "pid": 16792,
+      "process_cpu_seconds_including_worker_setup": 229.41978699999999,
+      "run_game_cpu_seconds": 229.37102588599998,
+      "task_key": [
+        "block1:batch-02",
+        660202,
+        "residual"
+      ],
+      "wall_seconds": 1164.1394093659983
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660203/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1588629504,
+      "pid": 16820,
+      "process_cpu_seconds_including_worker_setup": 233.68815899999998,
+      "run_game_cpu_seconds": 233.64248572099999,
+      "task_key": [
+        "block1:batch-02",
+        660203,
+        "residual"
+      ],
+      "wall_seconds": 1190.4450972269988
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660205/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1586671616,
+      "pid": 17086,
+      "process_cpu_seconds_including_worker_setup": 133.86475,
+      "run_game_cpu_seconds": 133.821691471,
+      "task_key": [
+        "block1:batch-02",
+        660205,
+        "residual"
+      ],
+      "wall_seconds": 705.9552689509983
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660204/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1587351552,
+      "pid": 17085,
+      "process_cpu_seconds_including_worker_setup": 199.127001,
+      "run_game_cpu_seconds": 199.081052624,
+      "task_key": [
+        "block1:batch-02",
+        660204,
+        "residual"
+      ],
+      "wall_seconds": 1031.844212942
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660206/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1587015680,
+      "pid": 17119,
+      "process_cpu_seconds_including_worker_setup": 124.76524699999999,
+      "run_game_cpu_seconds": 124.723742872,
+      "task_key": [
+        "block1:batch-02",
+        660206,
+        "residual"
+      ],
+      "wall_seconds": 649.8257520200023
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660207/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1587777536,
+      "pid": 17120,
+      "process_cpu_seconds_including_worker_setup": 183.90742,
+      "run_game_cpu_seconds": 183.857858096,
+      "task_key": [
+        "block1:batch-02",
+        660207,
+        "residual"
+      ],
+      "wall_seconds": 937.2808190510004
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660209/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1587335168,
+      "pid": 17150,
+      "process_cpu_seconds_including_worker_setup": 149.132503,
+      "run_game_cpu_seconds": 149.08845011300002,
+      "task_key": [
+        "block1:batch-02",
+        660209,
+        "residual"
+      ],
+      "wall_seconds": 769.8913110719986
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660208/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1589551104,
+      "pid": 17148,
+      "process_cpu_seconds_including_worker_setup": 228.28852,
+      "run_game_cpu_seconds": 228.238781973,
+      "task_key": [
+        "block1:batch-02",
+        660208,
+        "residual"
+      ],
+      "wall_seconds": 1156.708144903001
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660211/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1588256768,
+      "pid": 17179,
+      "process_cpu_seconds_including_worker_setup": 183.23848800000002,
+      "run_game_cpu_seconds": 183.192918905,
+      "task_key": [
+        "block1:batch-02",
+        660211,
+        "residual"
+      ],
+      "wall_seconds": 917.3697736159993
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660210/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1591427072,
+      "pid": 17151,
+      "process_cpu_seconds_including_worker_setup": 242.069844,
+      "run_game_cpu_seconds": 242.02062325100002,
+      "task_key": [
+        "block1:batch-02",
+        660210,
+        "residual"
+      ],
+      "wall_seconds": 1191.1804695770006
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660213/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1588191232,
+      "pid": 17235,
+      "process_cpu_seconds_including_worker_setup": 77.206457,
+      "run_game_cpu_seconds": 77.1620697,
+      "task_key": [
+        "block1:batch-02",
+        660213,
+        "residual"
+      ],
+      "wall_seconds": 414.28560629399726
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660212/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1588105216,
+      "pid": 17221,
+      "process_cpu_seconds_including_worker_setup": 148.135609,
+      "run_game_cpu_seconds": 148.09249336,
+      "task_key": [
+        "block1:batch-02",
+        660212,
+        "residual"
+      ],
+      "wall_seconds": 774.4639806019986
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660214/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1589055488,
+      "pid": 17240,
+      "process_cpu_seconds_including_worker_setup": 195.391695,
+      "run_game_cpu_seconds": 195.347831978,
+      "task_key": [
+        "block1:batch-02",
+        660214,
+        "residual"
+      ],
+      "wall_seconds": 989.8216755079993
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660215/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1588944896,
+      "pid": 17241,
+      "process_cpu_seconds_including_worker_setup": 172.891159,
+      "run_game_cpu_seconds": 172.842903409,
+      "task_key": [
+        "block1:batch-02",
+        660215,
+        "residual"
+      ],
+      "wall_seconds": 883.0159777349982
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660217/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1589383168,
+      "pid": 17298,
+      "process_cpu_seconds_including_worker_setup": 192.15289,
+      "run_game_cpu_seconds": 192.100697255,
+      "task_key": [
+        "block1:batch-02",
+        660217,
+        "residual"
+      ],
+      "wall_seconds": 977.4525440770012
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660216/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1592606720,
+      "pid": 17297,
+      "process_cpu_seconds_including_worker_setup": 279.769456,
+      "run_game_cpu_seconds": 279.718919235,
+      "task_key": [
+        "block1:batch-02",
+        660216,
+        "residual"
+      ],
+      "wall_seconds": 1393.4159409819986
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660219/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1589272576,
+      "pid": 17350,
+      "process_cpu_seconds_including_worker_setup": 113.95841899999999,
+      "run_game_cpu_seconds": 113.906946972,
+      "task_key": [
+        "block1:batch-02",
+        660219,
+        "residual"
+      ],
+      "wall_seconds": 605.9269827929966
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660218/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1593520128,
+      "pid": 17300,
+      "process_cpu_seconds_including_worker_setup": 287.612371,
+      "run_game_cpu_seconds": 287.561071187,
+      "task_key": [
+        "block1:batch-02",
+        660218,
+        "residual"
+      ],
+      "wall_seconds": 1445.6391674109982
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660220/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1592872960,
+      "pid": 17436,
+      "process_cpu_seconds_including_worker_setup": 257.999375,
+      "run_game_cpu_seconds": 257.94766654399996,
+      "task_key": [
+        "block1:batch-02",
+        660220,
+        "residual"
+      ],
+      "wall_seconds": 1298.6046350519973
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660221/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1594101760,
+      "pid": 18243,
+      "process_cpu_seconds_including_worker_setup": 276.262511,
+      "run_game_cpu_seconds": 276.20543676299997,
+      "task_key": [
+        "block1:batch-02",
+        660221,
+        "residual"
+      ],
+      "wall_seconds": 1375.7682448089981
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660222/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1593933824,
+      "pid": 18434,
+      "process_cpu_seconds_including_worker_setup": 253.567016,
+      "run_game_cpu_seconds": 253.51279484600002,
+      "task_key": [
+        "block1:batch-02",
+        660222,
+        "residual"
+      ],
+      "wall_seconds": 1286.0457849569939
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660223/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1592000512,
+      "pid": 18441,
+      "process_cpu_seconds_including_worker_setup": 178.348142,
+      "run_game_cpu_seconds": 178.296736032,
+      "task_key": [
+        "block1:batch-02",
+        660223,
+        "residual"
+      ],
+      "wall_seconds": 911.3892278229978
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660224/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1591046144,
+      "pid": 18443,
+      "process_cpu_seconds_including_worker_setup": 129.839462,
+      "run_game_cpu_seconds": 129.79120133199999,
+      "task_key": [
+        "block1:batch-02",
+        660224,
+        "residual"
+      ],
+      "wall_seconds": 676.0424507969947
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660225/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1596628992,
+      "pid": 18444,
+      "process_cpu_seconds_including_worker_setup": 284.441338,
+      "run_game_cpu_seconds": 284.386856636,
+      "task_key": [
+        "block1:batch-02",
+        660225,
+        "residual"
+      ],
+      "wall_seconds": 1410.879574423001
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660226/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1592553472,
+      "pid": 18653,
+      "process_cpu_seconds_including_worker_setup": 190.829819,
+      "run_game_cpu_seconds": 190.777205031,
+      "task_key": [
+        "block1:batch-02",
+        660226,
+        "residual"
+      ],
+      "wall_seconds": 986.4148367250018
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660227/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1592360960,
+      "pid": 18670,
+      "process_cpu_seconds_including_worker_setup": 200.359493,
+      "run_game_cpu_seconds": 200.308768828,
+      "task_key": [
+        "block1:batch-02",
+        660227,
+        "residual"
+      ],
+      "wall_seconds": 1020.1189050879984
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660228/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1596678144,
+      "pid": 18671,
+      "process_cpu_seconds_including_worker_setup": 272.158825,
+      "run_game_cpu_seconds": 272.10621566599997,
+      "task_key": [
+        "block1:batch-02",
+        660228,
+        "residual"
+      ],
+      "wall_seconds": 1351.7783496610064
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660229/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1592102912,
+      "pid": 18724,
+      "process_cpu_seconds_including_worker_setup": 125.965969,
+      "run_game_cpu_seconds": 125.919923236,
+      "task_key": [
+        "block1:batch-02",
+        660229,
+        "residual"
+      ],
+      "wall_seconds": 659.4732805730018
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660230/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1592532992,
+      "pid": 18730,
+      "process_cpu_seconds_including_worker_setup": 170.210785,
+      "run_game_cpu_seconds": 170.15221592400002,
+      "task_key": [
+        "block1:batch-02",
+        660230,
+        "residual"
+      ],
+      "wall_seconds": 870.128589427004
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660231/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1593909248,
+      "pid": 18731,
+      "process_cpu_seconds_including_worker_setup": 177.540583,
+      "run_game_cpu_seconds": 177.49233929899998,
+      "task_key": [
+        "block1:batch-02",
+        660231,
+        "residual"
+      ],
+      "wall_seconds": 903.9434809640006
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660232/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1592983552,
+      "pid": 18732,
+      "process_cpu_seconds_including_worker_setup": 141.690853,
+      "run_game_cpu_seconds": 141.63700063500002,
+      "task_key": [
+        "block1:batch-02",
+        660232,
+        "residual"
+      ],
+      "wall_seconds": 735.0034173250024
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660233/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1593106432,
+      "pid": 18784,
+      "process_cpu_seconds_including_worker_setup": 131.242692,
+      "run_game_cpu_seconds": 131.194961759,
+      "task_key": [
+        "block1:batch-02",
+        660233,
+        "residual"
+      ],
+      "wall_seconds": 685.772123761999
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660234/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1593753600,
+      "pid": 18790,
+      "process_cpu_seconds_including_worker_setup": 140.254964,
+      "run_game_cpu_seconds": 140.206993832,
+      "task_key": [
+        "block1:batch-02",
+        660234,
+        "residual"
+      ],
+      "wall_seconds": 729.0785541090008
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660235/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1594216448,
+      "pid": 18791,
+      "process_cpu_seconds_including_worker_setup": 170.92169,
+      "run_game_cpu_seconds": 170.868719077,
+      "task_key": [
+        "block1:batch-02",
+        660235,
+        "residual"
+      ],
+      "wall_seconds": 884.6450907180042
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660236/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1593655296,
+      "pid": 18838,
+      "process_cpu_seconds_including_worker_setup": 147.48986000000002,
+      "run_game_cpu_seconds": 147.437761023,
+      "task_key": [
+        "block1:batch-02",
+        660236,
+        "residual"
+      ],
+      "wall_seconds": 774.5829073630011
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660237/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1593569280,
+      "pid": 18873,
+      "process_cpu_seconds_including_worker_setup": 155.574435,
+      "run_game_cpu_seconds": 155.52812008499998,
+      "task_key": [
+        "block1:batch-02",
+        660237,
+        "residual"
+      ],
+      "wall_seconds": 815.1456201580004
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660238/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1594290176,
+      "pid": 18902,
+      "process_cpu_seconds_including_worker_setup": 162.937798,
+      "run_game_cpu_seconds": 162.891667653,
+      "task_key": [
+        "block1:batch-02",
+        660238,
+        "residual"
+      ],
+      "wall_seconds": 854.2419759019976
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660240/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1594290176,
+      "pid": 18909,
+      "process_cpu_seconds_including_worker_setup": 164.526097,
+      "run_game_cpu_seconds": 164.47926341299998,
+      "task_key": [
+        "block1:batch-02",
+        660240,
+        "residual"
+      ],
+      "wall_seconds": 857.8114795189977
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660239/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1602899968,
+      "pid": 18907,
+      "process_cpu_seconds_including_worker_setup": 367.573442,
+      "run_game_cpu_seconds": 367.51564089,
+      "task_key": [
+        "block1:batch-02",
+        660239,
+        "residual"
+      ],
+      "wall_seconds": 1833.5391958549953
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660241/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1595486208,
+      "pid": 19387,
+      "process_cpu_seconds_including_worker_setup": 174.655616,
+      "run_game_cpu_seconds": 174.604838741,
+      "task_key": [
+        "block1:batch-02",
+        660241,
+        "residual"
+      ],
+      "wall_seconds": 918.2745712329997
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660242/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 1595555840,
+      "pid": 19393,
+      "process_cpu_seconds_including_worker_setup": 163.880474,
+      "run_game_cpu_seconds": 163.832559452,
+      "task_key": [
+        "block1:batch-02",
+        660242,
+        "residual"
+      ],
+      "wall_seconds": 853.9871655789975
+    },
+    {
+      "exit_code": 70,
+      "peak_rss_bytes": 1595224064,
+      "pid": 19401,
+      "process_cpu_seconds_including_worker_setup": 30.094831,
+      "run_game_cpu_seconds": null,
+      "task_key": [
+        "block1:batch-02",
+        660244,
+        "residual"
+      ],
+      "wall_seconds": 162.573228094996
+    },
+    {
+      "exit_code": 70,
+      "peak_rss_bytes": 1595265024,
+      "pid": 19399,
+      "process_cpu_seconds_including_worker_setup": 119.390181,
+      "run_game_cpu_seconds": null,
+      "task_key": [
+        "block1:batch-02",
+        660243,
+        "residual"
+      ],
+      "wall_seconds": 631.7817293699991
+    }
+  ],
   "host": {
     "cpu_model": "AMD Ryzen 7 H 255 W/ Radeon 780M",
     "cpu_quota_count": null,
     "cpus_allowed_list": "0-15",
     "effective_cpu_count": 16,
-    "effective_memory_available_bytes": 21358055424,
+    "effective_memory_available_bytes": 19061321728,
     "logical_cpu_count": 16,
-    "memory_available_bytes": 21358055424,
+    "memory_available_bytes": 19061321728,
     "memory_current_bytes": 0,
     "memory_limit_bytes": null,
-    "memory_total_bytes": 25199456256
+    "memory_total_bytes": 25199452160
   },
-  "max_active_workers": 0,
+  "max_active_workers": 2,
   "max_configured_workers": 2,
-  "parent_peak_rss_bytes": 300195840,
-  "parent_plus_worker_peak_rss_upper_bound_bytes": 300195840,
-  "parent_process_cpu_seconds": 3.1683871970000004,
+  "parent_peak_rss_bytes": 1666514944,
+  "parent_plus_worker_peak_rss_upper_bound_bytes": 4872314880,
+  "parent_process_cpu_seconds": 870.0719100919999,
   "schema_id": "issue60-parallel-stage-receipt-v1",
-  "source_commit": "f34c19db520144386550e03f02d251681bf9fd62",
+  "source_commit": "24837c48ed2c2b8cfe6dedb6b759b08f1243be54",
   "source_files": {
     "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
     "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9"
   },
   "stage": "train",
-  "status": "FAILED",
-  "wall_seconds": 23.498899735001032,
+  "status": "RESOURCE_BLOCKED",
+  "wall_seconds": 46453.539570328,
   "worker_count": 2,
-  "worker_peak_rss_bytes": 0,
-  "worker_process_cpu_seconds": 0.0
+  "worker_peak_rss_bytes": 1602899968,
+  "worker_process_cpu_seconds": 17176.178736000005
 }

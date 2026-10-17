@@ -36,3 +36,5 @@ Traceback (most recent call last):
 subprocess.CalledProcessError: Command '['git', '-C', '/home/lsmft/sts_lightspeed-issue59', 'rev-parse', 'HEAD']' returned non-zero exit status 128.
 
 CONTINUATION_EXIT=
+R2 resource stop: ResourceBudgetExceeded: RESOURCE_BLOCKED: prospective cached-regime forecast exceeds the unchanged caps: Builder=180001.833s, all-in=200001.833s
+{"r2_resource_guard": {"accounted_before_stage": 5363.636503138, "process_cpu_limit": {"hard_limit_process_cpu_seconds": 174643, "mechanism": "RLIMIT_CPU", "soft_limit_process_cpu_seconds": 174613, "soft_signal_grace_seconds": 30}, "remaining_allowance_at_launch": 174636.009269654, "stage": "train"}}
