@@ -1,0 +1,257 @@
+{
+  "actual_cost_index_unchanged": true,
+  "aggregate_cpu_seconds_including_reserves": 234.581046996,
+  "aggregate_stage_cpu_seconds": 51.51946906800001,
+  "aggregate_tracker_start_cpu": 3.816856186,
+  "attribution_report_path": "evidence/prospective-cost/continuation-cache-attribution.json",
+  "attribution_report_sha256": "279eaabcbb922d12f92db660890fddc788712224dd1593a08c6aa8a9be43e621",
+  "authorization_comment_id": 6231868984,
+  "before_decision_check_count": 268,
+  "builder_cpu_cap_seconds": 180000.0,
+  "cache_active_before_dispatch": true,
+  "cache_completed_formal_keys_after": 242,
+  "cache_completed_formal_keys_before": 242,
+  "cache_cost_observations_after": 250,
+  "cache_cost_observations_before": 250,
+  "cached_guard_install_order": [
+    "original-r2-runtime-hooks",
+    "cached-guard-installed"
+  ],
+  "checkpoint_model_sha256": "c05ffb91ed6cb702e9ad135afe3b537c1348f2da8e21958c38141404055bfbb5",
+  "code_and_test_reserve_cpu_seconds": 60.0,
+  "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+  "cost_index_sha256_after": "9d42c8e76e17dc8a372ba4cc1454971d9ab3cae213112dff0718720f63176bf0",
+  "cost_index_sha256_before": "9d42c8e76e17dc8a372ba4cc1454971d9ab3cae213112dff0718720f63176bf0",
+  "cumulative_builder_cpu_seconds_after_charge": 23644.469044763006,
+  "cumulative_process_cpu_cap_seconds": 200000.0,
+  "current_attempt_cpu_seconds_including_reserves": 141.900609459,
+  "diagnostic_attempt_number": 2,
+  "diagnostic_cpu_ledger": [
+    {
+      "accounting": "continuation setup and parent-stage CPU plus 30 CPU-s conservative code/focused-check reserve and 30 CPU-s finalization reserve; worker CPU is charged once by the parallel stage receipt",
+      "attempt": "issue60-continuation-cached-guard-diagnostic-0001",
+      "authorization_comment_id": 6231868984,
+      "process_cpu_seconds": 92.680437537,
+      "source_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+      "stage": "issue60-cached-guard-diagnostic-parent-and-preparation",
+      "status": "FAILED",
+      "timestamp_utc": "2026-10-17T09:21:59Z"
+    },
+    {
+      "accounting": "wait4 child user+system CPU, each reaped worker exactly once",
+      "process_cpu_seconds": 49.131381000000005,
+      "stage": "issue60-cached-guard-diagnostic-attempt-0002-parallel-workers",
+      "status": "COMPLETE",
+      "timestamp_utc": "2026-10-17T09:27:44Z"
+    },
+    {
+      "accounting": "continuation setup and parent-stage CPU plus 60 CPU-s conservative code/focused-check reserve and 30 CPU-s finalization reserve; worker CPU is charged once by the parallel stage receipt",
+      "attempt": "issue60-continuation-cached-guard-diagnostic-0002",
+      "authorization_comment_id": 6231868984,
+      "process_cpu_seconds": 92.769228459,
+      "source_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+      "stage": "issue60-cached-guard-diagnostic-attempt-0002-parent-and-preparation",
+      "status": "PASS",
+      "timestamp_utc": "2026-10-17T09:27:44Z"
+    }
+  ],
+  "diagnostic_cpu_ledger_attempt": "issue60-continuation-cached-guard-diagnostic-0002",
+  "diagnostic_cpu_limit_seconds": 1000.0,
+  "diagnostic_cpu_seconds_before_attempt": 92.680437537,
+  "diagnostic_stage": "issue60-cached-guard-diagnostic-attempt-0002",
+  "diagnostic_stage_receipts": [
+    {
+      "aggregate_process_cpu_seconds": 2.3100860880000003,
+      "execution_count": 0,
+      "parent_process_cpu_seconds": 2.3100860880000003,
+      "path": "evidence/validation/parallel-execution/stages/issue60-cached-guard-diagnostic.json",
+      "sha256": "0c8d049f62c0e1fb2090048973224679fbec468b6ed263e62d312036d78bda7b",
+      "source_commit": "07c493a656bc344042f38532798e148d5fcd65cc",
+      "stage": "issue60-cached-guard-diagnostic",
+      "status": "FAILED",
+      "worker_process_cpu_seconds": 0.0
+    },
+    {
+      "aggregate_process_cpu_seconds": 51.51946906800001,
+      "execution_count": 2,
+      "parent_process_cpu_seconds": 2.388088068,
+      "path": "evidence/validation/parallel-execution/stages/issue60-cached-guard-diagnostic-attempt-0002.json",
+      "sha256": "4b9ecbec68ac08b0ba3d5c0677ff358257fd60f471ccc03dba077d44a649dc40",
+      "source_commit": "07c493a656bc344042f38532798e148d5fcd65cc",
+      "stage": "issue60-cached-guard-diagnostic-attempt-0002",
+      "status": "COMPLETE",
+      "worker_process_cpu_seconds": 49.131381000000005
+    }
+  ],
+  "dispatcher": {
+    "execution_count": 2,
+    "executions": [
+      {
+        "attempt": "evidence/validation/continuation-cache-guard/replays/seed-660129/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 289341440,
+        "pid": 565,
+        "process_cpu_seconds_including_worker_setup": 7.315853000000001,
+        "run_game_cpu_seconds": 7.286069288,
+        "task_key": [
+          "block1:batch-02",
+          660129,
+          "residual"
+        ],
+        "wall_seconds": 7.820577107000005
+      },
+      {
+        "attempt": "evidence/validation/continuation-cache-guard/replays/seed-660239/attempt-0001",
+        "exit_code": 0,
+        "peak_rss_bytes": 289685504,
+        "pid": 566,
+        "process_cpu_seconds_including_worker_setup": 41.815528,
+        "run_game_cpu_seconds": 41.774799198000004,
+        "task_key": [
+          "block1:batch-02",
+          660239,
+          "residual"
+        ],
+        "wall_seconds": 43.056681001
+      }
+    ],
+    "max_active_workers": 2,
+    "max_configured_workers": 2,
+    "parent_peak_rss_bytes": 354455552,
+    "parent_plus_worker_peak_rss_upper_bound_bytes": 933826560,
+    "worker_peak_rss_bytes": 289685504
+  },
+  "finalization_reserve_cpu_seconds": 30.0,
+  "formal_grid_forecast_enforced": false,
+  "original_attempts": [
+    {
+      "key": [
+        "block1:batch-02",
+        660129,
+        "residual"
+      ],
+      "path": "evidence/runs/training/block1/batch-02/seed-660129/attempt-0001",
+      "run_json_sha256": "b54536163deab565ed0ec794c3f2a87b5801b2ab7c1cfd5154bd035b59e11796"
+    },
+    {
+      "key": [
+        "block1:batch-02",
+        660239,
+        "residual"
+      ],
+      "path": "evidence/runs/training/block1/batch-02/seed-660239/attempt-0001",
+      "run_json_sha256": "6e677a7259460966695e425b722e9e9e0bca52ca9e2b9896bbf28eef08811e89"
+    }
+  ],
+  "parent_setup_and_stage_cpu_seconds": 2.769228459,
+  "parent_stage_cpu_seconds": 2.388088068,
+  "replay_keys": [
+    [
+      "block1:batch-02",
+      660129,
+      "residual"
+    ],
+    [
+      "block1:batch-02",
+      660239,
+      "residual"
+    ]
+  ],
+  "replays": [
+    {
+      "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+      "decision_rows": 16,
+      "original_decisions_sha256": "797ff51b437c6c600dae3c4d97ba5ae3478122bc84e48ea975b92a089b610708",
+      "original_run_json_sha256": "b54536163deab565ed0ec794c3f2a87b5801b2ab7c1cfd5154bd035b59e11796",
+      "process_cpu_seconds": 7.286069288,
+      "replay_attempt_path": "evidence/validation/continuation-cache-guard/replays/seed-660129/attempt-0001",
+      "replay_decisions_sha256": "49859f5f8c6142bbeb2ceccdb169b704177764e41bcf108e60e04de44fb1293e",
+      "replay_run_json_sha256": "f0c238abcb1c9e0c9b40140ec3effd8a4ccf367e6e854227931194e66bda19d1",
+      "seed": 660129,
+      "status": "PASS",
+      "summary_fields_compared": [
+        "status",
+        "game_seed",
+        "mode",
+        "block",
+        "stage_key",
+        "arm",
+        "runtime_policy_seed",
+        "model_sha256",
+        "config_sha256",
+        "terminal",
+        "outcome",
+        "terminal_floor",
+        "terminal_public_location",
+        "death_location",
+        "supported_choices",
+        "bootstrap_shifts",
+        "visible_bosses_seen",
+        "heart_entry_selected",
+        "screen_counts",
+        "transitions",
+        "boundaries",
+        "problems"
+      ],
+      "timing_path_pid_metadata_excluded": true,
+      "wall_seconds": 7.820577107000005
+    },
+    {
+      "decision_fields": "complete serialized decision rows (including public input, chosen action, behavior/base probabilities, and terminal targets)",
+      "decision_rows": 37,
+      "original_decisions_sha256": "78a45ceb19f2292e05cb757773dcf34ebd3a7df9917c4dd945e750172b41d974",
+      "original_run_json_sha256": "6e677a7259460966695e425b722e9e9e0bca52ca9e2b9896bbf28eef08811e89",
+      "process_cpu_seconds": 41.774799198000004,
+      "replay_attempt_path": "evidence/validation/continuation-cache-guard/replays/seed-660239/attempt-0001",
+      "replay_decisions_sha256": "7e4c3208b8f081d00fbf37cd6e7bb59f789a0c91dc50db225f42bb1a004817a0",
+      "replay_run_json_sha256": "891c7d2f387cab12752b41108f2bd77a8198f08daade1e14cd01bbf30696e3e5",
+      "seed": 660239,
+      "status": "PASS",
+      "summary_fields_compared": [
+        "status",
+        "game_seed",
+        "mode",
+        "block",
+        "stage_key",
+        "arm",
+        "runtime_policy_seed",
+        "model_sha256",
+        "config_sha256",
+        "terminal",
+        "outcome",
+        "terminal_floor",
+        "terminal_public_location",
+        "death_location",
+        "supported_choices",
+        "bootstrap_shifts",
+        "visible_bosses_seen",
+        "heart_entry_selected",
+        "screen_counts",
+        "transitions",
+        "boundaries",
+        "problems"
+      ],
+      "timing_path_pid_metadata_excluded": true,
+      "wall_seconds": 43.056681001
+    }
+  ],
+  "runtime": {
+    "deterministic_algorithms": true,
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "python": "3.13.13",
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "torch": "2.12.0+cpu",
+    "torch_threads": 1
+  },
+  "schema_id": "issue60-continuation-cache-diagnostic-v1",
+  "setup_cpu_seconds_before_tracker": 0.38114039099999975,
+  "status": "PASS",
+  "tag_count_after": 59,
+  "tag_count_before": 59,
+  "wall_seconds": 47.33356703400001,
+  "worker_cpu_seconds_charged_by_stage_receipt": 49.131381000000005,
+  "worker_settled_cpu_seconds": 49.131381000000005,
+  "worker_settlement_count": 2,
+  "worker_stage_cpu_seconds": 49.131381000000005
+}

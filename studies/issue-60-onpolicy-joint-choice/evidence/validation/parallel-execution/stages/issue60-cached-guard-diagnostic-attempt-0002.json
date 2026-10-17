@@ -1,0 +1,63 @@
+{
+  "aggregate_process_cpu_seconds": 51.51946906800001,
+  "execution_count": 2,
+  "executions": [
+    {
+      "attempt": "evidence/validation/continuation-cache-guard/replays/seed-660129/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 289341440,
+      "pid": 565,
+      "process_cpu_seconds_including_worker_setup": 7.315853000000001,
+      "run_game_cpu_seconds": 7.286069288,
+      "task_key": [
+        "block1:batch-02",
+        660129,
+        "residual"
+      ],
+      "wall_seconds": 7.820577107000005
+    },
+    {
+      "attempt": "evidence/validation/continuation-cache-guard/replays/seed-660239/attempt-0001",
+      "exit_code": 0,
+      "peak_rss_bytes": 289685504,
+      "pid": 566,
+      "process_cpu_seconds_including_worker_setup": 41.815528,
+      "run_game_cpu_seconds": 41.774799198000004,
+      "task_key": [
+        "block1:batch-02",
+        660239,
+        "residual"
+      ],
+      "wall_seconds": 43.056681001
+    }
+  ],
+  "host": {
+    "cpu_model": "AMD Ryzen 7 H 255 W/ Radeon 780M",
+    "cpu_quota_count": null,
+    "cpus_allowed_list": "0-15",
+    "effective_cpu_count": 16,
+    "effective_memory_available_bytes": 23925157888,
+    "logical_cpu_count": 16,
+    "memory_available_bytes": 23925157888,
+    "memory_current_bytes": 0,
+    "memory_limit_bytes": null,
+    "memory_total_bytes": 25199460352
+  },
+  "max_active_workers": 2,
+  "max_configured_workers": 2,
+  "parent_peak_rss_bytes": 354455552,
+  "parent_plus_worker_peak_rss_upper_bound_bytes": 933826560,
+  "parent_process_cpu_seconds": 2.388088068,
+  "schema_id": "issue60-parallel-stage-receipt-v1",
+  "source_commit": "07c493a656bc344042f38532798e148d5fcd65cc",
+  "source_files": {
+    "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+    "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9"
+  },
+  "stage": "issue60-cached-guard-diagnostic-attempt-0002",
+  "status": "COMPLETE",
+  "wall_seconds": 57.16615704,
+  "worker_count": 2,
+  "worker_peak_rss_bytes": 289685504,
+  "worker_process_cpu_seconds": 49.131381000000005
+}
