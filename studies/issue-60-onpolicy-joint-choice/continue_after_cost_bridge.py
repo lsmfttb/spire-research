@@ -242,6 +242,12 @@ def _record_bridge_charge(*, attempt: str, stage: str, seconds: float,
     bridge.atomic_json(bridge.BRIDGE_LATEST, latest)
 
 
+def _run_continue_with_cost_tagging() -> int:
+    """Install the prospective-cost hook before dispatching continuation games."""
+    bridge._install_tagged_dispatcher()
+    return int(bridge._run_continue())
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--verify-only", action="store_true")
@@ -335,7 +341,7 @@ def main() -> int:
     ledger_lines_before_runner = len(ledger.read_text(encoding="utf-8").splitlines()) if ledger.is_file() else 0
     runner_started = time.process_time()
     try:
-        exit_code = int(bridge._run_continue())
+        exit_code = _run_continue_with_cost_tagging()
     except BaseException as exc:
         ledger_lines_after_runner = len(ledger.read_text(encoding="utf-8").splitlines()) if ledger.is_file() else 0
         if ledger_lines_after_runner == ledger_lines_before_runner:
