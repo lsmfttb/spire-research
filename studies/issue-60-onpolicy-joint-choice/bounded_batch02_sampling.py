@@ -55,6 +55,174 @@ def _batch02_seed_schedule() -> tuple[int, ...]:
     return (*range(660001, 660129), *TARGET_SEEDS)
 
 
+def _r2_source_compatibility(r2: Any, head: str) -> dict[str, Any]:
+    """Verify sealed R2 code while allowing its later offline test-only edit.
+
+    The sealed R2 source commit remains the authority for all three original
+    files.  Two runtime files must still match that commit byte-for-byte.  The
+    later descendant edit to test_resource_amendment_r2.py is accepted only
+    because it is itself committed at HEAD and is the sole R2 source-path
+    difference since the seal; it changes offline assertions, not runtime code.
+    """
+    bridge._bind_resource_git_to_windows_worktree()
+    receipt_path = HERE / r2.R2_RECEIPT
+    document = r2._read_json(receipt_path)
+    gate = document.get("gate", {})
+    source_commit = str(gate.get("implementation_source_commit", ""))
+    source_hashes = dict(gate.get("implementation_source_files", {}))
+    symbol_hashes = dict(gate.get("implementation_changed_symbol_sha256", {}))
+    source_paths = tuple(r2.R2_SOURCE_PATHS)
+    if (gate.get("status") != "PASS" or not source_commit
+            or set(source_hashes) != set(source_paths)
+            or set(symbol_hashes) != set(source_paths)):
+        raise bridge.CostRegimeError("sealed R2 source manifest is incomplete")
+    r2._git(HERE, "merge-base", "--is-ancestor", source_commit, head)
+    study_git_path = __import__("resource_amendment_r1")._study_git_path(HERE, ".")
+    source_scope = r2._git(
+        HERE, "diff", "--name-status", "--no-renames",
+        r2.PARENT_HANDOFF, source_commit, "--", study_git_path,
+    )
+    source_observed = {}
+    for line in source_scope.splitlines():
+        status, path = line.split("\t", 1)
+        source_observed[path.removeprefix(study_git_path + "/")] = status
+    if source_observed != {path: "A" for path in source_paths}:
+        raise bridge.CostRegimeError("sealed R2 source commit no longer has its authorized source scope")
+
+    current_scope = r2._git(
+        HERE, "diff", "--name-status", "--no-renames",
+        source_commit, head, "--",
+        *(f"{study_git_path}/{relative}" for relative in source_paths),
+    )
+    current_observed = {}
+    for line in current_scope.splitlines():
+        status, path = line.split("\t", 1)
+        current_observed[path.removeprefix(study_git_path + "/")] = status
+    offline_test = "test_resource_amendment_r2.py"
+    if any(path != offline_test or status != "M" for path, status in current_observed.items()):
+        raise bridge.CostRegimeError(
+            f"R2 runtime source changed after its seal: {current_observed}"
+        )
+
+    source_facts: dict[str, dict[str, str]] = {}
+    for relative in source_paths:
+        committed = r2._git_bytes(
+            HERE, "show", f"{source_commit}:{study_git_path}/{relative}",
+        )
+        committed_sha = hashlib.sha256(committed).hexdigest()
+        if committed_sha != source_hashes[relative]:
+            raise bridge.CostRegimeError(f"sealed R2 source commit hash mismatch: {relative}")
+        path = HERE / relative
+        current_sha = _sha256(path)
+        head_blob = r2._git_bytes(HERE, "show", f"{head}:{study_git_path}/{relative}")
+        head_sha = hashlib.sha256(head_blob).hexdigest()
+        if current_sha != head_sha:
+            raise bridge.CostRegimeError(f"R2 source worktree differs from executing HEAD: {relative}")
+        if relative != offline_test:
+            if (current_sha != source_hashes[relative]
+                    or r2._source_symbol_hashes(path) != symbol_hashes[relative]):
+                raise bridge.CostRegimeError(f"sealed R2 runtime source changed: {relative}")
+        source_facts[relative] = {
+            "sealed_source_sha256": source_hashes[relative],
+            "executing_head_sha256": head_sha,
+            "matches_sealed_source": current_sha == source_hashes[relative],
+        }
+    return {
+        "status": "PASS",
+        "sealed_source_commit": source_commit,
+        "executing_head": head,
+        "source_paths": source_facts,
+        "post_seal_offline_test_only_change": (
+            current_observed == {offline_test: "M"}
+            and source_facts[offline_test]["matches_sealed_source"] is False
+        ),
+        "changed_paths_since_r2_seal": current_observed,
+        "runtime_source_files_unchanged": all(
+            source_facts[path]["matches_sealed_source"]
+            for path in source_paths if path != offline_test
+        ),
+    }
+
+
+def _verify_r2_source_scope_for_bounded_sample(
+    r2: Any, root: Path, source_commit: str,
+    source_hashes: Mapping[str, str], symbol_hashes: Mapping[str, Mapping[str, str]],
+    expected: Mapping[str, Any],
+) -> None:
+    """Apply the source-seal compatibility check at the reviewed hook boundary."""
+    if (Path(root).resolve() != HERE.resolve()
+            or source_commit != expected.get("sealed_source_commit")
+            or dict(source_hashes) != dict(
+                r2._read_json(HERE / r2.R2_RECEIPT)["gate"]["implementation_source_files"]
+            )
+            or dict(symbol_hashes) != dict(
+                r2._read_json(HERE / r2.R2_RECEIPT)["gate"]["implementation_changed_symbol_sha256"]
+            )):
+        raise bridge.CostRegimeError("R2 verifier input differs from the sealed source manifest")
+    observed = _r2_source_compatibility(r2, str(expected["executing_head"]))
+    if observed != dict(expected):
+        raise bridge.CostRegimeError("R2 source compatibility witness changed after preflight")
+
+
+def _no_dispatch_source_rollover(previous: Mapping[str, Any], target_state: Mapping[str, Any],
+                                 *, head: str, launcher_sha256: str) -> dict[str, Any]:
+    """Permit a new source revision only after fully evidenced no-dispatch failures."""
+    attempts = list(previous.get("attempts", []))
+    if previous.get("status") != "FAILED" or not attempts:
+        raise bridge.CostRegimeError("changed source cannot resume a bounded receipt without failed attempts")
+    if target_state.get("complete"):
+        raise bridge.CostRegimeError("changed source cannot resume after any authorized game completed")
+    for attempt in attempts:
+        if (attempt.get("status") not in {"FAILED", "FAILED_BEFORE_DISPATCH"}
+                or attempt.get("completed_games") or attempt.get("complete_keys")):
+            raise bridge.CostRegimeError("changed source resume requires only no-dispatch failed attempts")
+        stage_path = HERE / str(attempt.get("stage_receipt_path", ""))
+        if stage_path.is_file():
+            try:
+                stage = json.loads(stage_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise bridge.CostRegimeError("failed attempt has an unreadable stage receipt") from exc
+            if stage.get("executions") or int(stage.get("execution_count") or 0) != 0:
+                raise bridge.CostRegimeError("failed attempt stage receipt shows dispatched work")
+        stage = attempt.get("parallel_stage_receipt")
+        if isinstance(stage, Mapping) and (
+            stage.get("execution_count") not in (None, 0)
+            or stage.get("worker_process_cpu_seconds") not in (None, 0, 0.0)
+        ):
+            raise bridge.CostRegimeError("failed attempt summary shows dispatched worker work")
+
+    prior = attempts[-1]
+    recovery = next((row.get("pre_dispatch_failure_recovery", {}) for row in attempts
+                     if row.get("pre_dispatch_failure_recovery")), {})
+    expected_old = {
+        int(row["game_seed"]): row
+        for row in recovery.get("preserved_original_incomplete_attempts", [])
+    }
+    if set(expected_old) != {660243, 660244}:
+        raise bridge.CostRegimeError("no-dispatch resume lacks the original incomplete-attempt witness")
+    for row in target_state.get("keys", []):
+        seed = int(row["game_seed"])
+        if seed in expected_old:
+            observed = row.get("attempts", [])
+            expected = expected_old[seed]
+            if (len(observed) != 1 or observed[0].get("status") != "INCOMPLETE"
+                    or observed[0].get("run_json_exists")
+                    or observed[0].get("status_json_sha256") != expected.get("status_json_sha256")):
+                raise bridge.CostRegimeError("original incomplete target attempt changed before resume")
+        elif row.get("attempts"):
+            raise bridge.CostRegimeError("unexpected authorized target attempt exists before resume")
+    return {
+        "from_executing_head": previous.get("executing_head"),
+        "from_launcher_sha256": previous.get("launcher_sha256"),
+        "to_executing_head": head,
+        "to_launcher_sha256": launcher_sha256,
+        "basis": "all prior attempts failed before dispatch; no target games completed; original incomplete attempts preserved",
+        "preserved_attempt_ids": [row.get("attempt_id") for row in attempts],
+        "last_failed_attempt_id": prior.get("attempt_id"),
+        "new_dispatches_before_rollover": 0,
+    }
+
+
 def _remaining_local_budget(*, charged: float, setup: float,
                             finalization_reserve: float) -> float:
     return LOCAL_LIMIT - float(charged) - float(setup) - float(finalization_reserve)
@@ -450,7 +618,7 @@ def _recover_known_pre_dispatch_failure(previous: dict[str, Any], *, head: str,
     old_launcher_sha256 = str(previous.get("launcher_sha256", ""))
     attempt.update({
         "status": "FAILED_BEFORE_DISPATCH",
-        "failure": "R2 source hash mismatch: test_resource_amendment_r2.py; committed bytes matched the sealed R2 receipt but the Windows checkout line endings did not",
+        "failure": "ResourceAmendmentErrorR2: R2 source hash mismatch: test_resource_amendment_r2.py",
         "result_code": 2,
         "executing_head": old_head,
         "launcher_sha256": old_launcher_sha256,
@@ -561,6 +729,8 @@ def _write_bounded_receipt(preflight: dict[str, Any], *, status: str,
         "executing_head": preflight["executing_head"],
         "launcher_path": Path(__file__).resolve().relative_to(HERE).as_posix(),
         "launcher_sha256": preflight["launcher_sha256"],
+        "source_revision_rollovers": preflight["source_revision_rollovers"],
+        "r2_source_compatibility": preflight["r2_source_compatibility"],
         "started_utc": EXECUTION.get("started_utc"),
         "finished_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "runtime": preflight["runtime"],
@@ -630,6 +800,7 @@ def _preflight() -> dict[str, Any]:
             f"tracked source worktree has unexpected changes before bounded dispatch: {unexpected}"
         )
     bridge.git(HERE, "merge-base", "--is-ancestor", BASE_HANDOFF, head)
+    r2_source_compatibility = _r2_source_compatibility(resource_amendment_r2, head)
     manifest = producer_manifest(HERE)
     gate = bridge._read_json(PROSPECTIVE / "bridge-gate.json")
     bridge_record = bridge._read_json(bridge.BRIDGE_LATEST)
@@ -693,8 +864,21 @@ def _preflight() -> dict[str, Any]:
         })
         if not set(target_tag_seeds).issubset(set(prior_complete)):
             raise bridge.CostRegimeError("cost index has target tags not linked from a prior execution receipt")
-        if previous.get("executing_head") != head or previous.get("launcher_sha256") != _sha256(Path(__file__)):
-            raise bridge.CostRegimeError("a prior receipt binds this key set to different executing source")
+        source_revision_rollovers = list(previous.get("source_revision_rollovers", []))
+        current_launcher_sha = _sha256(Path(__file__))
+        if (previous.get("executing_head") != head
+                or previous.get("launcher_sha256") != current_launcher_sha):
+            target_state = _target_state(run_study, model_sha, run_study.config_sha())
+            rollover = _no_dispatch_source_rollover(
+                previous, target_state, head=head,
+                launcher_sha256=current_launcher_sha,
+            )
+            source_revision_rollovers.append(rollover)
+            previous["source_revision_rollovers"] = source_revision_rollovers
+            previous["executing_head"] = head
+            previous["launcher_sha256"] = current_launcher_sha
+            previous["updated_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            _atomic_json(RECEIPT, previous)
         if previous.get("status") == "COMPLETE":
             raise bridge.CostRegimeError("the bounded 14-key authorization is already complete")
         if previous.get("status") not in {"STARTED", "RESOURCE_BLOCKED", "FAILED"}:
@@ -703,6 +887,7 @@ def _preflight() -> dict[str, Any]:
             raise bridge.CostRegimeError("previous bounded invocation did not finalize; stop safely")
         # Failed/blocked attempts may resume only the same fixed keys and source.
     else:
+        source_revision_rollovers = []
         if target_tag_seeds:
             raise bridge.CostRegimeError("target cost tags exist without this authorization receipt")
         for seed in TARGET_SEEDS:
@@ -722,6 +907,8 @@ def _preflight() -> dict[str, Any]:
     return {
         "executing_head": head,
         "launcher_sha256": _sha256(Path(__file__)),
+        "source_revision_rollovers": source_revision_rollovers,
+        "r2_source_compatibility": r2_source_compatibility,
         "runtime": runtime,
         "config_sha256": run_study.config_sha(),
         "checkpoint": checkpoint,
@@ -764,12 +951,16 @@ def _preflight() -> dict[str, Any]:
 
 def _run_with_reviewed_hooks() -> int:
     global SETUP_CPU_BEFORE_TRACKER, ATTEMPT_ID
+    import resource_amendment_r2 as r2
+
     original_main = parallel.main
     original_read = parallel._read_validation_receipt
     validated_read = lambda: dict(
         EXECUTION["pre_dispatch"]["cached_execution_witness"]["in_memory_validation"]
     )
     original_tag = bridge._tag_attempt
+    original_source_scope = r2._verify_source_scope
+    source_compatibility = EXECUTION["pre_dispatch"]["r2_source_compatibility"]
     stage_root = PARALLEL_STAGE_DIR / f"attempt-{int(ATTEMPT['attempt_number']):04d}"
     old_parallel_evidence = parallel.EVIDENCE
     old_parallel_validation = parallel.VALIDATION
@@ -790,6 +981,12 @@ def _run_with_reviewed_hooks() -> int:
     parallel._read_validation_receipt = validated_read
     bridge._tag_attempt = tag_batch02_attempt
     bridge._install_tagged_dispatcher()
+    r2._verify_source_scope = lambda root, source_commit, source_hashes, symbol_hashes: (
+        _verify_r2_source_scope_for_bounded_sample(
+            r2, root, source_commit, source_hashes, symbol_hashes,
+            source_compatibility,
+        )
+    )
 
     def bounded_parallel_main() -> int:
         global SETUP_CPU_BEFORE_TRACKER
@@ -827,6 +1024,7 @@ def _run_with_reviewed_hooks() -> int:
         parallel.main = original_main
         parallel._read_validation_receipt = original_read
         bridge._tag_attempt = original_tag
+        r2._verify_source_scope = original_source_scope
 
 
 def _prepare_receipt(preflight: dict[str, Any]) -> None:
@@ -859,6 +1057,7 @@ def _prepare_receipt(preflight: dict[str, Any]) -> None:
         "launcher_sha256": preflight["launcher_sha256"],
         "attempts": attempts,
         "authorized_keys": list(TARGET_SEEDS),
+        "source_revision_rollovers": list(preflight["source_revision_rollovers"]),
     }
     AUTH_SPENT_BEFORE_ATTEMPT = _authorization_charges()
     # Conservative fixed charge for all implementation, focused checks and
