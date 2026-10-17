@@ -226,6 +226,148 @@ def _no_dispatch_source_rollover(previous: Mapping[str, Any], target_state: Mapp
     }
 
 
+def _settled_source_rollover(previous: Mapping[str, Any], target_state: Mapping[str, Any],
+                             *, head: str, launcher_sha256: str,
+                             config_sha256: str) -> dict[str, Any]:
+    """Allow an ordinary repair after settled partial failures, preserving evidence."""
+    attempts = list(previous.get("attempts", []))
+    if previous.get("status") not in {"FAILED", "RESOURCE_BLOCKED"} or not attempts:
+        raise bridge.CostRegimeError("changed source cannot resume without a settled failed receipt")
+
+    attempt_ids: set[str] = set()
+    recorded_complete: set[int] = set()
+    execution_count = 0
+    stage_execution_seeds: set[int] = set()
+    for attempt in attempts:
+        attempt_id = str(attempt.get("attempt_id", ""))
+        if (not attempt_id or attempt_id in attempt_ids
+                or attempt.get("status") not in {
+                    "FAILED", "FAILED_BEFORE_DISPATCH", "RESOURCE_BLOCKED",
+                }):
+            raise bridge.CostRegimeError("changed source resume requires settled failed attempts")
+        attempt_ids.add(attempt_id)
+        complete_keys = [int(seed) for seed in attempt.get("complete_keys", [])]
+        if len(complete_keys) != len(set(complete_keys)) or not set(complete_keys).issubset(TARGET_SEEDS):
+            raise bridge.CostRegimeError("failed receipt contains duplicate or unauthorized complete keys")
+        recorded_complete.update(complete_keys)
+
+        stage_path = HERE / str(attempt.get("stage_receipt_path", ""))
+        stage_summary = attempt.get("parallel_stage_receipt")
+        if not stage_path.is_file():
+            if complete_keys or attempt.get("completed_games"):
+                raise bridge.CostRegimeError("failed attempt without a stage receipt claims completed games")
+            if (attempt.get("status") == "RESOURCE_BLOCKED"
+                    and isinstance(stage_summary, Mapping)
+                    and int(stage_summary.get("execution_count") or 0) != 0):
+                raise bridge.CostRegimeError("resource-blocked attempt lost its dispatched stage receipt")
+            continue
+        if not isinstance(stage_summary, Mapping):
+            raise bridge.CostRegimeError("dispatched failed attempt lacks its settled stage receipt")
+        try:
+            stage = json.loads(stage_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise bridge.CostRegimeError("failed attempt has an unreadable stage receipt") from exc
+        observed = stage.get("executions")
+        if (not isinstance(observed, list)
+                or stage.get("status") not in {"FAILED", "RESOURCE_BLOCKED"}
+                or stage_summary.get("status") != stage.get("status")
+                or int(stage.get("execution_count", -1)) != len(observed)
+                or int(stage_summary.get("execution_count", -1)) != len(observed)
+                or stage_summary.get("sha256") != _sha256(stage_path)
+                or (attempt.get("executing_head")
+                    and stage.get("source_commit") != attempt.get("executing_head"))):
+            raise bridge.CostRegimeError("failed attempt stage receipt is not settled and linked exactly")
+        execution_count += len(observed)
+        for execution in observed:
+            key = execution.get("task_key")
+            if (not isinstance(key, list) or len(key) != 3 or key[0] != STAGE_KEY
+                    or int(key[1]) not in TARGET_SEEDS or key[2] != "residual"):
+                raise bridge.CostRegimeError("failed stage receipt contains an unauthorized worker key")
+            stage_execution_seeds.add(int(key[1]))
+        if any(int(row.get("game_seed", -1)) not in complete_keys
+               for row in attempt.get("completed_games", [])):
+            raise bridge.CostRegimeError("per-game completion link is absent from its attempt summary")
+
+    complete_by_seed = {int(row["game_seed"]): row for row in target_state.get("complete", [])}
+    if set(complete_by_seed) != recorded_complete:
+        raise bridge.CostRegimeError("failed receipt complete keys do not match completed target artifacts")
+    recovery = next((row.get("pre_dispatch_failure_recovery", {}) for row in attempts
+                     if row.get("pre_dispatch_failure_recovery")), {})
+    expected_old = {
+        int(row["game_seed"]): row
+        for row in recovery.get("preserved_original_incomplete_attempts", [])
+    }
+    if set(expected_old) != {660243, 660244}:
+        raise bridge.CostRegimeError("partial resume lacks the original incomplete-attempt witness")
+    for row in target_state.get("keys", []):
+        seed = int(row["game_seed"])
+        observed = row.get("attempts", [])
+        if any(item.get("status") not in {"INCOMPLETE", "COMPLETE"} for item in observed):
+            raise bridge.CostRegimeError("partial resume found an unsettled or invalid game attempt")
+        if seed in expected_old:
+            original = expected_old[seed]
+            retained = [item for item in observed
+                        if item.get("attempt_path") == original.get("attempt_path")]
+            if (len(retained) != 1 or retained[0].get("status") != "INCOMPLETE"
+                    or retained[0].get("run_json_exists")
+                    or retained[0].get("status_json_sha256") != original.get("status_json_sha256")):
+                raise bridge.CostRegimeError("original incomplete attempt changed before partial resume")
+
+    source_attempt_by_seed = {
+        int(seed): attempt for attempt in attempts for seed in attempt.get("complete_keys", [])
+    }
+    reconciled = []
+    for seed, row in sorted(complete_by_seed.items()):
+        attempt_path = HERE / str(row["attempt_path"])
+        run_path, status_path = attempt_path / "run.json", attempt_path / "status.json"
+        try:
+            run = json.loads(run_path.read_text(encoding="utf-8"))
+            status = json.loads(status_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise bridge.CostRegimeError("completed target artifact is unreadable during resume") from exc
+        if (run.get("status") != "COMPLETE" or status.get("status") != "COMPLETE"
+                or int(run.get("game_seed", -1)) != seed or int(status.get("game_seed", -1)) != seed
+                or run.get("stage_key") != STAGE_KEY or run.get("arm") != "residual"
+                or run.get("model_sha256") != CHECKPOINT_SHA
+                or run.get("config_sha256") != config_sha256
+                or not (attempt_path / "decisions.jsonl.gz").is_file()):
+            raise bridge.CostRegimeError("completed target artifact differs from its registered key/checkpoint")
+        source_attempt = source_attempt_by_seed.get(seed)
+        if source_attempt is None:
+            raise bridge.CostRegimeError("completed target artifact lacks a settled source attempt")
+        tag_path = _cost_tag_path(str(row["attempt_path"]))
+        tag = None
+        if tag_path.is_file():
+            try:
+                tag = json.loads(tag_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise bridge.CostRegimeError("completed target cost tag is unreadable") from exc
+            if (int(tag.get("game_seed", -1)) != seed or tag.get("stage_key") != STAGE_KEY
+                    or tag.get("arm") != "residual" or tag.get("attempt_path") != str(row["attempt_path"])
+                    or tag.get("run_json_sha256") != _sha256(run_path)):
+                raise bridge.CostRegimeError("completed target cost tag points to another run")
+        reconciled.append({
+            "game_seed": seed, "source_attempt_id": source_attempt.get("attempt_id"),
+            "attempt_path": str(row["attempt_path"]), "run_json_sha256": _sha256(run_path),
+            "status_json_sha256": _sha256(status_path),
+            "cost_tag_path": tag_path.relative_to(HERE).as_posix() if tag else None,
+            "cost_tag_sha256": _sha256(tag_path) if tag else None,
+        })
+    return {
+        "from_executing_head": previous.get("executing_head"),
+        "from_launcher_sha256": previous.get("launcher_sha256"),
+        "to_executing_head": head, "to_launcher_sha256": launcher_sha256,
+        "basis": "all prior dispatched attempts settled; exact authorized artifacts and original incomplete attempts preserved",
+        "preserved_attempt_ids": [row.get("attempt_id") for row in attempts],
+        "prior_dispatched_execution_count": execution_count,
+        "prior_stage_execution_seeds": sorted(stage_execution_seeds),
+        "completed_artifacts_not_listed_in_stage_executions": sorted(
+            set(complete_by_seed) - stage_execution_seeds,
+        ),
+        "reconciled_completed_game_artifacts": reconciled,
+    }
+
+
 def _remaining_local_budget(*, charged: float, setup: float,
                             finalization_reserve: float) -> float:
     return LOCAL_LIMIT - float(charged) - float(setup) - float(finalization_reserve)
@@ -390,6 +532,18 @@ def _write_stage_status(status: str, failure: str | None = None) -> None:
     })
 
 
+def _ensure_sampling_runtime_hooks(run_study_r2: Any, run_study: Any,
+                                  *, dispatcher_exists: bool) -> None:
+    """Install once when needed; never wrap an already installed dispatcher."""
+    if run_study_r2.RUN_STUDY is None:
+        if dispatcher_exists:
+            raise bridge.CostRegimeError("sampling dispatcher exists without its R2 runtime binding")
+        run_study_r2.RUN_STUDY = run_study
+        run_study_r2._install_runtime_hooks()
+    elif not dispatcher_exists:
+        run_study_r2._install_runtime_hooks()
+
+
 def _sampling_stage(stage: str, *, stage_start_cpu: float) -> int:
     """Replacement train stage that dispatches only the 14 named game owners."""
     import run_study
@@ -412,17 +566,17 @@ def _sampling_stage(stage: str, *, stage_start_cpu: float) -> int:
     # R2 imported its guard function by value; replace that binding so the old
     # prospective forecast gate cannot block this authorized sample.
     run_study_r2.enforce_budget = bridge._dynamic_enforce
-    if run_study_r2.RUN_STUDY is None:
-        run_study_r2.RUN_STUDY = run_study
-        run_study_r2._install_runtime_hooks()
+    _ensure_sampling_runtime_hooks(
+        run_study_r2, run_study, dispatcher_exists=parallel.DISPATCHER is not None,
+    )
     if parallel.DISPATCHER is None or parallel.DISPATCHER.workers != 2:
         raise bridge.CostRegimeError("bounded sampling requires the reviewed two-worker dispatcher")
     run_study_r2.STAGE_START_CPU = stage_start_cpu
     run_study_r2.MINIBATCHES_COMPLETED = 0
     try:
-        # Same order as the reviewed continuation: ordinary R2 hooks first,
-        # then the cached-path guard wrapper installed by this launcher.
-        run_study_r2._install_runtime_hooks()
+        # The tracked parallel stage already composed R2 and cache hooks before
+        # entering this function. Reinstalling them would wrap one dispatcher
+        # inside another and make workers recursively dispatch the same keys.
         if HOOK_EVENTS != ["original-r2-runtime-hooks", "cached-guard-installed"]:
             raise bridge.CostRegimeError("cached continuation hook order did not match the reviewed witness")
         if not continuation._cached_guard_is_active(bridge):
@@ -484,28 +638,30 @@ def _sampling_stage(stage: str, *, stage_start_cpu: float) -> int:
                     # A prior safe stop may have ended after run completion but
                     # before its cost tag settled; link that same attempt.
                     bridge._tag_attempt(existing_attempt)
-            first_seed = TARGET_SEEDS[0]
-            kwargs = {
-                "seed": first_seed,
-                "mode": "residual",
-                "model": model,
-                "block_name": "block1",
-                "runtime_seed": run_study.derive_seed(
-                    "training-policy", run_study.MODEL_SEEDS["block1"], first_seed, 2,
-                ),
-                "output_dir": run_study._training_game_dir("block1", 2, first_seed),
-                "model_sha": model_sha,
-                "config_digest": config_digest,
-                "vocab": vocab,
-                "bootstrap": bootstrap,
-                "require_targets": True,
-                "provenance_config": run_study._current_policy_provenance(
-                    config, vocab, model_sha, "residual",
-                ),
-                "stage_key": STAGE_KEY,
-                "arm": "residual",
-            }
-            results = run_study.run_game(**kwargs)
+            results = None
+            if missing:
+                dispatch_seed = missing[0]
+                kwargs = {
+                    "seed": dispatch_seed,
+                    "mode": "residual",
+                    "model": model,
+                    "block_name": "block1",
+                    "runtime_seed": run_study.derive_seed(
+                        "training-policy", run_study.MODEL_SEEDS["block1"], dispatch_seed, 2,
+                    ),
+                    "output_dir": run_study._training_game_dir("block1", 2, dispatch_seed),
+                    "model_sha": model_sha,
+                    "config_digest": config_digest,
+                    "vocab": vocab,
+                    "bootstrap": bootstrap,
+                    "require_targets": True,
+                    "provenance_config": run_study._current_policy_provenance(
+                        config, vocab, model_sha, "residual",
+                    ),
+                    "stage_key": STAGE_KEY,
+                    "arm": "residual",
+                }
+                results = run_study.run_game(**kwargs)
         finally:
             run_study.TRAINING_SEEDS["block1"] = original_seeds
 
@@ -520,7 +676,8 @@ def _sampling_stage(stage: str, *, stage_start_cpu: float) -> int:
             )
         if run_study_r2.MINIBATCHES_COMPLETED != 0:
             raise bridge.CostRegimeError("bounded sample unexpectedly completed a PPO minibatch")
-        if len(results) != 2 or results[1].get("status") != "COMPLETE":
+        if (missing and (results is None or len(results) != 2
+                         or results[1].get("status") != "COMPLETE")):
             raise bridge.CostRegimeError("bounded dispatcher did not return a complete game")
         complete = _target_state(run_study, model_sha, config_digest)
         if [row["game_seed"] for row in complete["complete"]] != list(TARGET_SEEDS):
@@ -872,6 +1029,10 @@ def _preflight() -> dict[str, Any]:
             int(row.get("game_seed", -1))
             for attempt in previous.get("attempts", [])
             for row in attempt.get("completed_games", [])
+        } | {
+            int(seed)
+            for attempt in previous.get("attempts", [])
+            for seed in attempt.get("complete_keys", [])
         })
         if not set(target_tag_seeds).issubset(set(prior_complete)):
             raise bridge.CostRegimeError("cost index has target tags not linked from a prior execution receipt")
@@ -880,10 +1041,21 @@ def _preflight() -> dict[str, Any]:
         if (previous.get("executing_head") != head
                 or previous.get("launcher_sha256") != current_launcher_sha):
             target_state = _target_state(run_study, model_sha, run_study.config_sha())
-            rollover = _no_dispatch_source_rollover(
-                previous, target_state, head=head,
-                launcher_sha256=current_launcher_sha,
+            dispatched = any(
+                int((attempt.get("parallel_stage_receipt") or {}).get("execution_count") or 0) > 0
+                for attempt in previous.get("attempts", [])
             )
+            if dispatched or target_state.get("complete"):
+                rollover = _settled_source_rollover(
+                    previous, target_state, head=head,
+                    launcher_sha256=current_launcher_sha,
+                    config_sha256=run_study.config_sha(),
+                )
+            else:
+                rollover = _no_dispatch_source_rollover(
+                    previous, target_state, head=head,
+                    launcher_sha256=current_launcher_sha,
+                )
             source_revision_rollovers.append(rollover)
             previous["source_revision_rollovers"] = source_revision_rollovers
             previous["executing_head"] = head

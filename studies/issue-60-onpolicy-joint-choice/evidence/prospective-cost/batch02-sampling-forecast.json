@@ -1,0 +1,79 @@
+{
+  "authorization_comment_id": 6232885569,
+  "cached_cost_sample_count": 61,
+  "cached_cost_sample_sha256": "a2b00dea6f45ba2d4e8f4822b821f5b0caf594591020d1131a07c4d7934f7853",
+  "complete_authorized_keys": [
+    660243,
+    660244,
+    660245
+  ],
+  "cost_index_path": "evidence/prospective-cost/cost-index.json",
+  "decision": "STOP_AFTER_AUTHORIZED_BATCH02_SAMPLING_BEFORE_PPO_OR_EVALUATION",
+  "forecast": {
+    "accounted_cpu_seconds": 24034.182992988008,
+    "all_history": {
+      "mean": 22.01217273232787,
+      "n": 61,
+      "sample_sd": 16.64464469968159,
+      "upper": 28.4055578571444
+    },
+    "builder_budget_cpu_seconds": 180000.0,
+    "cost_rule": "max(all-history and recent-128 mean + 3 sample-SD/sqrt(n))",
+    "game_cost_multiplier": 1.5,
+    "interpretation": "fixed operational heuristic; not a calibrated confidence bound or cost guarantee",
+    "max_based_stress_game_projection_cpu_seconds": 359793.75858561,
+    "max_observed_game_cpu_seconds_stress_only": 81.719305575,
+    "observed_complete_games": 61,
+    "optimizer_headroom_fraction": 0.2,
+    "process_cpu_cap_seconds": 200000.0,
+    "projected_all_in_cpu_seconds": 199287.0642713034,
+    "projected_builder_cpu_seconds": 179287.0642713034,
+    "projected_remaining_cpu_seconds": 155252.88127831538,
+    "projected_remaining_game_cpu_seconds_before_headroom": 104219.9917778628,
+    "projected_remaining_game_cpu_seconds_with_headroom": 125063.99013343535,
+    "projected_remaining_optimizer_cpu_seconds_with_headroom": 30188.89114488005,
+    "recent_observed_games": 61,
+    "recent_window": {
+      "mean": 22.01217273232787,
+      "n": 61,
+      "sample_sd": 16.64464469968159,
+      "upper": 28.4055578571444
+    },
+    "recent_window_size": 128,
+    "remaining_games": 2446,
+    "remaining_optimizer_cpu_seconds_before_headroom": 25157.40928740004,
+    "reviewer_reserve_cpu_seconds": 20000.0,
+    "status": "PASS",
+    "unit_cost_cpu_seconds": 28.4055578571444
+  },
+  "forecast_role": "descriptive updated cached-path projection; not a gate or permission to continue",
+  "incomplete_or_unstarted_authorized_keys": [
+    660246,
+    660247,
+    660248,
+    660249,
+    660250,
+    660251,
+    660252,
+    660253,
+    660254,
+    660255,
+    660256
+  ],
+  "legacy_latest_forecast_preserved": true,
+  "remaining_formal_games": 2446,
+  "remaining_optimizer_projection": {
+    "completed_batches": 1,
+    "max_supported_choices": 69,
+    "measured_full_256_row_minibatch_cpu_seconds": 5.375514805000009,
+    "optimizer_cost_multiplier": 1.5,
+    "projected_decisions_per_batch": 13312,
+    "projected_minibatches_per_epoch": 52,
+    "remaining_batches": 15,
+    "remaining_optimizer_cpu_seconds": 25157.40928740004,
+    "remaining_optimizer_minibatches": 3120
+  },
+  "schema_id": "issue60-batch02-sampling-forecast-v1",
+  "status": "UPDATED_COST_FORECAST",
+  "unknown_historical_114_game_producer_preserved_as_unknown": true
+}

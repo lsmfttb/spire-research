@@ -1,0 +1,62 @@
+{
+  "aggregate_process_cpu_seconds": 66.406533293,
+  "execution_count": 2,
+  "executions": [
+    {
+      "exit_code": 70,
+      "peak_rss_bytes": 269815808,
+      "pid": 1494,
+      "process_cpu_seconds_including_worker_setup": 0.09690199999999999,
+      "run_game_cpu_seconds": null,
+      "task_key": [
+        "block1:batch-02",
+        660244,
+        "residual"
+      ],
+      "wall_seconds": 0.17043786399995042
+    },
+    {
+      "attempt": "evidence/runs/training/block1/batch-02/seed-660243/attempt-0002",
+      "exit_code": 70,
+      "peak_rss_bytes": 284368896,
+      "pid": 1493,
+      "process_cpu_seconds_including_worker_setup": 31.350486,
+      "run_game_cpu_seconds": 11.410155521,
+      "task_key": [
+        "block1:batch-02",
+        660243,
+        "residual"
+      ],
+      "wall_seconds": 26.05305992000001
+    }
+  ],
+  "host": {
+    "cpu_model": "AMD Ryzen 7 H 255 W/ Radeon 780M",
+    "cpu_quota_count": null,
+    "cpus_allowed_list": "0-15",
+    "effective_cpu_count": 16,
+    "effective_memory_available_bytes": 23920648192,
+    "logical_cpu_count": 16,
+    "memory_available_bytes": 23920648192,
+    "memory_current_bytes": 0,
+    "memory_limit_bytes": null,
+    "memory_total_bytes": 25199452160
+  },
+  "max_active_workers": 2,
+  "max_configured_workers": 2,
+  "parent_peak_rss_bytes": 347983872,
+  "parent_plus_worker_peak_rss_upper_bound_bytes": 916721664,
+  "parent_process_cpu_seconds": 4.228112293,
+  "schema_id": "issue60-parallel-stage-receipt-v1",
+  "source_commit": "6e30c0ea35403dca8de0b897966b8ce15b7af0ca",
+  "source_files": {
+    "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+    "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9"
+  },
+  "stage": "train",
+  "status": "FAILED",
+  "wall_seconds": 31.801272184000027,
+  "worker_count": 2,
+  "worker_peak_rss_bytes": 284368896,
+  "worker_process_cpu_seconds": 62.178421
+}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -10,12 +11,39 @@ from bounded_batch02_sampling import (
     LOCAL_LIMIT,
     TARGET_SEEDS,
     _batch02_seed_schedule,
+    _ensure_sampling_runtime_hooks,
     _r2_source_compatibility,
     _remaining_local_budget,
+    _settled_source_rollover,
 )
 
 
 class BoundedBatch02SamplingTests(unittest.TestCase):
+    def test_existing_dispatcher_is_not_wrapped_again(self) -> None:
+        calls = []
+        already_bound = SimpleNamespace(
+            RUN_STUDY=object(), _install_runtime_hooks=lambda: calls.append("install"),
+        )
+        _ensure_sampling_runtime_hooks(already_bound, object(), dispatcher_exists=True)
+        self.assertEqual(calls, [])
+
+        unbound = SimpleNamespace(
+            RUN_STUDY=None, _install_runtime_hooks=lambda: calls.append("install"),
+        )
+        run_study = object()
+        _ensure_sampling_runtime_hooks(unbound, run_study, dispatcher_exists=False)
+        self.assertIs(unbound.RUN_STUDY, run_study)
+        self.assertEqual(calls, ["install"])
+        _ensure_sampling_runtime_hooks(unbound, run_study, dispatcher_exists=True)
+        self.assertEqual(calls, ["install"])
+
+        inconsistent = SimpleNamespace(
+            RUN_STUDY=None, _install_runtime_hooks=lambda: calls.append("unexpected"),
+        )
+        with self.assertRaisesRegex(CostRegimeError, "dispatcher exists without"):
+            _ensure_sampling_runtime_hooks(inconsistent, run_study, dispatcher_exists=True)
+        self.assertEqual(calls, ["install"])
+
     def test_dispatch_slice_is_exactly_the_authorized_original_keys(self) -> None:
         schedule = _batch02_seed_schedule()
         self.assertEqual(schedule[:128], tuple(range(660001, 660129)))
@@ -111,6 +139,107 @@ class BoundedBatch02SamplingTests(unittest.TestCase):
                 sampling._no_dispatch_source_rollover(
                     previous, target_state, head="new-head", launcher_sha256="new-launcher",
                 )
+
+    def test_settled_partial_source_rollover_reconciles_only_exact_completed_artifacts(self) -> None:
+        import json
+        import bounded_batch02_sampling as sampling
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runs = root / "evidence/runs/training/block1/batch-02"
+            original_status_hashes = {}
+            target_rows = []
+            for seed in (660243, 660244):
+                original = runs / f"seed-{seed}" / "attempt-0001"
+                original.mkdir(parents=True)
+                status_path = original / "status.json"
+                status_path.write_text(json.dumps({"game_seed": seed, "status": "INCOMPLETE"}))
+                digest = sampling._sha256(status_path)
+                original_status_hashes[seed] = digest
+                target_rows.append({
+                    "game_seed": seed,
+                    "attempts": [{
+                        "attempt_path": status_path.parent.relative_to(root).as_posix(),
+                        "status": "INCOMPLETE", "run_json_exists": False,
+                        "status_json_sha256": digest,
+                    }],
+                })
+
+            completed = runs / "seed-660243" / "attempt-0002"
+            completed.mkdir(parents=True)
+            run = {
+                "status": "COMPLETE", "game_seed": 660243,
+                "stage_key": "block1:batch-02", "arm": "residual",
+                "model_sha256": sampling.CHECKPOINT_SHA, "config_sha256": "d" * 64,
+                "process_cpu_seconds": 12.5,
+            }
+            (completed / "run.json").write_text(json.dumps(run))
+            (completed / "status.json").write_text(json.dumps({
+                "game_seed": 660243, "status": "COMPLETE",
+            }))
+            (completed / "decisions.jsonl.gz").write_bytes(b"test")
+            target_rows[0]["attempts"].append({
+                "attempt_path": completed.relative_to(root).as_posix(),
+                "status": "COMPLETE", "run_json_exists": True,
+                "status_json_sha256": sampling._sha256(completed / "status.json"),
+            })
+
+            stage_path = root / "stage.json"
+            stage = {
+                "status": "FAILED", "execution_count": 1,
+                "executions": [{"task_key": ["block1:batch-02", 660243, "residual"]}],
+                "source_commit": "old-head",
+            }
+            stage_path.write_text(json.dumps(stage))
+            previous = {
+                "status": "FAILED", "executing_head": "old-head",
+                "launcher_sha256": "old-launcher",
+                "attempts": [{
+                    "attempt_id": "no-dispatch-1", "status": "FAILED_BEFORE_DISPATCH",
+                    "complete_keys": [], "completed_games": [],
+                    "stage_receipt_path": "missing-stage.json",
+                    "pre_dispatch_failure_recovery": {
+                        "preserved_original_incomplete_attempts": [
+                            {
+                                "game_seed": seed,
+                                "attempt_path": f"evidence/runs/training/block1/batch-02/seed-{seed}/attempt-0001",
+                                "status_json_sha256": digest,
+                            }
+                            for seed, digest in original_status_hashes.items()
+                        ],
+                    },
+                }, {
+                    "attempt_id": "partial-2", "status": "FAILED",
+                    "executing_head": "old-head", "complete_keys": [660243],
+                    "completed_games": [], "stage_receipt_path": "stage.json",
+                    "parallel_stage_receipt": {
+                        "status": "FAILED", "execution_count": 1,
+                        "sha256": sampling._sha256(stage_path),
+                    },
+                }],
+            }
+            target_state = {
+                "complete": [{
+                    "game_seed": 660243,
+                    "attempt_path": completed.relative_to(root).as_posix(),
+                }],
+                "keys": target_rows + [
+                    {"game_seed": seed, "attempts": []}
+                    for seed in TARGET_SEEDS if seed not in {660243, 660244}
+                ],
+            }
+            with (mock.patch.object(sampling, "HERE", root),
+                  mock.patch.object(sampling, "PROSPECTIVE", root / "evidence/prospective-cost")):
+                rollover = _settled_source_rollover(
+                    previous, target_state, head="new-head", launcher_sha256="new-launcher",
+                    config_sha256="d" * 64,
+                )
+
+        self.assertEqual(rollover["prior_dispatched_execution_count"], 1)
+        self.assertEqual(rollover["reconciled_completed_game_artifacts"][0]["game_seed"], 660243)
+        self.assertEqual(
+            rollover["reconciled_completed_game_artifacts"][0]["source_attempt_id"], "partial-2",
+        )
 
 
 if __name__ == "__main__":

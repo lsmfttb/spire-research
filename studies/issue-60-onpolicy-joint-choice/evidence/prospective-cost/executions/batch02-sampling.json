@@ -1,0 +1,823 @@
+{
+  "additional_authorized_charged_cpu_seconds": 427.62919308100004,
+  "additional_authorized_limit_cpu_seconds": 2000.0,
+  "attempts": [
+    {
+      "attempt_id": "issue60-batch02-sampling-attempt-0001",
+      "attempt_number": 1,
+      "authorized_aggregate_cpu_seconds": 30.0,
+      "complete_keys": [],
+      "completed_games": [],
+      "executing_head": "35862582c1f995d701415003f8392cad30467cdd",
+      "failure": "R2 source hash mismatch: test_resource_amendment_r2.py; committed bytes matched the sealed R2 receipt but the Windows checkout line endings did not",
+      "incomplete_or_unstarted_keys": [
+        660243,
+        660244,
+        660245,
+        660246,
+        660247,
+        660248,
+        660249,
+        660250,
+        660251,
+        660252,
+        660253,
+        660254,
+        660255,
+        660256
+      ],
+      "launcher_sha256": "9adbce5c495433f1e46a949b0117b994bc4f895e5356aa9eaaf8439bcc2e05b1",
+      "pre_dispatch_failure_recovery": {
+        "completed_games_in_attempt_receipt": 0,
+        "cpu_charges": {
+          "attempt_finalization_reserve_seconds": 30.0,
+          "implementation_and_check_reserve_seconds": 200.0,
+          "pre_dispatch_parent_setup_covered_by_implementation_and_check_reserve": true
+        },
+        "finalization_failure_repaired": "NameError: name 'FORECAST_INDEX' is not defined",
+        "new_complete_target_games": 0,
+        "parallel_stage_receipt_absent": true,
+        "preserved_original_incomplete_attempts": [
+          {
+            "attempt_path": "evidence/runs/training/block1/batch-02/seed-660243/attempt-0001",
+            "failure": "ResourceBudgetExceeded: RESOURCE_BLOCKED: prospective cached-regime forecast exceeds the unchanged caps: Builder=180002.617s, all-in=200002.617s",
+            "game_seed": 660243,
+            "process_cpu_seconds": 119.390181,
+            "run_json_exists": false,
+            "run_json_sha256": null,
+            "status": "INCOMPLETE",
+            "status_json_mtime_utc": "2026-10-17T10:41:04Z",
+            "status_json_sha256": "57422d9d3d74ad9d44ac0ae5d9ed0b91fbeb10804a54b9b0d31f176943bb8279"
+          },
+          {
+            "attempt_path": "evidence/runs/training/block1/batch-02/seed-660244/attempt-0001",
+            "failure": "ResourceBudgetExceeded: RESOURCE_BLOCKED: prospective cached-regime forecast exceeds the unchanged caps: Builder=180001.833s, all-in=200001.833s",
+            "game_seed": 660244,
+            "process_cpu_seconds": 30.094831,
+            "run_json_exists": false,
+            "run_json_sha256": null,
+            "status": "INCOMPLETE",
+            "status_json_mtime_utc": "2026-10-17T10:41:04Z",
+            "status_json_sha256": "bb908d3db82c792bafbe78902316973ce56c5e89a08b8d396cb1c5df00ad8992"
+          }
+        ],
+        "recovery_action": "settle this attempt as a no-dispatch failure, then continue only the same 14 named keys under the same authorization",
+        "status": "PASS"
+      },
+      "result_code": 2,
+      "stage_receipt_path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0001/parallel-execution/stages/train.json",
+      "started_utc": "2026-10-17T11:02:01Z",
+      "status": "FAILED_BEFORE_DISPATCH"
+    },
+    {
+      "attempt_id": "issue60-batch02-sampling-attempt-0002",
+      "attempt_number": 2,
+      "authorized_aggregate_cpu_seconds": 30.0,
+      "complete_keys": [],
+      "completed_games": [],
+      "executing_head": "0c31db9b0f65edf1734751a30ea4d92beab0ef47",
+      "failure": "ResourceAmendmentErrorR2: R2 source hash mismatch: test_resource_amendment_r2.py",
+      "finished_utc": "2026-10-17T11:08:48Z",
+      "incomplete_or_unstarted_keys": [
+        660243,
+        660244,
+        660245,
+        660246,
+        660247,
+        660248,
+        660249,
+        660250,
+        660251,
+        660252,
+        660253,
+        660254,
+        660255,
+        660256
+      ],
+      "launcher_sha256": "13741a51763f2410dd32910891af3b44e1eb7222036e6a0549e962c1d71c9672",
+      "parallel_stage_receipt": {
+        "aggregate_process_cpu_seconds": null,
+        "execution_count": null,
+        "max_active_workers": null,
+        "max_configured_workers": null,
+        "path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0002/parallel-execution/stages/train.json",
+        "sha256": null,
+        "status": "FAILED",
+        "worker_process_cpu_seconds": null
+      },
+      "result_code": null,
+      "stage_receipt_path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0002/parallel-execution/stages/train.json",
+      "started_utc": "2026-10-17T11:07:55Z",
+      "status": "FAILED"
+    },
+    {
+      "attempt_id": "issue60-batch02-sampling-attempt-0003",
+      "attempt_number": 3,
+      "authorized_aggregate_cpu_seconds": 30.0,
+      "complete_keys": [],
+      "completed_games": [],
+      "executing_head": "b866d0e9ccce8b447a23f1ef305362f9b51fdcf9",
+      "failure": "CostRegimeError: bounded sampling requires the reviewed two-worker tracker",
+      "finished_utc": "2026-10-17T11:17:15Z",
+      "incomplete_or_unstarted_keys": [
+        660243,
+        660244,
+        660245,
+        660246,
+        660247,
+        660248,
+        660249,
+        660250,
+        660251,
+        660252,
+        660253,
+        660254,
+        660255,
+        660256
+      ],
+      "launcher_sha256": "d0bd6f4dc64d518e94a739bc8ac82679d0630f9d373d1deda4580fabac41cd1d",
+      "parallel_stage_receipt": {
+        "aggregate_process_cpu_seconds": null,
+        "execution_count": null,
+        "max_active_workers": null,
+        "max_configured_workers": null,
+        "path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0003/parallel-execution/stages/train.json",
+        "sha256": null,
+        "status": "FAILED",
+        "worker_process_cpu_seconds": null
+      },
+      "result_code": null,
+      "stage_receipt_path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0003/parallel-execution/stages/train.json",
+      "started_utc": "2026-10-17T11:16:13Z",
+      "status": "FAILED"
+    },
+    {
+      "attempt_id": "issue60-batch02-sampling-attempt-0004",
+      "attempt_number": 4,
+      "authorized_aggregate_cpu_seconds": 37.535527225,
+      "complete_keys": [],
+      "completed_games": [],
+      "executing_head": "bfb5c122ac35ec310a8f1817c8b8379b5dc63b66",
+      "failure": null,
+      "finished_utc": "2026-10-17T11:20:42Z",
+      "incomplete_or_unstarted_keys": [
+        660243,
+        660244,
+        660245,
+        660246,
+        660247,
+        660248,
+        660249,
+        660250,
+        660251,
+        660252,
+        660253,
+        660254,
+        660255,
+        660256
+      ],
+      "launcher_sha256": "f0707549a5d96c1ec712dfbc143f2843594e6753e4b82d973121f108e68aebcb",
+      "parallel_stage_receipt": {
+        "aggregate_process_cpu_seconds": 3.825757899,
+        "execution_count": 0,
+        "max_active_workers": 0,
+        "max_configured_workers": 2,
+        "path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0004/parallel-execution/stages/train.json",
+        "sha256": "7cc1b3174d09d437a5a15a088a211d2dd05a02a27e76453732cb157b5dbd9ee7",
+        "status": "RESOURCE_BLOCKED",
+        "worker_process_cpu_seconds": 0.0
+      },
+      "result_code": 75,
+      "setup_cpu_seconds_before_tracker": 3.709769326,
+      "stage_receipt_path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0004/parallel-execution/stages/train.json",
+      "started_utc": "2026-10-17T11:19:47Z",
+      "status": "RESOURCE_BLOCKED"
+    },
+    {
+      "attempt_id": "issue60-batch02-sampling-attempt-0005",
+      "attempt_number": 5,
+      "authorized_aggregate_cpu_seconds": 100.093665856,
+      "complete_keys": [
+        660243,
+        660244,
+        660245
+      ],
+      "completed_games": [
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660243/attempt-0002",
+          "game_seed": 660243,
+          "process_cpu_seconds": 11.410155521,
+          "run_json_sha256": "275c8a06b192f370a6004f56c643d44ffad0b0313ea8803114185810d16bd0f2",
+          "stage_key": "block1:batch-02",
+          "tag_path": "evidence/prospective-cost/tags/1220d1858478028fdcd2c26678632099a0150ceff4f4e1b5c40cb120867b0ef6.json",
+          "tag_sha256": "4d96058f626220e4663aceaad3358530b935746b50d85e19e019242c69795b7b"
+        }
+      ],
+      "executing_head": "6e30c0ea35403dca8de0b897966b8ce15b7af0ca",
+      "failure": "CostRegimeError: completed target games and linked cost tags differ",
+      "finished_utc": "2026-10-17T11:26:57Z",
+      "incomplete_or_unstarted_keys": [
+        660246,
+        660247,
+        660248,
+        660249,
+        660250,
+        660251,
+        660252,
+        660253,
+        660254,
+        660255,
+        660256
+      ],
+      "launcher_sha256": "ad57e3e7a47eacbc0fa189729f8d23c733f8c0afd10f51d6662209ee13c5a59d",
+      "parallel_stage_receipt": {
+        "aggregate_process_cpu_seconds": 66.406533293,
+        "execution_count": 2,
+        "max_active_workers": 2,
+        "max_configured_workers": 2,
+        "path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0005/parallel-execution/stages/train.json",
+        "sha256": "d0e329cdfaf9ef53aad2eb9e5daffa0fcd7f44ff8d5ec562566f6f8748f580e0",
+        "status": "FAILED",
+        "worker_process_cpu_seconds": 62.178421
+      },
+      "result_code": 2,
+      "setup_cpu_seconds_before_tracker": 3.687132563,
+      "stage_receipt_path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0005/parallel-execution/stages/train.json",
+      "started_utc": "2026-10-17T11:25:36Z",
+      "status": "FAILED"
+    }
+  ],
+  "authorization_comment_id": 6232885569,
+  "authorized_keys": [
+    660243,
+    660244,
+    660245,
+    660246,
+    660247,
+    660248,
+    660249,
+    660250,
+    660251,
+    660252,
+    660253,
+    660254,
+    660255,
+    660256
+  ],
+  "base_reviewed_handoff": "d7425ace823e2b0aee5d9640341f4cef49f00259",
+  "cached_execution_witness": {
+    "accepted_replay_workers": {
+      "execution_count": 2,
+      "executions": [
+        {
+          "attempt": "evidence/validation/guard-optimization/attempt-0004/replays/cached_two_worker/seed-660001/attempt-0001",
+          "exit_code": 0,
+          "peak_rss_bytes": 283815936,
+          "pid": 20414,
+          "process_cpu_seconds_including_worker_setup": 12.556734,
+          "run_game_cpu_seconds": 12.528527844,
+          "task_key": [
+            "block1:batch-01",
+            660001,
+            "residual"
+          ],
+          "wall_seconds": 13.292529028998615
+        },
+        {
+          "attempt": "evidence/validation/guard-optimization/attempt-0004/replays/cached_two_worker/seed-660046/attempt-0001",
+          "exit_code": 0,
+          "peak_rss_bytes": 285913088,
+          "pid": 20415,
+          "process_cpu_seconds_including_worker_setup": 81.920702,
+          "run_game_cpu_seconds": 81.88086946899999,
+          "task_key": [
+            "block1:batch-01",
+            660046,
+            "residual"
+          ],
+          "wall_seconds": 83.97095325300143
+        }
+      ],
+      "max_active_workers": 2,
+      "max_configured_workers": 2,
+      "parent_peak_rss_bytes": 371122176,
+      "parent_plus_worker_peak_rss_upper_bound_bytes": 942948352,
+      "worker_peak_rss_bytes": 285913088
+    },
+    "accepted_two_worker_evidence_path": "evidence/validation/guard-optimization/attempt-0004/producer.json",
+    "accepted_two_worker_evidence_sha256": "7fb8bb2ba2a6c50a821a7f9b188e3d4c2d6ccf2d9245485f006e0993be967702",
+    "active_cached_cost_sample_count": 59,
+    "active_cached_cost_sample_max_process_cpu_seconds": 81.719305575,
+    "continuation_binding_compatibility": {
+      "accepted_change": "Planner-accepted historical provenance correction only",
+      "binding_launcher_commit": "84c4f3997d230e9a392fdef0c8ac5f9d66a5e186",
+      "binding_launcher_sha256": "699d0588765ab4f326c4382851442c9cab7a599c137f363f16feaf693c692f97",
+      "binding_mutated": false,
+      "current_launcher_base_commit": "d7425ace823e2b0aee5d9640341f4cef49f00259",
+      "current_launcher_sha256": "f4a1ef5f3167919e2fcab2f0e5305fd1befad8b56c846ffef668dcfdc3ce9382",
+      "facts_match_retained_binding": true,
+      "status": "PASS"
+    },
+    "continuation_binding_path": "evidence/prospective-cost/continuation-validation-binding.json",
+    "continuation_binding_sha256": "b7729b8441d0bba081f132a7d26b61083153aa9e925d71e74b1ac68e3df18016",
+    "dispatcher_in_flight_reserve_initialized_from_cached_sample": true,
+    "guard_active_verified_during_stage": true,
+    "guard_install_order_expected": [
+      "original-r2-runtime-hooks",
+      "cached-guard-installed"
+    ],
+    "guard_install_order_observed": [
+      "original-r2-runtime-hooks",
+      "cached-guard-installed"
+    ],
+    "in_memory_validation": {
+      "binding_sha256": "b7729b8441d0bba081f132a7d26b61083153aa9e925d71e74b1ac68e3df18016",
+      "schema_id": "issue60-in-memory-accepted-two-worker-binding-v1",
+      "source_files": {
+        "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+        "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9"
+      },
+      "status": "PASS",
+      "validation": {
+        "basis": "evidence/prospective-cost/continuation-validation-binding.json",
+        "status": "PASS"
+      },
+      "worker_selection": {
+        "worker_count": 2
+      }
+    }
+  },
+  "checkpoint": {
+    "completed_batches": 1,
+    "model_sha256": "c05ffb91ed6cb702e9ad135afe3b537c1348f2da8e21958c38141404055bfbb5",
+    "path": "evidence/training/block1/latest.pt",
+    "sha256": "52a7f511b46742323020509aac3275ed7ec8f5f1974962435d129ea909b5c77d"
+  },
+  "complete_game_costs": [
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660243/attempt-0002",
+      "game_seed": 660243,
+      "process_cpu_seconds": 11.410155521,
+      "run_json_sha256": "275c8a06b192f370a6004f56c643d44ffad0b0313ea8803114185810d16bd0f2",
+      "status": "COMPLETE",
+      "terminal_floor": 8.0
+    },
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660244/attempt-0002",
+      "game_seed": 660244,
+      "process_cpu_seconds": 19.238419744,
+      "run_json_sha256": "10fb9940d8b2c00a2514a6947fa2f646e9fb3bf94045530fdf7457d098bd1542",
+      "status": "COMPLETE",
+      "terminal_floor": 10.0
+    },
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660245/attempt-0001",
+      "game_seed": 660245,
+      "process_cpu_seconds": 6.258796179,
+      "run_json_sha256": "d25abda8f5afd751a7a43e5abb044eb576041eaa00ffa660922119528b8adf1d",
+      "status": "COMPLETE",
+      "terminal_floor": 6.0
+    }
+  ],
+  "complete_keys": [
+    660243,
+    660244,
+    660245
+  ],
+  "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+  "cost_index_after_path": "evidence/prospective-cost/cost-index.json",
+  "cost_index_after_sha256": "a2b00dea6f45ba2d4e8f4822b821f5b0caf594591020d1131a07c4d7934f7853",
+  "cost_index_before": {
+    "cached_complete_game_count": 59,
+    "path": "evidence/prospective-cost/cost-index.json",
+    "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+    "producer_files": {
+      "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+      "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+      "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+      "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+      "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+      "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+      "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+      "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+      "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+      "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+    },
+    "sha256": "9d42c8e76e17dc8a372ba4cc1454971d9ab3cae213112dff0718720f63176bf0",
+    "tag_count": 59
+  },
+  "cost_tags_linking_observations_to_this_receipt": [
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660243/attempt-0002",
+      "game_seed": 660243,
+      "run_json_sha256": "275c8a06b192f370a6004f56c643d44ffad0b0313ea8803114185810d16bd0f2",
+      "tag_path": "evidence/prospective-cost/tags/1220d1858478028fdcd2c26678632099a0150ceff4f4e1b5c40cb120867b0ef6.json",
+      "tag_producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+      "tag_producer_files": {
+        "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+        "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+        "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+        "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+        "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+        "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+        "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+        "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+        "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+        "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+        "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+      },
+      "tag_sha256": "4d96058f626220e4663aceaad3358530b935746b50d85e19e019242c69795b7b"
+    },
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660244/attempt-0002",
+      "game_seed": 660244,
+      "run_json_sha256": "10fb9940d8b2c00a2514a6947fa2f646e9fb3bf94045530fdf7457d098bd1542",
+      "tag_path": "evidence/prospective-cost/tags/3078c5c73f5670d4132f6ba06b676bf3c5e558b35ad6255f5e247b26f4e6f49b.json",
+      "tag_producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+      "tag_producer_files": {
+        "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+        "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+        "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+        "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+        "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+        "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+        "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+        "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+        "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+        "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+        "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+      },
+      "tag_sha256": "52c6cb3df2164acd6dba41f11de68fe5e73117b7e810df47e3d4d1bcef524aa0"
+    }
+  ],
+  "cumulative_accounted_builder_cpu_seconds": 24034.182992988008,
+  "cumulative_builder_cap_cpu_seconds": 180000.0,
+  "cumulative_process_cap_cpu_seconds": 200000.0,
+  "disposition": "STUDY_ONLY / NO_SCIENTIFIC_RESULT",
+  "evaluation_runs": 0,
+  "executing_head": "6e30c0ea35403dca8de0b897966b8ce15b7af0ca",
+  "failure": "CostRegimeError: completed target games and linked cost tags differ",
+  "finished_utc": "2026-10-17T11:26:57Z",
+  "full_grid_forecast": {
+    "forecast": {
+      "accounted_cpu_seconds": 24034.182992988008,
+      "all_history": {
+        "mean": 22.01217273232787,
+        "n": 61,
+        "sample_sd": 16.64464469968159,
+        "upper": 28.4055578571444
+      },
+      "builder_budget_cpu_seconds": 180000.0,
+      "cost_rule": "max(all-history and recent-128 mean + 3 sample-SD/sqrt(n))",
+      "game_cost_multiplier": 1.5,
+      "interpretation": "fixed operational heuristic; not a calibrated confidence bound or cost guarantee",
+      "max_based_stress_game_projection_cpu_seconds": 359793.75858561,
+      "max_observed_game_cpu_seconds_stress_only": 81.719305575,
+      "observed_complete_games": 61,
+      "optimizer_headroom_fraction": 0.2,
+      "process_cpu_cap_seconds": 200000.0,
+      "projected_all_in_cpu_seconds": 199287.0642713034,
+      "projected_builder_cpu_seconds": 179287.0642713034,
+      "projected_remaining_cpu_seconds": 155252.88127831538,
+      "projected_remaining_game_cpu_seconds_before_headroom": 104219.9917778628,
+      "projected_remaining_game_cpu_seconds_with_headroom": 125063.99013343535,
+      "projected_remaining_optimizer_cpu_seconds_with_headroom": 30188.89114488005,
+      "recent_observed_games": 61,
+      "recent_window": {
+        "mean": 22.01217273232787,
+        "n": 61,
+        "sample_sd": 16.64464469968159,
+        "upper": 28.4055578571444
+      },
+      "recent_window_size": 128,
+      "remaining_games": 2446,
+      "remaining_optimizer_cpu_seconds_before_headroom": 25157.40928740004,
+      "reviewer_reserve_cpu_seconds": 20000.0,
+      "status": "PASS",
+      "unit_cost_cpu_seconds": 28.4055578571444
+    },
+    "optimizer_remaining_cpu_seconds": 25157.40928740004,
+    "path": "evidence/prospective-cost/batch02-sampling-forecast.json",
+    "remaining_formal_games": 2446,
+    "sha256": "91231eea33f707c62788ca968bf5d21f7c8fdd05001b1cba30594c2cd30cbea7"
+  },
+  "incomplete_or_unstarted_keys": [
+    660246,
+    660247,
+    660248,
+    660249,
+    660250,
+    660251,
+    660252,
+    660253,
+    660254,
+    660255,
+    660256
+  ],
+  "launcher_path": "bounded_batch02_sampling.py",
+  "launcher_sha256": "ad57e3e7a47eacbc0fa189729f8d23c733f8c0afd10f51d6662209ee13c5a59d",
+  "legacy_forecasts_preserved": {
+    "cost_index_snapshot": {
+      "path": "evidence/prospective-cost/history/cost-index-before-batch02.json",
+      "sha256": "9d42c8e76e17dc8a372ba4cc1454971d9ab3cae213112dff0718720f63176bf0"
+    },
+    "forecast_events_sha256": "1d494773a3ba3cb0ec36e2637bdcbade5e1bb85b3b31c3ceba2e0692846c36ef",
+    "latest_forecast_path": "evidence/prospective-cost/latest-forecast.json",
+    "latest_forecast_sha256": "9c5f77592a89b585317406b5a64d6cd7cbf372b83ad08cb8f863c4c5ab63d34e"
+  },
+  "limitations": [
+    "The 114 uncached historical batch-02 games still have unknown actual producer provenance.",
+    "The updated cost index is operational evidence, not a scientific result or permission to continue.",
+    "The retained legacy forecast remains historical; the new forecast is reported separately."
+  ],
+  "optimizer_updates": 0,
+  "parallel_stage_receipt": {
+    "aggregate_process_cpu_seconds": 66.406533293,
+    "execution_count": 2,
+    "executions": [
+      {
+        "exit_code": 70,
+        "peak_rss_bytes": 269815808,
+        "pid": 1494,
+        "process_cpu_seconds_including_worker_setup": 0.09690199999999999,
+        "run_game_cpu_seconds": null,
+        "task_key": [
+          "block1:batch-02",
+          660244,
+          "residual"
+        ],
+        "wall_seconds": 0.17043786399995042
+      },
+      {
+        "attempt": "evidence/runs/training/block1/batch-02/seed-660243/attempt-0002",
+        "exit_code": 70,
+        "peak_rss_bytes": 284368896,
+        "pid": 1493,
+        "process_cpu_seconds_including_worker_setup": 31.350486,
+        "run_game_cpu_seconds": 11.410155521,
+        "task_key": [
+          "block1:batch-02",
+          660243,
+          "residual"
+        ],
+        "wall_seconds": 26.05305992000001
+      }
+    ],
+    "host": {
+      "cpu_model": "AMD Ryzen 7 H 255 W/ Radeon 780M",
+      "cpu_quota_count": null,
+      "cpus_allowed_list": "0-15",
+      "effective_cpu_count": 16,
+      "effective_memory_available_bytes": 23920648192,
+      "logical_cpu_count": 16,
+      "memory_available_bytes": 23920648192,
+      "memory_current_bytes": 0,
+      "memory_limit_bytes": null,
+      "memory_total_bytes": 25199452160
+    },
+    "max_active_workers": 2,
+    "max_configured_workers": 2,
+    "parent_peak_rss_bytes": 347983872,
+    "parent_plus_worker_peak_rss_upper_bound_bytes": 916721664,
+    "parent_process_cpu_seconds": 4.228112293,
+    "schema_id": "issue60-parallel-stage-receipt-v1",
+    "source_commit": "6e30c0ea35403dca8de0b897966b8ce15b7af0ca",
+    "source_files": {
+      "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+      "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9"
+    },
+    "stage": "train",
+    "status": "FAILED",
+    "wall_seconds": 31.801272184000027,
+    "worker_count": 2,
+    "worker_peak_rss_bytes": 284368896,
+    "worker_process_cpu_seconds": 62.178421
+  },
+  "per_key_attempts": [
+    {
+      "attempts": [
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660243/attempt-0001",
+          "failure": "ResourceBudgetExceeded: RESOURCE_BLOCKED: prospective cached-regime forecast exceeds the unchanged caps: Builder=180002.617s, all-in=200002.617s",
+          "process_cpu_seconds": 119.390181,
+          "run_json_exists": false,
+          "run_json_sha256": null,
+          "status": "INCOMPLETE",
+          "status_json_mtime_utc": "2026-10-17T10:41:04Z",
+          "status_json_sha256": "57422d9d3d74ad9d44ac0ae5d9ed0b91fbeb10804a54b9b0d31f176943bb8279"
+        },
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660243/attempt-0002",
+          "failure": null,
+          "process_cpu_seconds": 11.410155521,
+          "run_json_exists": true,
+          "run_json_sha256": "275c8a06b192f370a6004f56c643d44ffad0b0313ea8803114185810d16bd0f2",
+          "status": "COMPLETE",
+          "status_json_mtime_utc": "2026-10-17T11:26:39Z",
+          "status_json_sha256": "c2aca90a52e18d4426449ccec822835ea1482e9b15d14e2a7b5817fb125ecc3c"
+        }
+      ],
+      "game_seed": 660243,
+      "status": "COMPLETE"
+    },
+    {
+      "attempts": [
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660244/attempt-0001",
+          "failure": "ResourceBudgetExceeded: RESOURCE_BLOCKED: prospective cached-regime forecast exceeds the unchanged caps: Builder=180001.833s, all-in=200001.833s",
+          "process_cpu_seconds": 30.094831,
+          "run_json_exists": false,
+          "run_json_sha256": null,
+          "status": "INCOMPLETE",
+          "status_json_mtime_utc": "2026-10-17T10:41:04Z",
+          "status_json_sha256": "bb908d3db82c792bafbe78902316973ce56c5e89a08b8d396cb1c5df00ad8992"
+        },
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660244/attempt-0002",
+          "failure": null,
+          "process_cpu_seconds": 19.238419744,
+          "run_json_exists": true,
+          "run_json_sha256": "10fb9940d8b2c00a2514a6947fa2f646e9fb3bf94045530fdf7457d098bd1542",
+          "status": "COMPLETE",
+          "status_json_mtime_utc": "2026-10-17T11:26:47Z",
+          "status_json_sha256": "96eba702a69d81653599fdd6bb51702c73a018f5f7021a57b0f0c3dd4f13842b"
+        }
+      ],
+      "game_seed": 660244,
+      "status": "COMPLETE"
+    },
+    {
+      "attempts": [
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660245/attempt-0001",
+          "failure": null,
+          "process_cpu_seconds": 6.258796179,
+          "run_json_exists": true,
+          "run_json_sha256": "d25abda8f5afd751a7a43e5abb044eb576041eaa00ffa660922119528b8adf1d",
+          "status": "COMPLETE",
+          "status_json_mtime_utc": "2026-10-17T11:26:49Z",
+          "status_json_sha256": "9306eeaf8adc73028e434551820d1060c9954a2485d1a8107b21e9b9dff6aeee"
+        }
+      ],
+      "game_seed": 660245,
+      "status": "COMPLETE"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660246,
+      "status": "NOT_STARTED"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660247,
+      "status": "NOT_STARTED"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660248,
+      "status": "NOT_STARTED"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660249,
+      "status": "NOT_STARTED"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660250,
+      "status": "NOT_STARTED"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660251,
+      "status": "NOT_STARTED"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660252,
+      "status": "NOT_STARTED"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660253,
+      "status": "NOT_STARTED"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660254,
+      "status": "NOT_STARTED"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660255,
+      "status": "NOT_STARTED"
+    },
+    {
+      "attempts": [],
+      "game_seed": 660256,
+      "status": "NOT_STARTED"
+    }
+  ],
+  "r2_source_compatibility": {
+    "changed_paths_since_r2_seal": {
+      "test_resource_amendment_r2.py": "M"
+    },
+    "executing_head": "6e30c0ea35403dca8de0b897966b8ce15b7af0ca",
+    "post_seal_offline_test_only_change": true,
+    "runtime_source_files_unchanged": true,
+    "sealed_source_commit": "aa7f467f20053cb1f87b0c0e79add4eca824e9b8",
+    "source_paths": {
+      "resource_amendment_r2.py": {
+        "executing_head_sha256": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+        "matches_sealed_source": true,
+        "sealed_source_sha256": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12"
+      },
+      "run_study_r2.py": {
+        "executing_head_sha256": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+        "matches_sealed_source": true,
+        "sealed_source_sha256": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf"
+      },
+      "test_resource_amendment_r2.py": {
+        "executing_head_sha256": "19e601ad5e22f32e542ed70a9d9d90b80624e9743597a7d23e17e6e47b4ded42",
+        "matches_sealed_source": false,
+        "sealed_source_sha256": "c57595e55d1f4e68fdbd6df717682ee3afd0168619b2cac5819cfccd0d1fbd18"
+      }
+    },
+    "status": "PASS"
+  },
+  "runtime": {
+    "deterministic_algorithms": true,
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "native_module": "/home/lsmft/stsrl-spikes/issue60-runtime/build-issue60/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_source": "/home/lsmft/stsrl-spikes/sts_lightspeed-issue59",
+    "python": "3.13.13",
+    "runtime_api": {
+      "LightSpeedAdapter": "sts_combat_rl.sim.lightspeed",
+      "action_space": {
+        "allow_excluded_fallback": true,
+        "excluded_kinds": [],
+        "include_non_combat_potions": true,
+        "preferred_kinds": [
+          "card",
+          "end_turn"
+        ]
+      },
+      "execute_controlled_run": "sts_combat_rl.sim.controlled_run"
+    },
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsr_source": "/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c",
+    "torch": "2.12.0+cpu",
+    "torch_threads": 1
+  },
+  "schema_id": "issue60-batch02-sampling-execution-v1",
+  "scope": "block1:batch-02 exact original game keys 660243..660256 only",
+  "source_revision_rollovers": [
+    {
+      "basis": "all prior attempts failed before dispatch; no target games completed; original incomplete attempts preserved",
+      "from_executing_head": "0c31db9b0f65edf1734751a30ea4d92beab0ef47",
+      "from_launcher_sha256": "13741a51763f2410dd32910891af3b44e1eb7222036e6a0549e962c1d71c9672",
+      "last_failed_attempt_id": "issue60-batch02-sampling-attempt-0002",
+      "new_dispatches_before_rollover": 0,
+      "preserved_attempt_ids": [
+        "issue60-batch02-sampling-attempt-0001",
+        "issue60-batch02-sampling-attempt-0002"
+      ],
+      "to_executing_head": "b866d0e9ccce8b447a23f1ef305362f9b51fdcf9",
+      "to_launcher_sha256": "d0bd6f4dc64d518e94a739bc8ac82679d0630f9d373d1deda4580fabac41cd1d"
+    },
+    {
+      "basis": "all prior attempts failed before dispatch; no target games completed; original incomplete attempts preserved",
+      "from_executing_head": "b866d0e9ccce8b447a23f1ef305362f9b51fdcf9",
+      "from_launcher_sha256": "d0bd6f4dc64d518e94a739bc8ac82679d0630f9d373d1deda4580fabac41cd1d",
+      "last_failed_attempt_id": "issue60-batch02-sampling-attempt-0003",
+      "new_dispatches_before_rollover": 0,
+      "preserved_attempt_ids": [
+        "issue60-batch02-sampling-attempt-0001",
+        "issue60-batch02-sampling-attempt-0002",
+        "issue60-batch02-sampling-attempt-0003"
+      ],
+      "to_executing_head": "bfb5c122ac35ec310a8f1817c8b8379b5dc63b66",
+      "to_launcher_sha256": "f0707549a5d96c1ec712dfbc143f2843594e6753e4b82d973121f108e68aebcb"
+    },
+    {
+      "basis": "all prior attempts failed before dispatch; no target games completed; original incomplete attempts preserved",
+      "from_executing_head": "bfb5c122ac35ec310a8f1817c8b8379b5dc63b66",
+      "from_launcher_sha256": "f0707549a5d96c1ec712dfbc143f2843594e6753e4b82d973121f108e68aebcb",
+      "last_failed_attempt_id": "issue60-batch02-sampling-attempt-0004",
+      "new_dispatches_before_rollover": 0,
+      "preserved_attempt_ids": [
+        "issue60-batch02-sampling-attempt-0001",
+        "issue60-batch02-sampling-attempt-0002",
+        "issue60-batch02-sampling-attempt-0003",
+        "issue60-batch02-sampling-attempt-0004"
+      ],
+      "to_executing_head": "6e30c0ea35403dca8de0b897966b8ce15b7af0ca",
+      "to_launcher_sha256": "ad57e3e7a47eacbc0fa189729f8d23c733f8c0afd10f51d6662209ee13c5a59d"
+    }
+  ],
+  "started_utc": "2026-10-17T11:02:01Z",
+  "status": "FAILED"
+}

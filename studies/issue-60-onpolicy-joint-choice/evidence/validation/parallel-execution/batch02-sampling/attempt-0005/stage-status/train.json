@@ -1,0 +1,25 @@
+{
+  "authorization_comment_id": 6232885569,
+  "authorized_game_seeds": [
+    660243,
+    660244,
+    660245,
+    660246,
+    660247,
+    660248,
+    660249,
+    660250,
+    660251,
+    660252,
+    660253,
+    660254,
+    660255,
+    660256
+  ],
+  "failure": "ParallelExecutionError: fixed game ('block1:batch-02', 660244, 'residual') failed: ParallelExecutionError: fixed game ('block1:batch-02', 660243, 'residual') failed: FileExistsError: [Errno 17] File exists: '/mnt/d/DeadlycatCoding/spire-research-issue60-batch02-14/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block1/batch-02/seed-660243/attempt-0002'",
+  "optimizer_updates": 0,
+  "schema_id": "issue60-batch02-sampling-stage-v1",
+  "stage_key": "block1:batch-02",
+  "status": "FAILED",
+  "updated_utc": "2026-10-17T11:26:52Z"
+}

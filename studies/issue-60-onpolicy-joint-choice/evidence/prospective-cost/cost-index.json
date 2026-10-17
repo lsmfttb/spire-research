@@ -353,9 +353,21 @@
       "game_seed": 660128,
       "process_cpu_seconds": 18.965882767,
       "stage_key": "block1:batch-01"
+    },
+    {
+      "arm": "residual",
+      "game_seed": 660243,
+      "process_cpu_seconds": 11.410155521,
+      "stage_key": "block1:batch-02"
+    },
+    {
+      "arm": "residual",
+      "game_seed": 660244,
+      "process_cpu_seconds": 19.238419744,
+      "stage_key": "block1:batch-02"
     }
   ],
-  "cost_observations_sha256": "76bf6684d5619f197194d33ae4ef9e6cbb0a34846d52cb732fa5c22915d53355",
+  "cost_observations_sha256": "a0c1d402de8663e38641b5c97d0bbbd59a8fd7f48c99316babbd251c41b29fb1",
   "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
   "producer_files": {
     "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
@@ -372,7 +384,7 @@
   },
   "regime_id": "issue60-cached-guard-v1",
   "schema_id": "issue60-prospective-cost-index-v1",
-  "tag_count": 59,
-  "tags_sha256": "d053bb82d16c0600b2fc6f36ba0961e4f0a2a2e29827428d8623333c042394e3",
-  "updated_utc": "2026-10-16T15:10:03Z"
+  "tag_count": 61,
+  "tags_sha256": "6b4d53a08783c5a22c197e8ab18eec4c252b2b4d49ac0aafb410a51e013204d1",
+  "updated_utc": "2026-10-17T11:26:47Z"
 }
