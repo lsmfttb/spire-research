@@ -10,6 +10,7 @@ import argparse
 import calendar
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -27,6 +28,8 @@ PROSPECTIVE = EVIDENCE / "prospective-cost"
 EXECUTIONS = PROSPECTIVE / "executions"
 RECEIPT = EXECUTIONS / "batch02-sampling.json"
 FORECAST_INDEX = PROSPECTIVE / "cost-index.json"
+FORECAST_PATH = PROSPECTIVE / "batch02-sampling-forecast.json"
+INTERRUPTION_RESERVE_STAGE = "issue60-batch02-sampling-unreconciled-interruption-reserve"
 AUTHORIZATION = 6232885569
 BASE_HANDOFF = "d7425ace823e2b0aee5d9640341f4cef49f00259"
 CHECKPOINT_SHA = "c05ffb91ed6cb702e9ad135afe3b537c1348f2da8e21958c38141404055bfbb5"
@@ -391,6 +394,36 @@ def _ledger_rows() -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def _numeric_cpu(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    amount = float(value)
+    return amount if math.isfinite(amount) and amount >= 0 else None
+
+
+def _interruption_budget_hold(*, code_and_check_reserve: float,
+                              attempt_rows: list[dict[str, Any]],
+                              explicit_hold: float) -> float:
+    """Reserve all unused local authority after an unsettled attempt.
+
+    The value is a budget hold, not a measurement of the missing process CPU.
+    The currently running attempt is excluded because its live tracker charges
+    that work and its in-flight reserve separately.
+    """
+    charged_attempts = 0.0
+    for row in attempt_rows:
+        amount = _numeric_cpu(row.get("authorized_aggregate_cpu_seconds"))
+        is_current_running = (
+            row.get("status") == "RUNNING" and row.get("attempt_id") == ATTEMPT_ID
+        )
+        if amount is not None:
+            charged_attempts += amount
+        elif not is_current_running:
+            return max(0.0, LOCAL_LIMIT - code_and_check_reserve
+                       - charged_attempts - explicit_hold)
+    return 0.0
+
+
 def _authorization_charges() -> float:
     code_and_check_reserve = sum(
         float(row.get("process_cpu_seconds", 0.0))
@@ -398,12 +431,23 @@ def _authorization_charges() -> float:
         if row.get("authorization_comment_id") == AUTHORIZATION
         and row.get("stage") == "issue60-batch02-sampling-code-check-reserve"
     )
+    attempts = list(EXECUTION.get("attempts", []))
     prior_attempts = sum(
-        float(row.get("authorized_aggregate_cpu_seconds", 0.0))
-        for row in EXECUTION.get("attempts", [])
-        if row.get("status") != "RUNNING" or "authorized_aggregate_cpu_seconds" in row
+        amount for row in attempts
+        if (amount := _numeric_cpu(row.get("authorized_aggregate_cpu_seconds"))) is not None
     )
-    return code_and_check_reserve + prior_attempts
+    explicit_hold = sum(
+        float(row.get("process_cpu_seconds", 0.0))
+        for row in _ledger_rows()
+        if row.get("authorization_comment_id") == AUTHORIZATION
+        and row.get("stage") == INTERRUPTION_RESERVE_STAGE
+    )
+    fallback_hold = _interruption_budget_hold(
+        code_and_check_reserve=code_and_check_reserve,
+        attempt_rows=attempts,
+        explicit_hold=explicit_hold,
+    )
+    return code_and_check_reserve + prior_attempts + explicit_hold + fallback_hold
 
 
 def _append_ledger(row: dict[str, Any]) -> None:
@@ -418,6 +462,29 @@ def _append_ledger(row: dict[str, Any]) -> None:
         os.fsync(stream.fileno())
 
 
+def _reserve_unreconciled_cpu(*, attempt_id: str, source_commit: str) -> float:
+    existing = next((row for row in _ledger_rows()
+                     if row.get("attempt") == f"{attempt_id}-unreconciled-budget-reserve"), None)
+    if existing is not None:
+        return float(existing.get("process_cpu_seconds", 0.0))
+    charge = max(0.0, LOCAL_LIMIT - _authorization_charges())
+    _append_ledger({
+        "attempt": f"{attempt_id}-unreconciled-budget-reserve",
+        "authorization_comment_id": AUTHORIZATION,
+        "stage": INTERRUPTION_RESERVE_STAGE,
+        "status": "CONSERVATIVE_BUDGET_HOLD",
+        "process_cpu_seconds": charge,
+        "measurement": "CONSERVATIVE_RESERVATION_NOT_MEASUREMENT",
+        "source_commit": source_commit,
+        "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "accounting": (
+            "reserve the full remaining 2,000 CPU-s local authorization because exact aggregate "
+            "CPU for this attempt is unavailable; this is a budget hold, not measured process CPU"
+        ),
+    })
+    return charge
+
+
 def _attempt_number() -> int:
     if not RECEIPT.is_file():
         return 1
@@ -425,13 +492,91 @@ def _attempt_number() -> int:
     if previous.get("authorization_comment_id") != AUTHORIZATION:
         raise bridge.CostRegimeError("sampling receipt belongs to another authorization")
     attempts = list(previous.get("attempts", []))
-    if attempts and attempts[-1].get("status") == "RUNNING":
+    if attempts and (
+        attempts[-1].get("status") in {"RUNNING", "INTERRUPTED"}
+        or _numeric_cpu(attempts[-1].get("authorized_aggregate_cpu_seconds")) is None
+    ):
         # A killed process may have spent CPU that no final stage receipt can
         # recover. Do not reset the local allowance or repeat uncertain work.
         raise bridge.CostRegimeError(
-            "prior bounded sampling attempt has no settled receipt; stop for Planner review"
+            "prior bounded sampling attempt is unsettled or interrupted; stop for budget reconciliation"
         )
     return len(attempts) + 1
+
+
+def _invalidate_batch02_forecast(*, status: str, reason: str,
+                                 attempt_id: str | None = None) -> dict[str, Any]:
+    """Replace any derived forecast with a hash-bound non-authorizing record."""
+    previous = None
+    previous_sha256 = None
+    if FORECAST_PATH.is_file():
+        previous = json.loads(FORECAST_PATH.read_text(encoding="utf-8"))
+        previous_sha256 = _sha256(FORECAST_PATH)
+        if str(previous.get("status", "")).startswith("INVALIDATED_"):
+            previous_sha256 = previous.get("source_forecast_sha256", previous_sha256)
+    preserved_path = None
+    if (previous is not None
+            and not str(previous.get("status", "")).startswith("INVALIDATED_")):
+        preserved = PROSPECTIVE / "history" / "batch02-sampling-forecast-before-unsettled-attempt.json"
+        preserved.parent.mkdir(parents=True, exist_ok=True)
+        if not preserved.exists():
+            shutil.copy2(FORECAST_PATH, preserved)
+        preserved_path = preserved.relative_to(HERE).as_posix()
+    index = bridge._read_json(FORECAST_INDEX) if FORECAST_INDEX.is_file() else {}
+    record = {
+        "schema_id": "issue60-batch02-sampling-forecast-v1",
+        "authorization_comment_id": AUTHORIZATION,
+        "status": status,
+        "forecast_role": "invalidated record; not a cost forecast or budget authorization",
+        "invalidation_reason": reason,
+        "attempt_id": attempt_id,
+        "source_forecast_sha256": previous_sha256,
+        "preserved_forecast_path": preserved_path,
+        "cost_index_path": FORECAST_INDEX.relative_to(HERE).as_posix(),
+        "cached_cost_sample_count": index.get("tag_count"),
+        "cached_cost_sample_sha256": (
+            _sha256(FORECAST_INDEX) if FORECAST_INDEX.is_file() else None
+        ),
+        "forecast": None,
+        "remaining_formal_games": None,
+        "decision": "STOP; do not dispatch until unresolved CPU and budget are reconciled",
+    }
+    if previous is not None:
+        for field in (
+            "interruption_reconciliation_path",
+            "preserved_forecast_path",
+            "exact_interrupted_attempt_aggregate_cpu_seconds",
+            "conservative_budget_charge_cpu_seconds",
+            "local_authorization_remaining_cpu_seconds",
+            "complete_authorized_keys",
+            "incomplete_or_unstarted_authorized_keys",
+            "dispatch_permitted",
+        ):
+            if field in previous:
+                record[field] = previous[field]
+    _atomic_json(FORECAST_PATH, record)
+    return record
+
+
+def _reject_unsettled_receipt_before_preflight() -> None:
+    if not RECEIPT.is_file():
+        return
+    previous = json.loads(RECEIPT.read_text(encoding="utf-8"))
+    attempts = list(previous.get("attempts", []))
+    unsettled = next((row for row in reversed(attempts) if (
+        row.get("status") in {"RUNNING", "INTERRUPTED"}
+        or _numeric_cpu(row.get("authorized_aggregate_cpu_seconds")) is None
+    )), None)
+    if previous.get("status") in {"STARTED", "INTERRUPTED"} or unsettled is not None:
+        _invalidate_batch02_forecast(
+            status="INVALIDATED_UNRECONCILED_CPU",
+            reason=("prior attempt was interrupted or never finalized; exact aggregate CPU "
+                    "is unavailable and its remaining local authority is held"),
+            attempt_id=(unsettled or {}).get("attempt_id"),
+        )
+        raise bridge.CostRegimeError(
+            "prior bounded sampling attempt is unsettled or interrupted; stop for budget reconciliation"
+        )
 
 
 def _cost_tag_path(attempt_path: str) -> Path:
@@ -940,6 +1085,7 @@ def _write_bounded_receipt(preflight: dict[str, Any], *, status: str,
 
 
 def _preflight() -> dict[str, Any]:
+    _reject_unsettled_receipt_before_preflight()
     import run_study
     import run_study_r2
     import resource_amendment_r1
@@ -1260,6 +1406,11 @@ def _prepare_receipt(preflight: dict[str, Any]) -> None:
     EXECUTION["pre_dispatch"] = preflight
     EXECUTION["attempts"][-1] = ATTEMPT
     _atomic_json(RECEIPT, EXECUTION)
+    _invalidate_batch02_forecast(
+        status="INVALIDATED_ATTEMPT_IN_PROGRESS",
+        reason="a new bounded attempt started; prior forecast cannot represent in-flight work",
+        attempt_id=ATTEMPT_ID,
+    )
 
 
 def _finalize(*, result: int | None, error: BaseException | None) -> dict[str, Any]:
@@ -1279,6 +1430,9 @@ def _finalize(*, result: int | None, error: BaseException | None) -> dict[str, A
         stage_status = "RESOURCE_BLOCKED" if "RESOURCE_BLOCKED" in str(error) else "FAILED"
     elif result == 0:
         stage_status = "COMPLETE"
+    stage_aggregate_cpu = _numeric_cpu(
+        (stage_receipt or {}).get("aggregate_process_cpu_seconds")
+    )
     target = _target_state(run_study, CHECKPOINT_SHA, run_study.config_sha())
     complete_keys = [row["game_seed"] for row in target["complete"]]
     status = "COMPLETE" if complete_keys == list(TARGET_SEEDS) and stage_status == "COMPLETE" else stage_status
@@ -1292,17 +1446,18 @@ def _finalize(*, result: int | None, error: BaseException | None) -> dict[str, A
     finalization_floor = INCREMENTAL_FINALIZATION_RESERVE
     charged_parent = setup_cpu + parent_stage_cpu + finalization_floor
     ledger_attempt = f"{ATTEMPT_ID}-parent-and-finalization"
-    _append_ledger({
-        "attempt": ledger_attempt,
-        "authorization_comment_id": AUTHORIZATION,
-        "stage": "issue60-batch02-sampling-parent-and-finalization",
-        "status": status,
-        "process_cpu_seconds": charged_parent,
-        "source_commit": EXECUTION["executing_head"],
-        "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "accounting": "pre-tracker parent/setup CPU + tracked parent-stage CPU + 30 CPU-s finalization reserve; worker CPU is separately charged by the parallel stage receipt",
-        "parallel_stage_receipt_path": ATTEMPT["stage_receipt_path"],
-    })
+    if stage_aggregate_cpu is not None:
+        _append_ledger({
+            "attempt": ledger_attempt,
+            "authorization_comment_id": AUTHORIZATION,
+            "stage": "issue60-batch02-sampling-parent-and-finalization",
+            "status": status,
+            "process_cpu_seconds": charged_parent,
+            "source_commit": EXECUTION["executing_head"],
+            "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "accounting": "pre-tracker parent/setup CPU + tracked parent-stage CPU + 30 CPU-s finalization reserve; worker CPU is separately charged by the parallel stage receipt",
+            "parallel_stage_receipt_path": ATTEMPT["stage_receipt_path"],
+        })
 
     # Reload tags after the dispatcher has tagged only complete authorized keys.
     bridge._COST_TAG_ROWS = None
@@ -1318,43 +1473,58 @@ def _finalize(*, result: int | None, error: BaseException | None) -> dict[str, A
         status = "FAILED"
         error = error or bridge.CostRegimeError("cost index contains a key outside the authorized set")
 
-    formal_complete = [row for row in complete_game_costs(HERE) if row.get("stage_key") != "preflight"]
-    remaining_games = max(0, int(resource_amendment_r2.FORMAL_GAME_COUNT) - len(formal_complete))
-    optimizer = remaining_optimizer_projection(HERE)
-    cached_costs = bridge._cost_sample()
-    forecast = build_forecast(
-        costs=cached_costs,
-        remaining_games=remaining_games,
-        remaining_optimizer_cpu=float(optimizer["remaining_optimizer_cpu_seconds"]),
-        accounted_cpu=(resource_amendment_r2.STATIC_ALLOWANCE_SECONDS
-                       + resource_amendment_r2._ledger_total(HERE)),
-    )
-    forecast_record = {
-        "schema_id": "issue60-batch02-sampling-forecast-v1",
-        "authorization_comment_id": AUTHORIZATION,
-        "status": "UPDATED_COST_FORECAST",
-        "forecast_role": "descriptive updated cached-path projection; not a gate or permission to continue",
-        "remaining_formal_games": remaining_games,
-        "remaining_optimizer_projection": optimizer,
-        "cached_cost_sample_count": len(cached_costs),
-        "cached_cost_sample_sha256": _sha256(bridge.FORECAST_INDEX),
-        "cost_index_path": bridge.FORECAST_INDEX.relative_to(HERE).as_posix(),
-        "forecast": forecast,
-        "decision": "STOP_AFTER_AUTHORIZED_BATCH02_SAMPLING_BEFORE_PPO_OR_EVALUATION",
-        "legacy_latest_forecast_preserved": True,
-        "unknown_historical_114_game_producer_preserved_as_unknown": True,
-        "complete_authorized_keys": complete_keys,
-        "incomplete_or_unstarted_authorized_keys": [
-            row["game_seed"] for row in target["keys"] if row["status"] != "COMPLETE"
-        ],
-    }
-    forecast_path = PROSPECTIVE / "batch02-sampling-forecast.json"
-    _atomic_json(forecast_path, forecast_record)
-    ATTEMPT["authorized_aggregate_cpu_seconds"] = (
-        setup_cpu
-        + float((stage_receipt or {}).get("aggregate_process_cpu_seconds", 0.0))
-        + INCREMENTAL_FINALIZATION_RESERVE
-    )
+    forecast_path = FORECAST_PATH
+    if stage_aggregate_cpu is None:
+        optimizer = None
+        remaining_games = None
+        forecast = None
+        forecast_record = _invalidate_batch02_forecast(
+            status="INVALIDATED_UNRECONCILED_CPU",
+            reason="terminal attempt lacks an exact aggregate parallel-stage CPU receipt",
+            attempt_id=ATTEMPT_ID,
+        )
+        hold = _reserve_unreconciled_cpu(
+            attempt_id=ATTEMPT_ID,
+            source_commit=EXECUTION["executing_head"],
+        )
+        ATTEMPT["authorized_aggregate_cpu_seconds"] = None
+        ATTEMPT["exact_aggregate_cpu_seconds"] = "UNAVAILABLE"
+        ATTEMPT["conservative_budget_charge_cpu_seconds"] = hold
+    else:
+        formal_complete = [row for row in complete_game_costs(HERE) if row.get("stage_key") != "preflight"]
+        remaining_games = max(0, int(resource_amendment_r2.FORMAL_GAME_COUNT) - len(formal_complete))
+        optimizer = remaining_optimizer_projection(HERE)
+        cached_costs = bridge._cost_sample()
+        forecast = build_forecast(
+            costs=cached_costs,
+            remaining_games=remaining_games,
+            remaining_optimizer_cpu=float(optimizer["remaining_optimizer_cpu_seconds"]),
+            accounted_cpu=(resource_amendment_r2.STATIC_ALLOWANCE_SECONDS
+                           + resource_amendment_r2._ledger_total(HERE)),
+        )
+        forecast_record = {
+            "schema_id": "issue60-batch02-sampling-forecast-v1",
+            "authorization_comment_id": AUTHORIZATION,
+            "status": "UPDATED_COST_FORECAST",
+            "forecast_role": "descriptive updated cached-path projection; not a gate or permission to continue",
+            "remaining_formal_games": remaining_games,
+            "remaining_optimizer_projection": optimizer,
+            "cached_cost_sample_count": len(cached_costs),
+            "cached_cost_sample_sha256": _sha256(bridge.FORECAST_INDEX),
+            "cost_index_path": bridge.FORECAST_INDEX.relative_to(HERE).as_posix(),
+            "forecast": forecast,
+            "decision": "STOP_AFTER_AUTHORIZED_BATCH02_SAMPLING_BEFORE_PPO_OR_EVALUATION",
+            "legacy_latest_forecast_preserved": True,
+            "unknown_historical_114_game_producer_preserved_as_unknown": True,
+            "complete_authorized_keys": complete_keys,
+            "incomplete_or_unstarted_authorized_keys": [
+                row["game_seed"] for row in target["keys"] if row["status"] != "COMPLETE"
+            ],
+        }
+        _atomic_json(forecast_path, forecast_record)
+        ATTEMPT["authorized_aggregate_cpu_seconds"] = (
+            setup_cpu + stage_aggregate_cpu + INCREMENTAL_FINALIZATION_RESERVE
+        )
     EXECUTION["attempts"][-1] = ATTEMPT
     receipt = _write_bounded_receipt(
         EXECUTION["pre_dispatch"], status=status,
@@ -1364,7 +1534,10 @@ def _finalize(*, result: int | None, error: BaseException | None) -> dict[str, A
             "path": forecast_path.relative_to(HERE).as_posix(),
             "sha256": _sha256(forecast_path),
             "remaining_formal_games": remaining_games,
-            "optimizer_remaining_cpu_seconds": optimizer["remaining_optimizer_cpu_seconds"],
+            "optimizer_remaining_cpu_seconds": (
+                optimizer["remaining_optimizer_cpu_seconds"] if optimizer else None
+            ),
+            "status": forecast_record["status"],
             "forecast": forecast,
         },
     )
@@ -1386,11 +1559,6 @@ def _finalize(*, result: int | None, error: BaseException | None) -> dict[str, A
         "max_active_workers": (stage_receipt or {}).get("max_active_workers"),
         "max_configured_workers": (stage_receipt or {}).get("max_configured_workers"),
     }
-    ATTEMPT["authorized_aggregate_cpu_seconds"] = (
-        float(ATTEMPT.get("setup_cpu_seconds_before_tracker", 0.0))
-        + float((stage_receipt or {}).get("aggregate_process_cpu_seconds", 0.0))
-        + INCREMENTAL_FINALIZATION_RESERVE
-    )
     EXECUTION["attempts"][-1] = ATTEMPT
     _atomic_json(RECEIPT, EXECUTION)
     return receipt

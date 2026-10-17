@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -12,6 +13,10 @@ from bounded_batch02_sampling import (
     TARGET_SEEDS,
     _batch02_seed_schedule,
     _ensure_sampling_runtime_hooks,
+    _authorization_charges,
+    _interruption_budget_hold,
+    _invalidate_batch02_forecast,
+    _attempt_number,
     _r2_source_compatibility,
     _remaining_local_budget,
     _settled_source_rollover,
@@ -57,6 +62,88 @@ class BoundedBatch02SamplingTests(unittest.TestCase):
         self.assertEqual(remaining, LOCAL_LIMIT - 255.0)
         self.assertLessEqual(200.0 + 25.0 + remaining + 30.0, LOCAL_LIMIT)
         self.assertLessEqual(_remaining_local_budget(charged=1950.0, setup=20.0, finalization_reserve=30.0), 0.0)
+
+    def test_interrupted_attempt_reserves_all_remaining_local_authority(self) -> None:
+        import bounded_batch02_sampling as sampling
+
+        attempts = [
+            {"status": "FAILED", "authorized_aggregate_cpu_seconds": 30.0},
+            {"status": "INTERRUPTED", "attempt_id": "attempt-0006",
+             "authorized_aggregate_cpu_seconds": None},
+        ]
+        hold = _interruption_budget_hold(
+            code_and_check_reserve=200.0, attempt_rows=attempts, explicit_hold=0.0,
+        )
+        self.assertEqual(hold, LOCAL_LIMIT - 230.0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            receipt = Path(tmp) / "receipt.json"
+            receipt.write_text(json.dumps({
+                "authorization_comment_id": sampling.AUTHORIZATION,
+                "status": "INTERRUPTED",
+                "attempts": attempts,
+            }), encoding="utf-8")
+            with mock.patch.object(sampling, "RECEIPT", receipt):
+                with self.assertRaisesRegex(CostRegimeError, "interrupted"):
+                    _attempt_number()
+
+    def test_authorization_charges_include_explicit_unmeasured_budget_hold(self) -> None:
+        import bounded_batch02_sampling as sampling
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "cpu-ledger.jsonl").write_text("\n".join([
+                json.dumps({
+                    "authorization_comment_id": sampling.AUTHORIZATION,
+                    "stage": "issue60-batch02-sampling-code-check-reserve",
+                    "process_cpu_seconds": 200.0,
+                }),
+                json.dumps({
+                    "authorization_comment_id": sampling.AUTHORIZATION,
+                    "stage": sampling.INTERRUPTION_RESERVE_STAGE,
+                    "process_cpu_seconds": LOCAL_LIMIT - 230.0,
+                    "measurement": "CONSERVATIVE_RESERVATION_NOT_MEASUREMENT",
+                }),
+            ]), encoding="utf-8")
+            with (mock.patch.object(sampling, "EVIDENCE", root),
+                  mock.patch.object(sampling, "ATTEMPT_ID", ""),
+                  mock.patch.object(sampling, "EXECUTION", {"attempts": [
+                      {"status": "FAILED", "authorized_aggregate_cpu_seconds": 30.0},
+                      {"status": "INTERRUPTED", "attempt_id": "attempt-0006",
+                       "authorized_aggregate_cpu_seconds": None},
+                  ]})):
+                self.assertEqual(_authorization_charges(), LOCAL_LIMIT)
+
+    def test_forecast_invalidation_preserves_stale_record_and_binds_current_index(self) -> None:
+        import bounded_batch02_sampling as sampling
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prospective = root / "prospective-cost"
+            prospective.mkdir()
+            index = prospective / "cost-index.json"
+            index.write_text(json.dumps({"tag_count": 65}), encoding="utf-8")
+            forecast_path = prospective / "batch02-sampling-forecast.json"
+            stale = json.dumps({"status": "UPDATED_COST_FORECAST", "forecast": {"status": "PASS"}})
+            forecast_path.write_text(stale, encoding="utf-8")
+            with (mock.patch.object(sampling, "HERE", root),
+                  mock.patch.object(sampling, "PROSPECTIVE", prospective),
+                  mock.patch.object(sampling, "FORECAST_INDEX", index),
+                  mock.patch.object(sampling, "FORECAST_PATH", forecast_path)):
+                record = _invalidate_batch02_forecast(
+                    status="INVALIDATED_UNRECONCILED_CPU",
+                    reason="parallel stage receipt is unavailable",
+                    attempt_id="attempt-0006",
+                )
+            preserved = prospective / "history" / "batch02-sampling-forecast-before-unsettled-attempt.json"
+            current = json.loads(forecast_path.read_text(encoding="utf-8"))
+            self.assertEqual(preserved.read_text(encoding="utf-8"), stale)
+            self.assertEqual(current["status"], "INVALIDATED_UNRECONCILED_CPU")
+            self.assertIsNone(current["forecast"])
+            self.assertEqual(current["cached_cost_sample_count"], 65)
+            self.assertEqual(current["cached_cost_sample_sha256"], sampling._sha256(index))
+            self.assertEqual(current["source_forecast_sha256"], sampling._sha256(preserved))
+            self.assertEqual(record["attempt_id"], "attempt-0006")
 
     def test_r2_seal_accepts_only_the_committed_offline_test_descendant(self) -> None:
         import resource_amendment_r2
