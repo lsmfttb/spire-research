@@ -457,7 +457,7 @@
   "cumulative_process_cap_cpu_seconds": 200000.0,
   "disposition": "STUDY_ONLY / NO_SCIENTIFIC_RESULT",
   "evaluation_runs": 0,
-  "executing_head": "6e30c0ea35403dca8de0b897966b8ce15b7af0ca",
+  "executing_head": "c65d0179459ed7b0dff2939fe1ba5f8d03240c28",
   "failure": "CostRegimeError: completed target games and linked cost tags differ",
   "finished_utc": "2026-10-17T11:26:57Z",
   "full_grid_forecast": {
@@ -517,7 +517,7 @@
     660256
   ],
   "launcher_path": "bounded_batch02_sampling.py",
-  "launcher_sha256": "ad57e3e7a47eacbc0fa189729f8d23c733f8c0afd10f51d6662209ee13c5a59d",
+  "launcher_sha256": "7df4598f2c79c38003ddbd82e95e471431c14d9f01c617205c26946b3f7122ab",
   "legacy_forecasts_preserved": {
     "cost_index_snapshot": {
       "path": "evidence/prospective-cost/history/cost-index-before-batch02.json",
@@ -816,8 +816,60 @@
       ],
       "to_executing_head": "6e30c0ea35403dca8de0b897966b8ce15b7af0ca",
       "to_launcher_sha256": "ad57e3e7a47eacbc0fa189729f8d23c733f8c0afd10f51d6662209ee13c5a59d"
+    },
+    {
+      "basis": "all prior dispatched attempts settled; exact authorized artifacts and original incomplete attempts preserved",
+      "completed_artifacts_not_listed_in_stage_executions": [
+        660245
+      ],
+      "from_executing_head": "6e30c0ea35403dca8de0b897966b8ce15b7af0ca",
+      "from_launcher_sha256": "ad57e3e7a47eacbc0fa189729f8d23c733f8c0afd10f51d6662209ee13c5a59d",
+      "preserved_attempt_ids": [
+        "issue60-batch02-sampling-attempt-0001",
+        "issue60-batch02-sampling-attempt-0002",
+        "issue60-batch02-sampling-attempt-0003",
+        "issue60-batch02-sampling-attempt-0004",
+        "issue60-batch02-sampling-attempt-0005"
+      ],
+      "prior_dispatched_execution_count": 2,
+      "prior_stage_execution_seeds": [
+        660243,
+        660244
+      ],
+      "reconciled_completed_game_artifacts": [
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660243/attempt-0002",
+          "cost_tag_path": "evidence/prospective-cost/tags/1220d1858478028fdcd2c26678632099a0150ceff4f4e1b5c40cb120867b0ef6.json",
+          "cost_tag_sha256": "4d96058f626220e4663aceaad3358530b935746b50d85e19e019242c69795b7b",
+          "game_seed": 660243,
+          "run_json_sha256": "275c8a06b192f370a6004f56c643d44ffad0b0313ea8803114185810d16bd0f2",
+          "source_attempt_id": "issue60-batch02-sampling-attempt-0005",
+          "status_json_sha256": "c2aca90a52e18d4426449ccec822835ea1482e9b15d14e2a7b5817fb125ecc3c"
+        },
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660244/attempt-0002",
+          "cost_tag_path": "evidence/prospective-cost/tags/3078c5c73f5670d4132f6ba06b676bf3c5e558b35ad6255f5e247b26f4e6f49b.json",
+          "cost_tag_sha256": "52c6cb3df2164acd6dba41f11de68fe5e73117b7e810df47e3d4d1bcef524aa0",
+          "game_seed": 660244,
+          "run_json_sha256": "10fb9940d8b2c00a2514a6947fa2f646e9fb3bf94045530fdf7457d098bd1542",
+          "source_attempt_id": "issue60-batch02-sampling-attempt-0005",
+          "status_json_sha256": "96eba702a69d81653599fdd6bb51702c73a018f5f7021a57b0f0c3dd4f13842b"
+        },
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660245/attempt-0001",
+          "cost_tag_path": null,
+          "cost_tag_sha256": null,
+          "game_seed": 660245,
+          "run_json_sha256": "d25abda8f5afd751a7a43e5abb044eb576041eaa00ffa660922119528b8adf1d",
+          "source_attempt_id": "issue60-batch02-sampling-attempt-0005",
+          "status_json_sha256": "9306eeaf8adc73028e434551820d1060c9954a2485d1a8107b21e9b9dff6aeee"
+        }
+      ],
+      "to_executing_head": "c65d0179459ed7b0dff2939fe1ba5f8d03240c28",
+      "to_launcher_sha256": "7df4598f2c79c38003ddbd82e95e471431c14d9f01c617205c26946b3f7122ab"
     }
   ],
   "started_utc": "2026-10-17T11:02:01Z",
-  "status": "FAILED"
+  "status": "FAILED",
+  "updated_utc": "2026-10-17T11:35:36Z"
 }
