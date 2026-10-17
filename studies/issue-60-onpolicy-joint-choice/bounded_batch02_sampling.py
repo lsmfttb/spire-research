@@ -7,6 +7,7 @@ two-worker dispatcher, then returns before any PPO update or later stage.
 from __future__ import annotations
 
 import argparse
+import calendar
 import hashlib
 import json
 import os
@@ -25,6 +26,7 @@ EVIDENCE = HERE / "evidence"
 PROSPECTIVE = EVIDENCE / "prospective-cost"
 EXECUTIONS = PROSPECTIVE / "executions"
 RECEIPT = EXECUTIONS / "batch02-sampling.json"
+FORECAST_INDEX = PROSPECTIVE / "cost-index.json"
 AUTHORIZATION = 6232885569
 BASE_HANDOFF = "d7425ace823e2b0aee5d9640341f4cef49f00259"
 CHECKPOINT_SHA = "c05ffb91ed6cb702e9ad135afe3b537c1348f2da8e21958c38141404055bfbb5"
@@ -370,8 +372,14 @@ def _target_state(run_study: Any, model_sha: str, config_digest: str) -> dict[st
                 "status": row.get("status"),
                 "failure": row.get("failure"),
                 "process_cpu_seconds": row.get("process_cpu_seconds"),
+                "status_json_sha256": _sha256(status_path),
                 "run_json_sha256": _sha256(status_path.parent / "run.json")
                 if (status_path.parent / "run.json").is_file() else None,
+                "run_json_exists": (status_path.parent / "run.json").is_file(),
+                "status_json_mtime_utc": time.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ",
+                    time.gmtime(status_path.stat().st_mtime),
+                ),
             })
         result = run_study.successful_attempt(output, model_sha, config_digest)
         if result is not None:
@@ -389,6 +397,87 @@ def _target_state(run_study: Any, model_sha: str, config_digest: str) -> dict[st
                          attempts[-1]["status"] if attempts else "NOT_STARTED"
                      )})
     return {"complete": complete, "keys": rows}
+
+
+def _recover_known_pre_dispatch_failure(previous: dict[str, Any], *, head: str,
+                                        launcher_sha256: str,
+                                        target_state: dict[str, Any]) -> None:
+    """Settle the one observed no-dispatch failure without resetting charges."""
+    attempts = list(previous.get("attempts", []))
+    if (previous.get("status") != "FINALIZATION_FAILED"
+            or previous.get("finalization_failure") != "NameError: name 'FORECAST_INDEX' is not defined"
+            or not attempts or attempts[-1].get("status") != "RUNNING"):
+        raise bridge.CostRegimeError("previous bounded attempt has no recognized safe recovery basis")
+    attempt = attempts[-1]
+    stage_path = HERE / str(attempt.get("stage_receipt_path", ""))
+    if stage_path.exists() or attempt.get("completed_games"):
+        raise bridge.CostRegimeError("failed bounded attempt may have dispatched work; stop for Planner review")
+    if target_state["complete"]:
+        raise bridge.CostRegimeError("unexpected completed target key after pre-dispatch failure")
+
+    retained_incomplete = []
+    for row in target_state["keys"]:
+        for observed in row["attempts"]:
+            retained_incomplete.append({"game_seed": row["game_seed"], **observed})
+    retained_incomplete.sort(key=lambda row: (row["game_seed"], row["attempt_path"]))
+    expected_old_paths = {
+        "evidence/runs/training/block1/batch-02/seed-660243/attempt-0001",
+        "evidence/runs/training/block1/batch-02/seed-660244/attempt-0001",
+    }
+    if ({row["attempt_path"] for row in retained_incomplete} != expected_old_paths
+            or any(row["status"] != "INCOMPLETE" or row["run_json_exists"]
+                   for row in retained_incomplete)):
+        raise bridge.CostRegimeError(
+            "pre-dispatch recovery did not preserve the two known INCOMPLETE attempts exactly"
+        )
+    started_epoch = calendar.timegm(time.strptime(previous["started_utc"], "%Y-%m-%dT%H:%M:%SZ"))
+    if any((HERE / row["attempt_path"] / "status.json").stat().st_mtime > started_epoch
+           for row in retained_incomplete):
+        raise bridge.CostRegimeError("an original incomplete attempt changed during the failed invocation")
+
+    code_charge = sum(
+        float(row.get("process_cpu_seconds", 0.0)) for row in _ledger_rows()
+        if row.get("attempt") == f"issue60-batch02-sampling-code-checks-{AUTHORIZATION}"
+    )
+    finalization_charge = sum(
+        float(row.get("process_cpu_seconds", 0.0)) for row in _ledger_rows()
+        if row.get("attempt") == f"{attempt.get('attempt_id')}-parent-and-finalization"
+    )
+    if code_charge < CODE_AND_CHECK_RESERVE or finalization_charge < INCREMENTAL_FINALIZATION_RESERVE:
+        raise bridge.CostRegimeError("pre-dispatch failure charges are missing from the durable CPU ledger")
+
+    old_head = str(previous.get("executing_head", ""))
+    old_launcher_sha256 = str(previous.get("launcher_sha256", ""))
+    attempt.update({
+        "status": "FAILED_BEFORE_DISPATCH",
+        "failure": "R2 source hash mismatch: test_resource_amendment_r2.py; committed bytes matched the sealed R2 receipt but the Windows checkout line endings did not",
+        "result_code": 2,
+        "executing_head": old_head,
+        "launcher_sha256": old_launcher_sha256,
+        "authorized_aggregate_cpu_seconds": finalization_charge,
+        "complete_keys": [],
+        "incomplete_or_unstarted_keys": list(TARGET_SEEDS),
+        "pre_dispatch_failure_recovery": {
+            "status": "PASS",
+            "finalization_failure_repaired": previous["finalization_failure"],
+            "parallel_stage_receipt_absent": True,
+            "completed_games_in_attempt_receipt": 0,
+            "new_complete_target_games": 0,
+            "preserved_original_incomplete_attempts": retained_incomplete,
+            "cpu_charges": {
+                "implementation_and_check_reserve_seconds": code_charge,
+                "attempt_finalization_reserve_seconds": finalization_charge,
+                "pre_dispatch_parent_setup_covered_by_implementation_and_check_reserve": True,
+            },
+            "recovery_action": "settle this attempt as a no-dispatch failure, then continue only the same 14 named keys under the same authorization",
+        },
+    })
+    previous["attempts"][-1] = attempt
+    previous["status"] = "FAILED"
+    previous["executing_head"] = head
+    previous["launcher_sha256"] = launcher_sha256
+    previous["updated_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    _atomic_json(RECEIPT, previous)
 
 
 def _validated_continuation_receipt() -> tuple[dict[str, Any], dict[str, Any]]:
@@ -524,10 +613,20 @@ def _preflight() -> dict[str, Any]:
 
     head = bridge.git(HERE, "rev-parse", "HEAD")
     bridge._bind_resource_git_to_windows_worktree()
-    if resource_amendment_r1._git(
+    tracked_status = resource_amendment_r1._git(
         HERE, "status", "--porcelain", "--untracked-files=no",
-    ):
-        raise bridge.CostRegimeError("source worktree must be clean before bounded dispatch")
+    )
+    mutable_ledger = (HERE / "evidence" / "cpu-ledger.jsonl").resolve()
+    repo_root = resource_amendment_r1._repo_root(HERE).resolve()
+    mutable_ledger_path = mutable_ledger.relative_to(repo_root).as_posix()
+    unexpected = [
+        line for line in tracked_status.splitlines()
+        if line[3:].replace("\\", "/") != mutable_ledger_path
+    ]
+    if unexpected:
+        raise bridge.CostRegimeError(
+            f"tracked source worktree has unexpected changes before bounded dispatch: {unexpected}"
+        )
     bridge.git(HERE, "merge-base", "--is-ancestor", BASE_HANDOFF, head)
     manifest = producer_manifest(HERE)
     gate = bridge._read_json(PROSPECTIVE / "bridge-gate.json")
@@ -580,6 +679,11 @@ def _preflight() -> dict[str, Any]:
     }
     if RECEIPT.is_file():
         previous = json.loads(RECEIPT.read_text(encoding="utf-8"))
+        if previous.get("status") == "FINALIZATION_FAILED":
+            _recover_known_pre_dispatch_failure(
+                previous, head=head, launcher_sha256=_sha256(Path(__file__)),
+                target_state=_target_state(run_study, model_sha, run_study.config_sha()),
+            )
         prior_complete = sorted({
             int(row.get("game_seed", -1))
             for attempt in previous.get("attempts", [])
@@ -735,6 +839,8 @@ def _prepare_receipt(preflight: dict[str, Any]) -> None:
         "attempt_id": ATTEMPT_ID,
         "status": "RUNNING",
         "started_utc": now,
+        "executing_head": preflight["executing_head"],
+        "launcher_sha256": preflight["launcher_sha256"],
         "stage_receipt_path": (
             (PARALLEL_STAGE_DIR / f"attempt-{number:04d}" / "parallel-execution" / "stages" / "train.json")
             .relative_to(HERE).as_posix()
