@@ -401,21 +401,22 @@ def _sampling_stage(stage: str, *, stage_start_cpu: float) -> int:
     failure = None
     if stage != "train":
         raise bridge.CostRegimeError(f"bounded sampling rejected unexpected stage {stage!r}")
-    run_study_r2.enforce_budget = bridge._dynamic_enforce
-    if run_study_r2.RUN_STUDY is None:
-        run_study_r2.RUN_STUDY = run_study
-        run_study_r2._install_runtime_hooks()
     tracker = parallel.TRACKER
-    if tracker is None or parallel.DISPATCHER is None or parallel.DISPATCHER.workers != 2:
+    if tracker is None:
         raise bridge.CostRegimeError("bounded sampling requires the reviewed two-worker tracker")
     setup_cpu = max(0.0, tracker.parent_start_cpu - LAUNCH_START_CPU)
     SETUP_CPU_BEFORE_TRACKER = setup_cpu
     ATTEMPT["setup_cpu_seconds_before_tracker"] = setup_cpu
     _install_bounded_enforcement(setup_cpu=setup_cpu)
-    # R2 imported its guard function by value; replace that binding after
-    # installing the bounded dispatcher guard so the old forecast gate cannot
-    # block this Planner-authorized zero-update sample.
+    # Install the bounded guard before the composed R2/cache hooks capture it.
+    # R2 imported its guard function by value; replace that binding so the old
+    # prospective forecast gate cannot block this authorized sample.
     run_study_r2.enforce_budget = bridge._dynamic_enforce
+    if run_study_r2.RUN_STUDY is None:
+        run_study_r2.RUN_STUDY = run_study
+        run_study_r2._install_runtime_hooks()
+    if parallel.DISPATCHER is None or parallel.DISPATCHER.workers != 2:
+        raise bridge.CostRegimeError("bounded sampling requires the reviewed two-worker dispatcher")
     run_study_r2.STAGE_START_CPU = stage_start_cpu
     run_study_r2.MINIBATCHES_COMPLETED = 0
     try:
