@@ -246,6 +246,109 @@
       "stage_receipt_path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0005/parallel-execution/stages/train.json",
       "started_utc": "2026-10-17T11:25:36Z",
       "status": "FAILED"
+    },
+    {
+      "attempt_id": "issue60-batch02-sampling-attempt-0006",
+      "attempt_number": 6,
+      "completed_games": [
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660245/attempt-0001",
+          "game_seed": 660245,
+          "process_cpu_seconds": 6.258796179,
+          "run_json_sha256": "d25abda8f5afd751a7a43e5abb044eb576041eaa00ffa660922119528b8adf1d",
+          "stage_key": "block1:batch-02",
+          "tag_path": "evidence/prospective-cost/tags/076d178b9b76d261757b9dcb6cfbdc1e8e2eb1495a7f77b55e66772f6937d676.json",
+          "tag_sha256": "0eb05e9ac3c6563e641d4da3c09aae86d2ad40d349926f485c4cd562b6a5670a"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660246/attempt-0001",
+          "game_seed": 660246,
+          "process_cpu_seconds": 19.406035024999998,
+          "run_json_sha256": "ba5724e57d6ed67bd9777f7c1bcaf15079c27fe92443cab2260ad8ac8e0b533c",
+          "stage_key": "block1:batch-02",
+          "tag_path": "evidence/prospective-cost/tags/b6043ae2998a06ea1a659503efdfaca1fc39dca4e39776605e7a4d9dff8b6056.json",
+          "tag_sha256": "927e2e2a41e43661f9f62870d68224a76391e246b431f67954b6ff0fcaeeb214"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660247/attempt-0001",
+          "game_seed": 660247,
+          "process_cpu_seconds": 54.949233557,
+          "run_json_sha256": "18db91b59c83f8cc26b8be41c760c40c4a1384d76c7fda957eebd90b35e3a772",
+          "stage_key": "block1:batch-02",
+          "tag_path": "evidence/prospective-cost/tags/68749cbd2230303f3025aad9781179e4d08494c32226f21610f9b952a03ee1bb.json",
+          "tag_sha256": "0bfaf8de680e1f0218087ac4d8bd81d04038c34525a7826aa45b32066ac28b0e"
+        },
+        {
+          "arm": "residual",
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660249/attempt-0001",
+          "game_seed": 660249,
+          "process_cpu_seconds": 22.419062726,
+          "run_json_sha256": "48681777af872c761251dd1503857cd186a5202e317c7ff7c37a6bc1b71451b5",
+          "stage_key": "block1:batch-02",
+          "tag_path": "evidence/prospective-cost/tags/ff53550a590d905ba0e4742ca1aea8a04a52be411c2b3accfa5e1b08d02c2935.json",
+          "tag_sha256": "2620aec1e07a9c07dc03a06e543686208c9fa7f468e9e3e553dca0f01d5a80ab"
+        }
+      ],
+      "executing_head": "687f65631c8a4defbde24f14d9f92e0748e5f606",
+      "launcher_sha256": "7df4598f2c79c38003ddbd82e95e471431c14d9f01c617205c26946b3f7122ab",
+      "setup_cpu_seconds_before_tracker": 5.037958494,
+      "stage_receipt_path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0006/parallel-execution/stages/train.json",
+      "started_utc": "2026-10-17T11:37:34Z",
+      "status": "INTERRUPTED",
+      "finished_utc": "2026-10-17T17:18:02Z",
+      "failure": "Execution session ended before the parallel dispatcher finalized. Two worker attempts remain RUNNING in their durable status files; no workers are alive now. The parallel stage receipt is absent, so exact aggregate CPU for the interrupted workers and post-setup parent work cannot be reconstructed. Stop under this authorization; do not relaunch remaining seeds without Reviewer/Planner budget reconciliation.",
+      "interruption_reconciliation": {
+        "observed_utc": "2026-10-17T17:18:02Z",
+        "stage_receipt_path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0006/parallel-execution/stages/train.json",
+        "stage_receipt_present": false,
+        "executing_head": "687f65631c8a4defbde24f14d9f92e0748e5f606",
+        "launcher_sha256": "7df4598f2c79c38003ddbd82e95e471431c14d9f01c617205c26946b3f7122ab",
+        "completed_target_seeds": [
+          660245,
+          660246,
+          660247,
+          660249
+        ],
+        "previously_completed_target_seeds": [
+          660243,
+          660244
+        ],
+        "interrupted_target_seeds": [
+          660248,
+          660250
+        ],
+        "unstarted_target_seeds": [
+          660251,
+          660252,
+          660253,
+          660254,
+          660255,
+          660256
+        ],
+        "known_completed_game_process_cpu_seconds": 103.033127487,
+        "setup_cpu_seconds_before_tracker": 5.037958494,
+        "exact_aggregate_cpu_seconds": "UNAVAILABLE",
+        "resume_blocked_until_budget_reconciled": true,
+        "workers": [
+          {
+            "game_seed": 660248,
+            "pid": 1188,
+            "last_status": "RUNNING",
+            "run_json_present": false,
+            "pid_alive_at_reconciliation": false
+          },
+          {
+            "game_seed": 660250,
+            "pid": 1195,
+            "last_status": "RUNNING",
+            "run_json_present": false,
+            "pid_alive_at_reconciliation": false
+          }
+        ]
+      }
     }
   ],
   "authorization_comment_id": 6232885569,
@@ -378,16 +481,43 @@
       "run_json_sha256": "d25abda8f5afd751a7a43e5abb044eb576041eaa00ffa660922119528b8adf1d",
       "status": "COMPLETE",
       "terminal_floor": 6.0
+    },
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660246/attempt-0001",
+      "game_seed": 660246,
+      "process_cpu_seconds": 19.406035024999998,
+      "run_json_sha256": "ba5724e57d6ed67bd9777f7c1bcaf15079c27fe92443cab2260ad8ac8e0b533c",
+      "status": "COMPLETE",
+      "terminal_floor": 6.0
+    },
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660247/attempt-0001",
+      "game_seed": 660247,
+      "process_cpu_seconds": 54.949233557,
+      "run_json_sha256": "18db91b59c83f8cc26b8be41c760c40c4a1384d76c7fda957eebd90b35e3a772",
+      "status": "COMPLETE",
+      "terminal_floor": 16.0
+    },
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660249/attempt-0001",
+      "game_seed": 660249,
+      "process_cpu_seconds": 22.419062726,
+      "run_json_sha256": "48681777af872c761251dd1503857cd186a5202e317c7ff7c37a6bc1b71451b5",
+      "status": "COMPLETE",
+      "terminal_floor": 11.0
     }
   ],
   "complete_keys": [
     660243,
     660244,
-    660245
+    660245,
+    660246,
+    660247,
+    660249
   ],
   "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
   "cost_index_after_path": "evidence/prospective-cost/cost-index.json",
-  "cost_index_after_sha256": "a2b00dea6f45ba2d4e8f4822b821f5b0caf594591020d1131a07c4d7934f7853",
+  "cost_index_after_sha256": "9422fc08ef2f14025a3975e55083df883bfc55fc56169a80e839a2b65a0feb64",
   "cost_index_before": {
     "cached_complete_game_count": 59,
     "path": "evidence/prospective-cost/cost-index.json",
@@ -450,6 +580,90 @@
         "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
       },
       "tag_sha256": "52c6cb3df2164acd6dba41f11de68fe5e73117b7e810df47e3d4d1bcef524aa0"
+    },
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660245/attempt-0001",
+      "game_seed": 660245,
+      "run_json_sha256": "d25abda8f5afd751a7a43e5abb044eb576041eaa00ffa660922119528b8adf1d",
+      "tag_path": "evidence/prospective-cost/tags/076d178b9b76d261757b9dcb6cfbdc1e8e2eb1495a7f77b55e66772f6937d676.json",
+      "tag_producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+      "tag_producer_files": {
+        "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+        "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+        "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+        "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+        "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+        "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+        "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+        "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+        "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+        "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+        "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+      },
+      "tag_sha256": "0eb05e9ac3c6563e641d4da3c09aae86d2ad40d349926f485c4cd562b6a5670a"
+    },
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660246/attempt-0001",
+      "game_seed": 660246,
+      "run_json_sha256": "ba5724e57d6ed67bd9777f7c1bcaf15079c27fe92443cab2260ad8ac8e0b533c",
+      "tag_path": "evidence/prospective-cost/tags/b6043ae2998a06ea1a659503efdfaca1fc39dca4e39776605e7a4d9dff8b6056.json",
+      "tag_producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+      "tag_producer_files": {
+        "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+        "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+        "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+        "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+        "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+        "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+        "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+        "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+        "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+        "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+        "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+      },
+      "tag_sha256": "927e2e2a41e43661f9f62870d68224a76391e246b431f67954b6ff0fcaeeb214"
+    },
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660247/attempt-0001",
+      "game_seed": 660247,
+      "run_json_sha256": "18db91b59c83f8cc26b8be41c760c40c4a1384d76c7fda957eebd90b35e3a772",
+      "tag_path": "evidence/prospective-cost/tags/68749cbd2230303f3025aad9781179e4d08494c32226f21610f9b952a03ee1bb.json",
+      "tag_producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+      "tag_producer_files": {
+        "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+        "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+        "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+        "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+        "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+        "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+        "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+        "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+        "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+        "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+        "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+      },
+      "tag_sha256": "0bfaf8de680e1f0218087ac4d8bd81d04038c34525a7826aa45b32066ac28b0e"
+    },
+    {
+      "attempt_path": "evidence/runs/training/block1/batch-02/seed-660249/attempt-0001",
+      "game_seed": 660249,
+      "run_json_sha256": "48681777af872c761251dd1503857cd186a5202e317c7ff7c37a6bc1b71451b5",
+      "tag_path": "evidence/prospective-cost/tags/ff53550a590d905ba0e4742ca1aea8a04a52be411c2b3accfa5e1b08d02c2935.json",
+      "tag_producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+      "tag_producer_files": {
+        "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+        "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
+        "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
+        "prospective_cost_regime.py": "74f3c6dcfa87d80e308faaac793847b72e8f98c7a9d2de2e8cf3a55895a051bf",
+        "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+        "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+        "run_cost_bridge.py": "a23e5ffbb781aa0c945ac29b4002b3db6cd7c47941ec75d9ee9be2c406ab3740",
+        "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
+        "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
+        "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
+        "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+      },
+      "tag_sha256": "2620aec1e07a9c07dc03a06e543686208c9fa7f468e9e3e553dca0f01d5a80ab"
     }
   ],
   "cumulative_accounted_builder_cpu_seconds": 24034.182992988008,
@@ -457,9 +671,9 @@
   "cumulative_process_cap_cpu_seconds": 200000.0,
   "disposition": "STUDY_ONLY / NO_SCIENTIFIC_RESULT",
   "evaluation_runs": 0,
-  "executing_head": "c65d0179459ed7b0dff2939fe1ba5f8d03240c28",
-  "failure": "CostRegimeError: completed target games and linked cost tags differ",
-  "finished_utc": "2026-10-17T11:26:57Z",
+  "executing_head": "687f65631c8a4defbde24f14d9f92e0748e5f606",
+  "failure": "Execution session ended before the parallel dispatcher finalized. Two worker attempts remain RUNNING in their durable status files; no workers are alive now. The parallel stage receipt is absent, so exact aggregate CPU for the interrupted workers and post-setup parent work cannot be reconstructed. Stop under this authorization; do not relaunch remaining seeds without Reviewer/Planner budget reconciliation.",
+  "finished_utc": "2026-10-17T17:18:02Z",
   "full_grid_forecast": {
     "forecast": {
       "accounted_cpu_seconds": 24034.182992988008,
@@ -504,10 +718,7 @@
     "sha256": "91231eea33f707c62788ca968bf5d21f7c8fdd05001b1cba30594c2cd30cbea7"
   },
   "incomplete_or_unstarted_keys": [
-    660246,
-    660247,
     660248,
-    660249,
     660250,
     660251,
     660252,
@@ -530,7 +741,8 @@
   "limitations": [
     "The 114 uncached historical batch-02 games still have unknown actual producer provenance.",
     "The updated cost index is operational evidence, not a scientific result or permission to continue.",
-    "The retained legacy forecast remains historical; the new forecast is reported separately."
+    "The retained legacy forecast remains historical; the new forecast is reported separately.",
+    "Attempt 0006 was interrupted after four completed game records. Exact aggregate CPU for two workers and post-setup parent work was not persisted; authorization charge, cumulative accounting total and post-attempt forecast remain unreconciled. No further dispatch is safe under this receipt."
   ],
   "optimizer_updates": 0,
   "parallel_stage_receipt": {
@@ -867,9 +1079,109 @@
       ],
       "to_executing_head": "c65d0179459ed7b0dff2939fe1ba5f8d03240c28",
       "to_launcher_sha256": "7df4598f2c79c38003ddbd82e95e471431c14d9f01c617205c26946b3f7122ab"
+    },
+    {
+      "basis": "all prior dispatched attempts settled; exact authorized artifacts and original incomplete attempts preserved",
+      "completed_artifacts_not_listed_in_stage_executions": [
+        660245
+      ],
+      "from_executing_head": "c65d0179459ed7b0dff2939fe1ba5f8d03240c28",
+      "from_launcher_sha256": "7df4598f2c79c38003ddbd82e95e471431c14d9f01c617205c26946b3f7122ab",
+      "preserved_attempt_ids": [
+        "issue60-batch02-sampling-attempt-0001",
+        "issue60-batch02-sampling-attempt-0002",
+        "issue60-batch02-sampling-attempt-0003",
+        "issue60-batch02-sampling-attempt-0004",
+        "issue60-batch02-sampling-attempt-0005"
+      ],
+      "prior_dispatched_execution_count": 2,
+      "prior_stage_execution_seeds": [
+        660243,
+        660244
+      ],
+      "reconciled_completed_game_artifacts": [
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660243/attempt-0002",
+          "cost_tag_path": "evidence/prospective-cost/tags/1220d1858478028fdcd2c26678632099a0150ceff4f4e1b5c40cb120867b0ef6.json",
+          "cost_tag_sha256": "4d96058f626220e4663aceaad3358530b935746b50d85e19e019242c69795b7b",
+          "game_seed": 660243,
+          "run_json_sha256": "275c8a06b192f370a6004f56c643d44ffad0b0313ea8803114185810d16bd0f2",
+          "source_attempt_id": "issue60-batch02-sampling-attempt-0005",
+          "status_json_sha256": "c2aca90a52e18d4426449ccec822835ea1482e9b15d14e2a7b5817fb125ecc3c"
+        },
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660244/attempt-0002",
+          "cost_tag_path": "evidence/prospective-cost/tags/3078c5c73f5670d4132f6ba06b676bf3c5e558b35ad6255f5e247b26f4e6f49b.json",
+          "cost_tag_sha256": "52c6cb3df2164acd6dba41f11de68fe5e73117b7e810df47e3d4d1bcef524aa0",
+          "game_seed": 660244,
+          "run_json_sha256": "10fb9940d8b2c00a2514a6947fa2f646e9fb3bf94045530fdf7457d098bd1542",
+          "source_attempt_id": "issue60-batch02-sampling-attempt-0005",
+          "status_json_sha256": "96eba702a69d81653599fdd6bb51702c73a018f5f7021a57b0f0c3dd4f13842b"
+        },
+        {
+          "attempt_path": "evidence/runs/training/block1/batch-02/seed-660245/attempt-0001",
+          "cost_tag_path": null,
+          "cost_tag_sha256": null,
+          "game_seed": 660245,
+          "run_json_sha256": "d25abda8f5afd751a7a43e5abb044eb576041eaa00ffa660922119528b8adf1d",
+          "source_attempt_id": "issue60-batch02-sampling-attempt-0005",
+          "status_json_sha256": "9306eeaf8adc73028e434551820d1060c9954a2485d1a8107b21e9b9dff6aeee"
+        }
+      ],
+      "to_executing_head": "687f65631c8a4defbde24f14d9f92e0748e5f606",
+      "to_launcher_sha256": "7df4598f2c79c38003ddbd82e95e471431c14d9f01c617205c26946b3f7122ab"
     }
   ],
   "started_utc": "2026-10-17T11:02:01Z",
-  "status": "FAILED",
-  "updated_utc": "2026-10-17T11:35:36Z"
+  "status": "INTERRUPTED",
+  "updated_utc": "2026-10-17T17:18:02Z",
+  "interruption_reconciliation": {
+    "observed_utc": "2026-10-17T17:18:02Z",
+    "stage_receipt_path": "evidence/validation/parallel-execution/batch02-sampling/attempt-0006/parallel-execution/stages/train.json",
+    "stage_receipt_present": false,
+    "executing_head": "687f65631c8a4defbde24f14d9f92e0748e5f606",
+    "launcher_sha256": "7df4598f2c79c38003ddbd82e95e471431c14d9f01c617205c26946b3f7122ab",
+    "completed_target_seeds": [
+      660245,
+      660246,
+      660247,
+      660249
+    ],
+    "previously_completed_target_seeds": [
+      660243,
+      660244
+    ],
+    "interrupted_target_seeds": [
+      660248,
+      660250
+    ],
+    "unstarted_target_seeds": [
+      660251,
+      660252,
+      660253,
+      660254,
+      660255,
+      660256
+    ],
+    "known_completed_game_process_cpu_seconds": 103.033127487,
+    "setup_cpu_seconds_before_tracker": 5.037958494,
+    "exact_aggregate_cpu_seconds": "UNAVAILABLE",
+    "resume_blocked_until_budget_reconciled": true,
+    "workers": [
+      {
+        "game_seed": 660248,
+        "pid": 1188,
+        "last_status": "RUNNING",
+        "run_json_present": false,
+        "pid_alive_at_reconciliation": false
+      },
+      {
+        "game_seed": 660250,
+        "pid": 1195,
+        "last_status": "RUNNING",
+        "run_json_present": false,
+        "pid_alive_at_reconciliation": false
+      }
+    ]
+  }
 }

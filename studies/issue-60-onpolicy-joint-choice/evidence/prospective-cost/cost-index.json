@@ -365,9 +365,33 @@
       "game_seed": 660244,
       "process_cpu_seconds": 19.238419744,
       "stage_key": "block1:batch-02"
+    },
+    {
+      "arm": "residual",
+      "game_seed": 660245,
+      "process_cpu_seconds": 6.258796179,
+      "stage_key": "block1:batch-02"
+    },
+    {
+      "arm": "residual",
+      "game_seed": 660246,
+      "process_cpu_seconds": 19.406035024999998,
+      "stage_key": "block1:batch-02"
+    },
+    {
+      "arm": "residual",
+      "game_seed": 660247,
+      "process_cpu_seconds": 54.949233557,
+      "stage_key": "block1:batch-02"
+    },
+    {
+      "arm": "residual",
+      "game_seed": 660249,
+      "process_cpu_seconds": 22.419062726,
+      "stage_key": "block1:batch-02"
     }
   ],
-  "cost_observations_sha256": "a0c1d402de8663e38641b5c97d0bbbd59a8fd7f48c99316babbd251c41b29fb1",
+  "cost_observations_sha256": "776458f27aec369b3ff2cfb1e56f698215f0729f47a4286e4735e482fee98ae2",
   "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
   "producer_files": {
     "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
@@ -384,7 +408,7 @@
   },
   "regime_id": "issue60-cached-guard-v1",
   "schema_id": "issue60-prospective-cost-index-v1",
-  "tag_count": 61,
-  "tags_sha256": "6b4d53a08783c5a22c197e8ab18eec4c252b2b4d49ac0aafb410a51e013204d1",
-  "updated_utc": "2026-10-17T11:26:47Z"
+  "tag_count": 65,
+  "tags_sha256": "6c22e17c6bfc444cbcd663bf4a3403cc4338f6b420d93a94f5f84caf020e5cb3",
+  "updated_utc": "2026-10-17T11:40:40Z"
 }
