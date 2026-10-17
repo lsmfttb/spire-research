@@ -81,6 +81,7 @@ class BoundedBatch02SamplingTests(unittest.TestCase):
         self.assertEqual(rollover["preserved_attempt_ids"], ["attempt-1"])
 
         previous["attempts"][0]["status"] = "RESOURCE_BLOCKED"
+        previous["status"] = "RESOURCE_BLOCKED"
         previous["attempts"][0]["stage_receipt_path"] = "blocked-stage.json"
         previous["attempts"][0]["parallel_stage_receipt"] = {
             "execution_count": 0, "worker_process_cpu_seconds": 0.0,

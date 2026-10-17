@@ -168,7 +168,7 @@ def _no_dispatch_source_rollover(previous: Mapping[str, Any], target_state: Mapp
                                  *, head: str, launcher_sha256: str) -> dict[str, Any]:
     """Permit a new source revision only after fully evidenced no-dispatch failures."""
     attempts = list(previous.get("attempts", []))
-    if previous.get("status") != "FAILED" or not attempts:
+    if previous.get("status") not in {"FAILED", "RESOURCE_BLOCKED"} or not attempts:
         raise bridge.CostRegimeError("changed source cannot resume a bounded receipt without failed attempts")
     if target_state.get("complete"):
         raise bridge.CostRegimeError("changed source cannot resume after any authorized game completed")
