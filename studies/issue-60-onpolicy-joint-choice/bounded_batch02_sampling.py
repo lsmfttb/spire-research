@@ -173,23 +173,26 @@ def _no_dispatch_source_rollover(previous: Mapping[str, Any], target_state: Mapp
     if target_state.get("complete"):
         raise bridge.CostRegimeError("changed source cannot resume after any authorized game completed")
     for attempt in attempts:
-        if (attempt.get("status") not in {"FAILED", "FAILED_BEFORE_DISPATCH"}
+        if (attempt.get("status") not in {"FAILED", "FAILED_BEFORE_DISPATCH", "RESOURCE_BLOCKED"}
                 or attempt.get("completed_games") or attempt.get("complete_keys")):
             raise bridge.CostRegimeError("changed source resume requires only no-dispatch failed attempts")
         stage_path = HERE / str(attempt.get("stage_receipt_path", ""))
+        stage = attempt.get("parallel_stage_receipt")
         if stage_path.is_file():
             try:
-                stage = json.loads(stage_path.read_text(encoding="utf-8"))
+                stage_document = json.loads(stage_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 raise bridge.CostRegimeError("failed attempt has an unreadable stage receipt") from exc
-            if stage.get("executions") or int(stage.get("execution_count") or 0) != 0:
+            if stage_document.get("executions") or int(stage_document.get("execution_count") or 0) != 0:
                 raise bridge.CostRegimeError("failed attempt stage receipt shows dispatched work")
-        stage = attempt.get("parallel_stage_receipt")
         if isinstance(stage, Mapping) and (
             stage.get("execution_count") not in (None, 0)
             or stage.get("worker_process_cpu_seconds") not in (None, 0, 0.0)
         ):
             raise bridge.CostRegimeError("failed attempt summary shows dispatched worker work")
+        if (attempt.get("status") == "RESOURCE_BLOCKED"
+                and not stage_path.is_file() and not isinstance(stage, Mapping)):
+            raise bridge.CostRegimeError("resource-blocked attempt lacks a stage receipt proving no dispatch")
 
     prior = attempts[-1]
     recovery = next((row.get("pre_dispatch_failure_recovery", {}) for row in attempts

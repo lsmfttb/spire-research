@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from prospective_cost_regime import CostRegimeError
 from bounded_batch02_sampling import (
     LOCAL_LIMIT,
     TARGET_SEEDS,
@@ -79,9 +80,33 @@ class BoundedBatch02SamplingTests(unittest.TestCase):
         self.assertEqual(rollover["new_dispatches_before_rollover"], 0)
         self.assertEqual(rollover["preserved_attempt_ids"], ["attempt-1"])
 
-        previous["attempts"][0]["status"] = "COMPLETE"
+        previous["attempts"][0]["status"] = "RESOURCE_BLOCKED"
+        previous["attempts"][0]["stage_receipt_path"] = "blocked-stage.json"
+        previous["attempts"][0]["parallel_stage_receipt"] = {
+            "execution_count": 0, "worker_process_cpu_seconds": 0.0,
+        }
+        previous["attempts"][0].pop("pre_dispatch_failure_recovery", None)
+        previous["attempts"][0]["pre_dispatch_failure_recovery"] = {
+            "preserved_original_incomplete_attempts": [
+                {"game_seed": seed, "status_json_sha256": digest}
+                for seed, digest in expected_hashes.items()
+            ],
+        }
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(sampling, "HERE", Path(tmp)):
-            with self.assertRaises(Exception):
+            (Path(tmp) / "blocked-stage.json").write_text(
+                '{"execution_count":0,"executions":[]}', encoding="utf-8",
+            )
+            rollover = sampling._no_dispatch_source_rollover(
+                previous, target_state, head="new-head", launcher_sha256="new-launcher",
+            )
+        self.assertEqual(rollover["new_dispatches_before_rollover"], 0)
+
+        previous["attempts"][0]["parallel_stage_receipt"]["worker_process_cpu_seconds"] = 0.5
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(sampling, "HERE", Path(tmp)):
+            (Path(tmp) / "blocked-stage.json").write_text(
+                '{"execution_count":0,"executions":[]}', encoding="utf-8",
+            )
+            with self.assertRaises(CostRegimeError):
                 sampling._no_dispatch_source_rollover(
                     previous, target_state, head="new-head", launcher_sha256="new-launcher",
                 )
