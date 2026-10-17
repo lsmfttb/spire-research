@@ -29,6 +29,7 @@ EXECUTIONS = PROSPECTIVE / "executions"
 RECEIPT = EXECUTIONS / "batch02-sampling.json"
 FORECAST_INDEX = PROSPECTIVE / "cost-index.json"
 FORECAST_PATH = PROSPECTIVE / "batch02-sampling-forecast.json"
+INTERRUPTION_RECONCILIATION_PATH = PROSPECTIVE / "batch02-sampling-interruption-reconciliation.json"
 INTERRUPTION_RESERVE_STAGE = "issue60-batch02-sampling-unreconciled-interruption-reserve"
 AUTHORIZATION = 6232885569
 BASE_HANDOFF = "d7425ace823e2b0aee5d9640341f4cef49f00259"
@@ -424,30 +425,43 @@ def _interruption_budget_hold(*, code_and_check_reserve: float,
     return 0.0
 
 
-def _authorization_charges() -> float:
-    code_and_check_reserve = sum(
+def _code_and_check_charge() -> float:
+    return sum(
         float(row.get("process_cpu_seconds", 0.0))
         for row in _ledger_rows()
         if row.get("authorization_comment_id") == AUTHORIZATION
         and row.get("stage") == "issue60-batch02-sampling-code-check-reserve"
     )
-    attempts = list(EXECUTION.get("attempts", []))
-    prior_attempts = sum(
-        amount for row in attempts
-        if (amount := _numeric_cpu(row.get("authorized_aggregate_cpu_seconds"))) is not None
-    )
-    explicit_hold = sum(
+
+
+def _explicit_interruption_hold() -> float:
+    return sum(
         float(row.get("process_cpu_seconds", 0.0))
         for row in _ledger_rows()
         if row.get("authorization_comment_id") == AUTHORIZATION
         and row.get("stage") == INTERRUPTION_RESERVE_STAGE
     )
-    fallback_hold = _interruption_budget_hold(
-        code_and_check_reserve=code_and_check_reserve,
-        attempt_rows=attempts,
-        explicit_hold=explicit_hold,
+
+
+def _recorded_authorization_charges(*, attempt_rows: list[dict[str, Any]] | None = None) -> float:
+    """Return durable charges, excluding the implicit unsettled-attempt hold."""
+    attempts = list(EXECUTION.get("attempts", [])) if attempt_rows is None else attempt_rows
+    prior_attempts = sum(
+        amount for row in attempts
+        if (amount := _numeric_cpu(row.get("authorized_aggregate_cpu_seconds"))) is not None
     )
-    return code_and_check_reserve + prior_attempts + explicit_hold + fallback_hold
+    return _code_and_check_charge() + prior_attempts + _explicit_interruption_hold()
+
+
+def _authorization_charges() -> float:
+    """Return durable charges plus an in-memory fail-closed interruption hold."""
+    attempts = list(EXECUTION.get("attempts", []))
+    fallback_hold = _interruption_budget_hold(
+        code_and_check_reserve=_code_and_check_charge(),
+        attempt_rows=attempts,
+        explicit_hold=_explicit_interruption_hold(),
+    )
+    return _recorded_authorization_charges() + fallback_hold
 
 
 def _append_ledger(row: dict[str, Any]) -> None:
@@ -462,12 +476,18 @@ def _append_ledger(row: dict[str, Any]) -> None:
         os.fsync(stream.fileno())
 
 
-def _reserve_unreconciled_cpu(*, attempt_id: str, source_commit: str) -> float:
+def _reserve_unreconciled_cpu(*, attempt_id: str, source_commit: str,
+                              attempt_rows: list[dict[str, Any]] | None = None) -> float:
     existing = next((row for row in _ledger_rows()
                      if row.get("attempt") == f"{attempt_id}-unreconciled-budget-reserve"), None)
     if existing is not None:
         return float(existing.get("process_cpu_seconds", 0.0))
-    charge = max(0.0, LOCAL_LIMIT - _authorization_charges())
+    # Do not use _authorization_charges() here: after restart its implicit
+    # fail-closed hold already consumes the whole remainder, leaving zero to
+    # persist.  The ledger must contain the explicit, idempotent reservation.
+    charge = max(0.0, LOCAL_LIMIT - _recorded_authorization_charges(
+        attempt_rows=attempt_rows,
+    ))
     _append_ledger({
         "attempt": f"{attempt_id}-unreconciled-budget-reserve",
         "authorization_comment_id": AUTHORIZATION,
@@ -550,30 +570,177 @@ def _invalidate_batch02_forecast(*, status: str, reason: str,
             "local_authorization_remaining_cpu_seconds",
             "complete_authorized_keys",
             "incomplete_or_unstarted_authorized_keys",
-            "dispatch_permitted",
         ):
             if field in previous:
                 record[field] = previous[field]
+    # An invalidated record is never an authorization, even if the stale
+    # forecast previously allowed dispatch.
+    record["dispatch_permitted"] = False
     _atomic_json(FORECAST_PATH, record)
     return record
+
+
+def _reconcile_unsettled_receipt(previous: dict[str, Any],
+                                 unsettled: dict[str, Any] | None) -> dict[str, Any]:
+    """Persist a conservative budget hold and recovery receipt before stopping."""
+    global EXECUTION
+
+    attempts = list(previous.get("attempts", []))
+    attempt = unsettled or (attempts[-1] if attempts else {})
+    attempt_id = str(attempt.get("attempt_id") or "issue60-batch02-sampling-unsettled-receipt")
+    source_commit = str(
+        attempt.get("executing_head") or previous.get("executing_head") or "UNKNOWN"
+    )
+    existing_reconciliation = (
+        json.loads(INTERRUPTION_RECONCILIATION_PATH.read_text(encoding="utf-8"))
+        if INTERRUPTION_RECONCILIATION_PATH.is_file() else {}
+    )
+    replaying_recovery = (
+        existing_reconciliation.get("interrupted_attempt_id") == attempt_id
+        and previous.get("status") == "INTERRUPTED"
+    )
+    same_reconciliation = existing_reconciliation.get("interrupted_attempt_id") == attempt_id
+    source_receipt_sha256 = (
+        existing_reconciliation.get("source_execution_receipt_sha256")
+        if same_reconciliation
+        else None
+    ) or _sha256(RECEIPT)
+    hold = _reserve_unreconciled_cpu(
+        attempt_id=attempt_id,
+        source_commit=source_commit,
+        attempt_rows=attempts,
+    )
+    charged_after_hold = _recorded_authorization_charges(attempt_rows=attempts)
+    remaining = max(0.0, LOCAL_LIMIT - charged_after_hold)
+
+    completed_games = [
+        row for source_attempt in attempts
+        for row in source_attempt.get("completed_games", [])
+    ]
+    completed = sorted({
+        int(row["game_seed"]) for row in completed_games
+        if isinstance(row, Mapping)
+        and row.get("game_seed") is not None
+        and int(row.get("game_seed", -1)) in TARGET_SEEDS
+    } | {
+        int(seed) for source_attempt in attempts
+        for seed in source_attempt.get("complete_keys", [])
+        if int(seed) in TARGET_SEEDS
+    })
+    unresolved = sorted(set(TARGET_SEEDS) - set(completed))
+    known_completed_cpu = [
+        float(row["process_cpu_seconds"]) for row in completed_games
+        if isinstance(row, Mapping)
+        and int(row.get("game_seed", -1)) in completed
+        and _numeric_cpu(row.get("process_cpu_seconds")) is not None
+    ]
+    completed_cpu = sum(known_completed_cpu) if known_completed_cpu else None
+    setup_cpu = _numeric_cpu(attempt.get("setup_cpu_seconds_before_tracker"))
+    stage_path_value = attempt.get("stage_receipt_path")
+    stage_path = HERE / str(stage_path_value) if stage_path_value else None
+    recorded_utc = (
+        existing_reconciliation.get("recorded_utc")
+        if same_reconciliation
+        else None
+    ) or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    reconciliation = {
+        "schema_id": "issue60-batch02-sampling-interruption-reconciliation-v1",
+        "authorization_comment_id": AUTHORIZATION,
+        "status": "CONSERVATIVE_BUDGET_HOLD_RECORDED",
+        "recorded_utc": recorded_utc,
+        "interrupted_attempt_id": attempt_id,
+        "unsettled_attempt_status_before_recovery": (
+            existing_reconciliation.get("unsettled_attempt_status_before_recovery")
+            if same_reconciliation
+            else attempt.get("status")
+        ),
+        "source_execution_receipt_path": RECEIPT.relative_to(HERE).as_posix(),
+        "source_execution_receipt_sha256": source_receipt_sha256,
+        "executing_head": source_commit,
+        "stage_receipt_path": str(stage_path_value) if stage_path_value else None,
+        "stage_receipt_present": bool(stage_path and stage_path.is_file()),
+        "stage_receipt_sha256": _sha256(stage_path) if stage_path and stage_path.is_file() else None,
+        "complete_authorized_keys": completed,
+        "incomplete_or_unstarted_authorized_keys": unresolved,
+        "known_completed_game_process_cpu_seconds": completed_cpu,
+        "known_setup_cpu_seconds": setup_cpu,
+        "exact_aggregate_cpu_seconds": "UNAVAILABLE",
+        "conservative_budget_charge_cpu_seconds": hold,
+        "conservative_charge_is_measured_cpu": False,
+        "conservative_charge_basis": (
+            "Reserve all remaining amount of the registered 2,000 CPU-s local authorization "
+            "because exact aggregate CPU for this unsettled attempt is unavailable. The hold "
+            "is a reservation, not measured CPU, and known components are traceability only."
+        ),
+        "local_authorization_limit_cpu_seconds": LOCAL_LIMIT,
+        "local_authorization_remaining_cpu_seconds": remaining,
+        "dispatch_permitted": False,
+        "scientific_status": "STUDY_ONLY / NO_SCIENTIFIC_RESULT",
+    }
+    _atomic_json(INTERRUPTION_RECONCILIATION_PATH, reconciliation)
+
+    forecast_record = _invalidate_batch02_forecast(
+        status="INVALIDATED_UNRECONCILED_CPU",
+        reason=("prior attempt was interrupted or never finalized; exact aggregate CPU "
+                "is unavailable and its remaining local authority is held"),
+        attempt_id=attempt_id,
+    )
+    forecast_record.update({
+        "exact_interrupted_attempt_aggregate_cpu_seconds": "UNAVAILABLE",
+        "conservative_budget_charge_cpu_seconds": hold,
+        "local_authorization_remaining_cpu_seconds": remaining,
+        "complete_authorized_keys": completed,
+        "incomplete_or_unstarted_authorized_keys": unresolved,
+        "interruption_reconciliation_path": (
+            INTERRUPTION_RECONCILIATION_PATH.relative_to(HERE).as_posix()
+        ),
+        "interruption_reconciliation_sha256": _sha256(INTERRUPTION_RECONCILIATION_PATH),
+        "dispatch_permitted": False,
+    })
+    _atomic_json(FORECAST_PATH, forecast_record)
+
+    if attempts:
+        attempt["status"] = "INTERRUPTED"
+        attempt["exact_aggregate_cpu_seconds"] = "UNAVAILABLE"
+        attempt["conservative_budget_charge_cpu_seconds"] = hold
+        attempt["complete_keys"] = completed
+        attempt["incomplete_or_unstarted_keys"] = unresolved
+        attempt["interruption_reconciliation_path"] = (
+            INTERRUPTION_RECONCILIATION_PATH.relative_to(HERE).as_posix()
+        )
+        attempt["interruption_reconciliation_sha256"] = _sha256(INTERRUPTION_RECONCILIATION_PATH)
+        previous["attempts"] = attempts
+    previous["status"] = "INTERRUPTED"
+    previous["failure"] = "recovered unsettled attempt; exact aggregate CPU unavailable; dispatch stopped"
+    if not replaying_recovery:
+        previous["updated_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    previous["exact_aggregate_cpu_seconds"] = "UNAVAILABLE"
+    previous["conservative_budget_charge_cpu_seconds"] = hold
+    previous["local_authorization_remaining_cpu_seconds"] = remaining
+    previous["interruption_reconciliation_path"] = (
+        INTERRUPTION_RECONCILIATION_PATH.relative_to(HERE).as_posix()
+    )
+    previous["interruption_reconciliation_sha256"] = _sha256(INTERRUPTION_RECONCILIATION_PATH)
+    previous["dispatch_permitted"] = False
+    previous["interruption_reconciliation"] = reconciliation
+    EXECUTION = previous
+    _atomic_json(RECEIPT, previous)
+    return reconciliation
 
 
 def _reject_unsettled_receipt_before_preflight() -> None:
     if not RECEIPT.is_file():
         return
     previous = json.loads(RECEIPT.read_text(encoding="utf-8"))
+    if previous.get("authorization_comment_id") != AUTHORIZATION:
+        raise bridge.CostRegimeError("sampling receipt belongs to another authorization")
     attempts = list(previous.get("attempts", []))
     unsettled = next((row for row in reversed(attempts) if (
         row.get("status") in {"RUNNING", "INTERRUPTED"}
         or _numeric_cpu(row.get("authorized_aggregate_cpu_seconds")) is None
     )), None)
     if previous.get("status") in {"STARTED", "INTERRUPTED"} or unsettled is not None:
-        _invalidate_batch02_forecast(
-            status="INVALIDATED_UNRECONCILED_CPU",
-            reason=("prior attempt was interrupted or never finalized; exact aggregate CPU "
-                    "is unavailable and its remaining local authority is held"),
-            attempt_id=(unsettled or {}).get("attempt_id"),
-        )
+        _reconcile_unsettled_receipt(previous, unsettled)
         raise bridge.CostRegimeError(
             "prior bounded sampling attempt is unsettled or interrupted; stop for budget reconciliation"
         )
