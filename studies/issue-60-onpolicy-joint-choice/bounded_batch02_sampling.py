@@ -619,10 +619,12 @@ def _preflight() -> dict[str, Any]:
     mutable_ledger = (HERE / "evidence" / "cpu-ledger.jsonl").resolve()
     repo_root = resource_amendment_r1._repo_root(HERE).resolve()
     mutable_ledger_path = mutable_ledger.relative_to(repo_root).as_posix()
-    unexpected = [
-        line for line in tracked_status.splitlines()
-        if line[3:].replace("\\", "/") != mutable_ledger_path
-    ]
+    unexpected = []
+    for line in tracked_status.splitlines():
+        fields = line.split(maxsplit=1)
+        path = fields[-1].replace("\\", "/") if len(fields) == 2 else ""
+        if path != mutable_ledger_path:
+            unexpected.append(line)
     if unexpected:
         raise bridge.CostRegimeError(
             f"tracked source worktree has unexpected changes before bounded dispatch: {unexpected}"
