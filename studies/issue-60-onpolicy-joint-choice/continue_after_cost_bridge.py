@@ -930,9 +930,15 @@ def _write_attribution_report(replay_report: dict[str, Any]) -> dict[str, Any]:
     gate = bridge._read_json(PROSPECTIVE / "bridge-gate.json")
     historical_latest_forecast = bridge._read_json(PROSPECTIVE / "latest-forecast.json")
     historical_r3 = bridge._read_historical_parallel_receipt(__import__("run_study_parallel"))
-    prior_handoff = "07c493a656bc344042f38532798e148d5fcd65cc"
-    old_launcher = bridge.git_bytes(
-        HERE, "show", f"{prior_handoff}:studies/issue-60-onpolicy-joint-choice/continue_after_cost_bridge.py",
+    completed_games_handoff = "8f3c8686611d3c11f7ea63986bf07ed092a977c1"
+    completed_games_handoff_launcher = bridge.git_bytes(
+        HERE, "show",
+        f"{completed_games_handoff}:studies/issue-60-onpolicy-joint-choice/continue_after_cost_bridge.py",
+    )
+    later_inspected_launcher_commit = "07c493a656bc344042f38532798e148d5fcd65cc"
+    later_inspected_launcher = bridge.git_bytes(
+        HERE, "show",
+        f"{later_inspected_launcher_commit}:studies/issue-60-onpolicy-joint-choice/continue_after_cost_bridge.py",
     )
     current_launcher_sha = _sha256(Path(__file__))
 
@@ -953,19 +959,41 @@ def _write_attribution_report(replay_report: dict[str, Any]) -> dict[str, Any]:
         }
 
     attribution = {
-        "schema_id": "issue60-continuation-cache-attribution-v1",
+        "schema_id": "issue60-continuation-cache-attribution-v2",
         "authorization_comment_id": DIAGNOSTIC_AUTHORIZATION,
-        "producer_commit": gate["source_commit"],
-        "producer_files": gate["source_files"],
+        "bridge_producer_commit": gate["source_commit"],
+        "bridge_producer_files": gate["source_files"],
         "continuation_provenance": {
-            "historical_continuation_commit": prior_handoff,
-            "historical_launcher_sha256": hashlib.sha256(old_launcher).hexdigest(),
+            "run_producer_commit": "unknown",
+            "run_producer_launcher_sha256": "unknown",
+            "run_producer_unknown_basis": (
+                "All 114 retained batch-02 run.json and 116 status.json records lack a source "
+                "commit, producer manifest, or launcher digest. The 8f3c868 handoff records the "
+                "completed games, but does not establish which source revision executed them."
+            ),
+            "completed_games_handoff_commit": completed_games_handoff,
+            "completed_games_handoff_launcher_sha256": hashlib.sha256(
+                completed_games_handoff_launcher
+            ).hexdigest(),
+            "completed_games_handoff_launcher_role": (
+                "Launcher snapshot at the handoff that recorded the 114 completed games; not "
+                "asserted to be the run-producing launcher."
+            ),
+            "completed_games_handoff_launcher_calls_run_continue_directly": True,
+            "later_inspected_launcher_commit": later_inspected_launcher_commit,
+            "later_inspected_launcher_sha256": hashlib.sha256(later_inspected_launcher).hexdigest(),
+            "later_inspected_launcher_role": (
+                "Adds prospective cost tagging to continuation. Its handoff records no games or "
+                "PPO updates, so it is not the producer of the retained 114 games."
+            ),
+            "later_inspected_launcher_installs_tagging_wrapper": True,
             "repaired_launcher_sha256": current_launcher_sha,
             "bridge_cached_guard_installer": "run_cost_bridge.py:_run_bridge",
-            "historical_continuation_cached_guard_installer": False,
+            "handoff_snapshot_cached_guard_installer": False,
             "classification": (
-                "The 59 bridge observations used GuardState/install_cached_guard; the 114 batch-02 "
-                "continuation observations used the same producer manifest but lacked that installer."
+                "The 59 bridge observations used GuardState/install_cached_guard. Keep the 114 "
+                "batch-02 observations classified as uncached; their exact producing source "
+                "revision is unknown from retained run metadata."
             ),
         },
         "retained_training_population": {

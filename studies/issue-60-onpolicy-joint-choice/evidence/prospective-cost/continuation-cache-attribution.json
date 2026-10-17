@@ -1,15 +1,7 @@
 {
   "authorization_comment_id": 6231868984,
-  "continuation_provenance": {
-    "bridge_cached_guard_installer": "run_cost_bridge.py:_run_bridge",
-    "classification": "The 59 bridge observations used GuardState/install_cached_guard; the 114 batch-02 continuation observations used the same producer manifest but lacked that installer.",
-    "historical_continuation_cached_guard_installer": false,
-    "historical_continuation_commit": "07c493a656bc344042f38532798e148d5fcd65cc",
-    "historical_launcher_sha256": "cf41e11d42698d19a3c71b9ca65d565bfe037ecdf957e0bfb58caac9c35d96ae",
-    "repaired_launcher_sha256": "699d0588765ab4f326c4382851442c9cab7a599c137f363f16feaf693c692f97"
-  },
-  "producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
-  "producer_files": {
+  "bridge_producer_commit": "ba51603de1451999257a1595fbf6f72b0eaa03a7",
+  "bridge_producer_files": {
     "config.json": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
     "guard_optimization.py": "7a8851294deb8ad900893544a066090db801774acc64b9848fcff9561de79be7",
     "parallel_execution.py": "53c4c63f9a2d250e34ad995544b84b75199077be012516a2c9d7dc0db0a3fdac",
@@ -21,6 +13,23 @@
     "run_study_parallel.py": "c58824bddd18bfa500a219b79d4f1a6961c5771bbaf3ebbe2fe56f97c39d15b9",
     "run_study_r2.py": "6617531789a8cddd5b832ee1b2013af52e410cbb603614e35bafe7de39825daf",
     "test_prospective_cost_regime.py": "93f4ca4c45143047221c0579d2c20587dccbdcec6980a2e9ecd5a663f988711d"
+  },
+  "continuation_provenance": {
+    "bridge_cached_guard_installer": "run_cost_bridge.py:_run_bridge",
+    "classification": "The 59 bridge observations used GuardState/install_cached_guard. Keep the 114 batch-02 observations classified as uncached; their exact producing source revision is unknown from retained run metadata.",
+    "completed_games_handoff_commit": "8f3c8686611d3c11f7ea63986bf07ed092a977c1",
+    "completed_games_handoff_launcher_calls_run_continue_directly": true,
+    "completed_games_handoff_launcher_role": "Launcher snapshot at the handoff that recorded the 114 completed games; not asserted to be the run-producing launcher.",
+    "completed_games_handoff_launcher_sha256": "bfd413454f890bf8f9dd29f54b2b7ed326e9ef9fdb7e4857f56379bd4ba91ebe",
+    "handoff_snapshot_cached_guard_installer": false,
+    "later_inspected_launcher_commit": "07c493a656bc344042f38532798e148d5fcd65cc",
+    "later_inspected_launcher_installs_tagging_wrapper": true,
+    "later_inspected_launcher_role": "Adds prospective cost tagging to continuation. Its handoff records no games or PPO updates, so it is not the producer of the retained 114 games.",
+    "later_inspected_launcher_sha256": "cf41e11d42698d19a3c71b9ca65d565bfe037ecdf957e0bfb58caac9c35d96ae",
+    "repaired_launcher_sha256": "f4a1ef5f3167919e2fcab2f0e5305fd1befad8b56c846ffef668dcfdc3ce9382",
+    "run_producer_commit": "unknown",
+    "run_producer_launcher_sha256": "unknown",
+    "run_producer_unknown_basis": "All 114 retained batch-02 run.json and 116 status.json records lack a source commit, producer manifest, or launcher digest. The 8f3c868 handoff records the completed games, but does not establish which source revision executed them."
   },
   "prospective_mixed_path_forecast": {
     "accounted_cpu_seconds_after_diagnostic_charge": 23644.469044763006,
@@ -74,7 +83,7 @@
     "aggregate_stage_cpu_seconds": 51.51946906800001,
     "aggregate_tracker_start_cpu": 3.816856186,
     "attribution_report_path": "evidence/prospective-cost/continuation-cache-attribution.json",
-    "attribution_report_sha256": "13a751511836a374932f00eacab3978ac3783caddb4630a107363efdea305ae4",
+    "attribution_report_sha256": "279eaabcbb922d12f92db660890fddc788712224dd1593a08c6aa8a9be43e621",
     "authorization_comment_id": 6231868984,
     "before_decision_check_count": 268,
     "builder_cpu_cap_seconds": 180000.0,
@@ -913,5 +922,5 @@
       "sum_cpu_seconds": 18333.425787879998
     }
   },
-  "schema_id": "issue60-continuation-cache-attribution-v1"
+  "schema_id": "issue60-continuation-cache-attribution-v2"
 }
