@@ -1,6 +1,7 @@
 """Focused offline checks for the Issue 60 resource-only R2 amendment."""
 from __future__ import annotations
 
+import math
 from pathlib import Path
 import unittest
 import tempfile
@@ -71,10 +72,27 @@ class ResourceAmendmentR2Tests(unittest.TestCase):
     def test_optimizer_forecast_retains_the_existing_dynamic_max_choice_rule(self) -> None:
         projection = remaining_optimizer_projection(HERE)
         self.assertEqual(projection["max_supported_choices"], 69)
-        self.assertEqual(projection["remaining_optimizer_minibatches"], 3328)
+        self.assertEqual(
+            projection["projected_decisions_per_batch"],
+            math.ceil(projection["max_supported_choices"] * 1.5) * 128,
+        )
+        self.assertEqual(
+            projection["projected_minibatches_per_epoch"],
+            math.ceil(projection["projected_decisions_per_batch"] / 256),
+        )
+        self.assertEqual(
+            projection["remaining_batches"],
+            max(0, 16 - projection["completed_batches"]),
+        )
+        expected_minibatches = (
+            projection["remaining_batches"]
+            * 4
+            * projection["projected_minibatches_per_epoch"]
+        )
+        self.assertEqual(projection["remaining_optimizer_minibatches"], expected_minibatches)
         self.assertAlmostEqual(
             projection["remaining_optimizer_cpu_seconds"],
-            3328 * 5.375514805000009 * 1.5, places=8,
+            expected_minibatches * 5.375514805000009 * 1.5, places=8,
         )
 
     def test_actual_budget_exhaustion_stops_before_work(self) -> None:
