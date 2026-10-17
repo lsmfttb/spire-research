@@ -643,17 +643,27 @@ def _reconcile_unsettled_receipt(previous: dict[str, Any],
         if same_reconciliation
         else None
     ) or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    legacy_attempt_reconciliation = attempt.get("interruption_reconciliation", {})
+    legacy_worker_statuses = {
+        str(row.get("last_status"))
+        for row in legacy_attempt_reconciliation.get("workers", [])
+        if isinstance(row, Mapping) and row.get("last_status")
+    } if isinstance(legacy_attempt_reconciliation, Mapping) else set()
+    original_attempt_status = (
+        existing_reconciliation.get("unsettled_attempt_status_before_recovery")
+        or ("RUNNING" if "RUNNING" in legacy_worker_statuses else None)
+        or attempt.get("status")
+        or previous.get("status")
+        or "UNKNOWN"
+    )
     reconciliation = {
+        **(existing_reconciliation if same_reconciliation else {}),
         "schema_id": "issue60-batch02-sampling-interruption-reconciliation-v1",
         "authorization_comment_id": AUTHORIZATION,
         "status": "CONSERVATIVE_BUDGET_HOLD_RECORDED",
         "recorded_utc": recorded_utc,
         "interrupted_attempt_id": attempt_id,
-        "unsettled_attempt_status_before_recovery": (
-            existing_reconciliation.get("unsettled_attempt_status_before_recovery")
-            if same_reconciliation
-            else attempt.get("status")
-        ),
+        "unsettled_attempt_status_before_recovery": original_attempt_status,
         "source_execution_receipt_path": RECEIPT.relative_to(HERE).as_posix(),
         "source_execution_receipt_sha256": source_receipt_sha256,
         "executing_head": source_commit,

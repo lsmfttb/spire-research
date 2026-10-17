@@ -241,6 +241,72 @@ class BoundedBatch02SamplingTests(unittest.TestCase):
                                  LOCAL_LIMIT - 230.0)
                 self.assertFalse(recovered_receipt["dispatch_permitted"])
 
+    def test_recovery_replay_preserves_retained_reconciliation_accounting(self) -> None:
+        import bounded_batch02_sampling as sampling
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            evidence = root / "evidence"
+            prospective = evidence / "prospective-cost"
+            executions = prospective / "executions"
+            executions.mkdir(parents=True)
+            receipt = executions / "batch02-sampling.json"
+            index = prospective / "cost-index.json"
+            forecast = prospective / "batch02-sampling-forecast.json"
+            reconciliation_path = (
+                prospective / "batch02-sampling-interruption-reconciliation.json"
+            )
+            ledger = evidence / "cpu-ledger.jsonl"
+            retained_files = (
+                (sampling.RECEIPT, receipt),
+                (sampling.FORECAST_INDEX, index),
+                (sampling.FORECAST_PATH, forecast),
+                (sampling.INTERRUPTION_RECONCILIATION_PATH, reconciliation_path),
+                (sampling.EVIDENCE / "cpu-ledger.jsonl", ledger),
+            )
+            for source, destination in retained_files:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(source.read_bytes())
+
+            retained = json.loads(reconciliation_path.read_text(encoding="utf-8"))
+            self.assertNotIn("unsettled_attempt_status_before_recovery", retained)
+            preserved_fields = (
+                "cumulative_all_in_cpu_seconds_after_conservative_hold",
+                "known_cumulative_all_in_cpu_seconds_before_hold",
+                "cumulative_builder_cap_cpu_seconds",
+                "cumulative_process_cap_cpu_seconds",
+                "known_local_authorization_charged_before_attempt",
+                "cost_index_observation_count",
+                "cost_index_path",
+                "cost_index_sha256",
+                "stale_forecast_path",
+                "stale_forecast_sha256",
+                "previous_forecast_projection_status",
+                "preserved_stale_forecast_path",
+            )
+            expected_fields = {key: retained[key] for key in preserved_fields}
+            with (mock.patch.object(sampling, "HERE", root),
+                  mock.patch.object(sampling, "EVIDENCE", evidence),
+                  mock.patch.object(sampling, "PROSPECTIVE", prospective),
+                  mock.patch.object(sampling, "RECEIPT", receipt),
+                  mock.patch.object(sampling, "FORECAST_INDEX", index),
+                  mock.patch.object(sampling, "FORECAST_PATH", forecast),
+                  mock.patch.object(sampling, "INTERRUPTION_RECONCILIATION_PATH", reconciliation_path),
+                  mock.patch.object(sampling, "EXECUTION", {})):
+                first_recovery = None
+                for _ in range(2):
+                    with self.assertRaisesRegex(CostRegimeError, "unsettled or interrupted"):
+                        sampling._reject_unsettled_receipt_before_preflight()
+                    recovered = json.loads(reconciliation_path.read_text(encoding="utf-8"))
+                    self.assertEqual(
+                        {key: recovered[key] for key in preserved_fields}, expected_fields,
+                    )
+                    self.assertEqual(recovered["unsettled_attempt_status_before_recovery"], "RUNNING")
+                    if first_recovery is None:
+                        first_recovery = reconciliation_path.read_bytes()
+                    else:
+                        self.assertEqual(reconciliation_path.read_bytes(), first_recovery)
+
     def test_r2_seal_accepts_only_the_committed_offline_test_descendant(self) -> None:
         import resource_amendment_r2
         import run_cost_bridge as bridge
