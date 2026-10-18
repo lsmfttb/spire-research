@@ -1,6 +1,6 @@
 {
-  "accounted_new_cpu_seconds": 71157.80875499602,
-  "administrative_debit_cpu_seconds": 161.953064391,
+  "accounted_new_cpu_seconds": 71187.80875499602,
+  "administrative_debit_cpu_seconds": 191.953064391,
   "administrative_debits": [
     {
       "kind": "interrupted-parent-invocation",
@@ -32,12 +32,20 @@
       "seconds": 30.0
     },
     {
+      "created_at_utc": "2026-10-18T19:42:12Z",
       "id": "issue60-builder-continuation-final-handoff-20261019",
       "kind": "bounded-builder-continuation-final-verification-and-handoff",
-      "seconds": 30.0,
       "measured": false,
-      "created_at_utc": "2026-10-18T19:42:12Z",
-      "reason": "Conservative Builder administrative debit for checkpoint publication, run monitoring, final stop/evidence verification, and Reviewer handoff after the prelaunch debit; exact host CPU was not retained."
+      "reason": "Conservative Builder administrative debit for checkpoint publication, run monitoring, final stop/evidence verification, and Reviewer handoff after the prelaunch debit; exact host CPU was not retained.",
+      "seconds": 30.0
+    },
+    {
+      "created_at_utc": "2026-10-18T20:02:54Z",
+      "id": "issue60-builder-budget-downshift-code-and-focused-tests-20261019",
+      "kind": "builder-budget-admission-repair-and-focused-verification",
+      "measured": false,
+      "reason": "Conservative administrative debit for the budget-admission repair, focused regression suite, commit, push, and bounded continuation setup; exact host CPU was not retained.",
+      "seconds": 30.0
     }
   ],
   "administrative_protocol_initialized": true,
