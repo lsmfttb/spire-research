@@ -1,0 +1,1194 @@
+"""Single STUDY_ONLY production entry for the registered Issue 60 trial.
+
+The frozen research source continues to own controller and PPO semantics. This
+entry installs the existing in-memory accounting hooks and fixed-key worker
+dispatcher, then resumes the registered training/evaluation stages. Its only
+special stop is the batch-02 integration-review boundary.
+"""
+from __future__ import annotations
+
+import gzip
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import resource
+import shutil
+import subprocess
+import sys
+import time
+from typing import Any, Mapping, Sequence
+
+
+ENTRY_PROCESS_CPU_STARTED = time.process_time()
+
+import torch
+
+import controllers
+import encoder
+import guard_optimization
+import parallel_execution
+import resource_amendment_r2
+import run_study
+import run_study_r2
+import trainer
+
+
+HERE = Path(__file__).resolve().parent
+EVIDENCE = HERE / "evidence"
+PROGRESS_PATH = EVIDENCE / "execution" / "production-progress.json"
+EVENTS_PATH = EVIDENCE / "execution" / "production-events.jsonl"
+MILESTONE_PATH = EVIDENCE / "execution" / "integration-milestone.json"
+ISSUE_NUMBER = 60
+REPOSITORY = "lsmfttb/spire-research"
+HISTORICAL_ADMIN_CPU_SECONDS = 25_644.469
+ACCEPTED_INTERRUPTION_DEBIT_SECONDS = 1_572.370806919
+NEW_BUILDER_CPU_LIMIT_SECONDS = 150_000.0
+INTEGRATION_CPU_LIMIT_SECONDS = 3_000.0
+INTEGRATION_MAX_WORKERS = 2
+PARENT_INTERRUPTION_RESERVE_SECONDS = 60.0
+GAME_RESERVE_MULTIPLIER = 1.25
+OPTIMIZER_RESERVE_MULTIPLIER = 2.0
+INITIAL_OPTIMIZER_RESERVE_SECONDS = 900.0
+EXPECTED_BATCH01_SHA = "c05ffb91ed6cb702e9ad135afe3b537c1348f2da8e21958c38141404055bfbb5"
+MISSING_BATCH02_SEEDS = (660248, 660250, 660251, 660252, 660253, 660254, 660255, 660256)
+
+
+class ProductionError(RuntimeError):
+    """A correctness, routing, or runtime failure in the production path."""
+
+
+class ProspectiveBudgetStop(ProductionError):
+    """The actual budget cannot safely reserve the next bounded operation."""
+
+
+class IntegrationMilestoneReached(Exception):
+    """Batch 02 completed; stop for the required independent integration review."""
+
+
+def _canonical_bytes(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _atomic_json(path: Path, value: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + f".tmp-{os.getpid()}")
+    with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+        json.dump(value, stream, sort_keys=True, indent=2, allow_nan=False)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+    try:
+        directory = os.open(path.parent, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(directory)
+    except OSError:
+        pass
+    finally:
+        os.close(directory)
+
+
+def _append_jsonl(path: Path, value: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline="\n") as stream:
+        stream.write(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def verify_active_sources_once(rs: Any) -> dict[str, Any]:
+    """Validate registered config and committed current study source at startup.
+
+    The historical frozen-manifest hash for run_study.py is stale on the
+    accepted study branch. Keep all other manifest checks and verify the
+    current orchestration source against the exact Git tree object instead.
+    """
+    manifest_path = rs.HERE / "frozen-manifest.json"
+    if not manifest_path.is_file():
+        raise ProductionError("registered study manifest is missing")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ProductionError("registered study manifest is unreadable") from exc
+    if manifest.get("schema_id") != "issue60-frozen-manifest-v1":
+        raise ProductionError("registered study manifest schema changed")
+    if manifest.get("config_sha256") != rs.config_sha():
+        raise ProductionError("registered config differs from the frozen manifest")
+    config = json.loads(rs.CONFIG_PATH.read_text(encoding="utf-8"))
+    if (manifest.get("source_pins") != config.get("sources")
+            or manifest.get("base_commit") != config.get("base", {}).get("commit")):
+        raise ProductionError("manifest source/base pins disagree with the registered config")
+    entries = manifest.get("files")
+    if not isinstance(entries, list):
+        raise ProductionError("registered manifest has no file identity list")
+    paths = [entry.get("path") for entry in entries if isinstance(entry, Mapping)]
+    if len(paths) != len(entries) or set(paths) != set(rs.FROZEN_FILES) or len(paths) != len(set(paths)):
+        raise ProductionError("registered manifest file set differs from the frozen study source list")
+    stale_manifest_run_study_sha: str | None = None
+    for entry in entries:
+        relative = str(entry["path"])
+        source = rs.HERE / relative
+        if not source.is_file():
+            raise ProductionError(f"registered study source is missing: {relative}")
+        current_sha = hashlib.sha256(source.read_bytes()).hexdigest()
+        if relative == "run_study.py":
+            stale_manifest_run_study_sha = str(entry["sha256"])
+            continue
+        if current_sha != entry.get("sha256"):
+            raise ProductionError(f"registered frozen scientific input changed: {relative}")
+
+    root_result = _run_counted(["git", "rev-parse", "--show-toplevel"], cwd=HERE)
+    head_result = _run_counted(["git", "rev-parse", "HEAD"], cwd=HERE)
+    if root_result.returncode != 0 or head_result.returncode != 0:
+        raise ProductionError("could not resolve the current source tree identity")
+    repo_root = Path(root_result.stdout.strip()).resolve()
+    relative_run_study = (rs.HERE / "run_study.py").resolve().relative_to(repo_root).as_posix()
+    committed = _run_counted(["git", "rev-parse", f"HEAD:{relative_run_study}"], cwd=repo_root)
+    working = _run_counted(["git", "hash-object", str((rs.HERE / "run_study.py").resolve())], cwd=repo_root)
+    if committed.returncode != 0 or working.returncode != 0 or committed.stdout.strip() != working.stdout.strip():
+        raise ProductionError("current run_study.py bytes differ from the committed source tree")
+    return {
+        "manifest_schema_id": manifest["schema_id"],
+        "config_sha256": rs.config_sha(),
+        "base_commit": config["base"]["commit"],
+        "source_pins": dict(config["sources"]),
+        "current_run_study_git_blob": committed.stdout.strip(),
+        "current_run_study_sha256": hashlib.sha256((rs.HERE / "run_study.py").read_bytes()).hexdigest(),
+        "historical_manifest_run_study_sha256": stale_manifest_run_study_sha,
+        "historical_manifest_run_study_sha_stale": (
+            hashlib.sha256((rs.HERE / "run_study.py").read_bytes()).hexdigest()
+            != stale_manifest_run_study_sha
+        ),
+        "other_frozen_files_verified": len(entries) - 1,
+        "verification": "current HEAD tree identity plus registered config and unchanged remaining manifest inputs",
+    }
+
+
+def _run_counted(argv: Sequence[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    before = resource.getrusage(resource.RUSAGE_CHILDREN)
+    environment = None
+    if argv and argv[0] == "git":
+        environment = os.environ.copy()
+        environment.update(_worktree_git_environment())
+    result = subprocess.run(argv, cwd=cwd, env=environment, check=False, capture_output=True, text=True)
+    after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    _EXTERNAL_CHILD_CPU[0] += max(0.0, (after.ru_utime + after.ru_stime) - (before.ru_utime + before.ru_stime))
+    return result
+
+
+def _run_counted_external(argv: Sequence[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    """Meter a subprocess outside the Windows-backed production worktree."""
+    before = resource.getrusage(resource.RUSAGE_CHILDREN)
+    result = subprocess.run(argv, cwd=cwd, check=False, capture_output=True, text=True)
+    after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    _EXTERNAL_CHILD_CPU[0] += max(0.0, (after.ru_utime + after.ru_stime) - (before.ru_utime + before.ru_stime))
+    return result
+
+
+_EXTERNAL_CHILD_CPU = [0.0]
+
+
+def _worktree_git_environment() -> dict[str, str]:
+    """Translate a Windows Git worktree pointer when this entry runs under WSL."""
+    repository_root = HERE.parents[1].resolve()
+    dot_git = repository_root / ".git"
+    if dot_git.is_dir():
+        return {"GIT_WORK_TREE": str(repository_root)}
+    if not dot_git.is_file():
+        raise ProductionError("repository .git metadata is missing")
+    first, separator, target = dot_git.read_text(encoding="utf-8").strip().partition(":")
+    if not separator or first.strip().lower() != "gitdir":
+        raise ProductionError("repository .git worktree pointer is invalid")
+    target = target.strip()
+    match = re.match(r"^([A-Za-z]):[\\/](.*)$", target)
+    if match:
+        worktree_git_dir = Path(f"/mnt/{match.group(1).lower()}/{match.group(2).replace(chr(92), '/')}")
+    else:
+        worktree_git_dir = Path(target)
+        if not worktree_git_dir.is_absolute():
+            worktree_git_dir = (dot_git.parent / worktree_git_dir).resolve()
+    if not worktree_git_dir.is_dir():
+        raise ProductionError(f"worktree Git metadata path is unavailable: {worktree_git_dir}")
+    return {
+        "GIT_DIR": str(worktree_git_dir),
+        "GIT_WORK_TREE": str(repository_root),
+    }
+
+
+def _gh_executable() -> str:
+    linux = shutil.which("gh")
+    if linux:
+        return linux
+    wsl_path = Path("/mnt/c/Program Files/GitHub CLI/gh.exe")
+    if wsl_path.is_file():
+        return str(wsl_path)
+    raise ProductionError("GitHub CLI is unavailable; issue routing must be checked before execution")
+
+
+def _issue_state() -> tuple[set[str], list[Mapping[str, Any]]]:
+    result = _run_counted([
+        _gh_executable(), "issue", "view", str(ISSUE_NUMBER), "--repo", REPOSITORY,
+        "--json", "labels,comments",
+    ])
+    if result.returncode != 0:
+        raise ProductionError(f"could not read Issue #{ISSUE_NUMBER} routing: {result.stderr.strip()}")
+    try:
+        raw = json.loads(result.stdout)
+        labels = {str(row["name"]) for row in raw.get("labels", [])}
+        comments = raw.get("comments", [])
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise ProductionError("GitHub CLI returned an invalid Issue routing response") from exc
+    return labels, comments if isinstance(comments, list) else []
+
+
+def execution_phase(completed_batch: int, labels: set[str], comments: Sequence[Mapping[str, Any]], head: str) -> str:
+    """Select the one allowed stage from durable checkpoint and reviewer routing."""
+    if "route:builder" not in labels:
+        return "awaiting-review"
+    if completed_batch == 1:
+        return "integration-milestone"
+    if completed_batch >= 2:
+        marker = f"issue60-integration-review-v1: PASS {head}"
+        if any(marker in str(comment.get("body", "")) for comment in comments):
+            return "full-continuation"
+        return "awaiting-review"
+    raise ProductionError(f"unexpected block1 checkpoint boundary: completed_batches={completed_batch}")
+
+
+def can_dispatch_with_reserves(*, actual_cpu: float, cpu_limit: float,
+                               active_or_pending_workers: int, game_reserve: float,
+                               optimizer_reserve: float, parent_reserve: float) -> bool:
+    values = (actual_cpu, cpu_limit, game_reserve, optimizer_reserve, parent_reserve)
+    if any(not math.isfinite(value) or value < 0 for value in values) or active_or_pending_workers < 0:
+        raise ValueError("CPU accounting reserves must be finite and nonnegative")
+    return (actual_cpu + active_or_pending_workers * game_reserve
+            + optimizer_reserve + parent_reserve) < cpu_limit
+
+
+def select_milestone_worker_count(*, preferred_workers: int, actual_cpu: float,
+                                  game_reserve: float, optimizer_reserve: float,
+                                  parent_reserve: float) -> int:
+    """Bound batch-02 integration parallelism before the dispatcher starts."""
+    if preferred_workers < 1:
+        raise ValueError("preferred worker count must be positive")
+    limit = min(int(preferred_workers), INTEGRATION_MAX_WORKERS)
+    for count in range(limit, 0, -1):
+        if can_dispatch_with_reserves(
+            actual_cpu=actual_cpu, cpu_limit=INTEGRATION_CPU_LIMIT_SECONDS,
+            active_or_pending_workers=count, game_reserve=game_reserve,
+            optimizer_reserve=optimizer_reserve, parent_reserve=parent_reserve,
+        ):
+            return count
+    raise ProspectiveBudgetStop(
+        "batch-02 integration cannot safely reserve one worker and the pending PPO update "
+        "inside the 3000s CPU cap"
+    )
+
+
+class ProductionProgress:
+    """Durable coarse state; detailed completed runs remain in their run.json files."""
+
+    def __init__(self, base: Path, *, config_sha: str):
+        self.base = Path(base)
+        self.config_sha = config_sha
+        self.data: dict[str, Any] = {
+            "schema_id": "issue60-production-progress-v1",
+            "purpose": "STUDY_ONLY",
+            "config_sha256": config_sha,
+            "measured_new_cpu_seconds": 0.0,
+            "administrative_debit_cpu_seconds": 0.0,
+            "administrative_debits": [],
+            "historical_admin_debit_cpu_seconds": 0.0,
+            "historical_admin_debits": [],
+            "open_invocation": None,
+            "open_optimizer_reservation": None,
+            "open_worker_reservations": {},
+            "phase": "created",
+            "events_written": 0,
+        }
+        if PROGRESS_PATH.is_file():
+            try:
+                saved = json.loads(PROGRESS_PATH.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ProductionError(f"production progress file is unreadable: {PROGRESS_PATH}") from exc
+            if saved.get("schema_id") != self.data["schema_id"] or saved.get("config_sha256") != config_sha:
+                raise ProductionError("production progress does not match the registered study config")
+            self.data.update(saved)
+        self._recover_interrupted_reservations()
+
+    def _recover_interrupted_reservations(self) -> None:
+        rows: list[dict[str, Any]] = []
+        invocation = self.data.get("open_invocation")
+        if isinstance(invocation, Mapping):
+            rows.append({
+                "kind": "interrupted-parent-invocation",
+                "seconds": float(invocation.get("reservation_seconds", PARENT_INTERRUPTION_RESERVE_SECONDS)),
+                "reason": "hard interruption left unmeasured parent/process interval",
+            })
+        optimizer = self.data.get("open_optimizer_reservation")
+        if isinstance(optimizer, Mapping):
+            rows.append({
+                "kind": "interrupted-optimizer-reservation",
+                "seconds": float(optimizer.get("reservation_seconds", 0.0)),
+                "block": optimizer.get("block"), "batch_index": optimizer.get("batch_index"),
+                "reason": "hard interruption left optimizer work interval unmeasured",
+            })
+        workers = self.data.get("open_worker_reservations", {})
+        if isinstance(workers, Mapping):
+            for reservation in workers.values():
+                if not isinstance(reservation, Mapping):
+                    continue
+                rows.append({
+                    "kind": "interrupted-worker-reservation",
+                    "seconds": float(reservation.get("reservation_seconds", 0.0)),
+                    "task_key": reservation.get("task_key"),
+                    "pid": reservation.get("pid"),
+                    "reason": "hard interruption left worker CPU interval unmeasured",
+                })
+        if rows:
+            self.add_administrative_debits(rows)
+            self.data["open_invocation"] = None
+            self.data["open_optimizer_reservation"] = None
+            self.data["open_worker_reservations"] = {}
+            self.data["phase"] = "resumed-after-interruption"
+            self.persist()
+
+    def add_administrative_debits(self, rows: Sequence[Mapping[str, Any]]) -> None:
+        for row in rows:
+            amount = float(row.get("seconds", 0.0))
+            if not math.isfinite(amount) or amount < 0:
+                raise ProductionError("interruption reservation debit is invalid")
+            self.data["administrative_debit_cpu_seconds"] = (
+                float(self.data["administrative_debit_cpu_seconds"]) + amount
+            )
+            self.data["administrative_debits"].append(dict(row))
+
+    def begin_invocation(self, *, head: str, launcher_sha: str,
+                         runtime: Mapping[str, Any], parent_reserve: float) -> None:
+        if self.data.get("open_invocation") is not None:
+            raise ProductionError("another production invocation is already marked open")
+        self.data["open_invocation"] = {
+            "started_utc": _utc_now(), "head": head, "launcher_sha256": launcher_sha,
+            "reservation_seconds": parent_reserve,
+        }
+        self.data["runtime"] = dict(runtime)
+        self.data["phase"] = "startup-validated"
+        self.persist()
+
+    def event(self, kind: str, *, actual_cpu: float, **details: Any) -> None:
+        row = {
+            "schema_id": "issue60-production-event-v1", "event": kind,
+            "timestamp_utc": _utc_now(), "measured_new_cpu_seconds": actual_cpu,
+            "administrative_debit_cpu_seconds": float(self.data["administrative_debit_cpu_seconds"]),
+            "historical_admin_debit_cpu_seconds": float(self.data["historical_admin_debit_cpu_seconds"]),
+            **details,
+        }
+        _append_jsonl(EVENTS_PATH, row)
+        self.data["events_written"] = int(self.data.get("events_written", 0)) + 1
+        self.persist(measured_cpu_seconds=actual_cpu)
+
+    def persist(self, *, measured_cpu_seconds: float | None = None) -> None:
+        if measured_cpu_seconds is not None:
+            if not math.isfinite(measured_cpu_seconds) or measured_cpu_seconds < 0:
+                raise ProductionError("measured production CPU is invalid")
+            self.data["measured_new_cpu_seconds"] = measured_cpu_seconds
+        self.data["accounted_new_cpu_seconds"] = (
+            float(self.data["measured_new_cpu_seconds"])
+            + float(self.data["administrative_debit_cpu_seconds"])
+        )
+        _atomic_json(PROGRESS_PATH, self.data)
+
+
+def _utc_now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+class Meter:
+    def __init__(self, *, progress: ProductionProgress,
+                 tracker: parallel_execution.ProcessCpuTracker,
+                 setup_parent_cpu: float, setup_external_cpu: float):
+        self.progress = progress
+        self.tracker = tracker
+        self.setup_parent_cpu = max(0.0, setup_parent_cpu)
+        self.setup_external_cpu = max(0.0, setup_external_cpu)
+        self.base_measured_cpu = float(progress.data["measured_new_cpu_seconds"])
+
+    def actual_cpu(self) -> float:
+        return (self.base_measured_cpu + self.setup_parent_cpu + self.setup_external_cpu
+                + self.tracker.current_stage_cpu())
+
+    def accounted_cpu(self) -> float:
+        return self.actual_cpu() + float(self.progress.data["administrative_debit_cpu_seconds"])
+
+
+class DurableDispatcher(parallel_execution.ParallelGameDispatcher):
+    def __init__(self, *args: Any, owner: "ProductionRuntime", **kwargs: Any):
+        self.owner = owner
+        super().__init__(*args, **kwargs)
+
+    def _fork_task(self, task: Mapping[str, Any], slot: int) -> int:
+        key = tuple(task["key"])
+        kwargs = task["kwargs"]
+        token = json.dumps(list(key), separators=(",", ":"))
+        reserve = self.owner.game_reserve_seconds()
+        reservation = {
+            "task_key": list(key), "pid": None,
+            "output_dir": str(Path(kwargs["output_dir"]).resolve()),
+            "model_sha256": str(kwargs["model_sha"]),
+            "config_sha256": str(kwargs["config_digest"]),
+            "reservation_seconds": reserve,
+            "reserved_utc": _utc_now(),
+        }
+        self.owner.progress.data["open_worker_reservations"][token] = reservation
+        self.owner.progress.event(
+            "worker-reservation", actual_cpu=self.owner.meter.actual_cpu(),
+            task_key=list(key), reservation_seconds=reserve,
+        )
+        try:
+            pid = super()._fork_task(task, slot)
+        except BaseException:
+            self.owner.progress.data["open_worker_reservations"].pop(token, None)
+            self.owner.progress.persist(measured_cpu_seconds=self.owner.meter.actual_cpu())
+            raise
+        reservation["pid"] = int(pid)
+        self.owner._worker_tokens[str(pid)] = token
+        self.owner.progress.persist(measured_cpu_seconds=self.owner.meter.actual_cpu())
+        return pid
+
+
+class ProductionRuntime:
+    def __init__(self, *, progress: ProductionProgress, state: guard_optimization.GuardState,
+                 tracker: parallel_execution.ProcessCpuTracker, meter: Meter,
+                 worker_selection: Mapping[str, Any], milestone_mode: bool):
+        self.progress = progress
+        self.state = state
+        self.tracker = tracker
+        self.meter = meter
+        self.worker_selection = dict(worker_selection)
+        self.milestone_mode = milestone_mode
+        self.optimizer_reserve_seconds = 0.0
+        self.dispatcher: DurableDispatcher | None = None
+        self._worker_tokens: dict[str, str] = {}
+        self.batch_validation: dict[str, Any] | None = None
+        self.milestone_checkpoint_sha: str | None = None
+
+    def game_reserve_seconds(self) -> float:
+        return max(60.0, float(self.state.max_observed_game_cpu_seconds) * GAME_RESERVE_MULTIPLIER)
+
+    def cpu_limit(self) -> float:
+        if self.milestone_mode:
+            return min(NEW_BUILDER_CPU_LIMIT_SECONDS, INTEGRATION_CPU_LIMIT_SECONDS)
+        return NEW_BUILDER_CPU_LIMIT_SECONDS
+
+    def check_budget(self, *, workers: int | None = None,
+                     optimizer_reserve: float | None = None) -> None:
+        actual = self.meter.accounted_cpu()
+        active = self.tracker.active_worker_count() if workers is None else workers
+        optimizer = self.optimizer_reserve_seconds if optimizer_reserve is None else optimizer_reserve
+        parent = float(self.progress.data.get("open_invocation", {}).get(
+            "reservation_seconds", PARENT_INTERRUPTION_RESERVE_SECONDS,
+        ))
+        if not can_dispatch_with_reserves(
+            actual_cpu=actual, cpu_limit=self.cpu_limit(),
+            active_or_pending_workers=active, game_reserve=self.game_reserve_seconds(),
+            optimizer_reserve=optimizer, parent_reserve=parent,
+        ):
+            raise ProspectiveBudgetStop(
+                f"actual prospective CPU {actual:.3f}s cannot safely reserve the next operation "
+                f"inside the {self.cpu_limit():.0f}s cap (workers={active}, "
+                f"game_reserve={self.game_reserve_seconds():.3f}s each, "
+                f"optimizer_reserve={optimizer:.3f}s, parent_reserve={parent:.3f}s)"
+            )
+
+    def persist_event(self, kind: str, **details: Any) -> None:
+        self.progress.event(kind, actual_cpu=self.meter.actual_cpu(), **details)
+
+    def worker_settled(self, pid: int, seconds: float, slot: int | None) -> None:
+        token = self._worker_tokens.pop(str(pid), None)
+        reservation = None
+        if token is not None:
+            reservation = self.progress.data["open_worker_reservations"].pop(token, None)
+        if reservation is not None:
+            output = Path(str(reservation["output_dir"]))
+            completed = run_study.successful_attempt(
+                output, str(reservation["model_sha256"]), str(reservation["config_sha256"]),
+            )
+            if completed is not None:
+                self.state.register_complete(*completed)
+            self.persist_event(
+                "worker-settled", pid=pid, slot=slot, task_key=reservation["task_key"],
+                settled_worker_cpu_seconds=seconds,
+                completed_keys=self.state.completed_run_count(),
+            )
+        else:
+            self.persist_event(
+                "worker-settled-unmatched", pid=pid, slot=slot,
+                settled_worker_cpu_seconds=seconds,
+            )
+
+    def install_cache(self, *, rs: Any, resource_module: Any,
+                      parallel_module: Any) -> None:
+        guard_optimization.install_cached_guard(
+            rs, run_study_r2, resource_module, self.state,
+            parallel_module=parallel_module,
+            on_worker_settlement=self.worker_settled,
+        )
+        self._cached_raw_game = rs.run_game
+        self._cached_atomic_json = rs.atomic_json
+        self._cached_count = rs._completed_run_count
+        self._cached_projection = rs._remaining_optimizer_projection
+        self._cached_r2_complete = resource_module.complete_game_costs
+        self._cached_r2_ledger = resource_module._ledger_total
+
+        progress_atomic = rs.atomic_json
+
+        def tracked_atomic(path: Path, value: Mapping[str, Any]) -> Any:
+            result = progress_atomic(path, value)
+            candidate = Path(path)
+            if candidate.parent.resolve() == (EVIDENCE / "training" / "block1").resolve() \
+                    and candidate.name.startswith("batch-") and candidate.suffix == ".json":
+                self.state.register_batch_json(candidate)
+                self.persist_event(
+                    "optimizer-checkpoint-summary", block="block1",
+                    batch_summary=str(candidate.relative_to(HERE)),
+                    checkpoint_sha256=_sha256(EVIDENCE / "training" / "block1" / "latest.pt"),
+                    completed_batches=self.state.completed_run_count(),
+                )
+            return result
+
+        rs.atomic_json = tracked_atomic
+        original_save = rs.atomic_torch_save
+
+        def tracked_checkpoint_save(path: Path, value: Mapping[str, Any]) -> Any:
+            result = original_save(path, value)
+            candidate = Path(path)
+            if candidate.name == "latest.pt" and candidate.parent.name in {"block1", "block2"}:
+                payload = torch.load(candidate, map_location="cpu", weights_only=False)
+                if payload.get("optimizer_state") is None or payload.get("model_state") is None:
+                    raise ProductionError("atomic PPO checkpoint lacks model or optimizer state")
+                self.milestone_checkpoint_sha = str(payload.get("model_sha256"))
+                self.progress.data["live_checkpoint"] = {
+                    "path": str(candidate.relative_to(HERE)),
+                    "file_sha256": _sha256(candidate),
+                    "model_sha256": payload.get("model_sha256"),
+                    "completed_batches": int(payload.get("completed_batches", 0)),
+                    "block": payload.get("block"),
+                }
+                self.persist_event(
+                    "atomic-checkpoint-written", checkpoint=self.progress.data["live_checkpoint"],
+                )
+            return result
+
+        rs.atomic_torch_save = tracked_checkpoint_save
+
+        original_update = rs.update_batch
+
+        def tracked_update(model: Any, optimizer: Any, rows: Sequence[Any], vocab: Any, **kwargs: Any):
+            block = "block1" if int(kwargs.get("block_seed", -1)) == rs.MODEL_SEEDS["block1"] else "block2"
+            batch_index = int(kwargs.get("batch_index", -1))
+            if block == "block1" and batch_index == 2:
+                self.verify_cache_installed("before-block1-batch02-update")
+                self.batch_validation = validate_batch02_input(
+                    rs=rs, model=model, vocab=vocab, bootstrap=BOOTSTRAP[0], rows=rows,
+                )
+                self.progress.data["batch02_validation"] = self.batch_validation
+                self.progress.data["open_optimizer_reservation"] = {
+                    "block": block, "batch_index": batch_index,
+                    "reservation_seconds": self.optimizer_reserve_seconds,
+                    "started_utc": _utc_now(),
+                }
+                self.check_budget(workers=0)
+                self.persist_event(
+                    "optimizer-started", block=block, batch_index=batch_index,
+                    reservation_seconds=self.optimizer_reserve_seconds,
+                    decision_count=len(rows), owner_count=128,
+                )
+            else:
+                self.progress.data["open_optimizer_reservation"] = {
+                    "block": block, "batch_index": batch_index,
+                    "reservation_seconds": self.optimizer_reserve_seconds,
+                    "started_utc": _utc_now(),
+                }
+                self.check_budget(workers=0)
+                self.progress.persist(measured_cpu_seconds=self.meter.actual_cpu())
+            started = time.process_time()
+            result = original_update(model, optimizer, rows, vocab, **kwargs)
+            update_cpu = max(0.0, time.process_time() - started)
+            self.progress.data["open_optimizer_reservation"] = None
+            self.progress.data["last_optimizer_update"] = {
+                "block": block, "batch_index": batch_index,
+                "measured_parent_cpu_seconds": update_cpu,
+                "decision_count": len(rows), "minibatch_count": len(result),
+            }
+            self.persist_event(
+                "optimizer-completed", block=block, batch_index=batch_index,
+                measured_parent_cpu_seconds=update_cpu, decision_count=len(rows),
+                minibatch_count=len(result),
+            )
+            return result
+
+        rs.update_batch = tracked_update
+
+        def actual_budget_guard(**_ignored: Any) -> None:
+            if self.milestone_mode and any(
+                path.endswith("block1/batch-02.json") for path in self.state._completed_batch_paths
+            ):
+                raise IntegrationMilestoneReached()
+            self.check_budget()
+
+        rs.budget_guard = actual_budget_guard
+        rs._accounted_cpu = lambda _cpu=0.0: self.meter.accounted_cpu()
+        rs.BUILDER_BUDGET = NEW_BUILDER_CPU_LIMIT_SECONDS
+
+        original_train_block = rs.train_block
+
+        def tracked_train_block(block: str, config: Mapping[str, Any], vocab: Any,
+                                bootstrap: Any, runtime: Mapping[str, Any], stage_started: float):
+            self.verify_cache_installed(f"before-training-{block}")
+            self.optimizer_reserve_seconds = self.optimizer_reserve(rs)
+            self.progress.data["phase"] = f"training-{block}"
+            self.persist_event(
+                "stage-started", stage=f"training-{block}",
+                worker_selection=self.worker_selection,
+                completed_run_keys=self.state.completed_run_count(),
+            )
+            try:
+                result = original_train_block(block, config, vocab, bootstrap, runtime, stage_started)
+                self.persist_event(
+                    "stage-completed", stage=f"training-{block}",
+                    completed_batches=result.get("completed_batches"),
+                    checkpoint=result.get("final_checkpoint"),
+                )
+                return result
+            except IntegrationMilestoneReached:
+                raise
+            finally:
+                self.optimizer_reserve_seconds = 0.0
+                self.verify_cache_installed(f"after-training-{block}")
+
+        rs.train_block = tracked_train_block
+        original_evaluation = rs.run_evaluation
+
+        def tracked_evaluation(config: Mapping[str, Any], runtime: Mapping[str, Any],
+                               vocab: Any, bootstrap: Any, stage_started: float):
+            self.verify_cache_installed("before-evaluation")
+            self.optimizer_reserve_seconds = 0.0
+            self.progress.data["phase"] = "evaluation"
+            self.persist_event(
+                "stage-started", stage="evaluation",
+                worker_selection=self.worker_selection,
+                completed_run_keys=self.state.completed_run_count(),
+            )
+            try:
+                result = original_evaluation(config, runtime, vocab, bootstrap, stage_started)
+                self.persist_event(
+                    "stage-completed", stage="evaluation", run_count=result.get("run_count"),
+                )
+                return result
+            finally:
+                self.verify_cache_installed("after-evaluation")
+
+        rs.run_evaluation = tracked_evaluation
+        self.dispatcher = DurableDispatcher(
+            rs, self.tracker, int(self.worker_selection["worker_count"]), owner=self,
+        )
+        rs.run_game = self.dispatcher.dispatch_run_game
+        self._dispatcher_loader = self.dispatcher.wrap_model_loader()
+        rs._load_final_model = self._dispatcher_loader
+        self._production_atomic = rs.atomic_json
+
+    def optimizer_reserve(self, rs: Any) -> float:
+        samples = []
+        for block in ("block1", "block2"):
+            for path in sorted((EVIDENCE / "training" / block).glob("batch-*.json")):
+                try:
+                    value = json.loads(path.read_text(encoding="utf-8"))
+                    amount = float(value.get("optimizer_cpu_seconds", 0.0))
+                except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                    continue
+                if math.isfinite(amount) and amount > 0:
+                    samples.append(amount)
+        return max(INITIAL_OPTIMIZER_RESERVE_SECONDS,
+                   (max(samples) * OPTIMIZER_RESERVE_MULTIPLIER) if samples else 0.0)
+
+    def verify_cache_installed(self, stage: str) -> None:
+        rs = run_study
+        if self.dispatcher is None:
+            # During first hook setup, only the cached stage hooks are ready.
+            if rs.atomic_json is not self._cached_atomic_json:
+                raise ProductionError(f"cached atomic accounting hook was lost before {stage}")
+            if rs._completed_run_count() != self.state.completed_run_count():
+                raise ProductionError(f"cached completed-key index is stale before {stage}")
+            return
+        if rs.atomic_json is not self._production_atomic:
+            raise ProductionError(f"production/cached atomic writer was replaced before {stage}")
+        if getattr(rs._completed_run_count, "__self__", None) is not self.state:
+            raise ProductionError(f"cached completed-key index is not installed at {stage}")
+        if rs._completed_run_count() != self.state.completed_run_count():
+            raise ProductionError(f"cached completed-key count drifted at {stage}")
+        if rs._remaining_optimizer_projection is not self._cached_projection:
+            raise ProductionError(f"cached optimizer accounting hook was replaced at {stage}")
+        if getattr(resource_amendment_r2.complete_game_costs, "__self__", None) is not self.state:
+            raise ProductionError(f"cached game-cost index is not installed at {stage}")
+        if getattr(resource_amendment_r2._ledger_total, "__self__", None) is not self.state:
+            raise ProductionError(f"cached ledger index is not installed at {stage}")
+        if getattr(rs.run_game, "__self__", None) is not self.dispatcher:
+            raise ProductionError(f"parallel dispatcher was replaced at {stage}")
+        if self.dispatcher.raw_run_game is not self._cached_raw_game:
+            raise ProductionError(f"dispatcher no longer uses the cached run-completion hook at {stage}")
+        if rs._load_final_model is not self._dispatcher_loader:
+            raise ProductionError(f"parallel final-model loader was replaced at {stage}")
+        if torch.get_num_threads() != 1:
+            raise ProductionError(f"worker Torch thread limit changed at {stage}")
+        self.progress.data["last_cache_verification"] = {
+            "stage": stage, "timestamp_utc": _utc_now(),
+            "completed_run_keys": self.state.completed_run_count(),
+            "dispatcher_workers": self.dispatcher.workers,
+        }
+
+
+BOOTSTRAP: list[Any] = []
+
+
+def validate_batch02_input(*, rs: Any, model: Any, vocab: Any,
+                           bootstrap: Any, rows: Sequence[Any]) -> dict[str, Any]:
+    """Validate all retained and newly completed owners before the batch-02 PPO update."""
+    digest = rs.config_sha()
+    checkpoint_path = EVIDENCE / "training" / "block1" / "latest.pt"
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    if (payload.get("completed_batches") != 1 or payload.get("model_sha256") != EXPECTED_BATCH01_SHA
+            or payload.get("config_sha256") != digest or payload.get("vocabulary_sha256") != vocab.sha256):
+        raise ProductionError("batch-02 update does not start from the retained post-batch-01 checkpoint/config")
+    if rs.model_fingerprint(model, vocab, digest) != EXPECTED_BATCH01_SHA:
+        raise ProductionError("batch-02 frozen model changed before owner assembly")
+
+    expected_seeds = list(rs.TRAINING_SEEDS["block1"])[128:256]
+    if len(expected_seeds) != 128 or len(set(expected_seeds)) != 128:
+        raise ProductionError("registered batch-02 owner grid is not exactly 128 unique keys")
+    reconstructed_rows = []
+    per_owner: list[dict[str, Any]] = []
+    max_probability_error = 0.0
+    max_value_error = 0.0
+    decisions_checked = 0
+    was_training = bool(model.training)
+    model.eval()
+    try:
+        with torch.inference_mode():
+            for seed in expected_seeds:
+                directory = rs._training_game_dir("block1", 2, seed)
+                completed = rs.successful_attempt(directory, EXPECTED_BATCH01_SHA, digest)
+                if completed is None:
+                    raise ProductionError(f"batch-02 owner {seed} lacks a complete frozen-policy attempt")
+                attempt, summary = completed
+                if (summary.get("game_seed") != seed or summary.get("stage_key") != "block1:batch-02"
+                        or summary.get("arm") not in {None, "residual"}
+                        or summary.get("model_sha256") != EXPECTED_BATCH01_SHA
+                        or summary.get("config_sha256") != digest
+                        or summary.get("status") != "COMPLETE"
+                        or summary.get("terminal") is not True
+                        or summary.get("problems") not in ([], None)
+                        or summary.get("outcome") not in {"PLAYER_LOSS", "PLAYER_VICTORY"}
+                        or summary.get("terminal_floor") is None):
+                    raise ProductionError(f"batch-02 owner {seed} summary identity/terminal evidence is invalid")
+                events = list(rs.read_jsonl(attempt / "decisions.jsonl.gz"))
+                if len(events) != int(summary.get("decision_count", -1)):
+                    raise ProductionError(f"batch-02 owner {seed} decision count does not match its log")
+                if not events:
+                    raise ProductionError(f"batch-02 owner {seed} has no decisions")
+                owner_rows = rs.decision_rows(attempt, summary)
+                if len(owner_rows) != len(events):
+                    raise ProductionError(f"batch-02 owner {seed} did not reconstruct every training row")
+                for event, row in zip(events, owner_rows, strict=True):
+                    serialized = event.get("issue60_public_input")
+                    if not isinstance(serialized, str):
+                        raise ProductionError(f"batch-02 owner {seed} has no serialized public input")
+                    if hashlib.sha256(serialized.encode("utf-8")).hexdigest() != event.get("issue60_public_input_sha256"):
+                        raise ProductionError(f"batch-02 owner {seed} public input hash is inconsistent")
+                    public = json.loads(serialized)
+                    options = public.get("legal_options")
+                    selected = event.get("issue60_selected_index")
+                    count = event.get("issue60_choice_count")
+                    if (not isinstance(options, list) or len(options) < 1 or count != len(options)
+                            or not isinstance(selected, int) or isinstance(selected, bool)
+                            or selected < 0 or selected >= len(options)
+                            or event.get("issue60_native_mapping_fresh") is not True
+                            or event.get("issue60_supported_choice") is not True):
+                        raise ProductionError(f"batch-02 owner {seed} has an invalid legal action index/mapping witness")
+                    base_stored = [float(value) for value in event.get("issue60_base_probabilities", [])]
+                    behavior_stored = [float(value) for value in event.get("issue60_behavior_probabilities", [])]
+                    if len(base_stored) != len(options) or len(behavior_stored) != len(options):
+                        raise ProductionError(f"batch-02 owner {seed} probability vectors do not match legal choices")
+                    if (any(not math.isfinite(value) or value < 0.0 for value in base_stored + behavior_stored)
+                            or not math.isclose(math.fsum(base_stored), 1.0, rel_tol=0.0, abs_tol=1e-10)
+                            or not math.isclose(math.fsum(behavior_stored), 1.0, rel_tol=0.0, abs_tol=1e-10)):
+                        raise ProductionError(f"batch-02 owner {seed} has an invalid stored probability distribution")
+                    _bootstrap_index, expected_base = controllers.p0_distribution(bootstrap, serialized, len(options))
+                    base_error = max(abs(a - b) for a, b in zip(base_stored, expected_base, strict=True))
+                    if base_error > 1e-10:
+                        raise ProductionError(f"batch-02 owner {seed} stored base distribution differs from frozen A")
+                    observation = encoder.encode(serialized, vocab)
+                    logits, value = model(observation)
+                    expected_behavior = controllers.policy_distribution(
+                        base_stored, [float(item) for item in logits.detach().cpu().tolist()],
+                    )
+                    probability_error = max(
+                        abs(a - b) for a, b in zip(behavior_stored, expected_behavior, strict=True)
+                    )
+                    max_probability_error = max(max_probability_error, probability_error)
+                    value_error = abs(float(event["issue60_value_prediction"]) - float(value.detach().cpu()))
+                    max_value_error = max(max_value_error, value_error)
+                    if probability_error > 1e-6 or value_error > 1e-5:
+                        raise ProductionError(
+                            f"batch-02 owner {seed} stored policy/value disagrees with frozen checkpoint "
+                            f"(probability_error={probability_error:.3g}, value_error={value_error:.3g})"
+                        )
+                    target = (float(summary["terminal_floor"]) - float(event["issue60_current_floor"])) / 60.0
+                    if not math.isclose(row.value_target, target, rel_tol=0.0, abs_tol=1e-12):
+                        raise ProductionError(f"batch-02 owner {seed} terminal target arithmetic is inconsistent")
+                    reconstructed_rows.append(row)
+                    decisions_checked += 1
+                per_owner.append({
+                    "seed": seed, "attempt": str(attempt.relative_to(HERE)),
+                    "decision_count": len(events),
+                    "decision_log_sha256": _sha256(attempt / "decisions.jsonl.gz"),
+                    "run_json_sha256": _sha256(attempt / "run.json"),
+                    "process_cpu_seconds": float(summary.get("process_cpu_seconds", 0.0)),
+                })
+    finally:
+        model.train(was_training)
+
+    if list(rows) != reconstructed_rows:
+        raise ProductionError("batch-02 optimizer rows differ from the declared owner/run/decision order")
+    rows_path = EVIDENCE / "training" / "block1" / "batch-02-training-rows.jsonl.gz"
+    if not rows_path.is_file():
+        raise ProductionError("batch-02 optimizer input artifact was not written before update")
+    with gzip.open(rows_path, "rt", encoding="utf-8") as stream:
+        stored_rows = [json.loads(line) for line in stream if line.strip()]
+    expected_artifact = [row.to_json() for row in reconstructed_rows]
+    if stored_rows != expected_artifact:
+        raise ProductionError("batch-02 training rows artifact differs from the validated 128-owner assembly")
+    return {
+        "schema_id": "issue60-batch02-input-validation-v1", "status": "PASS",
+        "config_sha256": digest, "starting_checkpoint_sha256": _sha256(checkpoint_path),
+        "starting_model_sha256": EXPECTED_BATCH01_SHA,
+        "owner_count": len(per_owner), "ordered_seeds": expected_seeds,
+        "missing_seed_keys_completed": list(MISSING_BATCH02_SEEDS),
+        "decision_count": decisions_checked,
+        "stored_probability_vectors_reconstructed": decisions_checked,
+        "stored_value_predictions_reconstructed": decisions_checked,
+        "base_probabilities_reconstructed_from_frozen_bootstrap": decisions_checked,
+        "legal_option_mapping_checks": decisions_checked,
+        "terminal_target_arithmetic_checks": decisions_checked,
+        "max_behavior_probability_absolute_error": max_probability_error,
+        "max_value_prediction_absolute_error": max_value_error,
+        "training_rows_sha256": _sha256(rows_path),
+        "owners": per_owner,
+        "provenance_limitation": (
+            "114 historically retained games have an unknown exact producer; their provisional use "
+            "is explicitly authorized for this exploratory pilot."
+        ),
+    }
+
+
+def _worker_samples() -> list[int]:
+    candidates = (
+        EVIDENCE / "validation" / "parallel-execution" / "stages" / "train.json",
+        EVIDENCE / "validation" / "parallel-execution" / "batch02-sampling" / "attempt-0005" / "parallel-execution" / "stages" / "train.json",
+        EVIDENCE / "validation" / "parallel-execution" / "batch02-sampling" / "attempt-0004" / "parallel-execution" / "stages" / "train.json",
+    )
+    samples: list[int] = []
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for row in raw.get("executions", []):
+            if not isinstance(row, Mapping):
+                continue
+            value = row.get("peak_rss_bytes")
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+                samples.append(int(value))
+    if not samples:
+        raise ProductionError("fixed parallel runner has no measured worker RSS sample for CPU/RAM selection")
+    return samples
+
+
+def _checkpoint_completed_batches(rs: Any, vocab: Any, config: Mapping[str, Any]) -> int:
+    path = EVIDENCE / "training" / "block1" / "latest.pt"
+    if not path.is_file():
+        raise ProductionError("block1 latest checkpoint is missing")
+    model = rs.JointChoiceActorCritic(vocab)
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(config["training"]["learning_rate"]))
+    cpu_state = torch.random.get_rng_state()
+    try:
+        payload = rs.load_checkpoint(path, model, optimizer, vocab, rs.config_sha())
+    finally:
+        torch.random.set_rng_state(cpu_state)
+    completed = int(payload.get("completed_batches", -1))
+    if completed == 1 and payload.get("model_sha256") != EXPECTED_BATCH01_SHA:
+        raise ProductionError("block1 batch-01 checkpoint SHA differs from the authorized milestone parent")
+    return completed
+
+
+def _startup_identity(rs: Any, runtime: Mapping[str, Any], head: str) -> dict[str, Any]:
+    checkpoint = EVIDENCE / "training" / "block1" / "latest.pt"
+    return {
+        "head": head, "launcher": str(Path(__file__).resolve().relative_to(HERE)),
+        "launcher_sha256": _sha256(Path(__file__).resolve()),
+        "config_sha256": rs.config_sha(), "runtime": dict(runtime),
+        "checkpoint_path": str(checkpoint.relative_to(HERE)),
+        "checkpoint_file_sha256": _sha256(checkpoint),
+    }
+
+
+def main() -> int:
+    if not hasattr(os, "fork") or not Path("/proc/self/stat").is_file():
+        raise ProductionError("the production entry requires the registered Linux /proc/fork CPU tracker")
+    setup_parent_cpu = max(0.0, time.process_time() - ENTRY_PROCESS_CPU_STARTED)
+    tracker = parallel_execution.ProcessCpuTracker.start(time.process_time())
+    resource_module = resource_amendment_r2
+
+    config = json.loads(run_study.CONFIG_PATH.read_text(encoding="utf-8"))
+    source_validation = verify_active_sources_once(run_study)
+    run_study.validate_config(config)
+
+    def metered_repo_head(path: str) -> str:
+        result = _run_counted_external(["git", "-C", str(path), "rev-parse", "HEAD"])
+        if result.returncode != 0:
+            raise ProductionError(f"could not read pinned source HEAD at {path}")
+        return result.stdout.strip()
+
+    run_study._repo_head = metered_repo_head
+    runtime = run_study.verify_runtime(config)
+    vocab = encoder.Vocabulary(HERE / "vocabulary.json")
+    if vocab.sha256 != config["sources"]["vocabulary_sha256"]:
+        raise ProductionError("frozen vocabulary SHA differs from the registered config")
+    bootstrap, _bootstrap_payload = controllers.load_bootstrap(HERE / config["bootstrap"]["checkpoint"])
+    BOOTSTRAP[:] = [bootstrap]
+    head_result = _run_counted(["git", "rev-parse", "HEAD"], cwd=HERE)
+    if head_result.returncode != 0:
+        raise ProductionError("could not record the actual repository HEAD")
+    head = head_result.stdout.strip()
+    completed_batches = _checkpoint_completed_batches(run_study, vocab, config)
+    labels, comments = _issue_state()
+    phase = execution_phase(completed_batches, labels, comments, head)
+
+    progress = ProductionProgress(PROGRESS_PATH.parent, config_sha=run_study.config_sha())
+    # The first administrative debit is recorded separately from any measured run CPU.
+    if not progress.data.get("administrative_protocol_initialized"):
+        progress.data["historical_admin_debit_cpu_seconds"] = ACCEPTED_INTERRUPTION_DEBIT_SECONDS
+        progress.data["historical_admin_debits"] = [{
+            "kind": "accepted-historical-interruption",
+            "seconds": ACCEPTED_INTERRUPTION_DEBIT_SECONDS,
+            "measured": False,
+            "reason": "Planner accepted this as an administrative debit, not a measured upper bound.",
+        }]
+        progress.data["administrative_protocol_initialized"] = True
+        progress.data["historical_admin_total_cpu_seconds"] = HISTORICAL_ADMIN_CPU_SECONDS
+        progress.persist()
+
+    if phase == "awaiting-review":
+        progress.data["phase"] = "awaiting-integration-review" if completed_batches >= 2 else "not-routed-to-builder"
+        progress.data["observed_head"] = head
+        progress.persist()
+        print(json.dumps({
+            "status": "AWAITING_REVIEW", "checkpoint_completed_batches": completed_batches,
+            "issue_labels": sorted(labels), "head": head,
+            "required_review_marker": f"issue60-integration-review-v1: PASS {head}",
+        }, indent=2))
+        return 0
+    if phase not in {"integration-milestone", "full-continuation"}:
+        raise ProductionError(f"Issue #{ISSUE_NUMBER} is not routed to Builder")
+
+    milestone_mode = phase == "integration-milestone"
+    progress.begin_invocation(
+        head=head, launcher_sha=_sha256(Path(__file__).resolve()), runtime=runtime,
+        parent_reserve=PARENT_INTERRUPTION_RESERVE_SECONDS,
+    )
+    selection = parallel_execution.choose_worker_count(
+        effective_cpus=int(parallel_execution.host_capacity()["effective_cpu_count"]),
+        available_bytes=int(parallel_execution.host_capacity()["effective_memory_available_bytes"]),
+        worker_peak_rss_samples=_worker_samples(), cap=parallel_execution.MAX_GAME_WORKERS,
+    )
+    meter = Meter(
+        progress=progress, tracker=tracker, setup_parent_cpu=setup_parent_cpu,
+        setup_external_cpu=_EXTERNAL_CHILD_CPU[0],
+    )
+    state = guard_optimization.GuardState(HERE, resource_module)
+    tracker.max_game_cpu.value = float(state.max_observed_game_cpu_seconds)
+    runtime_context = ProductionRuntime(
+        progress=progress, state=state, tracker=tracker, meter=meter,
+        worker_selection=selection, milestone_mode=milestone_mode,
+    )
+    if milestone_mode:
+        runtime_context.optimizer_reserve_seconds = runtime_context.optimizer_reserve(run_study)
+        selection["host_selected_worker_count"] = int(selection["worker_count"])
+        selection["worker_count"] = select_milestone_worker_count(
+            preferred_workers=int(selection["worker_count"]),
+            actual_cpu=meter.accounted_cpu(),
+            game_reserve=runtime_context.game_reserve_seconds(),
+            optimizer_reserve=runtime_context.optimizer_reserve_seconds,
+            parent_reserve=PARENT_INTERRUPTION_RESERVE_SECONDS,
+        )
+        selection["integration_budget_worker_ceiling"] = INTEGRATION_MAX_WORKERS
+        runtime_context.worker_selection = dict(selection)
+    runtime_context.install_cache(
+        rs=run_study, resource_module=resource_module,
+        parallel_module=parallel_execution,
+    )
+    runtime_context.verify_cache_installed("startup")
+    progress.data["startup_identity"] = _startup_identity(run_study, runtime, head)
+    progress.data["source_validation"] = source_validation
+    progress.data["historical_accounting"] = {
+        "historical_admin_total_cpu_seconds": HISTORICAL_ADMIN_CPU_SECONDS,
+        "accepted_interruption_debit_cpu_seconds": ACCEPTED_INTERRUPTION_DEBIT_SECONDS,
+        "historical_physical_cpu_certified": False,
+        "prospective_builder_limit_cpu_seconds": NEW_BUILDER_CPU_LIMIT_SECONDS,
+        "reviewer_reserve_cpu_seconds": 20_000.0,
+        "integration_milestone_limit_cpu_seconds": INTEGRATION_CPU_LIMIT_SECONDS,
+    }
+    progress.data["worker_selection"] = selection
+    progress.data["phase"] = phase
+    progress.persist(measured_cpu_seconds=meter.actual_cpu())
+    runtime_context.persist_event(
+        "production-started", phase=phase, head=head,
+        launcher_sha256=_sha256(Path(__file__).resolve()),
+        checkpoint=progress.data["startup_identity"]["checkpoint_file_sha256"],
+        worker_selection=selection,
+        cached_completed_run_keys=state.completed_run_count(),
+    )
+    config = json.loads(run_study.CONFIG_PATH.read_text(encoding="utf-8"))
+    stage_started = time.process_time()
+
+    try:
+        if milestone_mode:
+            run_study.train_block("block1", config, vocab, bootstrap, runtime, stage_started)
+            raise ProductionError("batch-02 completed without reaching its integration-review stop boundary")
+
+        blocks = [
+            run_study.train_block(block, config, vocab, bootstrap, stage_started)
+            for block in ("block1", "block2")
+        ]
+        training_result = {
+            "schema_id": "issue60-training-result-v1", "status": "COMPLETE",
+            "config_sha256": run_study.config_sha(), "blocks": blocks,
+            "source_pins": dict(config["sources"]),
+        }
+        run_study.atomic_json(EVIDENCE / "training" / "result.json", training_result)
+        evaluation = run_study.run_evaluation(config, runtime, vocab, bootstrap, stage_started)
+        analysis = run_study.analyze(config)
+        runtime_context.verify_cache_installed("before-analysis-complete")
+        progress.data["final_analysis"] = {
+            "status": analysis.get("status"),
+            "path": "evidence/analysis/result.json",
+        }
+        runtime_context.persist_event(
+            "production-completed", evaluation_run_count=evaluation.get("run_count"),
+            analysis_status=analysis.get("status"),
+            cumulative_completed_run_keys=state.completed_run_count(),
+        )
+        progress.data["phase"] = "completed"
+        progress.data["open_invocation"] = None
+        progress.persist(measured_cpu_seconds=meter.actual_cpu())
+        return 0
+    except IntegrationMilestoneReached:
+        checkpoint = torch.load(
+            EVIDENCE / "training" / "block1" / "latest.pt", map_location="cpu", weights_only=False,
+        )
+        if checkpoint.get("completed_batches") != 2 or checkpoint.get("model_sha256") != runtime_context.milestone_checkpoint_sha:
+            raise ProductionError("batch-02 integration checkpoint did not atomically retain the PPO state")
+        receipt = {
+            "schema_id": "issue60-integration-milestone-v1", "purpose": "STUDY_ONLY",
+            "status": "INTEGRATION_REVIEW_REQUIRED", "issue": ISSUE_NUMBER,
+            "execution_head": head,
+            "launcher": "production_entry.py",
+            "launcher_sha256": _sha256(Path(__file__).resolve()),
+            "config_sha256": run_study.config_sha(), "runtime": runtime,
+            "source_validation": progress.data["source_validation"],
+            "checkpoint": {
+                "path": "evidence/training/block1/latest.pt",
+                "file_sha256": _sha256(EVIDENCE / "training" / "block1" / "latest.pt"),
+                "model_sha256": checkpoint["model_sha256"],
+                "completed_batches": checkpoint["completed_batches"],
+                "optimizer_state_present": checkpoint.get("optimizer_state") is not None,
+            },
+            "batch02_validation": runtime_context.batch_validation,
+            "worker_selection": selection,
+            "max_active_workers": runtime_context.dispatcher.max_active_workers if runtime_context.dispatcher else 0,
+            "completed_batch02_seeds": [
+                row["seed"] for row in (runtime_context.batch_validation or {}).get("owners", [])
+            ],
+            "measured_new_cpu_seconds": meter.actual_cpu(),
+            "administrative_debit_cpu_seconds": progress.data["administrative_debit_cpu_seconds"],
+            "accounted_new_cpu_seconds": meter.accounted_cpu(),
+            "historical_admin_total_cpu_seconds": HISTORICAL_ADMIN_CPU_SECONDS,
+            "historical_physical_cpu_certified": False,
+            "stage_wall_seconds": max(0.0, time.monotonic() - _INVOCATION_WALL_STARTED[0]),
+            "provenance_limitation": (
+                "114 retained historical training games have an unknown exact producer and are used provisionally "
+                "under the Planner authorization; no full-provenance claim is made."
+            ),
+            "review_protocol": (
+                "After push, Reviewer must post issue60-integration-review-v1: PASS <exact pushed HEAD SHA> "
+                "only after reviewing that exact handoff commit."
+            ),
+        }
+        _atomic_json(MILESTONE_PATH, receipt)
+        progress.data["phase"] = "integration-review-required"
+        progress.data["milestone"] = str(MILESTONE_PATH.relative_to(HERE))
+        progress.data["milestone_checkpoint_sha256"] = receipt["checkpoint"]["file_sha256"]
+        progress.data["open_invocation"] = None
+        runtime_context.persist_event(
+            "integration-milestone-reached", milestone=str(MILESTONE_PATH.relative_to(HERE)),
+            checkpoint=receipt["checkpoint"], completed_batch02_owners=len(receipt["completed_batch02_seeds"]),
+            worker_count=selection["worker_count"], max_active_workers=receipt["max_active_workers"],
+        )
+        progress.persist(measured_cpu_seconds=meter.actual_cpu())
+        print(json.dumps(receipt, indent=2))
+        return 0
+    except ProspectiveBudgetStop as exc:
+        progress.data["phase"] = "budget-stop"
+        progress.data["stop_reason"] = str(exc)
+        progress.data["open_optimizer_reservation"] = None
+        progress.data["open_invocation"] = None
+        progress.persist(measured_cpu_seconds=meter.actual_cpu())
+        runtime_context.persist_event(
+            "prospective-budget-stop", reason=str(exc),
+            cumulative_completed_run_keys=state.completed_run_count(),
+        )
+        print(json.dumps({
+            "status": "BUDGET_STOP", "reason": str(exc),
+            "measured_new_cpu_seconds": progress.data["measured_new_cpu_seconds"],
+            "administrative_debit_cpu_seconds": progress.data["administrative_debit_cpu_seconds"],
+            "completed_run_keys": state.completed_run_count(),
+        }, indent=2))
+        return 2
+    except BaseException as exc:
+        progress.data["phase"] = "correctness-or-runtime-stop"
+        progress.data["stop_reason"] = f"{type(exc).__name__}: {exc}"
+        progress.data["open_optimizer_reservation"] = None
+        progress.data["open_invocation"] = None
+        progress.persist(measured_cpu_seconds=meter.actual_cpu())
+        runtime_context.persist_event(
+            "correctness-or-runtime-stop", error=progress.data["stop_reason"],
+            cumulative_completed_run_keys=state.completed_run_count(),
+        )
+        raise
+
+
+_INVOCATION_WALL_STARTED = [time.monotonic()]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
