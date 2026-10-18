@@ -43,10 +43,6 @@ EVENTS_PATH = EVIDENCE / "execution" / "production-events.jsonl"
 MILESTONE_PATH = EVIDENCE / "execution" / "integration-milestone.json"
 ISSUE_NUMBER = 60
 REPOSITORY = "lsmfttb/spire-research"
-# GitHub account identity recorded on the independent Issue #60 integration review.
-# The marker is deliberately a separate, exact comment body so Builder handoff prose
-# cannot satisfy the continuation gate by quoting its requested marker.
-REVIEWER_GITHUB_LOGIN = "lsmfttb"
 HISTORICAL_ADMIN_CPU_SECONDS = 25_644.469
 ACCEPTED_INTERRUPTION_DEBIT_SECONDS = 1_572.370806919
 NEW_BUILDER_CPU_LIMIT_SECONDS = 150_000.0
@@ -260,51 +256,30 @@ def _gh_executable() -> str:
     raise ProductionError("GitHub CLI is unavailable; issue routing must be checked before execution")
 
 
-def _issue_state() -> tuple[set[str], list[Mapping[str, Any]]]:
+def _issue_state() -> set[str]:
     result = _run_counted([
         _gh_executable(), "issue", "view", str(ISSUE_NUMBER), "--repo", REPOSITORY,
-        "--json", "labels,comments",
+        "--json", "labels",
     ])
     if result.returncode != 0:
         raise ProductionError(f"could not read Issue #{ISSUE_NUMBER} routing: {result.stderr.strip()}")
     try:
         raw = json.loads(result.stdout)
         labels = {str(row["name"]) for row in raw.get("labels", [])}
-        comments = raw.get("comments", [])
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         raise ProductionError("GitHub CLI returned an invalid Issue routing response") from exc
-    return labels, comments if isinstance(comments, list) else []
+    return labels
 
 
-def execution_phase(completed_batch: int, labels: set[str], comments: Sequence[Mapping[str, Any]], head: str) -> str:
-    """Select the one allowed stage from durable checkpoint and reviewer routing."""
+def execution_phase(completed_batch: int, labels: set[str]) -> str:
+    """Select the integration stage; no Issue comment grants auto-continuation."""
     if "route:builder" not in labels:
         return "awaiting-review"
     if completed_batch == 1:
         return "integration-milestone"
     if completed_batch >= 2:
-        marker = f"issue60-integration-review-v1: PASS {head}"
-        if any(_is_exact_reviewer_approval(comment, marker) for comment in comments):
-            return "full-continuation"
         return "awaiting-review"
     raise ProductionError(f"unexpected block1 checkpoint boundary: completed_batches={completed_batch}")
-
-
-def _is_exact_reviewer_approval(comment: Mapping[str, Any], marker: str) -> bool:
-    """Require a standalone marker comment from the designated Reviewer account."""
-    if not isinstance(comment, Mapping):
-        return False
-    author = comment.get("author")
-    if not isinstance(author, Mapping):
-        return False
-    login = author.get("login")
-    body = comment.get("body")
-    return (
-        isinstance(login, str)
-        and login.casefold() == REVIEWER_GITHUB_LOGIN.casefold()
-        and isinstance(body, str)
-        and body.strip() == marker
-    )
 
 
 def run_full_training_continuation(rs: Any, config: Mapping[str, Any], vocab: Any,
@@ -1034,8 +1009,8 @@ def main() -> int:
         raise ProductionError("could not record the actual repository HEAD")
     head = head_result.stdout.strip()
     completed_batches = _checkpoint_completed_batches(run_study, vocab, config)
-    labels, comments = _issue_state()
-    phase = execution_phase(completed_batches, labels, comments, head)
+    labels = _issue_state()
+    phase = execution_phase(completed_batches, labels)
 
     progress = ProductionProgress(PROGRESS_PATH.parent, config_sha=run_study.config_sha())
     # The first administrative debit is recorded separately from any measured run CPU.
@@ -1052,17 +1027,20 @@ def main() -> int:
         progress.persist()
 
     if phase == "awaiting-review":
-        progress.data["phase"] = "awaiting-integration-review" if completed_batches >= 2 else "not-routed-to-builder"
+        continuation_disabled = completed_batches >= 2
+        progress.data["phase"] = (
+            "continuation-disabled" if continuation_disabled else "not-routed-to-builder"
+        )
         progress.data["observed_head"] = head
         progress.persist()
         print(json.dumps({
-            "status": "AWAITING_REVIEW", "checkpoint_completed_batches": completed_batches,
+            "status": "CONTINUATION_DISABLED" if continuation_disabled else "AWAITING_REVIEW",
+            "checkpoint_completed_batches": completed_batches,
             "issue_labels": sorted(labels), "head": head,
-            "required_reviewer_login": REVIEWER_GITHUB_LOGIN,
-            "required_review_comment_body": f"issue60-integration-review-v1: PASS {head}",
+            "automatic_continuation_authorization": "disabled" if continuation_disabled else "not-applicable",
         }, indent=2))
         return 0
-    if phase not in {"integration-milestone", "full-continuation"}:
+    if phase != "integration-milestone":
         raise ProductionError(f"Issue #{ISSUE_NUMBER} is not routed to Builder")
 
     milestone_mode = phase == "integration-milestone"

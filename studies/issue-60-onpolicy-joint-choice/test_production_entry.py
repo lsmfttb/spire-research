@@ -1,6 +1,7 @@
 """Focused control/accounting checks for the Issue 60 production entry."""
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
@@ -13,41 +14,31 @@ import production_entry as production
 class ProductionEntryTests(unittest.TestCase):
     def test_initial_checkpoint_routes_only_to_integration_milestone(self):
         self.assertEqual(
-            production.execution_phase(1, {"route:builder"}, [], "base"),
+            production.execution_phase(1, {"route:builder"}),
             "integration-milestone",
         )
 
-    def test_batch02_checkpoint_waits_for_exact_reviewed_head(self):
-        labels = {"route:builder"}
-        comments = [{"author": {"login": production.REVIEWER_GITHUB_LOGIN},
-                     "body": "issue60-integration-review-v1: PASS abc123"}]
-        self.assertEqual(production.execution_phase(2, labels, comments, "different"), "awaiting-review")
-        self.assertEqual(production.execution_phase(2, labels, comments, "abc123"), "full-continuation")
-        self.assertEqual(production.execution_phase(2, {"route:reviewer"}, comments, "abc123"), "awaiting-review")
-
-    def test_quoted_handoff_marker_does_not_authorize_continuation(self):
+    def test_batch02_checkpoint_cannot_auto_continue_from_issue_comments(self):
         marker = "issue60-integration-review-v1: PASS abc123"
-        comments = [{
-            "author": {"login": production.REVIEWER_GITHUB_LOGIN},
-            "body": f"Builder handoff asks for review: `{marker}`",
-        }]
+        builder_comment = {
+            "author": {"login": "lsmfttb"},
+            "body": marker,
+        }
+        response = subprocess.CompletedProcess(
+            args=["gh", "issue", "view"], returncode=0,
+            stdout=json.dumps({
+                "labels": [{"name": "route:builder"}],
+                "comments": [builder_comment],
+            }), stderr="",
+        )
+        with patch.object(production, "_run_counted", return_value=response) as run:
+            labels = production._issue_state()
+        self.assertEqual(run.call_args.args[0][-2:], ["--json", "labels"])
         self.assertEqual(
-            production.execution_phase(2, {"route:builder"}, comments, "abc123"),
+            production.execution_phase(2, labels),
             "awaiting-review",
         )
-
-    def test_review_marker_requires_designated_author_and_exact_comment_body(self):
-        marker = "issue60-integration-review-v1: PASS abc123"
-        for comment in (
-            {"author": {"login": "someone-else"}, "body": marker},
-            {"author": {"login": production.REVIEWER_GITHUB_LOGIN}, "body": f"PASS\n{marker}"},
-            {"body": marker},
-        ):
-            with self.subTest(comment=comment):
-                self.assertEqual(
-                    production.execution_phase(2, {"route:builder"}, [comment], "abc123"),
-                    "awaiting-review",
-                )
+        self.assertEqual(production.execution_phase(2, {"route:reviewer"}), "awaiting-review")
 
     def test_production_entry_must_match_reviewed_head_blob(self):
         with tempfile.TemporaryDirectory() as temporary:
