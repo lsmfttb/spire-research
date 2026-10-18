@@ -1,0 +1,2788 @@
+{
+  "cpu": {
+    "aggregate_issue_limit_seconds": 1000,
+    "process_cpu_seconds_including_adapter_import_artifact_read_replay_and_trace_write": 2.984983317,
+    "replay_limit_seconds": 20.0
+  },
+  "created_at_utc": "2026-10-18T17:44:25.669746+00:00",
+  "floor5_battle_summary": {
+    "action_kind_counts": {
+      "card": 1446,
+      "end_turn": 484,
+      "single_card_select": 3
+    },
+    "entry_state": {
+      "battle_outcome": "UNDECIDED",
+      "battle_turn": 0,
+      "completed_battle_outcome": null,
+      "encounter_id": "THREE_LOUSE",
+      "floor_num": 5,
+      "monsters": [
+        {
+          "alive": true,
+          "current_hp": 18,
+          "current_move": "GREEN_LOUSE_SPIT_WEB",
+          "intent_category": "NON_ATTACK",
+          "max_hp": 18,
+          "name": "GREEN_LOUSE"
+        },
+        {
+          "alive": true,
+          "current_hp": 13,
+          "current_move": "GREEN_LOUSE_SPIT_WEB",
+          "intent_category": "NON_ATTACK",
+          "max_hp": 13,
+          "name": "GREEN_LOUSE"
+        },
+        {
+          "alive": true,
+          "current_hp": 15,
+          "current_move": "GREEN_LOUSE_BITE",
+          "intent_category": "ATTACK",
+          "max_hp": 15,
+          "name": "GREEN_LOUSE"
+        }
+      ],
+      "outcome": "UNDECIDED",
+      "player_block": 0,
+      "player_energy": 3,
+      "player_hp": 44,
+      "player_max_hp": 81,
+      "room_type": "MONSTER",
+      "screen_state": "BATTLE"
+    },
+    "exit_state": {
+      "history_index": 1969,
+      "state": {
+        "battle_outcome": null,
+        "battle_turn": null,
+        "completed_battle_outcome": "PLAYER_VICTORY",
+        "encounter_id": null,
+        "floor_num": 5,
+        "monsters": [],
+        "outcome": "UNDECIDED",
+        "player_block": null,
+        "player_energy": null,
+        "player_hp": 16,
+        "player_max_hp": 84,
+        "room_type": "MONSTER",
+        "screen_state": "REWARDS"
+      },
+      "terminal": false,
+      "transition_info": {
+        "action_id": "battle:1",
+        "action_kind": "card",
+        "completed_battle_outcome": "PLAYER_VICTORY"
+      }
+    },
+    "fingerprint_limit": "adapter stateful raw snapshot plus observation; native snapshot omits draw-pile card identities, so equality is not proof of full hidden engine-state identity",
+    "first_history_index": 37,
+    "last_history_index": 1969,
+    "maximum_turn": 484,
+    "player_hp_minimum_and_maximum": [
+      13,
+      44
+    ],
+    "repeated_exposed_pre_snapshot_fingerprints": [],
+    "same_exposed_snapshot_pre_post_transitions": 0,
+    "trace_rows": 1933,
+    "turn_changes": [
+      {
+        "after": 1,
+        "before": 0,
+        "history_index": 38
+      },
+      {
+        "after": 2,
+        "before": 1,
+        "history_index": 40
+      },
+      {
+        "after": 3,
+        "before": 2,
+        "history_index": 43
+      },
+      {
+        "after": 4,
+        "before": 3,
+        "history_index": 47
+      },
+      {
+        "after": 5,
+        "before": 4,
+        "history_index": 51
+      },
+      {
+        "after": 6,
+        "before": 5,
+        "history_index": 56
+      },
+      {
+        "after": 7,
+        "before": 6,
+        "history_index": 61
+      },
+      {
+        "after": 8,
+        "before": 7,
+        "history_index": 64
+      },
+      {
+        "after": 9,
+        "before": 8,
+        "history_index": 68
+      },
+      {
+        "after": 10,
+        "before": 9,
+        "history_index": 72
+      },
+      {
+        "after": 11,
+        "before": 10,
+        "history_index": 76
+      },
+      {
+        "after": 12,
+        "before": 11,
+        "history_index": 80
+      },
+      {
+        "after": 13,
+        "before": 12,
+        "history_index": 84
+      },
+      {
+        "after": 14,
+        "before": 13,
+        "history_index": 88
+      },
+      {
+        "after": 15,
+        "before": 14,
+        "history_index": 92
+      },
+      {
+        "after": 16,
+        "before": 15,
+        "history_index": 96
+      },
+      {
+        "after": 17,
+        "before": 16,
+        "history_index": 100
+      },
+      {
+        "after": 18,
+        "before": 17,
+        "history_index": 104
+      },
+      {
+        "after": 19,
+        "before": 18,
+        "history_index": 108
+      },
+      {
+        "after": 20,
+        "before": 19,
+        "history_index": 112
+      },
+      {
+        "after": 21,
+        "before": 20,
+        "history_index": 116
+      },
+      {
+        "after": 22,
+        "before": 21,
+        "history_index": 120
+      },
+      {
+        "after": 23,
+        "before": 22,
+        "history_index": 124
+      },
+      {
+        "after": 24,
+        "before": 23,
+        "history_index": 128
+      },
+      {
+        "after": 25,
+        "before": 24,
+        "history_index": 132
+      },
+      {
+        "after": 26,
+        "before": 25,
+        "history_index": 136
+      },
+      {
+        "after": 27,
+        "before": 26,
+        "history_index": 140
+      },
+      {
+        "after": 28,
+        "before": 27,
+        "history_index": 144
+      },
+      {
+        "after": 29,
+        "before": 28,
+        "history_index": 148
+      },
+      {
+        "after": 30,
+        "before": 29,
+        "history_index": 152
+      },
+      {
+        "after": 31,
+        "before": 30,
+        "history_index": 156
+      },
+      {
+        "after": 32,
+        "before": 31,
+        "history_index": 160
+      },
+      {
+        "after": 33,
+        "before": 32,
+        "history_index": 164
+      },
+      {
+        "after": 34,
+        "before": 33,
+        "history_index": 168
+      },
+      {
+        "after": 35,
+        "before": 34,
+        "history_index": 172
+      },
+      {
+        "after": 36,
+        "before": 35,
+        "history_index": 176
+      },
+      {
+        "after": 37,
+        "before": 36,
+        "history_index": 180
+      },
+      {
+        "after": 38,
+        "before": 37,
+        "history_index": 184
+      },
+      {
+        "after": 39,
+        "before": 38,
+        "history_index": 188
+      },
+      {
+        "after": 40,
+        "before": 39,
+        "history_index": 192
+      },
+      {
+        "after": 41,
+        "before": 40,
+        "history_index": 196
+      },
+      {
+        "after": 42,
+        "before": 41,
+        "history_index": 200
+      },
+      {
+        "after": 43,
+        "before": 42,
+        "history_index": 204
+      },
+      {
+        "after": 44,
+        "before": 43,
+        "history_index": 208
+      },
+      {
+        "after": 45,
+        "before": 44,
+        "history_index": 212
+      },
+      {
+        "after": 46,
+        "before": 45,
+        "history_index": 216
+      },
+      {
+        "after": 47,
+        "before": 46,
+        "history_index": 220
+      },
+      {
+        "after": 48,
+        "before": 47,
+        "history_index": 224
+      },
+      {
+        "after": 49,
+        "before": 48,
+        "history_index": 228
+      },
+      {
+        "after": 50,
+        "before": 49,
+        "history_index": 232
+      },
+      {
+        "after": 51,
+        "before": 50,
+        "history_index": 236
+      },
+      {
+        "after": 52,
+        "before": 51,
+        "history_index": 240
+      },
+      {
+        "after": 53,
+        "before": 52,
+        "history_index": 244
+      },
+      {
+        "after": 54,
+        "before": 53,
+        "history_index": 248
+      },
+      {
+        "after": 55,
+        "before": 54,
+        "history_index": 252
+      },
+      {
+        "after": 56,
+        "before": 55,
+        "history_index": 256
+      },
+      {
+        "after": 57,
+        "before": 56,
+        "history_index": 260
+      },
+      {
+        "after": 58,
+        "before": 57,
+        "history_index": 264
+      },
+      {
+        "after": 59,
+        "before": 58,
+        "history_index": 268
+      },
+      {
+        "after": 60,
+        "before": 59,
+        "history_index": 272
+      },
+      {
+        "after": 61,
+        "before": 60,
+        "history_index": 276
+      },
+      {
+        "after": 62,
+        "before": 61,
+        "history_index": 280
+      },
+      {
+        "after": 63,
+        "before": 62,
+        "history_index": 284
+      },
+      {
+        "after": 64,
+        "before": 63,
+        "history_index": 288
+      },
+      {
+        "after": 65,
+        "before": 64,
+        "history_index": 292
+      },
+      {
+        "after": 66,
+        "before": 65,
+        "history_index": 296
+      },
+      {
+        "after": 67,
+        "before": 66,
+        "history_index": 300
+      },
+      {
+        "after": 68,
+        "before": 67,
+        "history_index": 304
+      },
+      {
+        "after": 69,
+        "before": 68,
+        "history_index": 308
+      },
+      {
+        "after": 70,
+        "before": 69,
+        "history_index": 312
+      },
+      {
+        "after": 71,
+        "before": 70,
+        "history_index": 316
+      },
+      {
+        "after": 72,
+        "before": 71,
+        "history_index": 320
+      },
+      {
+        "after": 73,
+        "before": 72,
+        "history_index": 324
+      },
+      {
+        "after": 74,
+        "before": 73,
+        "history_index": 328
+      },
+      {
+        "after": 75,
+        "before": 74,
+        "history_index": 332
+      },
+      {
+        "after": 76,
+        "before": 75,
+        "history_index": 336
+      },
+      {
+        "after": 77,
+        "before": 76,
+        "history_index": 340
+      },
+      {
+        "after": 78,
+        "before": 77,
+        "history_index": 344
+      },
+      {
+        "after": 79,
+        "before": 78,
+        "history_index": 348
+      },
+      {
+        "after": 80,
+        "before": 79,
+        "history_index": 352
+      },
+      {
+        "after": 81,
+        "before": 80,
+        "history_index": 356
+      },
+      {
+        "after": 82,
+        "before": 81,
+        "history_index": 360
+      },
+      {
+        "after": 83,
+        "before": 82,
+        "history_index": 364
+      },
+      {
+        "after": 84,
+        "before": 83,
+        "history_index": 368
+      },
+      {
+        "after": 85,
+        "before": 84,
+        "history_index": 372
+      },
+      {
+        "after": 86,
+        "before": 85,
+        "history_index": 376
+      },
+      {
+        "after": 87,
+        "before": 86,
+        "history_index": 380
+      },
+      {
+        "after": 88,
+        "before": 87,
+        "history_index": 384
+      },
+      {
+        "after": 89,
+        "before": 88,
+        "history_index": 388
+      },
+      {
+        "after": 90,
+        "before": 89,
+        "history_index": 392
+      },
+      {
+        "after": 91,
+        "before": 90,
+        "history_index": 396
+      },
+      {
+        "after": 92,
+        "before": 91,
+        "history_index": 400
+      },
+      {
+        "after": 93,
+        "before": 92,
+        "history_index": 404
+      },
+      {
+        "after": 94,
+        "before": 93,
+        "history_index": 408
+      },
+      {
+        "after": 95,
+        "before": 94,
+        "history_index": 412
+      },
+      {
+        "after": 96,
+        "before": 95,
+        "history_index": 416
+      },
+      {
+        "after": 97,
+        "before": 96,
+        "history_index": 420
+      },
+      {
+        "after": 98,
+        "before": 97,
+        "history_index": 424
+      },
+      {
+        "after": 99,
+        "before": 98,
+        "history_index": 428
+      },
+      {
+        "after": 100,
+        "before": 99,
+        "history_index": 432
+      },
+      {
+        "after": 101,
+        "before": 100,
+        "history_index": 436
+      },
+      {
+        "after": 102,
+        "before": 101,
+        "history_index": 440
+      },
+      {
+        "after": 103,
+        "before": 102,
+        "history_index": 444
+      },
+      {
+        "after": 104,
+        "before": 103,
+        "history_index": 448
+      },
+      {
+        "after": 105,
+        "before": 104,
+        "history_index": 452
+      },
+      {
+        "after": 106,
+        "before": 105,
+        "history_index": 456
+      },
+      {
+        "after": 107,
+        "before": 106,
+        "history_index": 460
+      },
+      {
+        "after": 108,
+        "before": 107,
+        "history_index": 464
+      },
+      {
+        "after": 109,
+        "before": 108,
+        "history_index": 468
+      },
+      {
+        "after": 110,
+        "before": 109,
+        "history_index": 472
+      },
+      {
+        "after": 111,
+        "before": 110,
+        "history_index": 476
+      },
+      {
+        "after": 112,
+        "before": 111,
+        "history_index": 480
+      },
+      {
+        "after": 113,
+        "before": 112,
+        "history_index": 484
+      },
+      {
+        "after": 114,
+        "before": 113,
+        "history_index": 488
+      },
+      {
+        "after": 115,
+        "before": 114,
+        "history_index": 492
+      },
+      {
+        "after": 116,
+        "before": 115,
+        "history_index": 496
+      },
+      {
+        "after": 117,
+        "before": 116,
+        "history_index": 500
+      },
+      {
+        "after": 118,
+        "before": 117,
+        "history_index": 504
+      },
+      {
+        "after": 119,
+        "before": 118,
+        "history_index": 508
+      },
+      {
+        "after": 120,
+        "before": 119,
+        "history_index": 512
+      },
+      {
+        "after": 121,
+        "before": 120,
+        "history_index": 516
+      },
+      {
+        "after": 122,
+        "before": 121,
+        "history_index": 520
+      },
+      {
+        "after": 123,
+        "before": 122,
+        "history_index": 524
+      },
+      {
+        "after": 124,
+        "before": 123,
+        "history_index": 528
+      },
+      {
+        "after": 125,
+        "before": 124,
+        "history_index": 532
+      },
+      {
+        "after": 126,
+        "before": 125,
+        "history_index": 536
+      },
+      {
+        "after": 127,
+        "before": 126,
+        "history_index": 540
+      },
+      {
+        "after": 128,
+        "before": 127,
+        "history_index": 544
+      },
+      {
+        "after": 129,
+        "before": 128,
+        "history_index": 548
+      },
+      {
+        "after": 130,
+        "before": 129,
+        "history_index": 552
+      },
+      {
+        "after": 131,
+        "before": 130,
+        "history_index": 556
+      },
+      {
+        "after": 132,
+        "before": 131,
+        "history_index": 560
+      },
+      {
+        "after": 133,
+        "before": 132,
+        "history_index": 564
+      },
+      {
+        "after": 134,
+        "before": 133,
+        "history_index": 568
+      },
+      {
+        "after": 135,
+        "before": 134,
+        "history_index": 572
+      },
+      {
+        "after": 136,
+        "before": 135,
+        "history_index": 576
+      },
+      {
+        "after": 137,
+        "before": 136,
+        "history_index": 580
+      },
+      {
+        "after": 138,
+        "before": 137,
+        "history_index": 584
+      },
+      {
+        "after": 139,
+        "before": 138,
+        "history_index": 588
+      },
+      {
+        "after": 140,
+        "before": 139,
+        "history_index": 592
+      },
+      {
+        "after": 141,
+        "before": 140,
+        "history_index": 596
+      },
+      {
+        "after": 142,
+        "before": 141,
+        "history_index": 600
+      },
+      {
+        "after": 143,
+        "before": 142,
+        "history_index": 604
+      },
+      {
+        "after": 144,
+        "before": 143,
+        "history_index": 608
+      },
+      {
+        "after": 145,
+        "before": 144,
+        "history_index": 612
+      },
+      {
+        "after": 146,
+        "before": 145,
+        "history_index": 616
+      },
+      {
+        "after": 147,
+        "before": 146,
+        "history_index": 620
+      },
+      {
+        "after": 148,
+        "before": 147,
+        "history_index": 624
+      },
+      {
+        "after": 149,
+        "before": 148,
+        "history_index": 628
+      },
+      {
+        "after": 150,
+        "before": 149,
+        "history_index": 632
+      },
+      {
+        "after": 151,
+        "before": 150,
+        "history_index": 636
+      },
+      {
+        "after": 152,
+        "before": 151,
+        "history_index": 640
+      },
+      {
+        "after": 153,
+        "before": 152,
+        "history_index": 644
+      },
+      {
+        "after": 154,
+        "before": 153,
+        "history_index": 648
+      },
+      {
+        "after": 155,
+        "before": 154,
+        "history_index": 652
+      },
+      {
+        "after": 156,
+        "before": 155,
+        "history_index": 656
+      },
+      {
+        "after": 157,
+        "before": 156,
+        "history_index": 660
+      },
+      {
+        "after": 158,
+        "before": 157,
+        "history_index": 664
+      },
+      {
+        "after": 159,
+        "before": 158,
+        "history_index": 668
+      },
+      {
+        "after": 160,
+        "before": 159,
+        "history_index": 672
+      },
+      {
+        "after": 161,
+        "before": 160,
+        "history_index": 676
+      },
+      {
+        "after": 162,
+        "before": 161,
+        "history_index": 680
+      },
+      {
+        "after": 163,
+        "before": 162,
+        "history_index": 684
+      },
+      {
+        "after": 164,
+        "before": 163,
+        "history_index": 688
+      },
+      {
+        "after": 165,
+        "before": 164,
+        "history_index": 692
+      },
+      {
+        "after": 166,
+        "before": 165,
+        "history_index": 696
+      },
+      {
+        "after": 167,
+        "before": 166,
+        "history_index": 700
+      },
+      {
+        "after": 168,
+        "before": 167,
+        "history_index": 704
+      },
+      {
+        "after": 169,
+        "before": 168,
+        "history_index": 708
+      },
+      {
+        "after": 170,
+        "before": 169,
+        "history_index": 712
+      },
+      {
+        "after": 171,
+        "before": 170,
+        "history_index": 716
+      },
+      {
+        "after": 172,
+        "before": 171,
+        "history_index": 720
+      },
+      {
+        "after": 173,
+        "before": 172,
+        "history_index": 724
+      },
+      {
+        "after": 174,
+        "before": 173,
+        "history_index": 728
+      },
+      {
+        "after": 175,
+        "before": 174,
+        "history_index": 732
+      },
+      {
+        "after": 176,
+        "before": 175,
+        "history_index": 736
+      },
+      {
+        "after": 177,
+        "before": 176,
+        "history_index": 740
+      },
+      {
+        "after": 178,
+        "before": 177,
+        "history_index": 744
+      },
+      {
+        "after": 179,
+        "before": 178,
+        "history_index": 748
+      },
+      {
+        "after": 180,
+        "before": 179,
+        "history_index": 752
+      },
+      {
+        "after": 181,
+        "before": 180,
+        "history_index": 756
+      },
+      {
+        "after": 182,
+        "before": 181,
+        "history_index": 760
+      },
+      {
+        "after": 183,
+        "before": 182,
+        "history_index": 764
+      },
+      {
+        "after": 184,
+        "before": 183,
+        "history_index": 768
+      },
+      {
+        "after": 185,
+        "before": 184,
+        "history_index": 772
+      },
+      {
+        "after": 186,
+        "before": 185,
+        "history_index": 776
+      },
+      {
+        "after": 187,
+        "before": 186,
+        "history_index": 780
+      },
+      {
+        "after": 188,
+        "before": 187,
+        "history_index": 784
+      },
+      {
+        "after": 189,
+        "before": 188,
+        "history_index": 788
+      },
+      {
+        "after": 190,
+        "before": 189,
+        "history_index": 792
+      },
+      {
+        "after": 191,
+        "before": 190,
+        "history_index": 796
+      },
+      {
+        "after": 192,
+        "before": 191,
+        "history_index": 800
+      },
+      {
+        "after": 193,
+        "before": 192,
+        "history_index": 804
+      },
+      {
+        "after": 194,
+        "before": 193,
+        "history_index": 808
+      },
+      {
+        "after": 195,
+        "before": 194,
+        "history_index": 812
+      },
+      {
+        "after": 196,
+        "before": 195,
+        "history_index": 816
+      },
+      {
+        "after": 197,
+        "before": 196,
+        "history_index": 820
+      },
+      {
+        "after": 198,
+        "before": 197,
+        "history_index": 824
+      },
+      {
+        "after": 199,
+        "before": 198,
+        "history_index": 828
+      },
+      {
+        "after": 200,
+        "before": 199,
+        "history_index": 832
+      },
+      {
+        "after": 201,
+        "before": 200,
+        "history_index": 836
+      },
+      {
+        "after": 202,
+        "before": 201,
+        "history_index": 840
+      },
+      {
+        "after": 203,
+        "before": 202,
+        "history_index": 844
+      },
+      {
+        "after": 204,
+        "before": 203,
+        "history_index": 848
+      },
+      {
+        "after": 205,
+        "before": 204,
+        "history_index": 852
+      },
+      {
+        "after": 206,
+        "before": 205,
+        "history_index": 856
+      },
+      {
+        "after": 207,
+        "before": 206,
+        "history_index": 860
+      },
+      {
+        "after": 208,
+        "before": 207,
+        "history_index": 864
+      },
+      {
+        "after": 209,
+        "before": 208,
+        "history_index": 868
+      },
+      {
+        "after": 210,
+        "before": 209,
+        "history_index": 872
+      },
+      {
+        "after": 211,
+        "before": 210,
+        "history_index": 876
+      },
+      {
+        "after": 212,
+        "before": 211,
+        "history_index": 880
+      },
+      {
+        "after": 213,
+        "before": 212,
+        "history_index": 884
+      },
+      {
+        "after": 214,
+        "before": 213,
+        "history_index": 888
+      },
+      {
+        "after": 215,
+        "before": 214,
+        "history_index": 892
+      },
+      {
+        "after": 216,
+        "before": 215,
+        "history_index": 896
+      },
+      {
+        "after": 217,
+        "before": 216,
+        "history_index": 900
+      },
+      {
+        "after": 218,
+        "before": 217,
+        "history_index": 904
+      },
+      {
+        "after": 219,
+        "before": 218,
+        "history_index": 908
+      },
+      {
+        "after": 220,
+        "before": 219,
+        "history_index": 912
+      },
+      {
+        "after": 221,
+        "before": 220,
+        "history_index": 916
+      },
+      {
+        "after": 222,
+        "before": 221,
+        "history_index": 920
+      },
+      {
+        "after": 223,
+        "before": 222,
+        "history_index": 924
+      },
+      {
+        "after": 224,
+        "before": 223,
+        "history_index": 928
+      },
+      {
+        "after": 225,
+        "before": 224,
+        "history_index": 932
+      },
+      {
+        "after": 226,
+        "before": 225,
+        "history_index": 936
+      },
+      {
+        "after": 227,
+        "before": 226,
+        "history_index": 940
+      },
+      {
+        "after": 228,
+        "before": 227,
+        "history_index": 944
+      },
+      {
+        "after": 229,
+        "before": 228,
+        "history_index": 948
+      },
+      {
+        "after": 230,
+        "before": 229,
+        "history_index": 952
+      },
+      {
+        "after": 231,
+        "before": 230,
+        "history_index": 956
+      },
+      {
+        "after": 232,
+        "before": 231,
+        "history_index": 960
+      },
+      {
+        "after": 233,
+        "before": 232,
+        "history_index": 964
+      },
+      {
+        "after": 234,
+        "before": 233,
+        "history_index": 968
+      },
+      {
+        "after": 235,
+        "before": 234,
+        "history_index": 972
+      },
+      {
+        "after": 236,
+        "before": 235,
+        "history_index": 976
+      },
+      {
+        "after": 237,
+        "before": 236,
+        "history_index": 980
+      },
+      {
+        "after": 238,
+        "before": 237,
+        "history_index": 984
+      },
+      {
+        "after": 239,
+        "before": 238,
+        "history_index": 988
+      },
+      {
+        "after": 240,
+        "before": 239,
+        "history_index": 992
+      },
+      {
+        "after": 241,
+        "before": 240,
+        "history_index": 996
+      },
+      {
+        "after": 242,
+        "before": 241,
+        "history_index": 1000
+      },
+      {
+        "after": 243,
+        "before": 242,
+        "history_index": 1004
+      },
+      {
+        "after": 244,
+        "before": 243,
+        "history_index": 1008
+      },
+      {
+        "after": 245,
+        "before": 244,
+        "history_index": 1012
+      },
+      {
+        "after": 246,
+        "before": 245,
+        "history_index": 1016
+      },
+      {
+        "after": 247,
+        "before": 246,
+        "history_index": 1020
+      },
+      {
+        "after": 248,
+        "before": 247,
+        "history_index": 1024
+      },
+      {
+        "after": 249,
+        "before": 248,
+        "history_index": 1028
+      },
+      {
+        "after": 250,
+        "before": 249,
+        "history_index": 1032
+      },
+      {
+        "after": 251,
+        "before": 250,
+        "history_index": 1036
+      },
+      {
+        "after": 252,
+        "before": 251,
+        "history_index": 1040
+      },
+      {
+        "after": 253,
+        "before": 252,
+        "history_index": 1044
+      },
+      {
+        "after": 254,
+        "before": 253,
+        "history_index": 1048
+      },
+      {
+        "after": 255,
+        "before": 254,
+        "history_index": 1052
+      },
+      {
+        "after": 256,
+        "before": 255,
+        "history_index": 1056
+      },
+      {
+        "after": 257,
+        "before": 256,
+        "history_index": 1060
+      },
+      {
+        "after": 258,
+        "before": 257,
+        "history_index": 1064
+      },
+      {
+        "after": 259,
+        "before": 258,
+        "history_index": 1068
+      },
+      {
+        "after": 260,
+        "before": 259,
+        "history_index": 1072
+      },
+      {
+        "after": 261,
+        "before": 260,
+        "history_index": 1076
+      },
+      {
+        "after": 262,
+        "before": 261,
+        "history_index": 1080
+      },
+      {
+        "after": 263,
+        "before": 262,
+        "history_index": 1084
+      },
+      {
+        "after": 264,
+        "before": 263,
+        "history_index": 1088
+      },
+      {
+        "after": 265,
+        "before": 264,
+        "history_index": 1092
+      },
+      {
+        "after": 266,
+        "before": 265,
+        "history_index": 1096
+      },
+      {
+        "after": 267,
+        "before": 266,
+        "history_index": 1100
+      },
+      {
+        "after": 268,
+        "before": 267,
+        "history_index": 1104
+      },
+      {
+        "after": 269,
+        "before": 268,
+        "history_index": 1108
+      },
+      {
+        "after": 270,
+        "before": 269,
+        "history_index": 1112
+      },
+      {
+        "after": 271,
+        "before": 270,
+        "history_index": 1116
+      },
+      {
+        "after": 272,
+        "before": 271,
+        "history_index": 1120
+      },
+      {
+        "after": 273,
+        "before": 272,
+        "history_index": 1124
+      },
+      {
+        "after": 274,
+        "before": 273,
+        "history_index": 1128
+      },
+      {
+        "after": 275,
+        "before": 274,
+        "history_index": 1132
+      },
+      {
+        "after": 276,
+        "before": 275,
+        "history_index": 1136
+      },
+      {
+        "after": 277,
+        "before": 276,
+        "history_index": 1140
+      },
+      {
+        "after": 278,
+        "before": 277,
+        "history_index": 1144
+      },
+      {
+        "after": 279,
+        "before": 278,
+        "history_index": 1148
+      },
+      {
+        "after": 280,
+        "before": 279,
+        "history_index": 1152
+      },
+      {
+        "after": 281,
+        "before": 280,
+        "history_index": 1156
+      },
+      {
+        "after": 282,
+        "before": 281,
+        "history_index": 1160
+      },
+      {
+        "after": 283,
+        "before": 282,
+        "history_index": 1164
+      },
+      {
+        "after": 284,
+        "before": 283,
+        "history_index": 1168
+      },
+      {
+        "after": 285,
+        "before": 284,
+        "history_index": 1172
+      },
+      {
+        "after": 286,
+        "before": 285,
+        "history_index": 1176
+      },
+      {
+        "after": 287,
+        "before": 286,
+        "history_index": 1180
+      },
+      {
+        "after": 288,
+        "before": 287,
+        "history_index": 1184
+      },
+      {
+        "after": 289,
+        "before": 288,
+        "history_index": 1188
+      },
+      {
+        "after": 290,
+        "before": 289,
+        "history_index": 1192
+      },
+      {
+        "after": 291,
+        "before": 290,
+        "history_index": 1196
+      },
+      {
+        "after": 292,
+        "before": 291,
+        "history_index": 1200
+      },
+      {
+        "after": 293,
+        "before": 292,
+        "history_index": 1204
+      },
+      {
+        "after": 294,
+        "before": 293,
+        "history_index": 1208
+      },
+      {
+        "after": 295,
+        "before": 294,
+        "history_index": 1212
+      },
+      {
+        "after": 296,
+        "before": 295,
+        "history_index": 1216
+      },
+      {
+        "after": 297,
+        "before": 296,
+        "history_index": 1220
+      },
+      {
+        "after": 298,
+        "before": 297,
+        "history_index": 1224
+      },
+      {
+        "after": 299,
+        "before": 298,
+        "history_index": 1228
+      },
+      {
+        "after": 300,
+        "before": 299,
+        "history_index": 1232
+      },
+      {
+        "after": 301,
+        "before": 300,
+        "history_index": 1236
+      },
+      {
+        "after": 302,
+        "before": 301,
+        "history_index": 1240
+      },
+      {
+        "after": 303,
+        "before": 302,
+        "history_index": 1244
+      },
+      {
+        "after": 304,
+        "before": 303,
+        "history_index": 1248
+      },
+      {
+        "after": 305,
+        "before": 304,
+        "history_index": 1252
+      },
+      {
+        "after": 306,
+        "before": 305,
+        "history_index": 1256
+      },
+      {
+        "after": 307,
+        "before": 306,
+        "history_index": 1260
+      },
+      {
+        "after": 308,
+        "before": 307,
+        "history_index": 1264
+      },
+      {
+        "after": 309,
+        "before": 308,
+        "history_index": 1268
+      },
+      {
+        "after": 310,
+        "before": 309,
+        "history_index": 1272
+      },
+      {
+        "after": 311,
+        "before": 310,
+        "history_index": 1276
+      },
+      {
+        "after": 312,
+        "before": 311,
+        "history_index": 1280
+      },
+      {
+        "after": 313,
+        "before": 312,
+        "history_index": 1284
+      },
+      {
+        "after": 314,
+        "before": 313,
+        "history_index": 1288
+      },
+      {
+        "after": 315,
+        "before": 314,
+        "history_index": 1292
+      },
+      {
+        "after": 316,
+        "before": 315,
+        "history_index": 1296
+      },
+      {
+        "after": 317,
+        "before": 316,
+        "history_index": 1300
+      },
+      {
+        "after": 318,
+        "before": 317,
+        "history_index": 1304
+      },
+      {
+        "after": 319,
+        "before": 318,
+        "history_index": 1308
+      },
+      {
+        "after": 320,
+        "before": 319,
+        "history_index": 1312
+      },
+      {
+        "after": 321,
+        "before": 320,
+        "history_index": 1316
+      },
+      {
+        "after": 322,
+        "before": 321,
+        "history_index": 1320
+      },
+      {
+        "after": 323,
+        "before": 322,
+        "history_index": 1324
+      },
+      {
+        "after": 324,
+        "before": 323,
+        "history_index": 1328
+      },
+      {
+        "after": 325,
+        "before": 324,
+        "history_index": 1332
+      },
+      {
+        "after": 326,
+        "before": 325,
+        "history_index": 1336
+      },
+      {
+        "after": 327,
+        "before": 326,
+        "history_index": 1340
+      },
+      {
+        "after": 328,
+        "before": 327,
+        "history_index": 1344
+      },
+      {
+        "after": 329,
+        "before": 328,
+        "history_index": 1348
+      },
+      {
+        "after": 330,
+        "before": 329,
+        "history_index": 1352
+      },
+      {
+        "after": 331,
+        "before": 330,
+        "history_index": 1356
+      },
+      {
+        "after": 332,
+        "before": 331,
+        "history_index": 1360
+      },
+      {
+        "after": 333,
+        "before": 332,
+        "history_index": 1364
+      },
+      {
+        "after": 334,
+        "before": 333,
+        "history_index": 1368
+      },
+      {
+        "after": 335,
+        "before": 334,
+        "history_index": 1372
+      },
+      {
+        "after": 336,
+        "before": 335,
+        "history_index": 1376
+      },
+      {
+        "after": 337,
+        "before": 336,
+        "history_index": 1380
+      },
+      {
+        "after": 338,
+        "before": 337,
+        "history_index": 1384
+      },
+      {
+        "after": 339,
+        "before": 338,
+        "history_index": 1388
+      },
+      {
+        "after": 340,
+        "before": 339,
+        "history_index": 1392
+      },
+      {
+        "after": 341,
+        "before": 340,
+        "history_index": 1396
+      },
+      {
+        "after": 342,
+        "before": 341,
+        "history_index": 1400
+      },
+      {
+        "after": 343,
+        "before": 342,
+        "history_index": 1404
+      },
+      {
+        "after": 344,
+        "before": 343,
+        "history_index": 1408
+      },
+      {
+        "after": 345,
+        "before": 344,
+        "history_index": 1412
+      },
+      {
+        "after": 346,
+        "before": 345,
+        "history_index": 1416
+      },
+      {
+        "after": 347,
+        "before": 346,
+        "history_index": 1420
+      },
+      {
+        "after": 348,
+        "before": 347,
+        "history_index": 1424
+      },
+      {
+        "after": 349,
+        "before": 348,
+        "history_index": 1428
+      },
+      {
+        "after": 350,
+        "before": 349,
+        "history_index": 1432
+      },
+      {
+        "after": 351,
+        "before": 350,
+        "history_index": 1436
+      },
+      {
+        "after": 352,
+        "before": 351,
+        "history_index": 1440
+      },
+      {
+        "after": 353,
+        "before": 352,
+        "history_index": 1444
+      },
+      {
+        "after": 354,
+        "before": 353,
+        "history_index": 1448
+      },
+      {
+        "after": 355,
+        "before": 354,
+        "history_index": 1452
+      },
+      {
+        "after": 356,
+        "before": 355,
+        "history_index": 1456
+      },
+      {
+        "after": 357,
+        "before": 356,
+        "history_index": 1460
+      },
+      {
+        "after": 358,
+        "before": 357,
+        "history_index": 1464
+      },
+      {
+        "after": 359,
+        "before": 358,
+        "history_index": 1468
+      },
+      {
+        "after": 360,
+        "before": 359,
+        "history_index": 1472
+      },
+      {
+        "after": 361,
+        "before": 360,
+        "history_index": 1476
+      },
+      {
+        "after": 362,
+        "before": 361,
+        "history_index": 1480
+      },
+      {
+        "after": 363,
+        "before": 362,
+        "history_index": 1484
+      },
+      {
+        "after": 364,
+        "before": 363,
+        "history_index": 1488
+      },
+      {
+        "after": 365,
+        "before": 364,
+        "history_index": 1492
+      },
+      {
+        "after": 366,
+        "before": 365,
+        "history_index": 1496
+      },
+      {
+        "after": 367,
+        "before": 366,
+        "history_index": 1500
+      },
+      {
+        "after": 368,
+        "before": 367,
+        "history_index": 1504
+      },
+      {
+        "after": 369,
+        "before": 368,
+        "history_index": 1508
+      },
+      {
+        "after": 370,
+        "before": 369,
+        "history_index": 1512
+      },
+      {
+        "after": 371,
+        "before": 370,
+        "history_index": 1516
+      },
+      {
+        "after": 372,
+        "before": 371,
+        "history_index": 1520
+      },
+      {
+        "after": 373,
+        "before": 372,
+        "history_index": 1524
+      },
+      {
+        "after": 374,
+        "before": 373,
+        "history_index": 1528
+      },
+      {
+        "after": 375,
+        "before": 374,
+        "history_index": 1532
+      },
+      {
+        "after": 376,
+        "before": 375,
+        "history_index": 1536
+      },
+      {
+        "after": 377,
+        "before": 376,
+        "history_index": 1540
+      },
+      {
+        "after": 378,
+        "before": 377,
+        "history_index": 1544
+      },
+      {
+        "after": 379,
+        "before": 378,
+        "history_index": 1548
+      },
+      {
+        "after": 380,
+        "before": 379,
+        "history_index": 1552
+      },
+      {
+        "after": 381,
+        "before": 380,
+        "history_index": 1556
+      },
+      {
+        "after": 382,
+        "before": 381,
+        "history_index": 1560
+      },
+      {
+        "after": 383,
+        "before": 382,
+        "history_index": 1564
+      },
+      {
+        "after": 384,
+        "before": 383,
+        "history_index": 1568
+      },
+      {
+        "after": 385,
+        "before": 384,
+        "history_index": 1572
+      },
+      {
+        "after": 386,
+        "before": 385,
+        "history_index": 1576
+      },
+      {
+        "after": 387,
+        "before": 386,
+        "history_index": 1580
+      },
+      {
+        "after": 388,
+        "before": 387,
+        "history_index": 1584
+      },
+      {
+        "after": 389,
+        "before": 388,
+        "history_index": 1588
+      },
+      {
+        "after": 390,
+        "before": 389,
+        "history_index": 1592
+      },
+      {
+        "after": 391,
+        "before": 390,
+        "history_index": 1596
+      },
+      {
+        "after": 392,
+        "before": 391,
+        "history_index": 1600
+      },
+      {
+        "after": 393,
+        "before": 392,
+        "history_index": 1604
+      },
+      {
+        "after": 394,
+        "before": 393,
+        "history_index": 1608
+      },
+      {
+        "after": 395,
+        "before": 394,
+        "history_index": 1612
+      },
+      {
+        "after": 396,
+        "before": 395,
+        "history_index": 1616
+      },
+      {
+        "after": 397,
+        "before": 396,
+        "history_index": 1620
+      },
+      {
+        "after": 398,
+        "before": 397,
+        "history_index": 1624
+      },
+      {
+        "after": 399,
+        "before": 398,
+        "history_index": 1628
+      },
+      {
+        "after": 400,
+        "before": 399,
+        "history_index": 1632
+      },
+      {
+        "after": 401,
+        "before": 400,
+        "history_index": 1636
+      },
+      {
+        "after": 402,
+        "before": 401,
+        "history_index": 1640
+      },
+      {
+        "after": 403,
+        "before": 402,
+        "history_index": 1644
+      },
+      {
+        "after": 404,
+        "before": 403,
+        "history_index": 1648
+      },
+      {
+        "after": 405,
+        "before": 404,
+        "history_index": 1652
+      },
+      {
+        "after": 406,
+        "before": 405,
+        "history_index": 1656
+      },
+      {
+        "after": 407,
+        "before": 406,
+        "history_index": 1660
+      },
+      {
+        "after": 408,
+        "before": 407,
+        "history_index": 1664
+      },
+      {
+        "after": 409,
+        "before": 408,
+        "history_index": 1668
+      },
+      {
+        "after": 410,
+        "before": 409,
+        "history_index": 1672
+      },
+      {
+        "after": 411,
+        "before": 410,
+        "history_index": 1676
+      },
+      {
+        "after": 412,
+        "before": 411,
+        "history_index": 1680
+      },
+      {
+        "after": 413,
+        "before": 412,
+        "history_index": 1684
+      },
+      {
+        "after": 414,
+        "before": 413,
+        "history_index": 1688
+      },
+      {
+        "after": 415,
+        "before": 414,
+        "history_index": 1692
+      },
+      {
+        "after": 416,
+        "before": 415,
+        "history_index": 1696
+      },
+      {
+        "after": 417,
+        "before": 416,
+        "history_index": 1700
+      },
+      {
+        "after": 418,
+        "before": 417,
+        "history_index": 1704
+      },
+      {
+        "after": 419,
+        "before": 418,
+        "history_index": 1708
+      },
+      {
+        "after": 420,
+        "before": 419,
+        "history_index": 1712
+      },
+      {
+        "after": 421,
+        "before": 420,
+        "history_index": 1716
+      },
+      {
+        "after": 422,
+        "before": 421,
+        "history_index": 1720
+      },
+      {
+        "after": 423,
+        "before": 422,
+        "history_index": 1724
+      },
+      {
+        "after": 424,
+        "before": 423,
+        "history_index": 1728
+      },
+      {
+        "after": 425,
+        "before": 424,
+        "history_index": 1732
+      },
+      {
+        "after": 426,
+        "before": 425,
+        "history_index": 1736
+      },
+      {
+        "after": 427,
+        "before": 426,
+        "history_index": 1740
+      },
+      {
+        "after": 428,
+        "before": 427,
+        "history_index": 1744
+      },
+      {
+        "after": 429,
+        "before": 428,
+        "history_index": 1748
+      },
+      {
+        "after": 430,
+        "before": 429,
+        "history_index": 1752
+      },
+      {
+        "after": 431,
+        "before": 430,
+        "history_index": 1756
+      },
+      {
+        "after": 432,
+        "before": 431,
+        "history_index": 1760
+      },
+      {
+        "after": 433,
+        "before": 432,
+        "history_index": 1764
+      },
+      {
+        "after": 434,
+        "before": 433,
+        "history_index": 1768
+      },
+      {
+        "after": 435,
+        "before": 434,
+        "history_index": 1772
+      },
+      {
+        "after": 436,
+        "before": 435,
+        "history_index": 1776
+      },
+      {
+        "after": 437,
+        "before": 436,
+        "history_index": 1780
+      },
+      {
+        "after": 438,
+        "before": 437,
+        "history_index": 1784
+      },
+      {
+        "after": 439,
+        "before": 438,
+        "history_index": 1788
+      },
+      {
+        "after": 440,
+        "before": 439,
+        "history_index": 1792
+      },
+      {
+        "after": 441,
+        "before": 440,
+        "history_index": 1796
+      },
+      {
+        "after": 442,
+        "before": 441,
+        "history_index": 1800
+      },
+      {
+        "after": 443,
+        "before": 442,
+        "history_index": 1804
+      },
+      {
+        "after": 444,
+        "before": 443,
+        "history_index": 1808
+      },
+      {
+        "after": 445,
+        "before": 444,
+        "history_index": 1812
+      },
+      {
+        "after": 446,
+        "before": 445,
+        "history_index": 1816
+      },
+      {
+        "after": 447,
+        "before": 446,
+        "history_index": 1820
+      },
+      {
+        "after": 448,
+        "before": 447,
+        "history_index": 1824
+      },
+      {
+        "after": 449,
+        "before": 448,
+        "history_index": 1828
+      },
+      {
+        "after": 450,
+        "before": 449,
+        "history_index": 1832
+      },
+      {
+        "after": 451,
+        "before": 450,
+        "history_index": 1836
+      },
+      {
+        "after": 452,
+        "before": 451,
+        "history_index": 1840
+      },
+      {
+        "after": 453,
+        "before": 452,
+        "history_index": 1844
+      },
+      {
+        "after": 454,
+        "before": 453,
+        "history_index": 1848
+      },
+      {
+        "after": 455,
+        "before": 454,
+        "history_index": 1852
+      },
+      {
+        "after": 456,
+        "before": 455,
+        "history_index": 1856
+      },
+      {
+        "after": 457,
+        "before": 456,
+        "history_index": 1860
+      },
+      {
+        "after": 458,
+        "before": 457,
+        "history_index": 1864
+      },
+      {
+        "after": 459,
+        "before": 458,
+        "history_index": 1868
+      },
+      {
+        "after": 460,
+        "before": 459,
+        "history_index": 1872
+      },
+      {
+        "after": 461,
+        "before": 460,
+        "history_index": 1876
+      },
+      {
+        "after": 462,
+        "before": 461,
+        "history_index": 1880
+      },
+      {
+        "after": 463,
+        "before": 462,
+        "history_index": 1884
+      },
+      {
+        "after": 464,
+        "before": 463,
+        "history_index": 1888
+      },
+      {
+        "after": 465,
+        "before": 464,
+        "history_index": 1892
+      },
+      {
+        "after": 466,
+        "before": 465,
+        "history_index": 1896
+      },
+      {
+        "after": 467,
+        "before": 466,
+        "history_index": 1900
+      },
+      {
+        "after": 468,
+        "before": 467,
+        "history_index": 1904
+      },
+      {
+        "after": 469,
+        "before": 468,
+        "history_index": 1908
+      },
+      {
+        "after": 470,
+        "before": 469,
+        "history_index": 1912
+      },
+      {
+        "after": 471,
+        "before": 470,
+        "history_index": 1916
+      },
+      {
+        "after": 472,
+        "before": 471,
+        "history_index": 1920
+      },
+      {
+        "after": 473,
+        "before": 472,
+        "history_index": 1924
+      },
+      {
+        "after": 474,
+        "before": 473,
+        "history_index": 1928
+      },
+      {
+        "after": 475,
+        "before": 474,
+        "history_index": 1932
+      },
+      {
+        "after": 476,
+        "before": 475,
+        "history_index": 1936
+      },
+      {
+        "after": 477,
+        "before": 476,
+        "history_index": 1940
+      },
+      {
+        "after": 478,
+        "before": 477,
+        "history_index": 1944
+      },
+      {
+        "after": 479,
+        "before": 478,
+        "history_index": 1948
+      },
+      {
+        "after": 480,
+        "before": 479,
+        "history_index": 1952
+      },
+      {
+        "after": 481,
+        "before": 480,
+        "history_index": 1956
+      },
+      {
+        "after": 482,
+        "before": 481,
+        "history_index": 1960
+      },
+      {
+        "after": 483,
+        "before": 482,
+        "history_index": 1964
+      },
+      {
+        "after": 484,
+        "before": 483,
+        "history_index": 1967
+      }
+    ]
+  },
+  "input_artifacts": {
+    "decisions_jsonl_gz_sha256": "c9e1f42e02e23f914e1bbda525f883844020baa7ebd1a23cbf35f035abcab283",
+    "game_seed": 662496,
+    "last_decision_public_screen": "MAP_SCREEN",
+    "public_history_entries": 1992,
+    "retained_decision_rows": 15,
+    "run_json_sha256": "ac351980126e09740994248645f65edb296e44190049e6501821c4d2984449d8"
+  },
+  "limitations": [
+    "The native API snapshot exposes hands, discard/exhaust piles, player state, monsters and intents but only draw-pile size; fingerprints do not establish exact equality of hidden draw order.",
+    "The retained selected-action trace ends at the last supported floor-7 map decision. The final seven Battle search choices are not present as action identities in the retained decision/history artifacts; their Search log rows contain counters and CPU only. The floor-8 terminal is therefore reported from the original run artifact, not independently action-replayed.",
+    "The replay diagnoses one owner and does not estimate how common the long Battle is or support a performance claim."
+  ],
+  "repository_head": "e28460d6f5b6e328b0d304f09f88bca2e9a45f3f",
+  "schema_id": "issue60-owner-662496-direct-replay-v1",
+  "source_pins": {
+    "native_actual_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "native_binary_path": "/home/lsmft/stsrl-spikes/issue60-runtime/build-issue60/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "native_expected_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "stsr_actual_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsr_expected_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96"
+  },
+  "trace_artifact": "studies/issue-60-onpolicy-joint-choice/evidence/diagnostics/owner-662496-battle-prefix.jsonl.gz",
+  "verification": {
+    "battle_actions_in_replayed_prefix": 1972,
+    "battle_hp_comparison": "During BATTLE, compare retained public current_hp against live battle_player_hp; raw cur_hp is stale until the battle ends.",
+    "battle_trace_artifact": "studies/issue-60-onpolicy-joint-choice/evidence/diagnostics/owner-662496-battle-prefix.jsonl.gz",
+    "causal_assessment": {
+      "floor5_battle": {
+        "action_kinds": {
+          "card": 1446,
+          "end_turn": 484,
+          "single_card_select": 3
+        },
+        "card_names": {
+          "Armaments": 482,
+          "Barricade": 2,
+          "Bash": 4,
+          "Dark Embrace": 2,
+          "Feed": 1,
+          "Pummel": 1,
+          "Rage": 476,
+          "Shrug It Off": 478
+        },
+        "entry": {
+          "battle_outcome": "UNDECIDED",
+          "battle_turn": 0,
+          "completed_battle_outcome": null,
+          "encounter_id": "THREE_LOUSE",
+          "floor_num": 5,
+          "monsters": [
+            {
+              "alive": true,
+              "current_hp": 18,
+              "current_move": "GREEN_LOUSE_SPIT_WEB",
+              "intent_category": "NON_ATTACK",
+              "max_hp": 18,
+              "name": "GREEN_LOUSE"
+            },
+            {
+              "alive": true,
+              "current_hp": 13,
+              "current_move": "GREEN_LOUSE_SPIT_WEB",
+              "intent_category": "NON_ATTACK",
+              "max_hp": 13,
+              "name": "GREEN_LOUSE"
+            },
+            {
+              "alive": true,
+              "current_hp": 15,
+              "current_move": "GREEN_LOUSE_BITE",
+              "intent_category": "ATTACK",
+              "max_hp": 15,
+              "name": "GREEN_LOUSE"
+            }
+          ],
+          "outcome": "UNDECIDED",
+          "player_block": 0,
+          "player_energy": 3,
+          "player_hp": 44,
+          "player_max_hp": 81,
+          "room_type": "MONSTER",
+          "screen_state": "BATTLE"
+        },
+        "exit": {
+          "history_index": 1969,
+          "state": {
+            "battle_outcome": null,
+            "battle_turn": null,
+            "completed_battle_outcome": "PLAYER_VICTORY",
+            "encounter_id": null,
+            "floor_num": 5,
+            "monsters": [],
+            "outcome": "UNDECIDED",
+            "player_block": null,
+            "player_energy": null,
+            "player_hp": 16,
+            "player_max_hp": 84,
+            "room_type": "MONSTER",
+            "screen_state": "REWARDS"
+          },
+          "terminal": false,
+          "transition_info": {
+            "action_id": "battle:1",
+            "action_kind": "card",
+            "completed_battle_outcome": "PLAYER_VICTORY"
+          }
+        },
+        "max_observed_turn": 484,
+        "repeated_pre_state_fingerprints": 0,
+        "state_identical_transitions": 0,
+        "trace_actions": 1933,
+        "turn_changes": 484
+      },
+      "ordinal_replay": "all 1,992 retained ordinals were legal and reproduced retained pre/post screens and public resources",
+      "search_causality": "The retained artifact has Search counts and CPU but no per-call root action identities; replay establishes the resulting trajectory, not why Search selected its actions.",
+      "terminal_tail": "The final floor8 PLAYER_LOSS and HP 0 are retained run.json facts; its final seven action identities are not present in the ordinal prefix and were not fabricated or replayed.",
+      "turn_guard": "The retained floor5 replay reached turn 484; the next supported selected map action entered floor8 at turn 0. Seven later Search calls/transitions cannot reach the Native >500 turn guard."
+    },
+    "first_mismatch_or_blocker": null,
+    "floor5_boundary_summary_from_retained_run": [
+      {
+        "battle_outcome": null,
+        "boundary": "battle_enter",
+        "floor": 5.0,
+        "player_hp": 44.0,
+        "player_max_hp": 81.0,
+        "room_type": "MONSTER",
+        "screen": "BATTLE"
+      },
+      {
+        "battle_outcome": "PLAYER_VICTORY",
+        "boundary": "battle_exit",
+        "floor": 5.0,
+        "player_hp": 16.0,
+        "player_max_hp": 84.0,
+        "room_type": "MONSTER",
+        "screen": "REWARDS"
+      }
+    ],
+    "floor8_boundary_summary_from_retained_run": [
+      {
+        "battle_outcome": null,
+        "boundary": "battle_enter",
+        "floor": 8.0,
+        "player_hp": 15.0,
+        "player_max_hp": 84.0,
+        "room_type": "MONSTER",
+        "screen": "BATTLE"
+      },
+      {
+        "battle_outcome": "PLAYER_LOSS",
+        "boundary": "battle_exit",
+        "floor": 8.0,
+        "player_hp": 0.0,
+        "player_max_hp": 84.0,
+        "room_type": "MONSTER",
+        "screen": "BATTLE"
+      }
+    ],
+    "floor8_entry_state": {
+      "battle_outcome": "UNDECIDED",
+      "battle_turn": 0,
+      "completed_battle_outcome": null,
+      "encounter_id": "LARGE_SLIME",
+      "floor_num": 8,
+      "monsters": [
+        {
+          "alive": true,
+          "current_hp": 70,
+          "current_move": "SPIKE_SLIME_L_LICK",
+          "intent_category": "NON_ATTACK",
+          "max_hp": 70,
+          "name": "SPIKE_SLIME_L"
+        }
+      ],
+      "outcome": "UNDECIDED",
+      "player_block": 0,
+      "player_energy": 3,
+      "player_hp": 15,
+      "player_max_hp": 84,
+      "room_type": "MONSTER",
+      "screen_state": "BATTLE"
+    },
+    "last_decision_selected_action_extension": {
+      "decision_floor": 7,
+      "mapped_native_action": {
+        "action_id": "game:5",
+        "bits": 5,
+        "idx1": 5,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "map",
+        "label": "game.map bits=5 idx1=5 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      "native_action_match_count": 1,
+      "post_action_state": {
+        "battle_outcome": "UNDECIDED",
+        "battle_turn": 0,
+        "completed_battle_outcome": null,
+        "encounter_id": "LARGE_SLIME",
+        "floor_num": 8,
+        "monsters": [
+          {
+            "alive": true,
+            "current_hp": 70,
+            "current_move": "SPIKE_SLIME_L_LICK",
+            "intent_category": "NON_ATTACK",
+            "max_hp": 70,
+            "name": "SPIKE_SLIME_L"
+          }
+        ],
+        "outcome": "UNDECIDED",
+        "player_block": 0,
+        "player_energy": 3,
+        "player_hp": 15,
+        "player_max_hp": 84,
+        "room_type": "MONSTER",
+        "screen_state": "BATTLE"
+      },
+      "selected_index": 1,
+      "selected_public_action": {
+        "idx1": 5,
+        "idx2": 0,
+        "idx3": 0,
+        "kind": "map",
+        "label": "game.map idx1=5 idx2=0 idx3=0",
+        "scope": "game"
+      },
+      "source": "last recorded supported-decision selected index",
+      "transition_info": {
+        "action_id": "game:5",
+        "action_kind": "map"
+      },
+      "transition_terminal": false
+    },
+    "last_supported_decision_input_matches_replayed_prefix": true,
+    "native_turn_guard": {
+      "floor5_guard_triggered_in_replay": false,
+      "floor5_max_turn_in_replay": 484,
+      "floor5_within_10_turns_of_guard": false,
+      "floor8_entry_turn": 0,
+      "floor8_guard_can_be_ruled_out_from_retained_counts": true,
+      "floor8_turn_upper_bound_if_each_remaining_search_executes_at_most_one_end_turn": 7,
+      "source_guard": "BattleContext::executeActions returns PLAYER_LOSS when turn > 500",
+      "turn_increment_source": "BattleContext::afterMonsterTurns increments turn once per end-of-monster-turn boundary"
+    },
+    "normal_public_actor_or_critic_used": false,
+    "recorded_ordinal_prefix_complete": true,
+    "replay_cpu_seconds": 2.983151463,
+    "replay_method": "LightSpeedAdapter.reset/legal_actions/step directly; no Search, controlled-run executor, controller, or public-history builder",
+    "replayed_prefix_actions": 1992,
+    "retained_run_transitions": 2000,
+    "retained_search_calls": 1979,
+    "retained_terminal_summary": {
+      "death_location": {
+        "act": 1,
+        "floor": 8,
+        "room_type": "MONSTER"
+      },
+      "outcome": "PLAYER_LOSS",
+      "problems": [],
+      "terminal": true,
+      "terminal_floor": 8.0,
+      "terminal_public_location": {
+        "act": 1,
+        "floor": 8,
+        "room_type": "MONSTER"
+      }
+    },
+    "stop_reason": "PREFIX_COMPLETE",
+    "transitions_after_latest_supported_decision": 7,
+    "unreplayed_search_calls_after_prefix": 7
+  }
+}

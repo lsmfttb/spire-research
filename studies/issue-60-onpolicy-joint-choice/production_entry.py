@@ -159,6 +159,10 @@ def verify_active_sources_once(rs: Any) -> dict[str, Any]:
     relative_entry, committed_entry = _verify_committed_source(
         repo_root, Path(__file__).resolve(), source_name="production_entry.py",
     )
+    optimizer_path = HERE / "public_history_execution.py"
+    relative_optimizer, committed_optimizer = _verify_committed_source(
+        repo_root, optimizer_path, source_name="public_history_execution.py",
+    )
     return {
         "manifest_schema_id": manifest["schema_id"],
         "config_sha256": rs.config_sha(),
@@ -169,13 +173,16 @@ def verify_active_sources_once(rs: Any) -> dict[str, Any]:
         "current_production_entry_git_blob": committed_entry,
         "current_production_entry_sha256": _sha256(Path(__file__).resolve()),
         "current_production_entry_path": relative_entry,
+        "current_public_history_optimizer_git_blob": committed_optimizer,
+        "current_public_history_optimizer_sha256": _sha256(optimizer_path),
+        "current_public_history_optimizer_path": relative_optimizer,
         "historical_manifest_run_study_sha256": stale_manifest_run_study_sha,
         "historical_manifest_run_study_sha_stale": (
             hashlib.sha256((rs.HERE / "run_study.py").read_bytes()).hexdigest()
             != stale_manifest_run_study_sha
         ),
         "other_frozen_files_verified": len(entries) - 1,
-        "verification": "current HEAD tree identity for run_study.py and production_entry.py plus registered config and unchanged remaining manifest inputs",
+        "verification": "current HEAD tree identity for run_study.py, production_entry.py, and the study-local public-history optimizer plus registered config and unchanged remaining manifest inputs",
     }
 
 
@@ -275,18 +282,33 @@ def _issue_state() -> set[str]:
 
 def parse_production_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the registered Issue 60 study.")
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--continue-reviewed", action="store_true",
         help=(
             "continue the already authorized study from a valid batch-02 checkpoint; "
             "Issue comments are not consulted"
         ),
     )
+    mode.add_argument(
+        "--single-key-witness", action="store_true",
+        help=(
+            "execute only the next missing fixed training key through the production runtime, "
+            "then stop before PPO or evaluation"
+        ),
+    )
     return parser.parse_args(argv)
 
 
-def execution_phase(completed_batch: int, labels: set[str], *, continue_reviewed: bool = False) -> str:
+def execution_phase(completed_batch: int, labels: set[str], *, continue_reviewed: bool = False,
+                    single_key_witness: bool = False) -> str:
     """Select the registered run phase; comment text never grants execution authority."""
+    if single_key_witness:
+        if "route:builder" not in labels:
+            raise ProductionError("--single-key-witness requires Issue #60 to be routed to Builder")
+        if completed_batch < 2:
+            raise ProductionError("--single-key-witness requires the accepted training continuation boundary")
+        return "single-key-witness"
     if continue_reviewed:
         if "route:builder" not in labels:
             raise ProductionError("--continue-reviewed requires Issue #60 to be routed to Builder")
@@ -501,6 +523,21 @@ class DurableDispatcher(parallel_execution.ParallelGameDispatcher):
         self.owner = owner
         super().__init__(*args, **kwargs)
 
+    def _training_tasks(self, template: Mapping[str, Any]) -> list[dict[str, Any]]:
+        tasks = super()._training_tasks(template)
+        seed = self.owner.single_key_witness_seed
+        if seed is None:
+            return tasks
+        stage_key = str(template.get("stage_key", ""))
+        if stage_key != self.owner.single_key_witness_stage:
+            raise ProductionError("single-key witness attempted to dispatch outside its exact training stage")
+        selected = [task for task in tasks if int(task["kwargs"]["seed"]) == seed]
+        if len(selected) != 1:
+            raise ProductionError(
+                f"single-key witness expected exactly one missing task for seed {seed}, got {len(selected)}"
+            )
+        return selected
+
     def _fork_task(self, task: Mapping[str, Any], slot: int) -> int:
         key = tuple(task["key"])
         kwargs = task["kwargs"]
@@ -542,6 +579,8 @@ class ProductionRuntime:
         self.worker_selection = dict(worker_selection)
         self.milestone_mode = milestone_mode
         self.optimizer_reserve_seconds = 0.0
+        self.single_key_witness_seed: int | None = None
+        self.single_key_witness_stage: str | None = None
         self.dispatcher: DurableDispatcher | None = None
         self._worker_tokens: dict[str, str] = {}
         self.batch_validation: dict[str, Any] | None = None
@@ -1018,6 +1057,150 @@ def _startup_identity(rs: Any, runtime: Mapping[str, Any], head: str) -> dict[st
     }
 
 
+def run_single_key_witness(rs: Any, config: Mapping[str, Any], vocab: Any,
+                           bootstrap: Any, runtime: Mapping[str, Any],
+                           stage_started: float, runtime_context: ProductionRuntime,
+                           *, head: str, source_validation: Mapping[str, Any]) -> dict[str, Any]:
+    """Run exactly the first missing original block-2 key through production dispatch."""
+    block = "block2"
+    checkpoint_path = EVIDENCE / "training" / block / "latest.pt"
+    if not checkpoint_path.is_file():
+        raise ProductionError("single-key witness block2 checkpoint is missing")
+    digest = rs.config_sha()
+    training_config = config["training"]
+    torch.manual_seed(rs.MODEL_SEEDS[block])
+    model = rs.JointChoiceActorCritic(vocab)
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(training_config["learning_rate"]))
+    checkpoint = rs.load_checkpoint(checkpoint_path, model, optimizer, vocab, digest)
+    if checkpoint.get("block") != block:
+        raise ProductionError("single-key witness checkpoint is not the block2 model")
+    completed_batches = int(checkpoint.get("completed_batches", -1))
+    if not 1 <= completed_batches < 8:
+        raise ProductionError(f"single-key witness checkpoint boundary is invalid: {completed_batches}")
+    batch_index = completed_batches + 1
+    frozen_sha = rs.model_fingerprint(model, vocab, digest)
+    if frozen_sha != checkpoint.get("model_sha256"):
+        raise ProductionError("single-key witness loaded model fingerprint differs from its checkpoint")
+
+    batch_seeds = list(rs.TRAINING_SEEDS[block])[(batch_index - 1) * 128:batch_index * 128]
+    if not batch_seeds:
+        raise ProductionError(f"single-key witness has no registered seeds for batch {batch_index}")
+    selected_seed = None
+    output_dir = None
+    for seed in batch_seeds:
+        candidate_dir = rs._training_game_dir(block, batch_index, seed)
+        if rs.successful_attempt(candidate_dir, frozen_sha, digest) is None:
+            selected_seed, output_dir = int(seed), candidate_dir
+            break
+    if selected_seed is None or output_dir is None:
+        raise ProductionError(
+            f"block2 batch {batch_index} has no missing original key for checkpoint {frozen_sha}"
+        )
+
+    stage_key = f"{block}:batch-{batch_index:02d}"
+    runtime_context.single_key_witness_seed = selected_seed
+    runtime_context.single_key_witness_stage = stage_key
+    runtime_context.optimizer_reserve_seconds = runtime_context.optimizer_reserve(rs)
+    provenance = rs._current_policy_provenance(config, vocab, frozen_sha, "residual")
+    started_wall = time.monotonic()
+    attempt, summary = rs.run_game(
+        seed=selected_seed, mode="residual", model=model, block_name=block,
+        runtime_seed=rs.derive_seed("training-policy", rs.MODEL_SEEDS[block], selected_seed, batch_index),
+        output_dir=output_dir, model_sha=frozen_sha, config_digest=digest,
+        vocab=vocab, bootstrap=bootstrap, require_targets=True,
+        provenance_config=provenance, stage_key=stage_key, arm="residual",
+    )
+    if summary.get("status") != "COMPLETE":
+        raise ProductionError(f"single-key witness did not complete: {summary.get('problems')}")
+    completed = rs.successful_attempt(output_dir, frozen_sha, digest)
+    if completed is None or completed[0].resolve() != attempt.resolve():
+        raise ProductionError("single-key witness result is not a durable matching successful attempt")
+    if int(summary.get("game_seed", -1)) != selected_seed:
+        raise ProductionError("single-key witness result seed differs from the registered original key")
+
+    pid = int(summary.get("pid", -1))
+    metrics_path = EVIDENCE / "execution" / "public-history-execution.jsonl"
+    history_metrics = []
+    if metrics_path.is_file():
+        for line in metrics_path.read_text(encoding="utf-8").splitlines():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if record.get("pid") == pid and record.get("seed") == selected_seed:
+                history_metrics.append(record)
+    if len(history_metrics) != 1:
+        raise ProductionError(
+            f"single-key witness expected one public-history metric for pid={pid}, seed={selected_seed}, "
+            f"got {len(history_metrics)}"
+        )
+    execution_rows = [
+        row for row in runtime_context.dispatcher.executions
+        if tuple(row.get("task_key", ())) == (stage_key, selected_seed, "residual")
+    ] if runtime_context.dispatcher is not None else []
+    if len(execution_rows) != 1 or int(execution_rows[0].get("exit_code", -1)) != 0:
+        raise ProductionError("single-key witness lacks exactly one successful production worker record")
+    if runtime_context.dispatcher.max_active_workers != 1:
+        raise ProductionError("single-key witness production path did not execute exactly one worker")
+
+    summary_path = attempt / "run.json"
+    decisions_path = attempt / "decisions.jsonl.gz"
+    receipt = {
+        "schema_id": "issue60-single-key-witness-v1",
+        "purpose": "STUDY_ONLY",
+        "status": "COMPLETE",
+        "issue": ISSUE_NUMBER,
+        "execution_head": head,
+        "launcher": "production_entry.py",
+        "launcher_sha256": _sha256(Path(__file__).resolve()),
+        "config_sha256": digest,
+        "runtime": dict(runtime),
+        "source_validation": dict(source_validation),
+        "checkpoint": {
+            "path": str(checkpoint_path.relative_to(HERE)),
+            "file_sha256": _sha256(checkpoint_path),
+            "block": block,
+            "completed_batches_before_witness": completed_batches,
+            "model_sha256": frozen_sha,
+            "optimizer_state_loaded": checkpoint.get("optimizer_state") is not None,
+        },
+        "training_key": {
+            "block": block,
+            "batch_index": batch_index,
+            "stage_key": stage_key,
+            "seed": selected_seed,
+            "arm": "residual",
+            "runtime_policy_seed": rs.derive_seed(
+                "training-policy", rs.MODEL_SEEDS[block], selected_seed, batch_index,
+            ),
+            "output_directory": str(output_dir.relative_to(HERE)),
+        },
+        "attempt": {
+            "path": str(attempt.relative_to(HERE)),
+            "run_json_sha256": _sha256(summary_path),
+            "decisions_sha256": _sha256(decisions_path),
+            "status": summary["status"],
+            "supported_choices": summary.get("supported_choices"),
+            "search_calls": summary.get("search_calls"),
+            "process_cpu_seconds": summary.get("process_cpu_seconds"),
+            "pid": pid,
+        },
+        "public_history_execution_metric": history_metrics[0],
+        "production_dispatcher_execution": execution_rows[0],
+        "production_dispatcher": runtime_context.dispatcher.evidence(),
+        "measured_new_cpu_seconds_at_receipt": runtime_context.meter.actual_cpu(),
+        "accounted_new_cpu_seconds_at_receipt": runtime_context.meter.accounted_cpu(),
+        "stage_wall_seconds": max(0.0, time.monotonic() - started_wall),
+        "ppo_updated": False,
+        "evaluation_started": False,
+        "continuation": (
+            "The standard training continuation reuses this exact completed seed/model/config key "
+            "when it resumes; no new seed or duplicate successful run is introduced."
+        ),
+    }
+    return receipt
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_production_args(argv)
     if not hasattr(os, "fork") or not Path("/proc/self/stat").is_file():
@@ -1051,6 +1234,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     labels = _issue_state()
     phase = execution_phase(
         completed_batches, labels, continue_reviewed=args.continue_reviewed,
+        single_key_witness=args.single_key_witness,
     )
 
     progress = ProductionProgress(PROGRESS_PATH.parent, config_sha=run_study.config_sha())
@@ -1081,8 +1265,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             "automatic_continuation_authorization": "disabled" if continuation_disabled else "not-applicable",
         }, indent=2))
         return 0
-    if phase not in {"integration-milestone", "full-continuation"}:
+    if phase not in {"integration-milestone", "full-continuation", "single-key-witness"}:
         raise ProductionError(f"Issue #{ISSUE_NUMBER} is not routed to Builder")
+
+    from public_history_execution import install as install_public_history_execution
+
+    history_metrics_path = EVIDENCE / "execution" / "public-history-execution.jsonl"
+    history_execution = install_public_history_execution(metrics_path=history_metrics_path)
+    progress.data["public_history_execution"] = history_execution
+    progress.persist()
 
     milestone_mode = phase == "integration-milestone"
     progress.begin_invocation(
@@ -1148,6 +1339,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         if milestone_mode:
             run_study.train_block("block1", config, vocab, bootstrap, runtime, stage_started)
             raise ProductionError("batch-02 completed without reaching its integration-review stop boundary")
+
+        if phase == "single-key-witness":
+            receipt = run_single_key_witness(
+                run_study, config, vocab, bootstrap, runtime, stage_started, runtime_context,
+                head=head, source_validation=source_validation,
+            )
+            receipt_path = EVIDENCE / "execution" / "single-key-witness.json"
+            _atomic_json(receipt_path, receipt)
+            progress.data["phase"] = "single-key-witness-complete"
+            progress.data["single_key_witness"] = str(receipt_path.relative_to(HERE))
+            progress.data["open_invocation"] = None
+            progress.data["open_optimizer_reservation"] = None
+            runtime_context.persist_event(
+                "single-key-witness-completed", receipt=str(receipt_path.relative_to(HERE)),
+                seed=receipt["training_key"]["seed"], stage_key=receipt["training_key"]["stage_key"],
+                attempt=receipt["attempt"]["path"], ppo_updated=False, evaluation_started=False,
+            )
+            progress.persist(measured_cpu_seconds=meter.actual_cpu())
+            print(json.dumps(receipt, indent=2))
+            return 0
 
         evaluation, analysis = run_full_continuation_stages(
             run_study, config, vocab, bootstrap, runtime, stage_started,
