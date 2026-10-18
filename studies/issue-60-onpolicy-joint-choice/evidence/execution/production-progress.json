@@ -1,5 +1,5 @@
 {
-  "accounted_new_cpu_seconds": 73973.50401309502,
+  "accounted_new_cpu_seconds": 74188.58612588202,
   "administrative_debit_cpu_seconds": 191.953064391,
   "administrative_debits": [
     {
@@ -1263,7 +1263,11 @@
     "source_of_reserves": "previous_stop_reason retained in production-progress.json",
     "timestamp_utc": "2026-10-18T18:44:21Z"
   },
-  "events_written": 4825,
+  "events_written": 4947,
+  "final_analysis": {
+    "path": "evidence/analysis/result.json",
+    "status": "COMPLETE"
+  },
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
@@ -1284,10 +1288,10 @@
   "historical_admin_total_cpu_seconds": 25644.469,
   "issue60_bounded_diagnostics_cpu_recorded": true,
   "last_cache_verification": {
-    "completed_run_keys": 2048,
+    "completed_run_keys": 2688,
     "dispatcher_workers": 6,
-    "stage": "before-evaluation",
-    "timestamp_utc": "2026-10-18T20:19:11Z"
+    "stage": "before-analysis-complete",
+    "timestamp_utc": "2026-10-18T21:42:14Z"
   },
   "last_optimizer_update": {
     "batch_index": 8,
@@ -1303,18 +1307,13 @@
     "model_sha256": "16da45d181e713d8d33fb97344ebada9720b1f19565725a87a93009f0153f52d",
     "path": "evidence/training/block2/latest.pt"
   },
-  "measured_new_cpu_seconds": 73781.55094870403,
+  "measured_new_cpu_seconds": 73996.63306149103,
   "milestone": "evidence/execution/integration-milestone.json",
   "milestone_checkpoint_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
-  "open_invocation": {
-    "head": "e224e2d7bfde42c2e0592e53ca0e757fe202fc04",
-    "launcher_sha256": "832e0da8e44a41a849ec47334b7c59d117376a20087d8c497537ea078ee22064",
-    "reservation_seconds": 60.0,
-    "started_utc": "2026-10-18T20:05:30Z"
-  },
+  "open_invocation": null,
   "open_optimizer_reservation": null,
   "open_worker_reservations": {},
-  "phase": "evaluation",
+  "phase": "completed",
   "previous_stop_reason": "actual prospective CPU 71127.708s cannot safely reserve the next operation inside the 150000s cap (workers=7, game_reserve=10673.570s each, optimizer_reserve=4640.815s, parent_reserve=60.000s)",
   "public_history_execution": {
     "active_executor": "sts_combat_rl.sim.controlled_run.execute_controlled_run",
