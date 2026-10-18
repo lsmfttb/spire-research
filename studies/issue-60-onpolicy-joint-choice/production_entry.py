@@ -43,6 +43,10 @@ EVENTS_PATH = EVIDENCE / "execution" / "production-events.jsonl"
 MILESTONE_PATH = EVIDENCE / "execution" / "integration-milestone.json"
 ISSUE_NUMBER = 60
 REPOSITORY = "lsmfttb/spire-research"
+# GitHub account identity recorded on the independent Issue #60 integration review.
+# The marker is deliberately a separate, exact comment body so Builder handoff prose
+# cannot satisfy the continuation gate by quoting its requested marker.
+REVIEWER_GITHUB_LOGIN = "lsmfttb"
 HISTORICAL_ADMIN_CPU_SECONDS = 25_644.469
 ACCEPTED_INTERRUPTION_DEBIT_SECONDS = 1_572.370806919
 NEW_BUILDER_CPU_LIMIT_SECONDS = 150_000.0
@@ -151,26 +155,48 @@ def verify_active_sources_once(rs: Any) -> dict[str, Any]:
     if root_result.returncode != 0 or head_result.returncode != 0:
         raise ProductionError("could not resolve the current source tree identity")
     repo_root = Path(root_result.stdout.strip()).resolve()
-    relative_run_study = (rs.HERE / "run_study.py").resolve().relative_to(repo_root).as_posix()
-    committed = _run_counted(["git", "rev-parse", f"HEAD:{relative_run_study}"], cwd=repo_root)
-    working = _run_counted(["git", "hash-object", str((rs.HERE / "run_study.py").resolve())], cwd=repo_root)
-    if committed.returncode != 0 or working.returncode != 0 or committed.stdout.strip() != working.stdout.strip():
-        raise ProductionError("current run_study.py bytes differ from the committed source tree")
+    _, committed_run_study = _verify_committed_source(
+        repo_root, (rs.HERE / "run_study.py").resolve(), source_name="run_study.py",
+    )
+    relative_entry, committed_entry = _verify_committed_source(
+        repo_root, Path(__file__).resolve(), source_name="production_entry.py",
+    )
     return {
         "manifest_schema_id": manifest["schema_id"],
         "config_sha256": rs.config_sha(),
         "base_commit": config["base"]["commit"],
         "source_pins": dict(config["sources"]),
-        "current_run_study_git_blob": committed.stdout.strip(),
+        "current_run_study_git_blob": committed_run_study,
         "current_run_study_sha256": hashlib.sha256((rs.HERE / "run_study.py").read_bytes()).hexdigest(),
+        "current_production_entry_git_blob": committed_entry,
+        "current_production_entry_sha256": _sha256(Path(__file__).resolve()),
+        "current_production_entry_path": relative_entry,
         "historical_manifest_run_study_sha256": stale_manifest_run_study_sha,
         "historical_manifest_run_study_sha_stale": (
             hashlib.sha256((rs.HERE / "run_study.py").read_bytes()).hexdigest()
             != stale_manifest_run_study_sha
         ),
         "other_frozen_files_verified": len(entries) - 1,
-        "verification": "current HEAD tree identity plus registered config and unchanged remaining manifest inputs",
+        "verification": "current HEAD tree identity for run_study.py and production_entry.py plus registered config and unchanged remaining manifest inputs",
     }
+
+
+def _verify_committed_source(repo_root: Path, source: Path, *, source_name: str) -> tuple[str, str]:
+    """Fail closed unless a launched Python source file matches its HEAD blob."""
+    try:
+        relative = Path(source).resolve().relative_to(Path(repo_root).resolve()).as_posix()
+    except ValueError as exc:
+        raise ProductionError(f"{source_name} is outside the reviewed repository tree") from exc
+    committed = _run_counted(["git", "rev-parse", f"HEAD:{relative}"], cwd=repo_root)
+    working = _run_counted(
+        ["git", "hash-object", "--path", relative, str(Path(source).resolve())], cwd=repo_root,
+    )
+    if committed.returncode != 0 or working.returncode != 0:
+        raise ProductionError(f"could not verify {source_name} against the committed source tree")
+    committed_blob = committed.stdout.strip()
+    if not committed_blob or committed_blob != working.stdout.strip():
+        raise ProductionError(f"current {source_name} bytes differ from the committed source tree")
+    return relative, committed_blob
 
 
 def _run_counted(argv: Sequence[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -258,10 +284,37 @@ def execution_phase(completed_batch: int, labels: set[str], comments: Sequence[M
         return "integration-milestone"
     if completed_batch >= 2:
         marker = f"issue60-integration-review-v1: PASS {head}"
-        if any(marker in str(comment.get("body", "")) for comment in comments):
+        if any(_is_exact_reviewer_approval(comment, marker) for comment in comments):
             return "full-continuation"
         return "awaiting-review"
     raise ProductionError(f"unexpected block1 checkpoint boundary: completed_batches={completed_batch}")
+
+
+def _is_exact_reviewer_approval(comment: Mapping[str, Any], marker: str) -> bool:
+    """Require a standalone marker comment from the designated Reviewer account."""
+    if not isinstance(comment, Mapping):
+        return False
+    author = comment.get("author")
+    if not isinstance(author, Mapping):
+        return False
+    login = author.get("login")
+    body = comment.get("body")
+    return (
+        isinstance(login, str)
+        and login.casefold() == REVIEWER_GITHUB_LOGIN.casefold()
+        and isinstance(body, str)
+        and body.strip() == marker
+    )
+
+
+def run_full_training_continuation(rs: Any, config: Mapping[str, Any], vocab: Any,
+                                   bootstrap: Any, runtime: Mapping[str, Any],
+                                   stage_started: float) -> list[dict[str, Any]]:
+    """Run both registered training blocks with the installed runtime hooks."""
+    return [
+        rs.train_block(block, config, vocab, bootstrap, runtime, stage_started)
+        for block in ("block1", "block2")
+    ]
 
 
 def can_dispatch_with_reserves(*, actual_cpu: float, cpu_limit: float,
@@ -1005,7 +1058,8 @@ def main() -> int:
         print(json.dumps({
             "status": "AWAITING_REVIEW", "checkpoint_completed_batches": completed_batches,
             "issue_labels": sorted(labels), "head": head,
-            "required_review_marker": f"issue60-integration-review-v1: PASS {head}",
+            "required_reviewer_login": REVIEWER_GITHUB_LOGIN,
+            "required_review_comment_body": f"issue60-integration-review-v1: PASS {head}",
         }, indent=2))
         return 0
     if phase not in {"integration-milestone", "full-continuation"}:
@@ -1076,10 +1130,9 @@ def main() -> int:
             run_study.train_block("block1", config, vocab, bootstrap, runtime, stage_started)
             raise ProductionError("batch-02 completed without reaching its integration-review stop boundary")
 
-        blocks = [
-            run_study.train_block(block, config, vocab, bootstrap, stage_started)
-            for block in ("block1", "block2")
-        ]
+        blocks = run_full_training_continuation(
+            run_study, config, vocab, bootstrap, runtime, stage_started,
+        )
         training_result = {
             "schema_id": "issue60-training-result-v1", "status": "COMPLETE",
             "config_sha256": run_study.config_sha(), "blocks": blocks,
