@@ -1,5 +1,5 @@
 {
-  "accounted_new_cpu_seconds": 35530.18843909901,
+  "accounted_new_cpu_seconds": 40658.70271647801,
   "administrative_debit_cpu_seconds": 60.0,
   "administrative_debits": [
     {
@@ -1194,7 +1194,7 @@
     "training_rows_sha256": "1b414f23231b190e61debbf56fc4b734db5e54866c70387a3ba35a752997672b"
   },
   "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-  "events_written": 1966,
+  "events_written": 2114,
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
@@ -1220,20 +1220,20 @@
     "timestamp_utc": "2026-10-18T09:18:27Z"
   },
   "last_optimizer_update": {
-    "batch_index": 1,
+    "batch_index": 2,
     "block": "block2",
-    "decision_count": 3310,
-    "measured_parent_cpu_seconds": 560.0717872740006,
+    "decision_count": 3246,
+    "measured_parent_cpu_seconds": 2320.370334808,
     "minibatch_count": 52
   },
   "live_checkpoint": {
     "block": "block2",
-    "completed_batches": 1,
-    "file_sha256": "31b8a435e2663842ecac5b636d2ebb37996422472ed8f53228d44b1ffd44ae0d",
-    "model_sha256": "1cbb6d4da564696c68e1c1cd7030a0848bd983977ca15859c628db0158b2ecb8",
+    "completed_batches": 2,
+    "file_sha256": "1902ebb4e4c449f56163fd289f1a5f29f23a3e838fb1d77181222b60a92e00cc",
+    "model_sha256": "0784f7b645ebbf51cffecb0e5033b2f87a893d3de6716ad3b728f49ddbe09e6b",
     "path": "evidence/training/block2/latest.pt"
   },
-  "measured_new_cpu_seconds": 35470.18843909901,
+  "measured_new_cpu_seconds": 40598.70271647801,
   "milestone": "evidence/execution/integration-milestone.json",
   "milestone_checkpoint_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
   "open_invocation": {
@@ -1244,94 +1244,94 @@
   },
   "open_optimizer_reservation": null,
   "open_worker_reservations": {
-    "[\"block2:batch-02\",662187,\"residual\"]": {
+    "[\"block2:batch-03\",662260,\"residual\"]": {
       "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-      "model_sha256": "1cbb6d4da564696c68e1c1cd7030a0848bd983977ca15859c628db0158b2ecb8",
-      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-02/seed-662187",
-      "pid": 2282,
+      "model_sha256": "0784f7b645ebbf51cffecb0e5033b2f87a893d3de6716ad3b728f49ddbe09e6b",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-03/seed-662260",
+      "pid": 2540,
       "reservation_seconds": 459.3945511125,
-      "reserved_utc": "2026-10-18T09:55:41Z",
+      "reserved_utc": "2026-10-18T10:54:32Z",
       "task_key": [
-        "block2:batch-02",
-        662187,
+        "block2:batch-03",
+        662260,
         "residual"
       ]
     },
-    "[\"block2:batch-02\",662188,\"residual\"]": {
+    "[\"block2:batch-03\",662261,\"residual\"]": {
       "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-      "model_sha256": "1cbb6d4da564696c68e1c1cd7030a0848bd983977ca15859c628db0158b2ecb8",
-      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-02/seed-662188",
-      "pid": 2284,
+      "model_sha256": "0784f7b645ebbf51cffecb0e5033b2f87a893d3de6716ad3b728f49ddbe09e6b",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-03/seed-662261",
+      "pid": 2541,
       "reservation_seconds": 459.3945511125,
-      "reserved_utc": "2026-10-18T09:55:58Z",
+      "reserved_utc": "2026-10-18T10:55:01Z",
       "task_key": [
-        "block2:batch-02",
-        662188,
+        "block2:batch-03",
+        662261,
         "residual"
       ]
     },
-    "[\"block2:batch-02\",662189,\"residual\"]": {
+    "[\"block2:batch-03\",662262,\"residual\"]": {
       "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-      "model_sha256": "1cbb6d4da564696c68e1c1cd7030a0848bd983977ca15859c628db0158b2ecb8",
-      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-02/seed-662189",
-      "pid": 2285,
+      "model_sha256": "0784f7b645ebbf51cffecb0e5033b2f87a893d3de6716ad3b728f49ddbe09e6b",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-03/seed-662262",
+      "pid": 2542,
       "reservation_seconds": 459.3945511125,
-      "reserved_utc": "2026-10-18T09:56:15Z",
+      "reserved_utc": "2026-10-18T10:55:28Z",
       "task_key": [
-        "block2:batch-02",
-        662189,
+        "block2:batch-03",
+        662262,
         "residual"
       ]
     },
-    "[\"block2:batch-02\",662190,\"residual\"]": {
+    "[\"block2:batch-03\",662263,\"residual\"]": {
       "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-      "model_sha256": "1cbb6d4da564696c68e1c1cd7030a0848bd983977ca15859c628db0158b2ecb8",
-      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-02/seed-662190",
-      "pid": 2286,
+      "model_sha256": "0784f7b645ebbf51cffecb0e5033b2f87a893d3de6716ad3b728f49ddbe09e6b",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-03/seed-662263",
+      "pid": 2543,
       "reservation_seconds": 459.3945511125,
-      "reserved_utc": "2026-10-18T09:56:35Z",
+      "reserved_utc": "2026-10-18T10:55:57Z",
       "task_key": [
-        "block2:batch-02",
-        662190,
+        "block2:batch-03",
+        662263,
         "residual"
       ]
     },
-    "[\"block2:batch-02\",662191,\"residual\"]": {
+    "[\"block2:batch-03\",662264,\"residual\"]": {
       "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-      "model_sha256": "1cbb6d4da564696c68e1c1cd7030a0848bd983977ca15859c628db0158b2ecb8",
-      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-02/seed-662191",
-      "pid": 2287,
+      "model_sha256": "0784f7b645ebbf51cffecb0e5033b2f87a893d3de6716ad3b728f49ddbe09e6b",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-03/seed-662264",
+      "pid": 2544,
       "reservation_seconds": 459.3945511125,
-      "reserved_utc": "2026-10-18T09:56:51Z",
+      "reserved_utc": "2026-10-18T10:56:38Z",
       "task_key": [
-        "block2:batch-02",
-        662191,
+        "block2:batch-03",
+        662264,
         "residual"
       ]
     },
-    "[\"block2:batch-02\",662192,\"residual\"]": {
+    "[\"block2:batch-03\",662265,\"residual\"]": {
       "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-      "model_sha256": "1cbb6d4da564696c68e1c1cd7030a0848bd983977ca15859c628db0158b2ecb8",
-      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-02/seed-662192",
-      "pid": 2304,
+      "model_sha256": "0784f7b645ebbf51cffecb0e5033b2f87a893d3de6716ad3b728f49ddbe09e6b",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-03/seed-662265",
+      "pid": 2561,
       "reservation_seconds": 459.3945511125,
-      "reserved_utc": "2026-10-18T09:57:09Z",
+      "reserved_utc": "2026-10-18T10:57:07Z",
       "task_key": [
-        "block2:batch-02",
-        662192,
+        "block2:batch-03",
+        662265,
         "residual"
       ]
     },
-    "[\"block2:batch-02\",662193,\"residual\"]": {
+    "[\"block2:batch-03\",662266,\"residual\"]": {
       "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-      "model_sha256": "1cbb6d4da564696c68e1c1cd7030a0848bd983977ca15859c628db0158b2ecb8",
-      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-02/seed-662193",
-      "pid": 2309,
+      "model_sha256": "0784f7b645ebbf51cffecb0e5033b2f87a893d3de6716ad3b728f49ddbe09e6b",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-03/seed-662266",
+      "pid": 2566,
       "reservation_seconds": 459.3945511125,
-      "reserved_utc": "2026-10-18T09:57:27Z",
+      "reserved_utc": "2026-10-18T10:57:23Z",
       "task_key": [
-        "block2:batch-02",
-        662193,
+        "block2:batch-03",
+        662266,
         "residual"
       ]
     }
