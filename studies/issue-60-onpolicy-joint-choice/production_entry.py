@@ -2,11 +2,13 @@
 
 The frozen research source continues to own controller and PPO semantics. This
 entry installs the existing in-memory accounting hooks and fixed-key worker
-dispatcher, then resumes the registered training/evaluation stages. Its only
-special stop is the batch-02 integration-review boundary.
+dispatcher, then resumes the registered training/evaluation stages. The
+default mode stops at the batch-02 integration-review boundary; the explicit
+``--continue-reviewed`` option resumes the authorized fixed program there.
 """
 from __future__ import annotations
 
+import argparse
 import gzip
 import hashlib
 import json
@@ -271,8 +273,26 @@ def _issue_state() -> set[str]:
     return labels
 
 
-def execution_phase(completed_batch: int, labels: set[str]) -> str:
-    """Select the integration stage; no Issue comment grants auto-continuation."""
+def parse_production_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the registered Issue 60 study.")
+    parser.add_argument(
+        "--continue-reviewed", action="store_true",
+        help=(
+            "continue the already authorized study from a valid batch-02 checkpoint; "
+            "Issue comments are not consulted"
+        ),
+    )
+    return parser.parse_args(argv)
+
+
+def execution_phase(completed_batch: int, labels: set[str], *, continue_reviewed: bool = False) -> str:
+    """Select the registered run phase; comment text never grants execution authority."""
+    if continue_reviewed:
+        if "route:builder" not in labels:
+            raise ProductionError("--continue-reviewed requires Issue #60 to be routed to Builder")
+        if completed_batch < 2:
+            raise ProductionError("--continue-reviewed requires a valid completed batch-02 checkpoint")
+        return "full-continuation"
     if "route:builder" not in labels:
         return "awaiting-review"
     if completed_batch == 1:
@@ -290,6 +310,24 @@ def run_full_training_continuation(rs: Any, config: Mapping[str, Any], vocab: An
         rs.train_block(block, config, vocab, bootstrap, runtime, stage_started)
         for block in ("block1", "block2")
     ]
+
+
+def run_full_continuation_stages(rs: Any, config: Mapping[str, Any], vocab: Any,
+                                 bootstrap: Any, runtime: Mapping[str, Any],
+                                 stage_started: float) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Run the registered full continuation through training, evaluation, and analysis."""
+    blocks = run_full_training_continuation(
+        rs, config, vocab, bootstrap, runtime, stage_started,
+    )
+    training_result = {
+        "schema_id": "issue60-training-result-v1", "status": "COMPLETE",
+        "config_sha256": rs.config_sha(), "blocks": blocks,
+        "source_pins": dict(config["sources"]),
+    }
+    rs.atomic_json(EVIDENCE / "training" / "result.json", training_result)
+    evaluation = rs.run_evaluation(config, runtime, vocab, bootstrap, stage_started)
+    analysis = rs.analyze(config)
+    return evaluation, analysis
 
 
 def can_dispatch_with_reserves(*, actual_cpu: float, cpu_limit: float,
@@ -980,7 +1018,8 @@ def _startup_identity(rs: Any, runtime: Mapping[str, Any], head: str) -> dict[st
     }
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_production_args(argv)
     if not hasattr(os, "fork") or not Path("/proc/self/stat").is_file():
         raise ProductionError("the production entry requires the registered Linux /proc/fork CPU tracker")
     setup_parent_cpu = max(0.0, time.process_time() - ENTRY_PROCESS_CPU_STARTED)
@@ -1010,7 +1049,9 @@ def main() -> int:
     head = head_result.stdout.strip()
     completed_batches = _checkpoint_completed_batches(run_study, vocab, config)
     labels = _issue_state()
-    phase = execution_phase(completed_batches, labels)
+    phase = execution_phase(
+        completed_batches, labels, continue_reviewed=args.continue_reviewed,
+    )
 
     progress = ProductionProgress(PROGRESS_PATH.parent, config_sha=run_study.config_sha())
     # The first administrative debit is recorded separately from any measured run CPU.
@@ -1040,7 +1081,7 @@ def main() -> int:
             "automatic_continuation_authorization": "disabled" if continuation_disabled else "not-applicable",
         }, indent=2))
         return 0
-    if phase != "integration-milestone":
+    if phase not in {"integration-milestone", "full-continuation"}:
         raise ProductionError(f"Issue #{ISSUE_NUMBER} is not routed to Builder")
 
     milestone_mode = phase == "integration-milestone"
@@ -1108,17 +1149,9 @@ def main() -> int:
             run_study.train_block("block1", config, vocab, bootstrap, runtime, stage_started)
             raise ProductionError("batch-02 completed without reaching its integration-review stop boundary")
 
-        blocks = run_full_training_continuation(
+        evaluation, analysis = run_full_continuation_stages(
             run_study, config, vocab, bootstrap, runtime, stage_started,
         )
-        training_result = {
-            "schema_id": "issue60-training-result-v1", "status": "COMPLETE",
-            "config_sha256": run_study.config_sha(), "blocks": blocks,
-            "source_pins": dict(config["sources"]),
-        }
-        run_study.atomic_json(EVIDENCE / "training" / "result.json", training_result)
-        evaluation = run_study.run_evaluation(config, runtime, vocab, bootstrap, stage_started)
-        analysis = run_study.analyze(config)
         runtime_context.verify_cache_installed("before-analysis-complete")
         progress.data["final_analysis"] = {
             "status": analysis.get("status"),

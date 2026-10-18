@@ -39,6 +39,70 @@ class ProductionEntryTests(unittest.TestCase):
             "awaiting-review",
         )
         self.assertEqual(production.execution_phase(2, {"route:reviewer"}), "awaiting-review")
+        self.assertEqual(
+            production.execution_phase(2, labels, continue_reviewed=True),
+            "full-continuation",
+        )
+
+    def test_default_cli_keeps_batch02_at_review_boundary(self):
+        args = production.parse_production_args([])
+        self.assertFalse(args.continue_reviewed)
+        self.assertEqual(
+            production.execution_phase(2, {"route:builder"}, continue_reviewed=args.continue_reviewed),
+            "awaiting-review",
+        )
+
+    def test_explicit_continuation_requires_builder_route_and_batch02_checkpoint(self):
+        with self.assertRaisesRegex(production.ProductionError, "routed to Builder"):
+            production.execution_phase(2, {"route:reviewer"}, continue_reviewed=True)
+        with self.assertRaisesRegex(production.ProductionError, "batch-02 checkpoint"):
+            production.execution_phase(1, {"route:builder"}, continue_reviewed=True)
+
+    def test_cli_continuation_runs_both_blocks_then_evaluation_and_analysis(self):
+        args = production.parse_production_args(["--continue-reviewed"])
+        self.assertTrue(args.continue_reviewed)
+        phase = production.execution_phase(
+            2, {"route:builder"}, continue_reviewed=args.continue_reviewed,
+        )
+        self.assertEqual(phase, "full-continuation")
+
+        events = []
+        class Study:
+            def train_block(self, block, config, vocab, bootstrap, runtime, stage_started):
+                events.append(("train", block, config, vocab, bootstrap, runtime, stage_started))
+                return {"block": block}
+
+            def config_sha(self):
+                return "config-sha"
+
+            def atomic_json(self, path, payload):
+                events.append(("write-training", path, payload))
+
+            def run_evaluation(self, config, runtime, vocab, bootstrap, stage_started):
+                events.append(("evaluation", config, runtime, vocab, bootstrap, stage_started))
+                return {"run_count": 640}
+
+            def analyze(self, config):
+                events.append(("analysis", config))
+                return {"status": "COMPLETE"}
+
+        config, vocab, bootstrap, runtime, stage_started = (
+            {"sources": {"encoder": "pinned"}}, object(), object(), {"runtime": True}, 12.5,
+        )
+        evaluation, analysis = production.run_full_continuation_stages(
+            Study(), config, vocab, bootstrap, runtime, stage_started,
+        )
+
+        self.assertEqual(evaluation, {"run_count": 640})
+        self.assertEqual(analysis, {"status": "COMPLETE"})
+        self.assertEqual([event[0] for event in events], [
+            "train", "train", "write-training", "evaluation", "analysis",
+        ])
+        self.assertEqual([event[1] for event in events[:2]], ["block1", "block2"])
+        self.assertTrue(all(event[5] is runtime for event in events[:2]))
+        self.assertIs(events[3][2], runtime)
+        self.assertEqual(events[4][1], config)
+        self.assertEqual(events[2][2]["source_pins"], config["sources"])
 
     def test_production_entry_must_match_reviewed_head_blob(self):
         with tempfile.TemporaryDirectory() as temporary:
