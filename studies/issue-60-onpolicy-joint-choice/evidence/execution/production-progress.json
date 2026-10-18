@@ -1,5 +1,5 @@
 {
-  "accounted_new_cpu_seconds": 10564.879097024,
+  "accounted_new_cpu_seconds": 11345.080160443,
   "administrative_debit_cpu_seconds": 60.0,
   "administrative_debits": [
     {
@@ -1194,7 +1194,7 @@
     "training_rows_sha256": "1b414f23231b190e61debbf56fc4b734db5e54866c70387a3ba35a752997672b"
   },
   "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-  "events_written": 543,
+  "events_written": 565,
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
@@ -1220,20 +1220,20 @@
     "timestamp_utc": "2026-10-18T07:15:53Z"
   },
   "last_optimizer_update": {
-    "batch_index": 3,
+    "batch_index": 4,
     "block": "block1",
-    "decision_count": 3289,
-    "measured_parent_cpu_seconds": 567.692009229,
+    "decision_count": 3223,
+    "measured_parent_cpu_seconds": 572.0643874140001,
     "minibatch_count": 52
   },
   "live_checkpoint": {
     "block": "block1",
-    "completed_batches": 3,
-    "file_sha256": "2bb520c7a08dee51863d21acdda01c845d3a467188fa9d43481c78f32da5aa2b",
-    "model_sha256": "bae50417e2066aee7ba600dd2e754f5d5477f8de12b206c6773f67e4fc5eb38a",
+    "completed_batches": 4,
+    "file_sha256": "fceefb58770f5970c0a5061b4fe915d2d896a73cb4b6022b7ad3e37c70834a94",
+    "model_sha256": "74154408a9ba38d23cf6e4b804ca1c2b2b31e7d21310cef591f8f21344a666e9",
     "path": "evidence/training/block1/latest.pt"
   },
-  "measured_new_cpu_seconds": 10504.879097024,
+  "measured_new_cpu_seconds": 11285.080160443,
   "milestone": "evidence/execution/integration-milestone.json",
   "milestone_checkpoint_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
   "open_invocation": {
@@ -1242,13 +1242,100 @@
     "reservation_seconds": 60.0,
     "started_utc": "2026-10-18T07:15:44Z"
   },
-  "open_optimizer_reservation": {
-    "batch_index": 4,
-    "block": "block1",
-    "reservation_seconds": 3941.62270752,
-    "started_utc": "2026-10-18T07:42:25Z"
+  "open_optimizer_reservation": null,
+  "open_worker_reservations": {
+    "[\"block1:batch-05\",660513,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "74154408a9ba38d23cf6e4b804ca1c2b2b31e7d21310cef591f8f21344a666e9",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block1/batch-05/seed-660513",
+      "pid": 1075,
+      "reservation_seconds": 459.3945511125,
+      "reserved_utc": "2026-10-18T07:52:03Z",
+      "task_key": [
+        "block1:batch-05",
+        660513,
+        "residual"
+      ]
+    },
+    "[\"block1:batch-05\",660516,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "74154408a9ba38d23cf6e4b804ca1c2b2b31e7d21310cef591f8f21344a666e9",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block1/batch-05/seed-660516",
+      "pid": 1089,
+      "reservation_seconds": 459.3945511125,
+      "reserved_utc": "2026-10-18T07:52:09Z",
+      "task_key": [
+        "block1:batch-05",
+        660516,
+        "residual"
+      ]
+    },
+    "[\"block1:batch-05\",660521,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "74154408a9ba38d23cf6e4b804ca1c2b2b31e7d21310cef591f8f21344a666e9",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block1/batch-05/seed-660521",
+      "pid": 1098,
+      "reservation_seconds": 459.3945511125,
+      "reserved_utc": "2026-10-18T07:52:24Z",
+      "task_key": [
+        "block1:batch-05",
+        660521,
+        "residual"
+      ]
+    },
+    "[\"block1:batch-05\",660522,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "74154408a9ba38d23cf6e4b804ca1c2b2b31e7d21310cef591f8f21344a666e9",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block1/batch-05/seed-660522",
+      "pid": 1099,
+      "reservation_seconds": 459.3945511125,
+      "reserved_utc": "2026-10-18T07:52:27Z",
+      "task_key": [
+        "block1:batch-05",
+        660522,
+        "residual"
+      ]
+    },
+    "[\"block1:batch-05\",660523,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "74154408a9ba38d23cf6e4b804ca1c2b2b31e7d21310cef591f8f21344a666e9",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block1/batch-05/seed-660523",
+      "pid": 1100,
+      "reservation_seconds": 459.3945511125,
+      "reserved_utc": "2026-10-18T07:52:30Z",
+      "task_key": [
+        "block1:batch-05",
+        660523,
+        "residual"
+      ]
+    },
+    "[\"block1:batch-05\",660524,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "74154408a9ba38d23cf6e4b804ca1c2b2b31e7d21310cef591f8f21344a666e9",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block1/batch-05/seed-660524",
+      "pid": 1101,
+      "reservation_seconds": 459.3945511125,
+      "reserved_utc": "2026-10-18T07:52:34Z",
+      "task_key": [
+        "block1:batch-05",
+        660524,
+        "residual"
+      ]
+    },
+    "[\"block1:batch-05\",660525,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "74154408a9ba38d23cf6e4b804ca1c2b2b31e7d21310cef591f8f21344a666e9",
+      "output_dir": "/mnt/d/DeadlycatCoding/spire-research-issue60-continuation/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block1/batch-05/seed-660525",
+      "pid": 1102,
+      "reservation_seconds": 459.3945511125,
+      "reserved_utc": "2026-10-18T07:52:38Z",
+      "task_key": [
+        "block1:batch-05",
+        660525,
+        "residual"
+      ]
+    }
   },
-  "open_worker_reservations": {},
   "phase": "training-block1",
   "purpose": "STUDY_ONLY",
   "runtime": {
