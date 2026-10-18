@@ -1285,6 +1285,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         available_bytes=int(parallel_execution.host_capacity()["effective_memory_available_bytes"]),
         worker_peak_rss_samples=_worker_samples(), cap=parallel_execution.MAX_GAME_WORKERS,
     )
+    if phase == "single-key-witness":
+        selection["host_selected_worker_count"] = int(selection["worker_count"])
+        selection["worker_count"] = 1
+        selection["single_key_witness_worker_ceiling"] = 1
     meter = Meter(
         progress=progress, tracker=tracker, setup_parent_cpu=setup_parent_cpu,
         setup_external_cpu=_EXTERNAL_CHILD_CPU[0],
