@@ -1,6 +1,6 @@
 {
-  "accounted_new_cpu_seconds": 67644.62919554101,
-  "administrative_debit_cpu_seconds": 101.953064391,
+  "accounted_new_cpu_seconds": 67674.62919554101,
+  "administrative_debit_cpu_seconds": 131.953064391,
   "administrative_debits": [
     {
       "kind": "interrupted-parent-invocation",
@@ -24,6 +24,12 @@
       "measured": false,
       "reason": "Conservative CPU debit for bounded py_compile, CLI/authorization checks, pinned import probe, and two startup attempts that halted before game dispatch; exact process CPU was not retained.",
       "seconds": 20.0
+    },
+    {
+      "kind": "bounded-builder-prelaunch-verification",
+      "measured": false,
+      "reason": "Conservative charge for WSL environment/runtime/source validation, 10 focused production-entry unit tests, and pre-dispatch checkpoint/routing probes; no simulator workers were dispatched.",
+      "seconds": 30.0
     }
   ],
   "administrative_protocol_initialized": true,
@@ -1212,7 +1218,36 @@
     "training_rows_sha256": "1b414f23231b190e61debbf56fc4b734db5e54866c70387a3ba35a752997672b"
   },
   "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-  "events_written": 2636,
+  "continuation_prelaunch_plan": {
+    "completed_batches": {
+      "block1": 8,
+      "block2": 4
+    },
+    "cpu_limit_seconds": 150000.0,
+    "eight_worker_reserved_total_cpu_seconds": 157034.81219554102,
+    "focused_checks": {
+      "block1_checkpoint_batches": 8,
+      "block2_checkpoint_batches": 4,
+      "pinned_python": "3.13.13",
+      "pinned_torch": "2.12.0+cpu",
+      "production_entry_unittest_count": 10,
+      "production_entry_unittest_status": "PASS",
+      "source_and_runtime_probe": "PASS"
+    },
+    "head": "fa97f44d66b0099b8efad9fb24acd470173a0cc6",
+    "issue_route": "route:builder",
+    "optimizer_reserve_seconds": 3941.623,
+    "parent_reserve_seconds": 60.0,
+    "per_worker_game_reserve_seconds": 10673.57,
+    "planned_linux_cpu_affinity": "0-6",
+    "prelaunch_tooling_debit_seconds": 30.0,
+    "previous_actual_accounted_cpu_seconds": 67644.62919554101,
+    "selection_note": "Limit process affinity to seven CPUs so the production host-capacity selector cannot choose eight workers; actual memory-based count remains production-selected.",
+    "seven_worker_reserved_total_cpu_seconds": 146361.242195541,
+    "source_of_reserves": "previous_stop_reason retained in production-progress.json",
+    "timestamp_utc": "2026-10-18T18:44:21Z"
+  },
+  "events_written": 2637,
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
