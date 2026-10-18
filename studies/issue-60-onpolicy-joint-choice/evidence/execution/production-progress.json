@@ -1,6 +1,6 @@
 {
-  "accounted_new_cpu_seconds": 70428.27680834402,
-  "administrative_debit_cpu_seconds": 131.953064391,
+  "accounted_new_cpu_seconds": 71157.80875499602,
+  "administrative_debit_cpu_seconds": 161.953064391,
   "administrative_debits": [
     {
       "kind": "interrupted-parent-invocation",
@@ -30,6 +30,14 @@
       "measured": false,
       "reason": "Conservative charge for WSL environment/runtime/source validation, 10 focused production-entry unit tests, and pre-dispatch checkpoint/routing probes; no simulator workers were dispatched.",
       "seconds": 30.0
+    },
+    {
+      "id": "issue60-builder-continuation-final-handoff-20261019",
+      "kind": "bounded-builder-continuation-final-verification-and-handoff",
+      "seconds": 30.0,
+      "measured": false,
+      "created_at_utc": "2026-10-18T19:42:12Z",
+      "reason": "Conservative Builder administrative debit for checkpoint publication, run monitoring, final stop/evidence verification, and Reviewer handoff after the prelaunch debit; exact host CPU was not retained."
     }
   ],
   "administrative_protocol_initialized": true,
@@ -1247,7 +1255,7 @@
     "source_of_reserves": "previous_stop_reason retained in production-progress.json",
     "timestamp_utc": "2026-10-18T18:44:21Z"
   },
-  "events_written": 3397,
+  "events_written": 3413,
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
@@ -1268,42 +1276,32 @@
   "historical_admin_total_cpu_seconds": 25644.469,
   "issue60_bounded_diagnostics_cpu_recorded": true,
   "last_cache_verification": {
-    "completed_run_keys": 1544,
+    "completed_run_keys": 1926,
     "dispatcher_workers": 7,
-    "stage": "before-training-block2",
-    "timestamp_utc": "2026-10-18T18:46:20Z"
+    "stage": "after-training-block2",
+    "timestamp_utc": "2026-10-18T19:38:30Z"
   },
   "last_optimizer_update": {
-    "batch_index": 6,
+    "batch_index": 7,
     "block": "block2",
-    "decision_count": 3498,
-    "measured_parent_cpu_seconds": 767.466351329,
+    "decision_count": 3422,
+    "measured_parent_cpu_seconds": 681.3783112670001,
     "minibatch_count": 56
   },
   "live_checkpoint": {
     "block": "block2",
-    "completed_batches": 6,
-    "file_sha256": "c2663a588067964811779b78d482c075323bd63ff5b5849872f3083ff5368abc",
-    "model_sha256": "bb0c1e57a3d9e6029ba4253629b3f653810867ec4273dd6077a4040898a00f83",
+    "completed_batches": 7,
+    "file_sha256": "c4e4bcccfc38ef00729ea7018a23e2f41d934ae96082c801d1e44a85e413b34d",
+    "model_sha256": "dd826eef348a5147445389c74bd6ebb06108e7aadeeeb733dcc4dd79d2efe7f2",
     "path": "evidence/training/block2/latest.pt"
   },
-  "measured_new_cpu_seconds": 70296.32374395302,
+  "measured_new_cpu_seconds": 70995.85569060502,
   "milestone": "evidence/execution/integration-milestone.json",
   "milestone_checkpoint_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
-  "open_invocation": {
-    "head": "5267a46ef0f1229b2e708f5dfd826b3eb0beb3b0",
-    "launcher_sha256": "3b33e6de35d57c444188a727b892f33e6fa6a96b03902c3ee34cb39233409462",
-    "reservation_seconds": 60.0,
-    "started_utc": "2026-10-18T18:45:20Z"
-  },
-  "open_optimizer_reservation": {
-    "batch_index": 7,
-    "block": "block2",
-    "reservation_seconds": 4640.8148545939985,
-    "started_utc": "2026-10-18T19:26:26Z"
-  },
+  "open_invocation": null,
+  "open_optimizer_reservation": null,
   "open_worker_reservations": {},
-  "phase": "training-block2",
+  "phase": "budget-stop",
   "previous_stop_reason": "actual prospective CPU 67568.236s cannot safely reserve the next operation inside the 150000s cap (workers=8, game_reserve=10673.570s each, optimizer_reserve=3941.623s, parent_reserve=60.000s)",
   "public_history_execution": {
     "active_executor": "sts_combat_rl.sim.controlled_run.execute_controlled_run",
@@ -1413,6 +1411,7 @@
       "torch_threads": 1
     }
   },
+  "stop_reason": "actual prospective CPU 71127.708s cannot safely reserve the next operation inside the 150000s cap (workers=7, game_reserve=10673.570s each, optimizer_reserve=4640.815s, parent_reserve=60.000s)",
   "worker_selection": {
     "configured_cap": 8,
     "effective_cpu_count": 7,
