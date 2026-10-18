@@ -1,5 +1,5 @@
 {
-  "accounted_new_cpu_seconds": 71187.80875499602,
+  "accounted_new_cpu_seconds": 72317.59969599602,
   "administrative_debit_cpu_seconds": 191.953064391,
   "administrative_debits": [
     {
@@ -1263,7 +1263,7 @@
     "source_of_reserves": "previous_stop_reason retained in production-progress.json",
     "timestamp_utc": "2026-10-18T18:44:21Z"
   },
-  "events_written": 3413,
+  "events_written": 3739,
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
@@ -1284,33 +1284,91 @@
   "historical_admin_total_cpu_seconds": 25644.469,
   "issue60_bounded_diagnostics_cpu_recorded": true,
   "last_cache_verification": {
-    "completed_run_keys": 1926,
-    "dispatcher_workers": 7,
-    "stage": "after-training-block2",
-    "timestamp_utc": "2026-10-18T19:38:30Z"
+    "completed_run_keys": 2048,
+    "dispatcher_workers": 6,
+    "stage": "before-evaluation",
+    "timestamp_utc": "2026-10-18T20:19:11Z"
   },
   "last_optimizer_update": {
-    "batch_index": 7,
+    "batch_index": 8,
     "block": "block2",
-    "decision_count": 3422,
-    "measured_parent_cpu_seconds": 681.3783112670001,
+    "decision_count": 3343,
+    "measured_parent_cpu_seconds": 644.8579732149999,
     "minibatch_count": 56
   },
   "live_checkpoint": {
     "block": "block2",
-    "completed_batches": 7,
-    "file_sha256": "c4e4bcccfc38ef00729ea7018a23e2f41d934ae96082c801d1e44a85e413b34d",
-    "model_sha256": "dd826eef348a5147445389c74bd6ebb06108e7aadeeeb733dcc4dd79d2efe7f2",
+    "completed_batches": 8,
+    "file_sha256": "c2ab74cef99476462054fdd372f0d0c9b6d862052e14bf7b475a23e50ad1b36c",
+    "model_sha256": "16da45d181e713d8d33fb97344ebada9720b1f19565725a87a93009f0153f52d",
     "path": "evidence/training/block2/latest.pt"
   },
-  "measured_new_cpu_seconds": 70995.85569060502,
+  "measured_new_cpu_seconds": 72125.64663160502,
   "milestone": "evidence/execution/integration-milestone.json",
   "milestone_checkpoint_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
-  "open_invocation": null,
+  "open_invocation": {
+    "head": "e224e2d7bfde42c2e0592e53ca0e757fe202fc04",
+    "launcher_sha256": "832e0da8e44a41a849ec47334b7c59d117376a20087d8c497537ea078ee22064",
+    "reservation_seconds": 60.0,
+    "started_utc": "2026-10-18T20:05:30Z"
+  },
   "open_optimizer_reservation": null,
-  "open_worker_reservations": {},
-  "phase": "budget-stop",
-  "previous_stop_reason": "actual prospective CPU 67568.236s cannot safely reserve the next operation inside the 150000s cap (workers=8, game_reserve=10673.570s each, optimizer_reserve=3941.623s, parent_reserve=60.000s)",
+  "open_worker_reservations": {
+    "[\"owner-008\",669008,\"A\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "A",
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-budget-downshift-v2/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/evaluation/owner-008/A",
+      "pid": 889,
+      "reservation_seconds": 10673.5703364825,
+      "reserved_utc": "2026-10-18T20:21:07Z",
+      "task_key": [
+        "owner-008",
+        669008,
+        "A"
+      ]
+    },
+    "[\"owner-008\",669008,\"final_block1\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "463ac5426cb9a1a8a3f952652ca0d986616c2d744f2d7130b5a98109bc928303",
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-budget-downshift-v2/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/evaluation/owner-008/final_block1",
+      "pid": 886,
+      "reservation_seconds": 10673.5703364825,
+      "reserved_utc": "2026-10-18T20:21:00Z",
+      "task_key": [
+        "owner-008",
+        669008,
+        "final_block1"
+      ]
+    },
+    "[\"owner-008\",669008,\"final_block2\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "16da45d181e713d8d33fb97344ebada9720b1f19565725a87a93009f0153f52d",
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-budget-downshift-v2/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/evaluation/owner-008/final_block2",
+      "pid": 887,
+      "reservation_seconds": 10673.5703364825,
+      "reserved_utc": "2026-10-18T20:21:02Z",
+      "task_key": [
+        "owner-008",
+        669008,
+        "final_block2"
+      ]
+    },
+    "[\"owner-008\",669008,\"p0\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "p0",
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-budget-downshift-v2/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/evaluation/owner-008/p0",
+      "pid": 888,
+      "reservation_seconds": 10673.5703364825,
+      "reserved_utc": "2026-10-18T20:21:04Z",
+      "task_key": [
+        "owner-008",
+        669008,
+        "p0"
+      ]
+    }
+  },
+  "phase": "evaluation",
+  "previous_stop_reason": "actual prospective CPU 71127.708s cannot safely reserve the next operation inside the 150000s cap (workers=7, game_reserve=10673.570s each, optimizer_reserve=4640.815s, parent_reserve=60.000s)",
   "public_history_execution": {
     "active_executor": "sts_combat_rl.sim.controlled_run.execute_controlled_run",
     "existing_battle_history_validation": "none per Battle action; previously validated entries are privately retained",
@@ -1319,7 +1377,7 @@
       "MAP_SCREEN",
       "REWARDS"
     ],
-    "metrics_path": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-continuation/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/execution/public-history-execution.jsonl",
+    "metrics_path": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-budget-downshift-v2/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/execution/public-history-execution.jsonl",
     "new_entry_validation": "pinned sanitize_public_run_context plus schema/version/index check once before append",
     "optimizer_id": "issue60-demand-driven-public-history-v1",
     "pinned_stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
@@ -1362,9 +1420,9 @@
   "source_validation": {
     "base_commit": "9525d416b9488bb2455435699893b03fe19fe30a",
     "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-    "current_production_entry_git_blob": "1e947c5de6ec93dc06c3185dcc2399ab11d90242",
+    "current_production_entry_git_blob": "5602ed01583f17574a27221b4d7ff39845938e2c",
     "current_production_entry_path": "studies/issue-60-onpolicy-joint-choice/production_entry.py",
-    "current_production_entry_sha256": "3b33e6de35d57c444188a727b892f33e6fa6a96b03902c3ee34cb39233409462",
+    "current_production_entry_sha256": "832e0da8e44a41a849ec47334b7c59d117376a20087d8c497537ea078ee22064",
     "current_public_history_optimizer_git_blob": "cf12fa14c6969508fbb5933c5ada9d183eec92bc",
     "current_public_history_optimizer_path": "studies/issue-60-onpolicy-joint-choice/public_history_execution.py",
     "current_public_history_optimizer_sha256": "f6c3d1874fb20172406b161ab0296ef80a665ab0017840adba6af2fcf44fa2f4",
@@ -1390,9 +1448,9 @@
     "checkpoint_file_sha256": "c00a17141943a114d186f19895ae39742f57f884ea09f8291cf053b64fa707aa",
     "checkpoint_path": "evidence/training/block1/latest.pt",
     "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-    "head": "5267a46ef0f1229b2e708f5dfd826b3eb0beb3b0",
+    "head": "e224e2d7bfde42c2e0592e53ca0e757fe202fc04",
     "launcher": "production_entry.py",
-    "launcher_sha256": "3b33e6de35d57c444188a727b892f33e6fa6a96b03902c3ee34cb39233409462",
+    "launcher_sha256": "832e0da8e44a41a849ec47334b7c59d117376a20087d8c497537ea078ee22064",
     "runtime": {
       "deterministic_algorithms": true,
       "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
@@ -1419,14 +1477,24 @@
       "torch_threads": 1
     }
   },
-  "stop_reason": "actual prospective CPU 71127.708s cannot safely reserve the next operation inside the 150000s cap (workers=7, game_reserve=10673.570s each, optimizer_reserve=4640.815s, parent_reserve=60.000s)",
   "worker_selection": {
+    "budget_selection": {
+      "actual_cpu_seconds": 71199.04231946701,
+      "cpu_limit_seconds": 150000.0,
+      "game_reserve_seconds_per_worker": 10673.5703364825,
+      "optimizer_reserve_seconds": 4640.8148545939985,
+      "parent_reserve_seconds": 60.0,
+      "phase": "full-continuation",
+      "preferred_worker_count": 8,
+      "selected_worker_count": 6
+    },
     "configured_cap": 8,
-    "effective_cpu_count": 7,
+    "effective_cpu_count": 16,
+    "host_selected_worker_count": 8,
     "measured_worker_peak_rss_bytes": 1602899968,
     "memory_based_worker_capacity": 11,
-    "memory_reserve_bytes": 4776911667,
-    "worker_count": 7,
+    "memory_reserve_bytes": 4793727385,
+    "worker_count": 6,
     "worker_peak_rss_samples_bytes": [
       1563795456,
       1565499392,
