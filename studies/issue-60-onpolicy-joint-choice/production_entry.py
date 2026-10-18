@@ -56,6 +56,9 @@ OPTIMIZER_RESERVE_MULTIPLIER = 2.0
 INITIAL_OPTIMIZER_RESERVE_SECONDS = 900.0
 EXPECTED_BATCH01_SHA = "c05ffb91ed6cb702e9ad135afe3b537c1348f2da8e21958c38141404055bfbb5"
 MISSING_BATCH02_SEEDS = (660248, 660250, 660251, 660252, 660253, 660254, 660255, 660256)
+DEFAULT_STSRL_SOURCE = "/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c"
+DEFAULT_NATIVE_SOURCE = "/home/lsmft/stsrl-spikes/sts_lightspeed-issue59"
+DEFAULT_NATIVE_BUILD = "/home/lsmft/stsrl-spikes/issue60-runtime/build-issue60"
 
 
 class ProductionError(RuntimeError):
@@ -278,6 +281,31 @@ def _issue_state() -> set[str]:
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         raise ProductionError("GitHub CLI returned an invalid Issue routing response") from exc
     return labels
+
+
+def configure_registered_runtime_import_paths() -> dict[str, str]:
+    """Load the exact study-pinned Python and Native source/build before verification."""
+    stsr_source = Path(os.environ.get(
+        "ISSUE60_STSRL_SOURCE", os.environ.get("ISSUE60_STSRL_ROOT", DEFAULT_STSRL_SOURCE),
+    )).resolve()
+    native_source = Path(os.environ.get("ISSUE60_NATIVE_ROOT", DEFAULT_NATIVE_SOURCE)).resolve()
+    native_build = Path(os.environ.get("ISSUE60_NATIVE_BUILD", DEFAULT_NATIVE_BUILD)).resolve()
+    for path, description in ((stsr_source / "src", "pinned STSRL source"),
+                              (native_source, "pinned Native source"),
+                              (native_build, "pinned Native build")):
+        if not path.is_dir():
+            raise ProductionError(f"{description} is unavailable: {path}")
+    os.environ.setdefault("ISSUE60_STSRL_ROOT", str(stsr_source))
+    os.environ.setdefault("ISSUE60_NATIVE_ROOT", str(native_source))
+    for path in (native_build, stsr_source / "src"):
+        value = str(path)
+        if value not in sys.path:
+            sys.path.insert(0, value)
+    return {
+        "stsr_source": str(stsr_source),
+        "native_source": str(native_source),
+        "native_build": str(native_build),
+    }
 
 
 def parse_production_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -1060,7 +1088,8 @@ def _startup_identity(rs: Any, runtime: Mapping[str, Any], head: str) -> dict[st
 def run_single_key_witness(rs: Any, config: Mapping[str, Any], vocab: Any,
                            bootstrap: Any, runtime: Mapping[str, Any],
                            stage_started: float, runtime_context: ProductionRuntime,
-                           *, head: str, source_validation: Mapping[str, Any]) -> dict[str, Any]:
+                           *, head: str, source_validation: Mapping[str, Any],
+                           runtime_import_paths: Mapping[str, str]) -> dict[str, Any]:
     """Run exactly the first missing original block-2 key through production dispatch."""
     block = "block2"
     checkpoint_path = EVIDENCE / "training" / block / "latest.pt"
@@ -1155,6 +1184,7 @@ def run_single_key_witness(rs: Any, config: Mapping[str, Any], vocab: Any,
         "launcher_sha256": _sha256(Path(__file__).resolve()),
         "config_sha256": digest,
         "runtime": dict(runtime),
+        "runtime_import_paths": dict(runtime_import_paths),
         "source_validation": dict(source_validation),
         "checkpoint": {
             "path": str(checkpoint_path.relative_to(HERE)),
@@ -1212,6 +1242,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     config = json.loads(run_study.CONFIG_PATH.read_text(encoding="utf-8"))
     source_validation = verify_active_sources_once(run_study)
     run_study.validate_config(config)
+    runtime_import_paths = configure_registered_runtime_import_paths()
 
     def metered_repo_head(path: str) -> str:
         result = _run_counted_external(["git", "-C", str(path), "rev-parse", "HEAD"])
@@ -1318,6 +1349,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     runtime_context.verify_cache_installed("startup")
     progress.data["startup_identity"] = _startup_identity(run_study, runtime, head)
     progress.data["source_validation"] = source_validation
+    progress.data["runtime_import_paths"] = runtime_import_paths
     progress.data["historical_accounting"] = {
         "historical_admin_total_cpu_seconds": HISTORICAL_ADMIN_CPU_SECONDS,
         "accepted_interruption_debit_cpu_seconds": ACCEPTED_INTERRUPTION_DEBIT_SECONDS,
@@ -1348,6 +1380,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             receipt = run_single_key_witness(
                 run_study, config, vocab, bootstrap, runtime, stage_started, runtime_context,
                 head=head, source_validation=source_validation,
+                runtime_import_paths=runtime_import_paths,
             )
             receipt_path = EVIDENCE / "execution" / "single-key-witness.json"
             _atomic_json(receipt_path, receipt)
