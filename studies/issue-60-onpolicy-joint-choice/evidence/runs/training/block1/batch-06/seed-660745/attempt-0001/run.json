@@ -1,0 +1,3390 @@
+{
+  "arm": "residual",
+  "block": "block1",
+  "bootstrap_shifts": 4,
+  "boundaries": [
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 1.0,
+      "gold": 99.0,
+      "heart_encounter": false,
+      "player_hp": 68.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 68
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 99
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 1.0,
+      "gold": 99.0,
+      "heart_encounter": false,
+      "player_hp": 66.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 66
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 99
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 3.0,
+      "gold": 109.0,
+      "heart_encounter": false,
+      "player_hp": 75.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 109
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 3.0,
+      "gold": 109.0,
+      "heart_encounter": false,
+      "player_hp": 74.0,
+      "player_max_hp": 78.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 74
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 109
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 78
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 5.0,
+      "gold": 109.0,
+      "heart_encounter": false,
+      "player_hp": 74.0,
+      "player_max_hp": 78.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 74
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 109
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 78
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 5.0,
+      "gold": 109.0,
+      "heart_encounter": false,
+      "player_hp": 72.0,
+      "player_max_hp": 78.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 72
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 109
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 78
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 7.0,
+      "gold": 109.0,
+      "heart_encounter": false,
+      "player_hp": 72.0,
+      "player_max_hp": 78.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 72
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 109
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 78
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 7.0,
+      "gold": 109.0,
+      "heart_encounter": false,
+      "player_hp": 66.0,
+      "player_max_hp": 78.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 66
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 109
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 78
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 8.0,
+      "gold": 109.0,
+      "heart_encounter": false,
+      "player_hp": 66.0,
+      "player_max_hp": 78.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 66
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 109
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 78
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 8.0,
+      "gold": 109.0,
+      "heart_encounter": false,
+      "player_hp": 49.0,
+      "player_max_hp": 78.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 49
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 109
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 78
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 12.0,
+      "gold": 73.0,
+      "heart_encounter": false,
+      "player_hp": 64.0,
+      "player_max_hp": 78.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 64
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 73
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 78
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "ELITE",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 12.0,
+      "gold": 73.0,
+      "heart_encounter": false,
+      "player_hp": 17.0,
+      "player_max_hp": 81.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 17
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 73
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 81
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "ELITE",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 14.0,
+      "gold": 32.0,
+      "heart_encounter": false,
+      "player_hp": 17.0,
+      "player_max_hp": 81.0,
+      "potion_count": 1.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 17
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DISARM",
+              "misc": 0,
+              "name": "Disarm",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 32
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 81
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 1
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "SkillPotion",
+              "name": "Skill Potion",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 14.0,
+      "gold": 0.0,
+      "heart_encounter": false,
+      "player_hp": 12.0,
+      "player_max_hp": 84.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 12
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DISARM",
+              "misc": 0,
+              "name": "Disarm",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 0
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 84
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 16.0,
+      "gold": 0.0,
+      "heart_encounter": false,
+      "player_hp": 12.0,
+      "player_max_hp": 84.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 12
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DISARM",
+              "misc": 0,
+              "name": "Disarm",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 0
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 84
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "BOSS",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_LOSS",
+      "boundary": "battle_exit",
+      "floor": 16.0,
+      "gold": 0.0,
+      "heart_encounter": false,
+      "player_hp": 0.0,
+      "player_max_hp": 84.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 0
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DISARM",
+              "misc": 0,
+              "name": "Disarm",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "FEED",
+              "misc": 0,
+              "name": "Feed",
+              "rarity": "RARE",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "PAIN",
+              "misc": 0,
+              "name": "Pain",
+              "rarity": "CURSE",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SPOT_WEAKNESS",
+              "misc": 0,
+              "name": "Spot Weakness",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 1,
+              "upgraded": true
+            },
+            {
+              "id_label": "WARCRY",
+              "misc": 0,
+              "name": "Warcry",
+              "rarity": "COMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 0
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 84
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Burning Blood",
+              "name": "Burning Blood"
+            },
+            {
+              "counter": 0,
+              "id_label": "WarpedTongs",
+              "name": "Warped Tongs"
+            }
+          ]
+        }
+      },
+      "room_type": "BOSS",
+      "screen": "BATTLE"
+    }
+  ],
+  "completed_cpu_seconds": 52.86952878,
+  "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+  "death_location": {
+    "act": 1,
+    "floor": 16,
+    "room_type": "BOSS"
+  },
+  "decision_count": 33,
+  "decision_file": "decisions.jsonl.gz",
+  "failure": null,
+  "game_seed": 660745,
+  "heart_entry_selected": false,
+  "mode": "residual",
+  "model_sha256": "4cde9d60241e903416a35f68dcfb32b0c47b8cf78fdf997fdef7c3a3effbde9b",
+  "outcome": "PLAYER_LOSS",
+  "pid": 1448,
+  "problems": [],
+  "process_cpu_seconds": 52.853386404,
+  "runtime_policy_seed": 16059121259637111582,
+  "schema_id": "issue60-game-attempt-v1",
+  "screen_counts": {
+    "BATTLE": 109,
+    "CARD_SELECT": 2,
+    "EVENT_SCREEN": 5,
+    "MAP_SCREEN": 17,
+    "REST_ROOM": 2,
+    "REWARDS": 16,
+    "SHOP_ROOM": 3,
+    "TREASURE_ROOM": 1
+  },
+  "search_calls": 109,
+  "search_cpu_seconds": 0.5993102800000207,
+  "search_log_file": "battle-search.jsonl.gz",
+  "serialization_compression_cpu_seconds": 0.03297063599999461,
+  "stage_key": "block1:batch-06",
+  "started_cpu_seconds": 0.016131336,
+  "status": "COMPLETE",
+  "supported_choices": 33,
+  "terminal": true,
+  "terminal_floor": 16.0,
+  "terminal_public_location": {
+    "act": 1,
+    "floor": 16,
+    "room_type": "BOSS"
+  },
+  "transitions": 155,
+  "visible_bosses_seen": [
+    "Slime Boss"
+  ]
+}

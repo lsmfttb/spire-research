@@ -1,0 +1,2098 @@
+{
+  "arm": "residual",
+  "block": "block1",
+  "bootstrap_shifts": 0,
+  "boundaries": [
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 1.0,
+      "gold": 99.0,
+      "heart_encounter": false,
+      "player_hp": 68.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 68
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 99
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Fusion Hammer",
+              "name": "Fusion Hammer"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 1.0,
+      "gold": 99.0,
+      "heart_encounter": false,
+      "player_hp": 63.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 63
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 99
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Fusion Hammer",
+              "name": "Fusion Hammer"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 3.0,
+      "gold": 10.0,
+      "heart_encounter": false,
+      "player_hp": 63.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 63
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLOTHESLINE",
+              "misc": 0,
+              "name": "Clothesline",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEEP_BREATH",
+              "misc": 0,
+              "name": "Deep Breath",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "INFLAME",
+              "misc": 0,
+              "name": "Inflame",
+              "rarity": "UNCOMMON",
+              "type": "POWER",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 10
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Fusion Hammer",
+              "name": "Fusion Hammer"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 3.0,
+      "gold": 10.0,
+      "heart_encounter": false,
+      "player_hp": 56.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 56
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLOTHESLINE",
+              "misc": 0,
+              "name": "Clothesline",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEEP_BREATH",
+              "misc": 0,
+              "name": "Deep Breath",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "INFLAME",
+              "misc": 0,
+              "name": "Inflame",
+              "rarity": "UNCOMMON",
+              "type": "POWER",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 10
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Fusion Hammer",
+              "name": "Fusion Hammer"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 4.0,
+      "gold": 20.0,
+      "heart_encounter": false,
+      "player_hp": 56.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 56
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLASH",
+              "misc": 0,
+              "name": "Clash",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLOTHESLINE",
+              "misc": 0,
+              "name": "Clothesline",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEEP_BREATH",
+              "misc": 0,
+              "name": "Deep Breath",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "INFLAME",
+              "misc": 0,
+              "name": "Inflame",
+              "rarity": "UNCOMMON",
+              "type": "POWER",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 20
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Fusion Hammer",
+              "name": "Fusion Hammer"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 4.0,
+      "gold": 20.0,
+      "heart_encounter": false,
+      "player_hp": 47.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 47
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLASH",
+              "misc": 0,
+              "name": "Clash",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLOTHESLINE",
+              "misc": 0,
+              "name": "Clothesline",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEEP_BREATH",
+              "misc": 0,
+              "name": "Deep Breath",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "INFLAME",
+              "misc": 0,
+              "name": "Inflame",
+              "rarity": "UNCOMMON",
+              "type": "POWER",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 20
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Fusion Hammer",
+              "name": "Fusion Hammer"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 5.0,
+      "gold": 32.0,
+      "heart_encounter": false,
+      "player_hp": 47.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 47
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLASH",
+              "misc": 0,
+              "name": "Clash",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLOTHESLINE",
+              "misc": 0,
+              "name": "Clothesline",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEEP_BREATH",
+              "misc": 0,
+              "name": "Deep Breath",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DISARM",
+              "misc": 0,
+              "name": "Disarm",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "INFLAME",
+              "misc": 0,
+              "name": "Inflame",
+              "rarity": "UNCOMMON",
+              "type": "POWER",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 32
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Fusion Hammer",
+              "name": "Fusion Hammer"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_VICTORY",
+      "boundary": "battle_exit",
+      "floor": 5.0,
+      "gold": 0.0,
+      "heart_encounter": false,
+      "player_hp": 34.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 34
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLASH",
+              "misc": 0,
+              "name": "Clash",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLOTHESLINE",
+              "misc": 0,
+              "name": "Clothesline",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEEP_BREATH",
+              "misc": 0,
+              "name": "Deep Breath",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DISARM",
+              "misc": 0,
+              "name": "Disarm",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "INFLAME",
+              "misc": 0,
+              "name": "Inflame",
+              "rarity": "UNCOMMON",
+              "type": "POWER",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 0
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": false
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Fusion Hammer",
+              "name": "Fusion Hammer"
+            }
+          ]
+        }
+      },
+      "room_type": "MONSTER",
+      "screen": "REWARDS"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": null,
+      "boundary": "battle_enter",
+      "floor": 7.0,
+      "gold": 13.0,
+      "heart_encounter": false,
+      "player_hp": 34.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 34
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLASH",
+              "misc": 0,
+              "name": "Clash",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLOTHESLINE",
+              "misc": 0,
+              "name": "Clothesline",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEEP_BREATH",
+              "misc": 0,
+              "name": "Deep Breath",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DISARM",
+              "misc": 0,
+              "name": "Disarm",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "INFLAME",
+              "misc": 0,
+              "name": "Inflame",
+              "rarity": "UNCOMMON",
+              "type": "POWER",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SEARING_BLOW",
+              "misc": 0,
+              "name": "Searing Blow",
+              "rarity": "UNCOMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 13
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": true
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Fusion Hammer",
+              "name": "Fusion Hammer"
+            }
+          ]
+        }
+      },
+      "room_type": "ELITE",
+      "screen": "BATTLE"
+    },
+    {
+      "act": 1.0,
+      "battle_outcome": "PLAYER_LOSS",
+      "boundary": "battle_exit",
+      "floor": 7.0,
+      "gold": 13.0,
+      "heart_encounter": false,
+      "player_hp": 0.0,
+      "player_max_hp": 75.0,
+      "potion_count": 0.0,
+      "public_resources": {
+        "current_hp": {
+          "availability": "available",
+          "value": 0
+        },
+        "deck": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "ASCENDERS_BANE",
+              "misc": 0,
+              "name": "Ascender's Bane",
+              "rarity": "SPECIAL",
+              "type": "CURSE",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "BASH",
+              "misc": 0,
+              "name": "Bash",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLASH",
+              "misc": 0,
+              "name": "Clash",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "CLOTHESLINE",
+              "misc": 0,
+              "name": "Clothesline",
+              "rarity": "COMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEEP_BREATH",
+              "misc": 0,
+              "name": "Deep Breath",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DEFEND_RED",
+              "misc": 0,
+              "name": "Defend",
+              "rarity": "BASIC",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "DISARM",
+              "misc": 0,
+              "name": "Disarm",
+              "rarity": "UNCOMMON",
+              "type": "SKILL",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "INFLAME",
+              "misc": 0,
+              "name": "Inflame",
+              "rarity": "UNCOMMON",
+              "type": "POWER",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "SEARING_BLOW",
+              "misc": 0,
+              "name": "Searing Blow",
+              "rarity": "UNCOMMON",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            },
+            {
+              "id_label": "STRIKE_RED",
+              "misc": 0,
+              "name": "Strike",
+              "rarity": "BASIC",
+              "type": "ATTACK",
+              "upgrade_count": 0,
+              "upgraded": false
+            }
+          ]
+        },
+        "gold": {
+          "availability": "available",
+          "value": 13
+        },
+        "keys": {
+          "availability": "available",
+          "value": {
+            "blue_key": false,
+            "green_key": false,
+            "red_key": true
+          }
+        },
+        "max_hp": {
+          "availability": "available",
+          "value": 75
+        },
+        "potion_capacity": {
+          "availability": "available",
+          "value": 2
+        },
+        "potion_count": {
+          "availability": "available",
+          "value": 0
+        },
+        "potion_identities": {
+          "availability": "available",
+          "value": [
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 0
+            },
+            {
+              "id_label": "EMPTY_POTION_ID",
+              "name": "EMPTY_POTION_SLOT",
+              "potion_index": 1
+            }
+          ]
+        },
+        "relics": {
+          "availability": "available",
+          "value": [
+            {
+              "counter": 0,
+              "id_label": "Fusion Hammer",
+              "name": "Fusion Hammer"
+            }
+          ]
+        }
+      },
+      "room_type": "ELITE",
+      "screen": "BATTLE"
+    }
+  ],
+  "completed_cpu_seconds": 19.520367382,
+  "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+  "death_location": {
+    "act": 1,
+    "floor": 7,
+    "room_type": "ELITE"
+  },
+  "decision_count": 21,
+  "decision_file": "decisions.jsonl.gz",
+  "failure": null,
+  "game_seed": 660654,
+  "heart_entry_selected": false,
+  "mode": "residual",
+  "model_sha256": "4cde9d60241e903416a35f68dcfb32b0c47b8cf78fdf997fdef7c3a3effbde9b",
+  "outcome": "PLAYER_LOSS",
+  "pid": 1322,
+  "problems": [],
+  "process_cpu_seconds": 19.503934051999998,
+  "runtime_policy_seed": 3760991872629927274,
+  "schema_id": "issue60-game-attempt-v1",
+  "screen_counts": {
+    "BATTLE": 68,
+    "EVENT_SCREEN": 1,
+    "MAP_SCREEN": 8,
+    "REST_ROOM": 1,
+    "REWARDS": 13,
+    "SHOP_ROOM": 3
+  },
+  "search_calls": 68,
+  "search_cpu_seconds": 0.30574357999999313,
+  "search_log_file": "battle-search.jsonl.gz",
+  "serialization_compression_cpu_seconds": 0.015676686999999134,
+  "stage_key": "block1:batch-06",
+  "started_cpu_seconds": 0.016421428,
+  "status": "COMPLETE",
+  "supported_choices": 21,
+  "terminal": true,
+  "terminal_floor": 7.0,
+  "terminal_public_location": {
+    "act": 1,
+    "floor": 7,
+    "room_type": "ELITE"
+  },
+  "transitions": 94,
+  "visible_bosses_seen": [
+    "Hexaghost"
+  ]
+}
