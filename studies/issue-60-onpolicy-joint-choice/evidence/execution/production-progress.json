@@ -1,5 +1,5 @@
 {
-  "accounted_new_cpu_seconds": 73401.28594264803,
+  "accounted_new_cpu_seconds": 73519.02745561903,
   "administrative_debit_cpu_seconds": 191.953064391,
   "administrative_debits": [
     {
@@ -1263,7 +1263,7 @@
     "source_of_reserves": "previous_stop_reason retained in production-progress.json",
     "timestamp_utc": "2026-10-18T18:44:21Z"
   },
-  "events_written": 4506,
+  "events_written": 4576,
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
@@ -1303,7 +1303,7 @@
     "model_sha256": "16da45d181e713d8d33fb97344ebada9720b1f19565725a87a93009f0153f52d",
     "path": "evidence/training/block2/latest.pt"
   },
-  "measured_new_cpu_seconds": 73209.33287825703,
+  "measured_new_cpu_seconds": 73327.07439122803,
   "milestone": "evidence/execution/integration-milestone.json",
   "milestone_checkpoint_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
   "open_invocation": {
@@ -1314,16 +1314,16 @@
   },
   "open_optimizer_reservation": null,
   "open_worker_reservations": {
-    "[\"owner-085\",669085,\"final_block1\"]": {
+    "[\"owner-092\",669092,\"final_block1\"]": {
       "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
       "model_sha256": "463ac5426cb9a1a8a3f952652ca0d986616c2d744f2d7130b5a98109bc928303",
-      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-budget-downshift-v2/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/evaluation/owner-085/final_block1",
-      "pid": 2000,
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-budget-downshift-v2/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/evaluation/owner-092/final_block1",
+      "pid": 2133,
       "reservation_seconds": 10673.5703364825,
-      "reserved_utc": "2026-10-18T21:00:42Z",
+      "reserved_utc": "2026-10-18T21:06:48Z",
       "task_key": [
-        "owner-085",
-        669085,
+        "owner-092",
+        669092,
         "final_block1"
       ]
     }
