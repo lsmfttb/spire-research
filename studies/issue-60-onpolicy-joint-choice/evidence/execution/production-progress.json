@@ -1,11 +1,29 @@
 {
-  "accounted_new_cpu_seconds": 67591.80089638801,
-  "administrative_debit_cpu_seconds": 60.0,
+  "accounted_new_cpu_seconds": 67644.62919554101,
+  "administrative_debit_cpu_seconds": 101.953064391,
   "administrative_debits": [
     {
       "kind": "interrupted-parent-invocation",
       "reason": "hard interruption left unmeasured parent/process interval",
       "seconds": 60.0
+    },
+    {
+      "evidence": "evidence/diagnostics/public-history-execution-parity-1792345402319845252.json:verification.cpu_seconds",
+      "kind": "bounded-public-history-parity-diagnostic",
+      "measured": true,
+      "seconds": 18.968081074
+    },
+    {
+      "evidence": "evidence/diagnostics/owner-662496-direct-replay.json:cpu.process_cpu_seconds_including_adapter_import_artifact_read_replay_and_trace_write",
+      "kind": "owner-662496-direct-prefix-replay",
+      "measured": true,
+      "seconds": 2.984983317
+    },
+    {
+      "kind": "production-launcher-and-source-preflight-checks",
+      "measured": false,
+      "reason": "Conservative CPU debit for bounded py_compile, CLI/authorization checks, pinned import probe, and two startup attempts that halted before game dispatch; exact process CPU was not retained.",
+      "seconds": 20.0
     }
   ],
   "administrative_protocol_initialized": true,
@@ -1194,7 +1212,7 @@
     "training_rows_sha256": "1b414f23231b190e61debbf56fc4b734db5e54866c70387a3ba35a752997672b"
   },
   "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-  "events_written": 2632,
+  "events_written": 2636,
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
@@ -1213,11 +1231,12 @@
     }
   ],
   "historical_admin_total_cpu_seconds": 25644.469,
+  "issue60_bounded_diagnostics_cpu_recorded": true,
   "last_cache_verification": {
     "completed_run_keys": 1543,
-    "dispatcher_workers": 8,
-    "stage": "after-training-block2",
-    "timestamp_utc": "2026-10-18T15:43:56Z"
+    "dispatcher_workers": 1,
+    "stage": "startup",
+    "timestamp_utc": "2026-10-18T18:09:27Z"
   },
   "last_optimizer_update": {
     "batch_index": 4,
@@ -1233,13 +1252,29 @@
     "model_sha256": "00a86a3625788b361fbfe144c3e921e85c194a60e00c856b0443b3e3e70f84a0",
     "path": "evidence/training/block2/latest.pt"
   },
-  "measured_new_cpu_seconds": 67531.80089638801,
+  "measured_new_cpu_seconds": 67542.67613115002,
   "milestone": "evidence/execution/integration-milestone.json",
   "milestone_checkpoint_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
   "open_invocation": null,
   "open_optimizer_reservation": null,
   "open_worker_reservations": {},
-  "phase": "budget-stop",
+  "phase": "single-key-witness-complete",
+  "previous_stop_reason": "actual prospective CPU 67568.236s cannot safely reserve the next operation inside the 150000s cap (workers=8, game_reserve=10673.570s each, optimizer_reserve=3941.623s, parent_reserve=60.000s)",
+  "public_history_execution": {
+    "active_executor": "sts_combat_rl.sim.controlled_run.execute_controlled_run",
+    "existing_battle_history_validation": "none per Battle action; previously validated entries are privately retained",
+    "full_history_materialization": "detached copy for supported MAP/REWARDS inputs and one terminal run context",
+    "history_consumers": [
+      "MAP_SCREEN",
+      "REWARDS"
+    ],
+    "metrics_path": "/mnt/d/DeadlycatCoding/spire-research-issue60-bounded-correctness/studies/issue-60-onpolicy-joint-choice/evidence/execution/public-history-execution.jsonl",
+    "new_entry_validation": "pinned sanitize_public_run_context plus schema/version/index check once before append",
+    "optimizer_id": "issue60-demand-driven-public-history-v1",
+    "pinned_stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "semantics": "action selection, candidate ordering, Native adapter, teacher/Search@400, training rows and PPO update unchanged",
+    "study_scope": "STUDY_ONLY"
+  },
   "purpose": "STUDY_ONLY",
   "runtime": {
     "deterministic_algorithms": true,
@@ -1266,13 +1301,22 @@
     "torch": "2.12.0+cpu",
     "torch_threads": 1
   },
+  "runtime_import_paths": {
+    "native_build": "/home/lsmft/stsrl-spikes/issue60-runtime/build-issue60",
+    "native_source": "/home/lsmft/stsrl-spikes/sts_lightspeed-issue59",
+    "stsr_source": "/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c"
+  },
   "schema_id": "issue60-production-progress-v1",
+  "single_key_witness": "evidence/execution/single-key-witness.json",
   "source_validation": {
     "base_commit": "9525d416b9488bb2455435699893b03fe19fe30a",
     "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-    "current_production_entry_git_blob": "6aad64eb7c1a3cb56b934864fead3f55ac24250f",
+    "current_production_entry_git_blob": "e9b1bab0baa48d825c17cb1f85f1e2a7f4302259",
     "current_production_entry_path": "studies/issue-60-onpolicy-joint-choice/production_entry.py",
-    "current_production_entry_sha256": "16db174c6b38e8fa54ebcfe81c7cc52ede6d32499888baa46ff44d7a71832a18",
+    "current_production_entry_sha256": "e1ccf1100a3bbb5f4af5778a42c4611fa169328121653dc9044e187d3b562fa9",
+    "current_public_history_optimizer_git_blob": "cf12fa14c6969508fbb5933c5ada9d183eec92bc",
+    "current_public_history_optimizer_path": "studies/issue-60-onpolicy-joint-choice/public_history_execution.py",
+    "current_public_history_optimizer_sha256": "f6c3d1874fb20172406b161ab0296ef80a665ab0017840adba6af2fcf44fa2f4",
     "current_run_study_git_blob": "e27727861f719e494eb37c8cbc40cf83bbb32c5a",
     "current_run_study_sha256": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6",
     "historical_manifest_run_study_sha256": "91559cddb2e2758d19aa1c5e063d03189b9b29f15c9616ba51e6f0a57c425c16",
@@ -1289,15 +1333,15 @@
       "vocabulary_schema": "issue60-fixed-category-vocab-v1",
       "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
     },
-    "verification": "current HEAD tree identity for run_study.py and production_entry.py plus registered config and unchanged remaining manifest inputs"
+    "verification": "current HEAD tree identity for run_study.py, production_entry.py, and the study-local public-history optimizer plus registered config and unchanged remaining manifest inputs"
   },
   "startup_identity": {
-    "checkpoint_file_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
+    "checkpoint_file_sha256": "c00a17141943a114d186f19895ae39742f57f884ea09f8291cf053b64fa707aa",
     "checkpoint_path": "evidence/training/block1/latest.pt",
     "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-    "head": "2ae07c802e11da85a40a20671d39d9937610cf29",
+    "head": "280d410cd387c28f031a2ba2014be7ac79c20f3e",
     "launcher": "production_entry.py",
-    "launcher_sha256": "16db174c6b38e8fa54ebcfe81c7cc52ede6d32499888baa46ff44d7a71832a18",
+    "launcher_sha256": "e1ccf1100a3bbb5f4af5778a42c4611fa169328121653dc9044e187d3b562fa9",
     "runtime": {
       "deterministic_algorithms": true,
       "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
@@ -1324,14 +1368,15 @@
       "torch_threads": 1
     }
   },
-  "stop_reason": "actual prospective CPU 67568.236s cannot safely reserve the next operation inside the 150000s cap (workers=8, game_reserve=10673.570s each, optimizer_reserve=3941.623s, parent_reserve=60.000s)",
   "worker_selection": {
     "configured_cap": 8,
     "effective_cpu_count": 16,
+    "host_selected_worker_count": 8,
     "measured_worker_peak_rss_bytes": 1602899968,
     "memory_based_worker_capacity": 11,
-    "memory_reserve_bytes": 4793117081,
-    "worker_count": 8,
+    "memory_reserve_bytes": 4791910400,
+    "single_key_witness_worker_ceiling": 1,
+    "worker_count": 1,
     "worker_peak_rss_samples_bytes": [
       1563795456,
       1565499392,
