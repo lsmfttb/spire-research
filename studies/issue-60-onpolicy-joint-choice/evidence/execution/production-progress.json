@@ -1,5 +1,5 @@
 {
-  "accounted_new_cpu_seconds": 68121.27802194802,
+  "accounted_new_cpu_seconds": 68948.98040274902,
   "administrative_debit_cpu_seconds": 131.953064391,
   "administrative_debits": [
     {
@@ -1247,7 +1247,7 @@
     "source_of_reserves": "previous_stop_reason retained in production-progress.json",
     "timestamp_utc": "2026-10-18T18:44:21Z"
   },
-  "events_written": 2881,
+  "events_written": 2925,
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
@@ -1274,20 +1274,20 @@
     "timestamp_utc": "2026-10-18T18:46:20Z"
   },
   "last_optimizer_update": {
-    "batch_index": 4,
+    "batch_index": 5,
     "block": "block2",
-    "decision_count": 3156,
-    "measured_parent_cpu_seconds": 2123.0382180859997,
+    "decision_count": 3286,
+    "measured_parent_cpu_seconds": 753.8442235030001,
     "minibatch_count": 52
   },
   "live_checkpoint": {
     "block": "block2",
-    "completed_batches": 4,
-    "file_sha256": "2bf2e3edb50300a5cb734b3ae3047872c6e41807fb7423a9be9bfa13335c2205",
-    "model_sha256": "00a86a3625788b361fbfe144c3e921e85c194a60e00c856b0443b3e3e70f84a0",
+    "completed_batches": 5,
+    "file_sha256": "5b3863e90d8739b6a826e471b0369441663f57676ef417bbe32ae2eddc84e282",
+    "model_sha256": "a358af42555bcab15a5f6ef1019e078f0e32174904dc8c1605ca02df294ba014",
     "path": "evidence/training/block2/latest.pt"
   },
-  "measured_new_cpu_seconds": 67989.32495755702,
+  "measured_new_cpu_seconds": 68817.02733835802,
   "milestone": "evidence/execution/integration-milestone.json",
   "milestone_checkpoint_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
   "open_invocation": {
@@ -1296,13 +1296,87 @@
     "reservation_seconds": 60.0,
     "started_utc": "2026-10-18T18:45:20Z"
   },
-  "open_optimizer_reservation": {
-    "batch_index": 5,
-    "block": "block2",
-    "reservation_seconds": 4640.8148545939985,
-    "started_utc": "2026-10-18T18:48:07Z"
+  "open_optimizer_reservation": null,
+  "open_worker_reservations": {
+    "[\"block2:batch-06\",662659,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "a358af42555bcab15a5f6ef1019e078f0e32174904dc8c1605ca02df294ba014",
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-continuation/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-06/seed-662659",
+      "pid": 5374,
+      "reservation_seconds": 10673.5703364825,
+      "reserved_utc": "2026-10-18T19:01:10Z",
+      "task_key": [
+        "block2:batch-06",
+        662659,
+        "residual"
+      ]
+    },
+    "[\"block2:batch-06\",662660,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "a358af42555bcab15a5f6ef1019e078f0e32174904dc8c1605ca02df294ba014",
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-continuation/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-06/seed-662660",
+      "pid": 5375,
+      "reservation_seconds": 10673.5703364825,
+      "reserved_utc": "2026-10-18T19:01:12Z",
+      "task_key": [
+        "block2:batch-06",
+        662660,
+        "residual"
+      ]
+    },
+    "[\"block2:batch-06\",662661,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "a358af42555bcab15a5f6ef1019e078f0e32174904dc8c1605ca02df294ba014",
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-continuation/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-06/seed-662661",
+      "pid": 5376,
+      "reservation_seconds": 10673.5703364825,
+      "reserved_utc": "2026-10-18T19:01:13Z",
+      "task_key": [
+        "block2:batch-06",
+        662661,
+        "residual"
+      ]
+    },
+    "[\"block2:batch-06\",662662,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "a358af42555bcab15a5f6ef1019e078f0e32174904dc8c1605ca02df294ba014",
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-continuation/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-06/seed-662662",
+      "pid": 5381,
+      "reservation_seconds": 10673.5703364825,
+      "reserved_utc": "2026-10-18T19:01:14Z",
+      "task_key": [
+        "block2:batch-06",
+        662662,
+        "residual"
+      ]
+    },
+    "[\"block2:batch-06\",662663,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "a358af42555bcab15a5f6ef1019e078f0e32174904dc8c1605ca02df294ba014",
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-continuation/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-06/seed-662663",
+      "pid": 5382,
+      "reservation_seconds": 10673.5703364825,
+      "reserved_utc": "2026-10-18T19:01:16Z",
+      "task_key": [
+        "block2:batch-06",
+        662663,
+        "residual"
+      ]
+    },
+    "[\"block2:batch-06\",662664,\"residual\"]": {
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "model_sha256": "a358af42555bcab15a5f6ef1019e078f0e32174904dc8c1605ca02df294ba014",
+      "output_dir": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-continuation/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/runs/training/block2/batch-06/seed-662664",
+      "pid": 5387,
+      "reservation_seconds": 10673.5703364825,
+      "reserved_utc": "2026-10-18T19:01:17Z",
+      "task_key": [
+        "block2:batch-06",
+        662664,
+        "residual"
+      ]
+    }
   },
-  "open_worker_reservations": {},
   "phase": "training-block2",
   "previous_stop_reason": "actual prospective CPU 67568.236s cannot safely reserve the next operation inside the 150000s cap (workers=8, game_reserve=10673.570s each, optimizer_reserve=3941.623s, parent_reserve=60.000s)",
   "public_history_execution": {
