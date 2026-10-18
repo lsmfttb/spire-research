@@ -10,7 +10,7 @@ import time
 from types import SimpleNamespace
 
 from parallel_execution import (
-    aggregate_process_cpu, can_dispatch, choose_worker_count,
+    aggregate_process_cpu, can_dispatch, choose_worker_count, BudgetAdmissionDeferred,
     ordered_result_items, ParallelGameDispatcher, ProcessCpuTracker,
     stage_result_status,
 )
@@ -140,6 +140,58 @@ class ParallelExecutionTests(unittest.TestCase):
             self.assertEqual(list(results), [tuple(task["key"]) for task in tasks])
             self.assertEqual([row[1]["game_seed"] for row in results.values()], [660001, 660002])
             self.assertGreater(tracker.current_stage_cpu(), 0.0)
+
+    @unittest.skipUnless(hasattr(os, "fork"), "dispatcher integration requires Linux fork")
+    def test_budget_admission_defers_and_retries_after_active_worker_settles(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def successful_attempt(directory, model_sha, config_digest):
+                for path in sorted(directory.glob("attempt-*/run.json")):
+                    row = json.loads(path.read_text(encoding="utf-8"))
+                    if (row.get("status") == "COMPLETE"
+                            and row.get("model_sha256") == model_sha
+                            and row.get("config_sha256") == config_digest
+                            and (path.parent / "decisions.jsonl.gz").is_file()):
+                        return path.parent, row
+                return None
+
+            tracker = ProcessCpuTracker.start(time.process_time())
+
+            def reserve_at_most_two(**_kwargs):
+                if tracker.active_worker_count() >= 3:
+                    raise BudgetAdmissionDeferred("two active workers fit; three do not")
+
+            fake = SimpleNamespace(
+                run_game=_fake_run_game, HERE=root,
+                Vocabulary=lambda _path: None,
+                successful_attempt=successful_attempt,
+                budget_guard=reserve_at_most_two,
+                _completed_run_count=lambda: 0,
+                _remaining_optimizer_projection=lambda: 0.0,
+            )
+            dispatcher = ParallelGameDispatcher(fake, tracker, 3)
+            tasks = []
+            for seed in (660001, 660002, 660003, 660004, 660005):
+                key = ("validation", seed, "residual")
+                tasks.append({
+                    "key": key,
+                    "kwargs": {
+                        "seed": seed, "model": None, "vocab": None, "bootstrap": None,
+                        "model_sha": "model", "config_digest": "config",
+                        "output_dir": root / f"seed-{seed}",
+                    },
+                })
+
+            results = dispatcher.run_jobs(tasks)
+
+            self.assertEqual(len(results), len(tasks))
+            self.assertEqual(dispatcher.max_active_workers, 2)
+            self.assertGreaterEqual(len(dispatcher.budget_admission_deferrals), 1)
+            self.assertEqual(
+                [row[1]["game_seed"] for row in results.values()],
+                [660001, 660002, 660003, 660004, 660005],
+            )
 
 
 if __name__ == "__main__":

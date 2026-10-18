@@ -174,6 +174,40 @@ class ProductionEntryTests(unittest.TestCase):
             game_reserve=459.4, optimizer_reserve=1144.3, parent_reserve=60.0,
         ))
 
+    def test_full_continuation_downshifts_to_largest_budget_feasible_worker_count(self):
+        actual_cpu = 71_127.708
+        game_reserve = 10_673.570
+        optimizer_reserve = 4_640.815
+        parent_reserve = 60.0
+        self.assertFalse(production.can_dispatch_with_reserves(
+            actual_cpu=actual_cpu, cpu_limit=150_000.0, active_or_pending_workers=7,
+            game_reserve=game_reserve, optimizer_reserve=optimizer_reserve,
+            parent_reserve=parent_reserve,
+        ))
+        self.assertTrue(production.can_dispatch_with_reserves(
+            actual_cpu=actual_cpu, cpu_limit=150_000.0, active_or_pending_workers=6,
+            game_reserve=game_reserve, optimizer_reserve=optimizer_reserve,
+            parent_reserve=parent_reserve,
+        ))
+        self.assertEqual(production.select_phase_worker_count(
+            phase="full-continuation", preferred_workers=7, actual_cpu=actual_cpu,
+            game_reserve=game_reserve, optimizer_reserve=optimizer_reserve,
+            parent_reserve=parent_reserve,
+        ), 6)
+
+    def test_dispatch_budget_rejection_defers_only_while_other_workers_can_settle(self):
+        runtime = object.__new__(production.ProductionRuntime)
+        for active_count, expected in (
+            (2, production.parallel_execution.BudgetAdmissionDeferred),
+            (1, production.ProspectiveBudgetStop),
+        ):
+            runtime.tracker = type("Tracker", (), {
+                "active_worker_count": lambda _self, count=active_count: count,
+            })()
+            with patch.object(runtime, "check_budget", side_effect=production.ProspectiveBudgetStop("cap")):
+                with self.assertRaises(expected):
+                    runtime.dispatch_budget_guard()
+
     def test_interrupted_reservations_become_debits_without_changing_measured_cpu(self):
         with tempfile.TemporaryDirectory() as temporary:
             progress_path = Path(temporary) / "production-progress.json"

@@ -390,23 +390,45 @@ def can_dispatch_with_reserves(*, actual_cpu: float, cpu_limit: float,
             + optimizer_reserve + parent_reserve) < cpu_limit
 
 
-def select_milestone_worker_count(*, preferred_workers: int, actual_cpu: float,
-                                  game_reserve: float, optimizer_reserve: float,
-                                  parent_reserve: float) -> int:
-    """Bound batch-02 integration parallelism before the dispatcher starts."""
+def select_phase_worker_count(*, phase: str, preferred_workers: int, actual_cpu: float,
+                              game_reserve: float, optimizer_reserve: float,
+                              parent_reserve: float) -> int:
+    """Select the largest host-supported worker count that fits this phase's CPU reserves."""
     if preferred_workers < 1:
         raise ValueError("preferred worker count must be positive")
-    limit = min(int(preferred_workers), INTEGRATION_MAX_WORKERS)
+    if phase == "integration-milestone":
+        cpu_limit = min(NEW_BUILDER_CPU_LIMIT_SECONDS, INTEGRATION_CPU_LIMIT_SECONDS)
+        worker_ceiling = INTEGRATION_MAX_WORKERS
+    elif phase == "single-key-witness":
+        cpu_limit = NEW_BUILDER_CPU_LIMIT_SECONDS
+        worker_ceiling = 1
+    elif phase == "full-continuation":
+        cpu_limit = NEW_BUILDER_CPU_LIMIT_SECONDS
+        worker_ceiling = parallel_execution.MAX_GAME_WORKERS
+    else:
+        raise ValueError(f"phase has no production worker budget policy: {phase}")
+    limit = min(int(preferred_workers), int(worker_ceiling))
     for count in range(limit, 0, -1):
         if can_dispatch_with_reserves(
-            actual_cpu=actual_cpu, cpu_limit=INTEGRATION_CPU_LIMIT_SECONDS,
+            actual_cpu=actual_cpu, cpu_limit=cpu_limit,
             active_or_pending_workers=count, game_reserve=game_reserve,
             optimizer_reserve=optimizer_reserve, parent_reserve=parent_reserve,
         ):
             return count
     raise ProspectiveBudgetStop(
-        "batch-02 integration cannot safely reserve one worker and the pending PPO update "
-        "inside the 3000s CPU cap"
+        f"{phase} cannot safely reserve one worker and its pending bounded work "
+        f"inside the {cpu_limit:.0f}s CPU cap"
+    )
+
+
+def select_milestone_worker_count(*, preferred_workers: int, actual_cpu: float,
+                                  game_reserve: float, optimizer_reserve: float,
+                                  parent_reserve: float) -> int:
+    """Bound batch-02 integration parallelism before the dispatcher starts."""
+    return select_phase_worker_count(
+        phase="integration-milestone", preferred_workers=preferred_workers,
+        actual_cpu=actual_cpu, game_reserve=game_reserve,
+        optimizer_reserve=optimizer_reserve, parent_reserve=parent_reserve,
     )
 
 
@@ -569,6 +591,9 @@ class DurableDispatcher(parallel_execution.ParallelGameDispatcher):
             )
         return selected
 
+    def _on_budget_admission_deferred(self, record: Mapping[str, Any]) -> None:
+        self.owner.persist_event("worker-admission-deferred", **dict(record))
+
     def _fork_task(self, task: Mapping[str, Any], slot: int) -> int:
         key = tuple(task["key"])
         kwargs = task["kwargs"]
@@ -644,6 +669,20 @@ class ProductionRuntime:
                 f"game_reserve={self.game_reserve_seconds():.3f}s each, "
                 f"optimizer_reserve={optimizer:.3f}s, parent_reserve={parent:.3f}s)"
             )
+
+    def dispatch_budget_guard(self) -> None:
+        """Let active games settle when only an additional worker reserve is unaffordable."""
+        try:
+            self.check_budget()
+        except ProspectiveBudgetStop as exc:
+            # The dispatcher reserves one pending slot before calling this
+            # guard. If the aggregate count exceeds one, at least one existing
+            # worker can settle and free part of its conservative game reserve.
+            # The dispatcher then retries the same queued key. With only the
+            # pending slot, no safe work can settle to make room, so stop now.
+            if self.tracker.active_worker_count() > 1:
+                raise parallel_execution.BudgetAdmissionDeferred(str(exc)) from exc
+            raise
 
     def persist_event(self, kind: str, **details: Any) -> None:
         self.progress.event(kind, actual_cpu=self.meter.actual_cpu(), **details)
@@ -779,7 +818,7 @@ class ProductionRuntime:
                 path.endswith("block1/batch-02.json") for path in self.state._completed_batch_paths
             ):
                 raise IntegrationMilestoneReached()
-            self.check_budget()
+            self.dispatch_budget_guard()
 
         rs.budget_guard = actual_budget_guard
         rs._accounted_cpu = lambda _cpu=0.0: self.meter.accounted_cpu()
@@ -1319,8 +1358,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         available_bytes=int(parallel_execution.host_capacity()["effective_memory_available_bytes"]),
         worker_peak_rss_samples=_worker_samples(), cap=parallel_execution.MAX_GAME_WORKERS,
     )
+    host_selected_workers = int(selection["worker_count"])
     if phase == "single-key-witness":
-        selection["host_selected_worker_count"] = int(selection["worker_count"])
         selection["worker_count"] = 1
         selection["single_key_witness_worker_ceiling"] = 1
     meter = Meter(
@@ -1333,18 +1372,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         progress=progress, state=state, tracker=tracker, meter=meter,
         worker_selection=selection, milestone_mode=milestone_mode,
     )
+    runtime_context.optimizer_reserve_seconds = runtime_context.optimizer_reserve(run_study)
+    preferred_workers = int(selection["worker_count"])
+    actual_cpu = meter.accounted_cpu()
+    game_reserve = runtime_context.game_reserve_seconds()
+    selection["host_selected_worker_count"] = host_selected_workers
+    selection["worker_count"] = select_phase_worker_count(
+        phase=phase,
+        preferred_workers=preferred_workers,
+        actual_cpu=actual_cpu,
+        game_reserve=game_reserve,
+        optimizer_reserve=runtime_context.optimizer_reserve_seconds,
+        parent_reserve=PARENT_INTERRUPTION_RESERVE_SECONDS,
+    )
+    selection["budget_selection"] = {
+        "phase": phase,
+        "actual_cpu_seconds": actual_cpu,
+        "cpu_limit_seconds": runtime_context.cpu_limit(),
+        "preferred_worker_count": preferred_workers,
+        "game_reserve_seconds_per_worker": game_reserve,
+        "optimizer_reserve_seconds": runtime_context.optimizer_reserve_seconds,
+        "parent_reserve_seconds": PARENT_INTERRUPTION_RESERVE_SECONDS,
+        "selected_worker_count": int(selection["worker_count"]),
+    }
     if milestone_mode:
-        runtime_context.optimizer_reserve_seconds = runtime_context.optimizer_reserve(run_study)
-        selection["host_selected_worker_count"] = int(selection["worker_count"])
-        selection["worker_count"] = select_milestone_worker_count(
-            preferred_workers=int(selection["worker_count"]),
-            actual_cpu=meter.accounted_cpu(),
-            game_reserve=runtime_context.game_reserve_seconds(),
-            optimizer_reserve=runtime_context.optimizer_reserve_seconds,
-            parent_reserve=PARENT_INTERRUPTION_RESERVE_SECONDS,
-        )
         selection["integration_budget_worker_ceiling"] = INTEGRATION_MAX_WORKERS
-        runtime_context.worker_selection = dict(selection)
+    runtime_context.worker_selection = dict(selection)
     runtime_context.install_cache(
         rs=run_study, resource_module=resource_module,
         parallel_module=parallel_execution,

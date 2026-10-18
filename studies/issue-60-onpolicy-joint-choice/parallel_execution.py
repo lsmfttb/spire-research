@@ -30,6 +30,10 @@ class ParallelExecutionError(RuntimeError):
     """A fixed-key worker could not produce a valid terminal game record."""
 
 
+class BudgetAdmissionDeferred(ParallelExecutionError):
+    """A queued worker does not fit now, but active workers may free reserve."""
+
+
 def _proc_stat(pid: int) -> tuple[int, int] | None:
     try:
         text = Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
@@ -336,6 +340,7 @@ class ParallelGameDispatcher:
         self.executions: list[dict[str, Any]] = []
         self.max_worker_rss_bytes = 0
         self.max_active_workers = 0
+        self.budget_admission_deferrals: list[dict[str, Any]] = []
         self._completed_groups: set[str] = set()
 
     def _prepare_worker_kwargs(self, kwargs: Mapping[str, Any]) -> dict[str, Any]:
@@ -404,6 +409,10 @@ class ParallelGameDispatcher:
             current_stage_cpu=self.tracker.current_stage_cpu(),
         )
 
+    def _on_budget_admission_deferred(self, record: Mapping[str, Any]) -> None:
+        """Hook for a durable runner to record a temporary queue deferral."""
+        return None
+
     def _mark_abnormal_attempt_incomplete(self, task: Mapping[str, Any],
                                           failure: str, cpu_seconds: float) -> None:
         output_dir = Path(task["kwargs"]["output_dir"])
@@ -442,6 +451,23 @@ class ParallelGameDispatcher:
                 try:
                     self.tracker.set_pending_workers(1)
                     self._budget_guard()
+                except BudgetAdmissionDeferred as exc:
+                    self.tracker.set_pending_workers(0)
+                    if not active:
+                        stop_error = exc
+                        break
+                    record = {
+                        "configured_workers": self.workers,
+                        "active_workers": len(active),
+                        "queued_task_count": len(pending),
+                        "next_task_key": list(pending[0]["key"]),
+                        "reason": str(exc),
+                    }
+                    self.budget_admission_deferrals.append(record)
+                    self._on_budget_admission_deferred(record)
+                    # Keep the rejected task queued; wait for one active worker
+                    # to settle, then evaluate the updated actual/reserved CPU.
+                    break
                 except BaseException as exc:
                     stop_error = exc
                     self.tracker.set_pending_workers(0)
@@ -633,6 +659,7 @@ class ParallelGameDispatcher:
         return {
             "max_configured_workers": self.workers,
             "max_active_workers": self.max_active_workers,
+            "budget_admission_deferrals": list(self.budget_admission_deferrals),
             "parent_peak_rss_bytes": parent_rss,
             "worker_peak_rss_bytes": self.max_worker_rss_bytes,
             "parent_plus_worker_peak_rss_upper_bound_bytes": parent_worker_rss_bound,
