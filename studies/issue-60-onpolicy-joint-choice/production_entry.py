@@ -492,6 +492,9 @@ class ProductionProgress:
                          runtime: Mapping[str, Any], parent_reserve: float) -> None:
         if self.data.get("open_invocation") is not None:
             raise ProductionError("another production invocation is already marked open")
+        prior_stop_reason = self.data.pop("stop_reason", None)
+        if prior_stop_reason:
+            self.data["previous_stop_reason"] = prior_stop_reason
         self.data["open_invocation"] = {
             "started_utc": _utc_now(), "head": head, "launcher_sha256": launcher_sha,
             "reservation_seconds": parent_reserve,
