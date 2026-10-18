@@ -1,5 +1,5 @@
 {
-  "accounted_new_cpu_seconds": 65313.212575936006,
+  "accounted_new_cpu_seconds": 67591.80089638801,
   "administrative_debit_cpu_seconds": 60.0,
   "administrative_debits": [
     {
@@ -1194,7 +1194,7 @@
     "training_rows_sha256": "1b414f23231b190e61debbf56fc4b734db5e54866c70387a3ba35a752997672b"
   },
   "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-  "events_written": 2615,
+  "events_written": 2632,
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
@@ -1214,42 +1214,32 @@
   ],
   "historical_admin_total_cpu_seconds": 25644.469,
   "last_cache_verification": {
-    "completed_run_keys": 1024,
+    "completed_run_keys": 1543,
     "dispatcher_workers": 8,
-    "stage": "before-training-block2",
-    "timestamp_utc": "2026-10-18T09:18:27Z"
+    "stage": "after-training-block2",
+    "timestamp_utc": "2026-10-18T15:43:56Z"
   },
   "last_optimizer_update": {
-    "batch_index": 3,
+    "batch_index": 4,
     "block": "block2",
-    "decision_count": 3653,
-    "measured_parent_cpu_seconds": 1575.596414955,
-    "minibatch_count": 60
+    "decision_count": 3156,
+    "measured_parent_cpu_seconds": 2123.0382180859997,
+    "minibatch_count": 52
   },
   "live_checkpoint": {
     "block": "block2",
-    "completed_batches": 3,
-    "file_sha256": "5dfaeaf6bf4be872daf545cf1b7d88f3cbb7eb6440c6bb094cd3794b70ee0216",
-    "model_sha256": "db2b297d779d776a772a1c32d125cb5a55b14b2657379ea843209413306db3bd",
+    "completed_batches": 4,
+    "file_sha256": "2bf2e3edb50300a5cb734b3ae3047872c6e41807fb7423a9be9bfa13335c2205",
+    "model_sha256": "00a86a3625788b361fbfe144c3e921e85c194a60e00c856b0443b3e3e70f84a0",
     "path": "evidence/training/block2/latest.pt"
   },
-  "measured_new_cpu_seconds": 65253.212575936006,
+  "measured_new_cpu_seconds": 67531.80089638801,
   "milestone": "evidence/execution/integration-milestone.json",
   "milestone_checkpoint_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
-  "open_invocation": {
-    "head": "2ae07c802e11da85a40a20671d39d9937610cf29",
-    "launcher_sha256": "16db174c6b38e8fa54ebcfe81c7cc52ede6d32499888baa46ff44d7a71832a18",
-    "reservation_seconds": 60.0,
-    "started_utc": "2026-10-18T07:15:44Z"
-  },
-  "open_optimizer_reservation": {
-    "batch_index": 4,
-    "block": "block2",
-    "reservation_seconds": 3941.62270752,
-    "started_utc": "2026-10-18T15:06:02Z"
-  },
+  "open_invocation": null,
+  "open_optimizer_reservation": null,
   "open_worker_reservations": {},
-  "phase": "training-block2",
+  "phase": "budget-stop",
   "purpose": "STUDY_ONLY",
   "runtime": {
     "deterministic_algorithms": true,
@@ -1334,7 +1324,7 @@
       "torch_threads": 1
     }
   },
-  "stop_reason": "actual prospective CPU 81.953s cannot safely reserve the next operation inside the 3000s cap (workers=4, game_reserve=459.395s each, optimizer_reserve=1144.266s, parent_reserve=60.000s)",
+  "stop_reason": "actual prospective CPU 67568.236s cannot safely reserve the next operation inside the 150000s cap (workers=8, game_reserve=10673.570s each, optimizer_reserve=3941.623s, parent_reserve=60.000s)",
   "worker_selection": {
     "configured_cap": 8,
     "effective_cpu_count": 16,
