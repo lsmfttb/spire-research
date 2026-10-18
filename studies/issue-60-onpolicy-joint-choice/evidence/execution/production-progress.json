@@ -1,5 +1,5 @@
 {
-  "accounted_new_cpu_seconds": 67674.62919554101,
+  "accounted_new_cpu_seconds": 68121.27802194802,
   "administrative_debit_cpu_seconds": 131.953064391,
   "administrative_debits": [
     {
@@ -1247,7 +1247,7 @@
     "source_of_reserves": "previous_stop_reason retained in production-progress.json",
     "timestamp_utc": "2026-10-18T18:44:21Z"
   },
-  "events_written": 2637,
+  "events_written": 2881,
   "historical_accounting": {
     "accepted_interruption_debit_cpu_seconds": 1572.370806919,
     "historical_admin_total_cpu_seconds": 25644.469,
@@ -1268,10 +1268,10 @@
   "historical_admin_total_cpu_seconds": 25644.469,
   "issue60_bounded_diagnostics_cpu_recorded": true,
   "last_cache_verification": {
-    "completed_run_keys": 1543,
-    "dispatcher_workers": 1,
-    "stage": "startup",
-    "timestamp_utc": "2026-10-18T18:09:27Z"
+    "completed_run_keys": 1544,
+    "dispatcher_workers": 7,
+    "stage": "before-training-block2",
+    "timestamp_utc": "2026-10-18T18:46:20Z"
   },
   "last_optimizer_update": {
     "batch_index": 4,
@@ -1287,13 +1287,23 @@
     "model_sha256": "00a86a3625788b361fbfe144c3e921e85c194a60e00c856b0443b3e3e70f84a0",
     "path": "evidence/training/block2/latest.pt"
   },
-  "measured_new_cpu_seconds": 67542.67613115002,
+  "measured_new_cpu_seconds": 67989.32495755702,
   "milestone": "evidence/execution/integration-milestone.json",
   "milestone_checkpoint_sha256": "228f611b43070a1f93fa46e7ac6f9420edeb336ae8c9013619056f5849de3bfd",
-  "open_invocation": null,
-  "open_optimizer_reservation": null,
+  "open_invocation": {
+    "head": "5267a46ef0f1229b2e708f5dfd826b3eb0beb3b0",
+    "launcher_sha256": "3b33e6de35d57c444188a727b892f33e6fa6a96b03902c3ee34cb39233409462",
+    "reservation_seconds": 60.0,
+    "started_utc": "2026-10-18T18:45:20Z"
+  },
+  "open_optimizer_reservation": {
+    "batch_index": 5,
+    "block": "block2",
+    "reservation_seconds": 4640.8148545939985,
+    "started_utc": "2026-10-18T18:48:07Z"
+  },
   "open_worker_reservations": {},
-  "phase": "single-key-witness-complete",
+  "phase": "training-block2",
   "previous_stop_reason": "actual prospective CPU 67568.236s cannot safely reserve the next operation inside the 150000s cap (workers=8, game_reserve=10673.570s each, optimizer_reserve=3941.623s, parent_reserve=60.000s)",
   "public_history_execution": {
     "active_executor": "sts_combat_rl.sim.controlled_run.execute_controlled_run",
@@ -1303,7 +1313,7 @@
       "MAP_SCREEN",
       "REWARDS"
     ],
-    "metrics_path": "/mnt/d/DeadlycatCoding/spire-research-issue60-bounded-correctness/studies/issue-60-onpolicy-joint-choice/evidence/execution/public-history-execution.jsonl",
+    "metrics_path": "/mnt/c/Users/lsmft/.codex/worktrees/issue60-continuation/spire-research/studies/issue-60-onpolicy-joint-choice/evidence/execution/public-history-execution.jsonl",
     "new_entry_validation": "pinned sanitize_public_run_context plus schema/version/index check once before append",
     "optimizer_id": "issue60-demand-driven-public-history-v1",
     "pinned_stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
@@ -1346,9 +1356,9 @@
   "source_validation": {
     "base_commit": "9525d416b9488bb2455435699893b03fe19fe30a",
     "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-    "current_production_entry_git_blob": "e9b1bab0baa48d825c17cb1f85f1e2a7f4302259",
+    "current_production_entry_git_blob": "1e947c5de6ec93dc06c3185dcc2399ab11d90242",
     "current_production_entry_path": "studies/issue-60-onpolicy-joint-choice/production_entry.py",
-    "current_production_entry_sha256": "e1ccf1100a3bbb5f4af5778a42c4611fa169328121653dc9044e187d3b562fa9",
+    "current_production_entry_sha256": "3b33e6de35d57c444188a727b892f33e6fa6a96b03902c3ee34cb39233409462",
     "current_public_history_optimizer_git_blob": "cf12fa14c6969508fbb5933c5ada9d183eec92bc",
     "current_public_history_optimizer_path": "studies/issue-60-onpolicy-joint-choice/public_history_execution.py",
     "current_public_history_optimizer_sha256": "f6c3d1874fb20172406b161ab0296ef80a665ab0017840adba6af2fcf44fa2f4",
@@ -1374,9 +1384,9 @@
     "checkpoint_file_sha256": "c00a17141943a114d186f19895ae39742f57f884ea09f8291cf053b64fa707aa",
     "checkpoint_path": "evidence/training/block1/latest.pt",
     "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
-    "head": "280d410cd387c28f031a2ba2014be7ac79c20f3e",
+    "head": "5267a46ef0f1229b2e708f5dfd826b3eb0beb3b0",
     "launcher": "production_entry.py",
-    "launcher_sha256": "e1ccf1100a3bbb5f4af5778a42c4611fa169328121653dc9044e187d3b562fa9",
+    "launcher_sha256": "3b33e6de35d57c444188a727b892f33e6fa6a96b03902c3ee34cb39233409462",
     "runtime": {
       "deterministic_algorithms": true,
       "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
@@ -1405,13 +1415,11 @@
   },
   "worker_selection": {
     "configured_cap": 8,
-    "effective_cpu_count": 16,
-    "host_selected_worker_count": 8,
+    "effective_cpu_count": 7,
     "measured_worker_peak_rss_bytes": 1602899968,
     "memory_based_worker_capacity": 11,
-    "memory_reserve_bytes": 4791910400,
-    "single_key_witness_worker_ceiling": 1,
-    "worker_count": 1,
+    "memory_reserve_bytes": 4776911667,
+    "worker_count": 7,
     "worker_peak_rss_samples_bytes": [
       1563795456,
       1565499392,
