@@ -1,0 +1,337 @@
+{
+  "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+  "cpu_runtime": "2.12.0+cpu; 1 thread; deterministic algorithms enabled",
+  "frozen_issue60_commit": "1cce7997c648121742f0df0cfb95a2211aa3492c",
+  "gradient_probes": {
+    "block1_final_policy_vs_critic": {
+      "candidate_count": 4,
+      "critic_0.5_shared_gradient_norm": 0.001267298745601493,
+      "critic_0.5_value_head_gradient_norm": 0.0007471556693834353,
+      "game_seed": 660897,
+      "optimizer_steps": 0,
+      "policy_actor[-1]_gradient_norm": 6.436992580305837e-05,
+      "policy_actor[0]_gradient_norm": 7.727168537161846e-06,
+      "policy_row_loss_gradient_norm": 8.921378527326879e-05,
+      "policy_shared_gradient_norm": 6.1285422420768e-05,
+      "policy_vs_0.5_critic_shared_cosine": 0.02463325968290286,
+      "ppo_ratio": 1.0014894008636475,
+      "probe_advantage": -0.0711915115515391,
+      "stored_raw_advantage": -0.0711915115515391
+    },
+    "block1_initial_policy_vs_critic": {
+      "candidate_count": 4,
+      "critic_0.5_shared_gradient_norm": 0.027791712348778405,
+      "critic_0.5_value_head_gradient_norm": 0.009090629897866034,
+      "game_seed": 660001,
+      "optimizer_steps": 0,
+      "policy_actor[-1]_gradient_norm": 9.447049754658692e-06,
+      "policy_actor[0]_gradient_norm": 0.0,
+      "policy_row_loss_gradient_norm": 9.447049754658692e-06,
+      "policy_shared_gradient_norm": 0.0,
+      "policy_vs_0.5_critic_shared_cosine": null,
+      "ppo_ratio": 1.0,
+      "probe_advantage": 0.34979955752690634,
+      "stored_raw_advantage": 0.34979955752690634
+    },
+    "method": "single retained decision-row autograd decomposition; no optimizer step; stored raw advantage, per-game denominator 128; critic coefficient 0.5"
+  },
+  "integrity": {
+    "block1": {
+      "actual_final_pt_sha256": "c00a17141943a114d186f19895ae39742f57f884ea09f8291cf053b64fa707aa",
+      "batch01_model_sha256_before": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+      "completed_batches": 8,
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "final_json_checkpoint_sha256": "c00a17141943a114d186f19895ae39742f57f884ea09f8291cf053b64fa707aa",
+      "final_model_sha256": "463ac5426cb9a1a8a3f952652ca0d986616c2d744f2d7130b5a98109bc928303",
+      "integrity": "PASS",
+      "model_seed": 660101,
+      "reconstructed_initial_model_sha256": "a00a775a36443545720f709c8932cb6d0b175fd7ffb3a2ac0b30ae74b4a469eb",
+      "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+    },
+    "block2": {
+      "actual_final_pt_sha256": "c2ab74cef99476462054fdd372f0d0c9b6d862052e14bf7b475a23e50ad1b36c",
+      "batch01_model_sha256_before": "23a3ca68c5370944becbcf661d2f3df52e65785d31bb1dd530e3302f5e698e3f",
+      "completed_batches": 8,
+      "config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+      "final_json_checkpoint_sha256": "c2ab74cef99476462054fdd372f0d0c9b6d862052e14bf7b475a23e50ad1b36c",
+      "final_model_sha256": "16da45d181e713d8d33fb97344ebada9720b1f19565725a87a93009f0153f52d",
+      "integrity": "PASS",
+      "model_seed": 660102,
+      "reconstructed_initial_model_sha256": "23a3ca68c5370944becbcf661d2f3df52e65785d31bb1dd530e3302f5e698e3f",
+      "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+    }
+  },
+  "optimizer_steps": 0,
+  "parameter_deltas": {
+    "block1": {
+      "actor[-1].bias": {
+        "delta_l2": 0.0035994977224618196,
+        "delta_max_abs": 0.0035994977224618196,
+        "delta_rms": 0.0035994977224618196,
+        "final_l2": 0.0035994977224618196,
+        "init_l2": 0.0,
+        "parameter_count": 1,
+        "relative_delta": null
+      },
+      "actor[-1].weight": {
+        "delta_l2": 0.1424504921957801,
+        "delta_max_abs": 0.028574824333190918,
+        "delta_rms": 0.017806311524472512,
+        "final_l2": 0.1424504921957801,
+        "init_l2": 0.0,
+        "parameter_count": 64,
+        "relative_delta": null
+      },
+      "actor[0]": {
+        "delta_l2": 2.5173683941448752,
+        "delta_max_abs": 0.08527038991451263,
+        "delta_rms": 0.01756322528441011,
+        "final_l2": 5.345366263948963,
+        "init_l2": 4.6295985708744185,
+        "parameter_count": 20544,
+        "relative_delta": 0.5437552210211188
+      },
+      "all_parameters": {
+        "delta_l2": 3.595694277673948,
+        "delta_max_abs": 0.10007762908935547,
+        "delta_rms": 0.011151383123451585,
+        "final_l2": 111.04055706313758,
+        "init_l2": 110.96383084265672,
+        "parameter_count": 103970,
+        "relative_delta": 0.03240420099385836
+      },
+      "category": {
+        "delta_l2": 1.0078427473597862,
+        "delta_max_abs": 0.08174139261245728,
+        "delta_rms": 0.009103709664265998,
+        "final_l2": 110.09717204311549,
+        "init_l2": 110.08333608638446,
+        "parameter_count": 12256,
+        "relative_delta": 0.009155270753866988
+      },
+      "choice_combine": {
+        "delta_l2": 1.0500210511113652,
+        "delta_max_abs": 0.06365817785263062,
+        "delta_rms": 0.011556149826399865,
+        "final_l2": 4.814996153903159,
+        "init_l2": 4.661743222920003,
+        "parameter_count": 8256,
+        "relative_delta": 0.225242146746482
+      },
+      "entity": {
+        "delta_l2": 0.6451160430440209,
+        "delta_max_abs": 0.06867598742246628,
+        "delta_rms": 0.008145820155154653,
+        "final_l2": 6.664029818276463,
+        "init_l2": 6.618077791086841,
+        "parameter_count": 6272,
+        "relative_delta": 0.09747785737920103
+      },
+      "global_context": {
+        "delta_l2": 1.7419242161021802,
+        "delta_max_abs": 0.10007762908935547,
+        "delta_rms": 0.009217691527903566,
+        "final_l2": 6.781566458319646,
+        "init_l2": 6.552352986262373,
+        "parameter_count": 35712,
+        "relative_delta": 0.26584712694115975
+      },
+      "map_message": {
+        "delta_l2": 0.8281014365297934,
+        "delta_max_abs": 0.09509068820625544,
+        "delta_rms": 0.0064444179411873685,
+        "final_l2": 6.623555243451145,
+        "init_l2": 6.536672161982675,
+        "parameter_count": 16512,
+        "relative_delta": 0.12668547787145215
+      },
+      "map_node": {
+        "delta_l2": 0.5627149338739958,
+        "delta_max_abs": 0.06817027553915977,
+        "delta_rms": 0.008593321350297644,
+        "final_l2": 4.714994739192697,
+        "init_l2": 4.653635937253878,
+        "parameter_count": 4288,
+        "relative_delta": 0.12091941472457671
+      },
+      "shared_encoder_and_global_context": {
+        "delta_l2": 2.563428559723525,
+        "delta_max_abs": 0.10007762908935547,
+        "delta_rms": 0.0088819667974719,
+        "final_l2": 110.91020276040733,
+        "init_l2": 110.86563681988916,
+        "parameter_count": 83296,
+        "relative_delta": 0.02312193961315567
+      },
+      "value": {
+        "delta_l2": 0.02006556105914024,
+        "delta_max_abs": 0.007769344374537468,
+        "delta_rms": 0.0024888265403540163,
+        "final_l2": 0.582229286754147,
+        "init_l2": 0.5908848201769734,
+        "parameter_count": 65,
+        "relative_delta": 0.033958498126810045
+      }
+    },
+    "block2": {
+      "actor[-1].bias": {
+        "delta_l2": 0.0022426419891417027,
+        "delta_max_abs": 0.0022426419891417027,
+        "delta_rms": 0.0022426419891417027,
+        "final_l2": 0.0022426419891417027,
+        "init_l2": 0.0,
+        "parameter_count": 1,
+        "relative_delta": null
+      },
+      "actor[-1].weight": {
+        "delta_l2": 0.19365785875308303,
+        "delta_max_abs": 0.03718026354908943,
+        "delta_rms": 0.02420723234413538,
+        "final_l2": 0.19365785875308303,
+        "init_l2": 0.0,
+        "parameter_count": 64,
+        "relative_delta": null
+      },
+      "actor[0]": {
+        "delta_l2": 2.942366095944133,
+        "delta_max_abs": 0.0879204124212265,
+        "delta_rms": 0.020528357602515836,
+        "final_l2": 5.515859395074405,
+        "init_l2": 4.624909307002976,
+        "parameter_count": 20544,
+        "relative_delta": 0.636199739417342
+      },
+      "all_parameters": {
+        "delta_l2": 4.162369012412847,
+        "delta_max_abs": 0.13143660128116608,
+        "delta_rms": 0.012908820376304342,
+        "final_l2": 111.5898934497454,
+        "init_l2": 111.49248008687397,
+        "parameter_count": 103970,
+        "relative_delta": 0.037333181656462974
+      },
+      "category": {
+        "delta_l2": 1.0805242389176564,
+        "delta_max_abs": 0.07951641082763672,
+        "delta_rms": 0.009760231923162053,
+        "final_l2": 110.62984697430483,
+        "init_l2": 110.61703621467137,
+        "parameter_count": 12256,
+        "relative_delta": 0.009768153947107328
+      },
+      "choice_combine": {
+        "delta_l2": 1.2855608852928144,
+        "delta_max_abs": 0.047708556056022644,
+        "delta_rms": 0.014148415582410421,
+        "final_l2": 4.849240061752727,
+        "init_l2": 4.620054294442294,
+        "parameter_count": 8256,
+        "relative_delta": 0.2782566617970882
+      },
+      "entity": {
+        "delta_l2": 0.9047997396151736,
+        "delta_max_abs": 0.13143660128116608,
+        "delta_rms": 0.011424821991030596,
+        "final_l2": 6.655538524899779,
+        "init_l2": 6.556547568719874,
+        "parameter_count": 6272,
+        "relative_delta": 0.13799941663381088
+      },
+      "global_context": {
+        "delta_l2": 1.8190040615163108,
+        "delta_max_abs": 0.11713135242462158,
+        "delta_rms": 0.009625572784434811,
+        "final_l2": 6.828559032053147,
+        "init_l2": 6.574367538040669,
+        "parameter_count": 35712,
+        "relative_delta": 0.2766812246183639
+      },
+      "map_message": {
+        "delta_l2": 1.1154686760272272,
+        "delta_max_abs": 0.09288978949189186,
+        "delta_rms": 0.008680755800577276,
+        "final_l2": 6.72460011040646,
+        "init_l2": 6.565006147246528,
+        "parameter_count": 16512,
+        "relative_delta": 0.16991129193307353
+      },
+      "map_node": {
+        "delta_l2": 0.661965203573195,
+        "delta_max_abs": 0.05992790125310421,
+        "delta_rms": 0.010108990137968222,
+        "final_l2": 4.789268475558034,
+        "init_l2": 4.70229241594778,
+        "parameter_count": 4288,
+        "relative_delta": 0.1407749976007758
+      },
+      "shared_encoder_and_global_context": {
+        "delta_l2": 2.9377042164322202,
+        "delta_max_abs": 0.13143660128116608,
+        "delta_rms": 0.010178786224476748,
+        "final_l2": 111.45205660471785,
+        "init_l2": 111.39522021534925,
+        "parameter_count": 83296,
+        "relative_delta": 0.026371905461949355
+      },
+      "value": {
+        "delta_l2": 0.013531222763855865,
+        "delta_max_abs": 0.006219353526830673,
+        "delta_rms": 0.0016783416241823179,
+        "final_l2": 0.5302692168648974,
+        "init_l2": 0.536882666705751,
+        "parameter_count": 65,
+        "relative_delta": 0.025203314621576177
+      }
+    }
+  },
+  "process_cpu_seconds": 7.049175842,
+  "purpose": "STUDY_ONLY; read-only post-hoc diagnosis of frozen Issue 60 checkpoints",
+  "schema_id": "issue61-actor-critic-initialization-diagnosis-v1",
+  "score_movement": {
+    "block1_checkpoint_on_block1_batch08": {
+      "abs_residual_p0_winner_margin_fraction_median": 0.009060677338302904,
+      "abs_residual_p0_winner_margin_fraction_p95": 0.08233954613119639,
+      "candidate_count_histogram": {
+        "2": 9,
+        "3": 52,
+        "4": 60,
+        "5": 5,
+        "6": 2
+      },
+      "centered_residual_max_abs_max": 0.637006402015686,
+      "centered_residual_max_abs_mean": 0.1008144201223331,
+      "centered_residual_rms_mean": 0.06629544774495984,
+      "centered_residual_rms_median": 0.020542972682352174,
+      "centered_residual_rms_p95": 0.34009174900338474,
+      "distinct_game_seeds": 128,
+      "pairwise_log_odds_shift_max": 1.0870990753173828,
+      "pairwise_log_odds_shift_median": 0.048782430589199066,
+      "pairwise_log_odds_shift_p95": 0.8949282586574553,
+      "retained_decision_rows": 128
+    },
+    "block2_checkpoint_on_block2_batch08": {
+      "abs_residual_p0_winner_margin_fraction_median": 0.040588429882598254,
+      "abs_residual_p0_winner_margin_fraction_p95": 0.19974018889047576,
+      "candidate_count_histogram": {
+        "2": 12,
+        "3": 53,
+        "4": 59,
+        "5": 3,
+        "6": 1
+      },
+      "centered_residual_max_abs_max": 1.201300859451294,
+      "centered_residual_max_abs_mean": 0.17461896711029112,
+      "centered_residual_rms_mean": 0.11941357248406062,
+      "centered_residual_rms_median": 0.07758458809272267,
+      "centered_residual_rms_p95": 0.380936987772216,
+      "distinct_game_seeds": 128,
+      "pairwise_log_odds_shift_max": 1.8212045431137085,
+      "pairwise_log_odds_shift_median": 0.1941029354929924,
+      "pairwise_log_odds_shift_p95": 1.0313415288925167,
+      "retained_decision_rows": 128
+    },
+    "method": "first supported multi-choice row per game_seed in each retained batch-08 training file; each checkpoint evaluated on the same public input used by its initialization, whose zero-initialized actor[-1] gives zero residuals. This is not the retained evaluation action-flip audit."
+  },
+  "simulator_calls": 0,
+  "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
+}
