@@ -24,6 +24,7 @@ DOMAIN = "issue63-natural-review-v1"
 SCREEN_COUNTS = {"MAP_SCREEN": 35, "REWARDS": 61}
 ACTION_FIELDS = ("scope", "kind", "idx1", "idx2", "idx3", "label")
 UNKNOWN = "未记录/不可见"
+MAP_PREVIEW_STEPS = 4
 
 
 class PacketBlocked(RuntimeError):
@@ -226,6 +227,30 @@ def list_lines(value: Any, keys: tuple[str, ...]) -> list[str]:
     return result
 
 
+def map_nodes(record: Mapping[str, Any]) -> dict[tuple[int, int], Mapping[str, Any]]:
+    state, avail = record["state"], record["availability"]
+    if avail.get("visible_map_graph") != "available":
+        block("visible_map_graph 不可用，不能呈现路线下游拓扑")
+    graph = state.get("map_graph")
+    if not isinstance(graph, list):
+        block("visible_map_graph available 但 public_state.map_graph 不是列表")
+    nodes: dict[tuple[int, int], Mapping[str, Any]] = {}
+    for ordinal, entry in enumerate(graph, 1):
+        if not isinstance(entry, Mapping):
+            block(f"公开地图图第 {ordinal} 项不是对象")
+        x, y, symbol, edges = (entry.get("x"), entry.get("y"),
+                               entry.get("room_symbol"), entry.get("outgoing_edges"))
+        if type(x) is not int or type(y) is not int or not isinstance(symbol, str) or not symbol:
+            block(f"公开地图图第 {ordinal} 项缺少有效坐标或房型")
+        if not isinstance(edges, list):
+            block(f"公开地图图第 {ordinal} 项 outgoing_edges 不是列表")
+        coord = (x, y)
+        if coord in nodes:
+            block(f"公开地图图坐标重复: {coord}")
+        nodes[coord] = entry
+    return nodes
+
+
 def map_context(record: Mapping[str, Any]) -> tuple[str, str]:
     state, avail = record["state"], record["availability"]
     node = available_direct(state, avail, "current_map_node")
@@ -241,12 +266,124 @@ def map_context(record: Mapping[str, Any]) -> tuple[str, str]:
         return canonical(node), UNKNOWN
     if not isinstance(graph, list):
         block("visible_map_graph 不是列表")
+    if node.get("location") != "map_node":
+        return canonical(node), UNKNOWN
     matches = [entry for entry in graph if isinstance(entry, Mapping)
                and entry.get("x") == node.get("x") and entry.get("y") == node.get("y")]
     if len(matches) != 1:
         return canonical(node), UNKNOWN
     edges = matches[0].get("outgoing_edges")
     return canonical(node), canonical(edges) if isinstance(edges, list) else UNKNOWN
+
+
+def map_node_label(node: Mapping[str, Any]) -> str:
+    return f"{text_value(node['room_symbol'])}@({node['x']},{node['y']})"
+
+
+def route_previews(record: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Project four directed-edge steps after each legal route from public map data."""
+    if record["screen"] != "MAP_SCREEN":
+        return []
+    nodes = map_nodes(record)
+    previews = []
+    for option_number, option in enumerate(record["options"], 1):
+        semantics = option["semantics"]
+        if semantics.get("choice_type") != "map_route":
+            continue
+        destination = semantics.get("destination")
+        if (not isinstance(destination, Mapping)
+                or destination.get("location") != "map_node"
+                or type(destination.get("x")) is not int
+                or type(destination.get("y")) is not int):
+            block(f"合法 MAP 选项 #{option_number} 缺少公开地图目的地")
+        root = (destination["x"], destination["y"])
+        if root not in nodes:
+            block(f"合法 MAP 选项 #{option_number} 的目的地不在可见地图图中")
+        root_node = nodes[root]
+        if root_node.get("room_symbol") != destination.get("room_symbol"):
+            block(f"合法 MAP 选项 #{option_number} 的目的地房型与地图图不一致")
+
+        levels = []
+        frontier = [root]
+        visited = {root}
+        for step in range(MAP_PREVIEW_STEPS + 1):
+            rows = []
+            next_frontier = []
+            for coord in sorted(frontier):
+                node = nodes[coord]
+                successors = []
+                if step < MAP_PREVIEW_STEPS:
+                    for edge in node["outgoing_edges"]:
+                        if (not isinstance(edge, Mapping)
+                                or type(edge.get("x")) is not int
+                                or type(edge.get("y")) is not int):
+                            block(f"地图节点 {coord} 的公开出边坐标无效")
+                        target = (edge["x"], edge["y"])
+                        child = nodes.get(target)
+                        if child is None:
+                            block(f"地图节点 {coord} 的公开出边目标 {target} 不在图中")
+                        successors.append(map_node_label(child))
+                        if target not in visited:
+                            visited.add(target)
+                            next_frontier.append(target)
+                rows.append({"node": map_node_label(node),
+                             "successors": successors,
+                             "at_preview_limit": step == MAP_PREVIEW_STEPS})
+            levels.append(rows)
+            if not next_frontier:
+                break
+            frontier = next_frontier
+        previews.append({"option_number": option_number,
+                         "destination": map_node_label(root_node),
+                         "levels": levels})
+    if not previews:
+        block("MAP_SCREEN 没有可呈现的合法 map_route 选项")
+    return previews
+
+
+def _group_fields(value: Any, prefix: str = "") -> list[tuple[str, Any]]:
+    found: list[tuple[str, Any]] = []
+    if not isinstance(value, Mapping):
+        return found
+    for key, item in value.items():
+        name = str(key)
+        normalized = name.lower()
+        path = f"{prefix}.{name}" if prefix else name
+        if "group" in normalized or "exclu" in normalized or "claim" in normalized:
+            found.append((path, item))
+        elif isinstance(item, Mapping):
+            found.extend(_group_fields(item, path))
+    return found
+
+
+def reward_context_lines(record: Mapping[str, Any]) -> list[str]:
+    context = record["state"].get("screen_context")
+    if not isinstance(context, Mapping):
+        block("REWARDS 缺少当前公开 screen_context")
+    explicit = [(f"screen_context.{key}", value)
+                for key, value in _group_fields(context)]
+    categories: dict[str, list[int]] = {}
+    for option_number, option in enumerate(record["options"], 1):
+        semantics = option["semantics"]
+        explicit.extend((f"option#{option_number}.{key}", value)
+                        for key, value in _group_fields(semantics))
+        choice_type = semantics.get("choice_type")
+        if not isinstance(choice_type, str):
+            block(f"REWARDS 合法选项 #{option_number} 缺少公开 choice_type")
+        categories.setdefault(choice_type, []).append(option_number)
+    lines = ["### 奖励选项类别与公开分组信息"]
+    if explicit:
+        lines.append("- public_input 中直接记录的分组/领取/互斥字段：")
+        lines.extend(f"  - `{key}`：{fence(value)}" for key, value in explicit)
+    else:
+        lines.append("- 当前 screen_context 及各合法选项语义均未记录奖励组 ID、组成员、共同领取或互斥字段：未记录/不可见。")
+    lines.append("- 按可见 choice_type 汇总（仅为语义类别，不代表实际领取分组或互斥规则）：")
+    for choice_type, option_numbers in categories.items():
+        numbers = ", ".join(f"#{number}" for number in option_numbers)
+        lines.append(f"  - `{choice_type}`：合法选项 {numbers}")
+    if not explicit:
+        lines.append("- 不据此推断不同类别或同类别选项能否共同领取；共同领取/互斥关系：未记录/不可见。")
+    return lines
 
 
 def fence(value: Any) -> str:
@@ -292,10 +429,39 @@ def render_case(case_id: str, record: Mapping[str, Any]) -> str:
         f"- 钥匙：{text_value(resource_value(resources, 'keys'))}",
     ])
     node, edges = map_context(record)
+    edge_text = text_value(edges)
+    current_node = state.get("current_map_node")
+    if (screen == "MAP_SCREEN" and isinstance(current_node, Mapping)
+            and current_node.get("location") == "before_first_route"):
+        edge_text += "（当前节点无唯一地图坐标；不表示候选目的地下游图不可见）"
     lines.extend([
         f"- 当前公开地图节点：{text_value(node)}",
-        f"- 该节点在公开地图图中的直接后继：{text_value(edges)}",
+        f"- 该节点在公开地图图中的直接后继：{edge_text}",
         "",
+    ])
+    if screen == "MAP_SCREEN":
+        lines.extend([
+            "### 各合法路线目的地的公开下游地图",
+            f"- 按每个合法路线选项分别展开；从目的地起沿 public_state.map_graph 的有向边展示最多 {MAP_PREVIEW_STEPS} 跳。房型和坐标直接取公开图；跳数边界之外不呈现。",
+        ])
+        for preview in route_previews(record):
+            lines.append(f"- 合法选项 #{preview['option_number']}，目的地 {preview['destination']}：")
+            for step, rows in enumerate(preview["levels"]):
+                parts = []
+                for row in rows:
+                    if row["at_preview_limit"]:
+                        relation = "（预览边界；更下游未呈现）"
+                    elif row["successors"]:
+                        relation = " → " + ", ".join(row["successors"])
+                    else:
+                        relation = " → 无已记录后继"
+                    parts.append(row["node"] + relation)
+                lines.append(f"  - 第 {step} 跳：" + "；".join(parts))
+        lines.append("")
+    if screen == "REWARDS":
+        lines.extend(reward_context_lines(record))
+        lines.append("")
+    lines.extend([
         "### 全部合法选项（保持 public_input 的原有顺序）",
         "每项保留公开选择语义及其对应候选动作身份；序号仅为本卡展示顺序。", "",
     ])
