@@ -107,7 +107,8 @@ def _score_summary(model: JointChoiceActorCritic, rows: list[dict], vocab: Vocab
     rms: list[float] = []
     max_abs: list[float] = []
     pairwise: list[float] = []
-    barrier_fraction: list[float] = []
+    adverse_margin_fraction: list[float] = []
+    max_absolute_margin_fraction: list[float] = []
     candidate_counts: dict[str, int] = {}
     model.eval()
     with torch.no_grad():
@@ -123,9 +124,17 @@ def _score_summary(model: JointChoiceActorCritic, rows: list[dict], vocab: Vocab
             pairwise.append(float(centered.max() - centered.min()))
             p0 = [float(x) for x in row["p0"]]
             best = max(range(n), key=p0.__getitem__)
-            second = max((i for i in range(n) if i != best), key=p0.__getitem__)
-            base_margin = math.log(p0[best] / p0[second])
-            barrier_fraction.append(abs(float(logits[best] - logits[second])) / base_margin)
+            alternatives = [i for i in range(n) if i != best]
+            if any(p0[i] <= 0.0 or p0[best] <= p0[i] for i in alternatives):
+                raise ValueError("expected one p0 winner above positive alternative probabilities")
+            margin_fractions = [
+                float(logits[i] - logits[best]) / math.log(p0[best] / p0[i])
+                for i in alternatives
+            ]
+            # Positive alternative-minus-winner shift erodes the p0 winner margin.
+            # The absolute maximum also captures shifts favoring the winner.
+            adverse_margin_fraction.append(max(0.0, max(margin_fractions)))
+            max_absolute_margin_fraction.append(max(abs(x) for x in margin_fractions))
 
     def percentile(values: list[float], p: float) -> float:
         values = sorted(values)
@@ -150,8 +159,10 @@ def _score_summary(model: JointChoiceActorCritic, rows: list[dict], vocab: Vocab
         "pairwise_log_odds_shift_median": percentile(pairwise, 0.5),
         "pairwise_log_odds_shift_p95": percentile(pairwise, 0.95),
         "pairwise_log_odds_shift_max": max(pairwise) if pairwise else None,
-        "abs_residual_p0_winner_margin_fraction_median": percentile(barrier_fraction, 0.5),
-        "abs_residual_p0_winner_margin_fraction_p95": percentile(barrier_fraction, 0.95),
+        "max_adverse_alt_score_shift_over_p0_margin_median": percentile(adverse_margin_fraction, 0.5),
+        "max_adverse_alt_score_shift_over_p0_margin_p95": percentile(adverse_margin_fraction, 0.95),
+        "max_abs_winner_to_alt_score_shift_over_p0_margin_median": percentile(max_absolute_margin_fraction, 0.5),
+        "max_abs_winner_to_alt_score_shift_over_p0_margin_p95": percentile(max_absolute_margin_fraction, 0.95),
     }
 
 
@@ -327,7 +338,7 @@ def main() -> None:
         "integrity": integrity,
         "parameter_deltas": parameter_deltas,
         "score_movement": {
-            "method": "first supported multi-choice row per game_seed in each retained batch-08 training file; each checkpoint evaluated on the same public input used by its initialization, whose zero-initialized actor[-1] gives zero residuals. This is not the retained evaluation action-flip audit.",
+            "method": "first supported multi-choice row per game_seed in each retained batch-08 training file; on each public input, compare every alternative i to the unique p0 winner w using margin_i=log(p0[w]/p0[i]). Per row, adverse fraction=max(0,max_i((logit[i]-logit[w])/margin_i)); absolute fraction=max_i(abs(logit[i]-logit[w])/margin_i). Both take maxima over all alternatives and are candidate-order invariant. This is not the retained evaluation action-flip audit.",
             "block1_checkpoint_on_block1_batch08": score_movement["block1"],
             "block2_checkpoint_on_block2_batch08": score_movement["block2"],
         },

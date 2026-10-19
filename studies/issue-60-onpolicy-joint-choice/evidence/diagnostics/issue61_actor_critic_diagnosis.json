@@ -284,13 +284,11 @@
       }
     }
   },
-  "process_cpu_seconds": 7.049175842,
+  "process_cpu_seconds": 6.709256432999999,
   "purpose": "STUDY_ONLY; read-only post-hoc diagnosis of frozen Issue 60 checkpoints",
   "schema_id": "issue61-actor-critic-initialization-diagnosis-v1",
   "score_movement": {
     "block1_checkpoint_on_block1_batch08": {
-      "abs_residual_p0_winner_margin_fraction_median": 0.009060677338302904,
-      "abs_residual_p0_winner_margin_fraction_p95": 0.08233954613119639,
       "candidate_count_histogram": {
         "2": 9,
         "3": 52,
@@ -304,14 +302,16 @@
       "centered_residual_rms_median": 0.020542972682352174,
       "centered_residual_rms_p95": 0.34009174900338474,
       "distinct_game_seeds": 128,
+      "max_abs_winner_to_alt_score_shift_over_p0_margin_median": 0.013645507852193699,
+      "max_abs_winner_to_alt_score_shift_over_p0_margin_p95": 0.21536514872754947,
+      "max_adverse_alt_score_shift_over_p0_margin_median": 0.0026714350574895207,
+      "max_adverse_alt_score_shift_over_p0_margin_p95": 0.08703213448836958,
       "pairwise_log_odds_shift_max": 1.0870990753173828,
       "pairwise_log_odds_shift_median": 0.048782430589199066,
       "pairwise_log_odds_shift_p95": 0.8949282586574553,
       "retained_decision_rows": 128
     },
     "block2_checkpoint_on_block2_batch08": {
-      "abs_residual_p0_winner_margin_fraction_median": 0.040588429882598254,
-      "abs_residual_p0_winner_margin_fraction_p95": 0.19974018889047576,
       "candidate_count_histogram": {
         "2": 12,
         "3": 53,
@@ -325,12 +325,16 @@
       "centered_residual_rms_median": 0.07758458809272267,
       "centered_residual_rms_p95": 0.380936987772216,
       "distinct_game_seeds": 128,
+      "max_abs_winner_to_alt_score_shift_over_p0_margin_median": 0.05159933727197037,
+      "max_abs_winner_to_alt_score_shift_over_p0_margin_p95": 0.2676896965349679,
+      "max_adverse_alt_score_shift_over_p0_margin_median": 0.0,
+      "max_adverse_alt_score_shift_over_p0_margin_p95": 0.15237471757905946,
       "pairwise_log_odds_shift_max": 1.8212045431137085,
       "pairwise_log_odds_shift_median": 0.1941029354929924,
       "pairwise_log_odds_shift_p95": 1.0313415288925167,
       "retained_decision_rows": 128
     },
-    "method": "first supported multi-choice row per game_seed in each retained batch-08 training file; each checkpoint evaluated on the same public input used by its initialization, whose zero-initialized actor[-1] gives zero residuals. This is not the retained evaluation action-flip audit."
+    "method": "first supported multi-choice row per game_seed in each retained batch-08 training file; on each public input, compare every alternative i to the unique p0 winner w using margin_i=log(p0[w]/p0[i]). Per row, adverse fraction=max(0,max_i((logit[i]-logit[w])/margin_i)); absolute fraction=max_i(abs(logit[i]-logit[w])/margin_i). Both take maxima over all alternatives and are candidate-order invariant. This is not the retained evaluation action-flip audit."
   },
   "simulator_calls": 0,
   "vocabulary_sha256": "be26f114a56cba2ce1d864c57ce2e4135a5a3330a49e669310f542abcd46a9ad"
