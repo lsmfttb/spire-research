@@ -852,9 +852,25 @@ def init_runtime() -> None:
     CONFIG = json.loads(rs.CONFIG_PATH.read_text(encoding="utf-8"))
     rs.validate_config(CONFIG)
     repo_root = SOURCE.parent.parent
-    base = subprocess.check_output(["git", "-C", str(repo_root), "rev-parse", "HEAD"], text=True).strip()
-    if base != SOURCE_COMMIT:
-        raise RuntimeError(f"frozen Issue 60 source commit mismatch: {base}")
+    source_relative = SOURCE.relative_to(repo_root).as_posix()
+    pinned_tree = subprocess.check_output(
+        ["git", "-C", str(repo_root), "rev-parse", f"{SOURCE_COMMIT}:{source_relative}"],
+        text=True,
+    ).strip()
+    checkout_tree = subprocess.check_output(
+        ["git", "-C", str(repo_root), "rev-parse", f"HEAD:{source_relative}"],
+        text=True,
+    ).strip()
+    if checkout_tree != pinned_tree:
+        raise RuntimeError(
+            f"frozen Issue 60 source tree mismatch: expected {pinned_tree}, found {checkout_tree}"
+        )
+    source_changes = subprocess.check_output(
+        ["git", "-C", str(repo_root), "status", "--porcelain", "--untracked-files=all", "--", source_relative],
+        text=True,
+    ).strip()
+    if source_changes:
+        raise RuntimeError("frozen Issue 60 source worktree has local modifications")
     chain = verify_resource_chain(SOURCE, require_gate_seal=False)
     RUNTIME = rs.verify_runtime(CONFIG)
     VOCAB = rs.Vocabulary(SOURCE / "vocabulary.json")

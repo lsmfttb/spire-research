@@ -18,14 +18,14 @@ The fixed 96 owners yielded 35 MAP_SCREEN roots and 61 REWARDS roots, with no in
 - Native extension SHA-256: `68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73`.
 - Frozen block 1 checkpoint SHA-256: `463ac5426cb9a1a8a3f952652ca0d986616c2d744f2d7130b5a98109bc928303`.
 - Frozen block 2 checkpoint SHA-256: `16da45d181e713d8d33fb97344ebada9720b1f19565725a87a93009f0153f52d`.
-- Study runner SHA-256: `bdad8faf5d292582c8d32b058a814397fd87fab0035f520bd70240201cfd5b56`.
+- Study runner SHA-256 after the source-snapshot guard repair: `56ee81a8d76650aaa00c0358ccc2e64af528c97cb6935720757eec6ffea6190b`.
 - Resource amendment R1 chain validation: PASS. Runtime pins, APIs, deterministic-algorithm setting, and single-thread Torch setting are recorded in `evidence/manifest.json`.
 
 Each branch replayed from standard start through the natural p0 prefix. At the source root and branch root, the runner checked the sampled ordinal, legal action identities, public history/input digests, and native checkpoint fingerprint before forcing the selected lawful action. The pilot parity witness is in `evidence/pilot.json`; every dispatched row in `evidence/branches.json` records `root_verified: true`.
 
 One initial parallel-dispatch attempt completed its game work but failed collection because the frozen dispatcher's result-path check was rooted at the source directory. The study-local dispatcher setup was corrected to resolve the exact Issue #60 output paths; the attempt's **14.027164 CPU seconds remain included** in the ledger. The final dispatch then completed and verified the fixed 728-branch matrix.
 
-Measured all-in study runner CPU was **1,712.312241 seconds**. Aggregate ledger wall time was **248.328732 seconds**; the successful 8-worker dispatch itself used 219.896903 wall seconds, about 3.31 terminal branches/second. Including the registered 300-second Builder static allowance and 1,200-second Reviewer reserve gives a 3,212.312-second envelope against the 12,000-second cap.
+Measured all-in study runner CPU was **1,716.231189 seconds**. Aggregate ledger wall time was **252.706897 seconds**; the successful 8-worker dispatch itself used 219.896903 wall seconds, about 3.31 terminal branches/second. Including the registered 300-second Builder static allowance and 1,200-second Reviewer reserve gives a 3,216.231-second envelope against the 12,000-second cap.
 
 ## Interpretation limits
 
@@ -49,3 +49,7 @@ python -m unittest discover -s studies/issue-62-natural-root-q -p test_issue62.p
 ```
 
 No further simulator runs or training are part of this handoff. The independent Reviewer should check the actual forced-action path, full-history p0 continuation, terminal accounting and Q arithmetic, then reproduce one or two frozen keys and the registered bootstrap before routing to Planner.
+
+## Review startup re-run
+
+After the independent review found that the checkout-HEAD guard rejected the study commit, the same owner 6210001/action-0/stream-0 pilot was rerun from a clean checkout with the fixed source-tree guard. It passed with the same root parity and terminal floor. This startup/reproducibility rerun added no cohort or analysis rows; its CPU and wall time are included in the ledger above.
