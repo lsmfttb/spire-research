@@ -1,0 +1,84 @@
+{
+  "all_in_cpu_cap_seconds": 12000.0,
+  "builder_static_reserve_cpu_seconds": 300.0,
+  "checkpoint_sha256": {
+    "block1": "463ac5426cb9a1a8a3f952652ca0d986616c2d744f2d7130b5a98109bc928303",
+    "block2": "16da45d181e713d8d33fb97344ebada9720b1f19565725a87a93009f0153f52d"
+  },
+  "design_sha256": "ff1734527801207ea983bd739374a2064fb4b58f17ee760a67260e6566ebd641",
+  "resource_chain": {
+    "amendment_id": "R1",
+    "authorization_receipt_sha256": "5105fef2608de5fd8bb73938111b81e6f6028c69148adb5dd3c6f65dffb8cece",
+    "frozen_manifest_sha256": "cd9491cdd0211ea4a2a418b293f94f6bfd81f5827b7a85a86b3e5fed2a3f42a5",
+    "gate_seal": null,
+    "original_blocked_gate_sha256": "2fd4b2e6f96f0624b63889e0315c013bef7adddd7e30d6948a9309a209a263eb",
+    "original_config_sha256": "07020535931cd81bef9b40fa1c30e75b553ac160bc53057e58f82bd8cf2007ca",
+    "producer_commit": "4596b36014cde8236d17bbb068af956df5b65c92",
+    "source_change_whitelist": {
+      "changed_paths": {
+        ".gitattributes": "M",
+        "attempt_lifecycle.py": "A",
+        "freeze_manifest_r1.py": "A",
+        "frozen-manifest-r1.json": "A",
+        "prepare_resource_amendment_r1.py": "A",
+        "resource-amendment-r1.json": "A",
+        "resource-authorization-r1.json": "A",
+        "resource_amendment_r1.py": "A",
+        "run_study.py": "M",
+        "test_resource_amendment_r1.py": "A"
+      },
+      "changed_runner_symbols": [
+        "REVIEWER_RESERVE",
+        "PROCESS_BUDGET",
+        "run_training",
+        "main",
+        "run_game"
+      ],
+      "runner_ast_whitelist_passed": true
+    },
+    "status": "PASS"
+  },
+  "reviewer_reserve_cpu_seconds": 1200.0,
+  "schema_id": "issue62-study-manifest-v1",
+  "source_code_sha256": {
+    "adapter_v47.py": "06a6f3edaec30ba2920093337cecedacbd02631b5091fb662e157de7ae2f9433",
+    "attempt_lifecycle.py": "686cff420a147d3d0460a6883dfe5f12001aef31766f69fde0799b5350e928ed",
+    "bootstrap_v47.py": "c3a8108c0f057c68b735a8decc3c8e73cb3edc422f9be7d78003a7dec6bd4ed8",
+    "controllers.py": "464746ba8753ca23b99e84fddcc69c28d0ae3b7d936f2453cf2b12723d04b916",
+    "encoder.py": "1e670d156e1eb908458d520ca1de17b4bbe22f849452dd1fd3d6ca979916a5b8",
+    "model.py": "60beb24e5f4a1605fea7471e74308554b65d0ec601d3bbe37eea6fd609d3e5cd",
+    "parallel_execution.py": "f6226c12576898e6dc48e6fd968975286b7f71316a6ff1e670c5aab4c5f9993e",
+    "public_history_execution.py": "f6c3d1874fb20172406b161ab0296ef80a665ab0017840adba6af2fcf44fa2f4",
+    "resource_amendment_r1.py": "448a7b1f2a4585ca4ac31d5bce15e46b21c10550298ba99279b5e0b38c1c5fbb",
+    "resource_amendment_r2.py": "10941bf1a26a213748a0816482cbf846aac0b8d0debf0ebe43e69b5361d85f12",
+    "run_study.py": "7228f8bfc08c7ed2257c6d795b138ed2139bb1d2a50bb4f7bb2d33ad665072a6"
+  },
+  "source_commit": "1cce7997c648121742f0df0cfb95a2211aa3492c",
+  "source_runtime": {
+    "deterministic_algorithms": true,
+    "native_binary_sha256": "68e9df911849f3f406d793c4419fddae7522f7e66c8a46ee6c40d3b6e417ea73",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "native_module": "/home/lsmft/stsrl-spikes/issue60-runtime/build-issue60/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_source": "/home/lsmft/stsrl-spikes/sts_lightspeed-issue59",
+    "python": "3.13.13",
+    "runtime_api": {
+      "LightSpeedAdapter": "sts_combat_rl.sim.lightspeed",
+      "action_space": {
+        "allow_excluded_fallback": true,
+        "excluded_kinds": [],
+        "include_non_combat_potions": true,
+        "preferred_kinds": [
+          "card",
+          "end_turn"
+        ]
+      },
+      "execute_controlled_run": "sts_combat_rl.sim.controlled_run"
+    },
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsr_source": "/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c",
+    "torch": "2.12.0+cpu",
+    "torch_threads": 1
+  },
+  "study": "STUDY_ONLY",
+  "study_runner_sha256": "bdad8faf5d292582c8d32b058a814397fd87fab0035f520bd70240201cfd5b56"
+}

@@ -1,0 +1,1935 @@
+{
+  "block1_95pct_owner_cluster_paired_bootstrap_ci": [
+    -0.004621103758352919,
+    0.020868357505574912
+  ],
+  "block1_mean_delta_floor": 0.0069494694057065515,
+  "block2_95pct_owner_cluster_paired_bootstrap_ci": [
+    -0.006366837925751782,
+    0.01819020192243169
+  ],
+  "block2_mean_delta_floor": 0.005343583753555187,
+  "bootstrap_resamples": 5000,
+  "bootstrap_rng": "python.random.Random(6219999), paired owner index draws",
+  "completed_terminal_branch_count": 728,
+  "eligible_owner_count": 96,
+  "interpretation_limit": "One forced root action followed by frozen stochastic p0; not repeated residual-policy deployment, full-game efficacy, or a hidden-world conditional expectation at each root.",
+  "mean_within_root_tau_a_residual_score_vs_qhat": 0.03119212962962963,
+  "owner_rows": [
+    {
+      "delta_block1": 0.013254822991976525,
+      "delta_block2": 0.017932537947012182,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210001,
+      "primary_delta": 0.015593680469494354,
+      "qhat_terminal_floor_by_action": [
+        6.5,
+        5.5,
+        13.5
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.6666666666666666
+    },
+    {
+      "delta_block1": -0.0333170970974585,
+      "delta_block2": -0.12427883666370773,
+      "legal_n": 9,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210002,
+      "primary_delta": -0.07879796688058312,
+      "qhat_terminal_floor_by_action": [
+        16.0,
+        12.0,
+        13.0,
+        16.0,
+        9.5,
+        16.0,
+        16.0,
+        13.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.3055555555555556
+    },
+    {
+      "delta_block1": -1.4363510381087963e-15,
+      "delta_block2": -1.8041124150158794e-16,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210003,
+      "primary_delta": -8.083811398051921e-16,
+      "qhat_terminal_floor_by_action": [
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.004999603707584545,
+      "delta_block2": -0.010541411864409683,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210004,
+      "primary_delta": -0.007770507785997114,
+      "qhat_terminal_floor_by_action": [
+        15.0,
+        15.0,
+        16.0,
+        16.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.023641312793306113,
+      "delta_block2": 0.07032616532834586,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210005,
+      "primary_delta": 0.023342426267519874,
+      "qhat_terminal_floor_by_action": [
+        10.0,
+        10.0,
+        13.0,
+        13.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.16666666666666666
+    },
+    {
+      "delta_block1": 0.0441443897882506,
+      "delta_block2": 0.05612846986469862,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210006,
+      "primary_delta": 0.05013642982647461,
+      "qhat_terminal_floor_by_action": [
+        9.0,
+        9.0,
+        9.0,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.5
+    },
+    {
+      "delta_block1": 0.0018803494635571093,
+      "delta_block2": -0.008398568658925156,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210007,
+      "primary_delta": -0.0032591095976840234,
+      "qhat_terminal_floor_by_action": [
+        13.0,
+        14.5,
+        10.5
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.3333333333333333
+    },
+    {
+      "delta_block1": -0.01036604486932579,
+      "delta_block2": -0.021461899212855837,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210008,
+      "primary_delta": -0.015913972041090813,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        14.5,
+        7.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.006734714844283115,
+      "delta_block2": -0.021010963924387463,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210009,
+      "primary_delta": -0.007138124540052174,
+      "qhat_terminal_floor_by_action": [
+        14.5,
+        14.5,
+        16.0,
+        11.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.026442158366326053,
+      "delta_block2": 0.013207742170134151,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210010,
+      "primary_delta": -0.006617208098095951,
+      "qhat_terminal_floor_by_action": [
+        9.0,
+        10.0,
+        9.5,
+        11.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.33333333333333337
+    },
+    {
+      "delta_block1": 0.08054822622138857,
+      "delta_block2": -0.021020948544537066,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210011,
+      "primary_delta": 0.029763638838425754,
+      "qhat_terminal_floor_by_action": [
+        13.0,
+        16.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.020997450278583997,
+      "delta_block2": 0.0236927782786142,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 3,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210012,
+      "primary_delta": 0.001347664000015101,
+      "qhat_terminal_floor_by_action": [
+        12.5,
+        13.5,
+        13.0,
+        6.0,
+        12.5,
+        12.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.26666666666666666
+    },
+    {
+      "delta_block1": -2.740863092043355e-16,
+      "delta_block2": 2.185751579730777e-16,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 5,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210013,
+      "primary_delta": -2.7755575615628914e-17,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0,
+        6.0,
+        6.0,
+        6.0,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -2.42861286636753e-16,
+      "delta_block2": 0.0,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210014,
+      "primary_delta": -1.214306433183765e-16,
+      "qhat_terminal_floor_by_action": [
+        5.0,
+        5.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -2.42861286636753e-16,
+      "delta_block2": 3.885780586188048e-16,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210015,
+      "primary_delta": 7.28583859910259e-17,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        7.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.003995268629291931,
+      "delta_block2": -0.007515287369103108,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210016,
+      "primary_delta": -0.0017600093699055887,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        10.0,
+        5.5,
+        11.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": -0.16666666666666666
+    },
+    {
+      "delta_block1": -0.04292873241398869,
+      "delta_block2": -0.1697456134453398,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "EVENT"
+      },
+      "owner_seed": 6210017,
+      "primary_delta": -0.10633717292966424,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        10.5,
+        12.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": -0.3333333333333333
+    },
+    {
+      "delta_block1": -0.01391771123948891,
+      "delta_block2": 0.010070715527901997,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210018,
+      "primary_delta": -0.0019234978557934566,
+      "qhat_terminal_floor_by_action": [
+        5.0,
+        6.0,
+        5.5,
+        5.0,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.2
+    },
+    {
+      "delta_block1": -0.041855522948041846,
+      "delta_block2": -0.01896294749815139,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210019,
+      "primary_delta": -0.030409235223096617,
+      "qhat_terminal_floor_by_action": [
+        9.0,
+        13.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -1.0
+    },
+    {
+      "delta_block1": -0.008592369891360925,
+      "delta_block2": 0.007782776149648594,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210020,
+      "primary_delta": -0.00040479687085616563,
+      "qhat_terminal_floor_by_action": [
+        13.5,
+        14.0,
+        16.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -2.0261570199409107e-15,
+      "delta_block2": -6.106226635438361e-16,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210021,
+      "primary_delta": -1.3183898417423734e-15,
+      "qhat_terminal_floor_by_action": [
+        16.0,
+        16.0,
+        16.0,
+        16.0,
+        16.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.025851571849624888,
+      "delta_block2": -0.01635253177801707,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210022,
+      "primary_delta": -0.02110205181382098,
+      "qhat_terminal_floor_by_action": [
+        14.0,
+        14.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.6666666666666666
+    },
+    {
+      "delta_block1": 0.2174733056586992,
+      "delta_block2": 0.10818313313672162,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210023,
+      "primary_delta": 0.16282821939771042,
+      "qhat_terminal_floor_by_action": [
+        15.0,
+        8.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 1.0
+    },
+    {
+      "delta_block1": -6.661338147750939e-16,
+      "delta_block2": -1.6653345369377348e-16,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210024,
+      "primary_delta": -4.163336342344337e-16,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.04131107672768334,
+      "delta_block2": 0.051893823108353485,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210025,
+      "primary_delta": 0.046602449918018415,
+      "qhat_terminal_floor_by_action": [
+        16.0,
+        16.0,
+        12.0,
+        16.0,
+        16.0,
+        12.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.4
+    },
+    {
+      "delta_block1": 0.014592371436918355,
+      "delta_block2": 0.1496035439375215,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210026,
+      "primary_delta": 0.08209795768721993,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0,
+        8.0,
+        8.0,
+        8.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.2
+    },
+    {
+      "delta_block1": 1.9081958235744878e-16,
+      "delta_block2": -3.122502256758253e-16,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210027,
+      "primary_delta": -6.071532165918825e-17,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        7.0,
+        7.0,
+        7.0,
+        7.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.03438442520540791,
+      "delta_block2": 0.023293510953395644,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210028,
+      "primary_delta": 0.028838968079401776,
+      "qhat_terminal_floor_by_action": [
+        16.0,
+        16.0,
+        16.0,
+        16.0,
+        11.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.4
+    },
+    {
+      "delta_block1": -0.015969269952600923,
+      "delta_block2": -0.028495800175373294,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210029,
+      "primary_delta": -0.02223253506398711,
+      "qhat_terminal_floor_by_action": [
+        7.5,
+        7.5,
+        11.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.6666666666666666
+    },
+    {
+      "delta_block1": 0.44176147317380265,
+      "delta_block2": 0.07000982130667983,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210030,
+      "primary_delta": 0.25588564724024127,
+      "qhat_terminal_floor_by_action": [
+        10.5,
+        10.5,
+        10.5,
+        5.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.3333333333333333
+    },
+    {
+      "delta_block1": -5.551115123125783e-16,
+      "delta_block2": -1.2212453270876722e-15,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210031,
+      "primary_delta": -8.881784197001252e-16,
+      "qhat_terminal_floor_by_action": [
+        16.0,
+        16.0,
+        16.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -1.1102230246251565e-16,
+      "delta_block2": -5.551115123125783e-17,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210032,
+      "primary_delta": -8.326672684688674e-17,
+      "qhat_terminal_floor_by_action": [
+        8.0,
+        8.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.006470522132809728,
+      "delta_block2": 0.004072094799418394,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210033,
+      "primary_delta": 0.005271308466114061,
+      "qhat_terminal_floor_by_action": [
+        6.5,
+        6.5,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.6666666666666666
+    },
+    {
+      "delta_block1": -8.881784197001252e-16,
+      "delta_block2": 4.440892098500626e-16,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210034,
+      "primary_delta": -2.220446049250313e-16,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        7.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.018520420912906708,
+      "delta_block2": -0.02378708260129192,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 3,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210035,
+      "primary_delta": -0.021153751757099312,
+      "qhat_terminal_floor_by_action": [
+        11.0,
+        10.5,
+        10.5,
+        10.5,
+        10.5,
+        13.5
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.4666666666666667
+    },
+    {
+      "delta_block1": 0.005902531526885857,
+      "delta_block2": 0.011785039071899914,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210036,
+      "primary_delta": 0.008843785299392885,
+      "qhat_terminal_floor_by_action": [
+        16.0,
+        16.0,
+        14.0,
+        15.0,
+        15.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.06666666666666668
+    },
+    {
+      "delta_block1": 0.10255233286723392,
+      "delta_block2": -0.005190396672953526,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210037,
+      "primary_delta": 0.0486809680971402,
+      "qhat_terminal_floor_by_action": [
+        10.0,
+        8.0,
+        10.5,
+        6.5,
+        6.5,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.26666666666666666
+    },
+    {
+      "delta_block1": 0.051952798601949304,
+      "delta_block2": 0.006276003420171344,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210038,
+      "primary_delta": 0.029114401011060324,
+      "qhat_terminal_floor_by_action": [
+        12.0,
+        12.0,
+        16.0,
+        8.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.16666666666666666
+    },
+    {
+      "delta_block1": 1.97758476261356e-16,
+      "delta_block2": -9.71445146547012e-16,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210039,
+      "primary_delta": -3.86843335142828e-16,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0,
+        6.0,
+        6.0,
+        6.0,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.0073915353675916284,
+      "delta_block2": -0.0033121648813140975,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210040,
+      "primary_delta": 0.0020396852431387655,
+      "qhat_terminal_floor_by_action": [
+        15.0,
+        14.5,
+        12.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.33333333333333337
+    },
+    {
+      "delta_block1": 0.00010179823613538572,
+      "delta_block2": 0.011405724133828683,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210041,
+      "primary_delta": 0.0057537611849820345,
+      "qhat_terminal_floor_by_action": [
+        11.0,
+        9.5,
+        11.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.3333333333333333
+    },
+    {
+      "delta_block1": 0.009745256017223564,
+      "delta_block2": 0.019735345636772546,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210042,
+      "primary_delta": 0.014740300826998055,
+      "qhat_terminal_floor_by_action": [
+        10.0,
+        11.0,
+        10.0,
+        9.5
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.5
+    },
+    {
+      "delta_block1": -0.004840953262982006,
+      "delta_block2": -0.010259090213837349,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210043,
+      "primary_delta": -0.007550021738409678,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        9.0,
+        6.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": -0.3333333333333333
+    },
+    {
+      "delta_block1": 0.01623318524038027,
+      "delta_block2": 0.060412775557832685,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210044,
+      "primary_delta": 0.03832298039910648,
+      "qhat_terminal_floor_by_action": [
+        13.0,
+        13.0,
+        13.0,
+        9.5
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.5
+    },
+    {
+      "delta_block1": -0.010263471569830183,
+      "delta_block2": -0.06233592094500208,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210045,
+      "primary_delta": -0.03629969625741613,
+      "qhat_terminal_floor_by_action": [
+        14.5,
+        16.0,
+        7.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": -0.3333333333333333
+    },
+    {
+      "delta_block1": 0.009241557177584403,
+      "delta_block2": -0.06818194343625694,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210046,
+      "primary_delta": -0.02947019312933627,
+      "qhat_terminal_floor_by_action": [
+        10.0,
+        10.0,
+        7.0,
+        7.0,
+        7.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.1
+    },
+    {
+      "delta_block1": -1.7763568394002505e-15,
+      "delta_block2": -1.887379141862766e-15,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210047,
+      "primary_delta": -1.8318679906315083e-15,
+      "qhat_terminal_floor_by_action": [
+        15.0,
+        15.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.04346905121896588,
+      "delta_block2": -0.038900114511912554,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210048,
+      "primary_delta": -0.04118458286543922,
+      "qhat_terminal_floor_by_action": [
+        12.0,
+        14.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.3333333333333333
+    },
+    {
+      "delta_block1": -0.02583476248375069,
+      "delta_block2": -0.016300153137992796,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210049,
+      "primary_delta": -0.021067457810871743,
+      "qhat_terminal_floor_by_action": [
+        14.0,
+        14.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.6666666666666666
+    },
+    {
+      "delta_block1": 1.4432899320127035e-15,
+      "delta_block2": -2.6645352591003757e-15,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210050,
+      "primary_delta": -6.106226635438361e-16,
+      "qhat_terminal_floor_by_action": [
+        16.0,
+        16.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -5.273559366969494e-16,
+      "delta_block2": -2.7755575615628914e-17,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210051,
+      "primary_delta": -2.7755575615628914e-16,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        7.0,
+        7.0,
+        7.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.006614755468534073,
+      "delta_block2": -0.04965946692472281,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210052,
+      "primary_delta": -0.02152235572809437,
+      "qhat_terminal_floor_by_action": [
+        8.0,
+        7.5,
+        4.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": -0.33333333333333337
+    },
+    {
+      "delta_block1": -0.004635063496829142,
+      "delta_block2": 0.005576450745923837,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210053,
+      "primary_delta": 0.0004706936245473473,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        7.0,
+        10.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": -0.3333333333333333
+    },
+    {
+      "delta_block1": -0.005997706158010686,
+      "delta_block2": 0.001536099690525438,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210054,
+      "primary_delta": -0.002230803233742624,
+      "qhat_terminal_floor_by_action": [
+        5.5,
+        5.5,
+        5.0,
+        5.5
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -4.5102810375396984e-17,
+      "delta_block2": -3.191891195797325e-16,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 3,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210055,
+      "primary_delta": -1.8214596497756474e-16,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        7.0,
+        7.0,
+        7.0,
+        7.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.005638291427736961,
+      "delta_block2": -0.0029255553268555876,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210056,
+      "primary_delta": -0.004281923377296274,
+      "qhat_terminal_floor_by_action": [
+        11.0,
+        11.0,
+        11.0,
+        11.0,
+        11.5
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.4
+    },
+    {
+      "delta_block1": 0.07364138610960971,
+      "delta_block2": -0.0006685823430940853,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210057,
+      "primary_delta": 0.036486401883257816,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        7.0,
+        8.0,
+        13.0,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.3
+    },
+    {
+      "delta_block1": -9.159339953157541e-16,
+      "delta_block2": -7.771561172376096e-16,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210058,
+      "primary_delta": -8.465450562766819e-16,
+      "qhat_terminal_floor_by_action": [
+        16.0,
+        16.0,
+        16.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.001940621344446919,
+      "delta_block2": 0.03299062717041283,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 3,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210059,
+      "primary_delta": 0.015525002912982956,
+      "qhat_terminal_floor_by_action": [
+        19.0,
+        19.0,
+        16.0,
+        19.5,
+        19.0,
+        12.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.2
+    },
+    {
+      "delta_block1": -1.1102230246251565e-16,
+      "delta_block2": 1.249000902703301e-16,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210060,
+      "primary_delta": 6.938893903907228e-18,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.2197018231232884,
+      "delta_block2": 0.2781609805446509,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210061,
+      "primary_delta": 0.24893140183396964,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        7.0,
+        13.0,
+        16.0,
+        7.5
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.2
+    },
+    {
+      "delta_block1": 0.005228899026314071,
+      "delta_block2": 0.002381920913565705,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210062,
+      "primary_delta": 0.003805409969939888,
+      "qhat_terminal_floor_by_action": [
+        8.5,
+        8.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 1.0
+    },
+    {
+      "delta_block1": -0.016409901435016156,
+      "delta_block2": -0.011500464744487841,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210063,
+      "primary_delta": -0.013955183089751999,
+      "qhat_terminal_floor_by_action": [
+        10.0,
+        10.0,
+        9.0,
+        10.0,
+        10.0,
+        7.5
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.06666666666666667
+    },
+    {
+      "delta_block1": -0.18581189756237593,
+      "delta_block2": -0.09238885303816191,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210064,
+      "primary_delta": -0.13910037530026892,
+      "qhat_terminal_floor_by_action": [
+        10.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -1.0
+    },
+    {
+      "delta_block1": -0.007933946688005115,
+      "delta_block2": -0.007741722858889676,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210065,
+      "primary_delta": -0.007837834773447395,
+      "qhat_terminal_floor_by_action": [
+        13.5,
+        11.5,
+        16.0,
+        13.0,
+        13.0,
+        10.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.13333333333333336
+    },
+    {
+      "delta_block1": 0.024145666738625907,
+      "delta_block2": 0.031355151093544566,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210066,
+      "primary_delta": 0.027750408916085236,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        12.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 1.0
+    },
+    {
+      "delta_block1": -0.044656474401905594,
+      "delta_block2": -0.03197663095575922,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210067,
+      "primary_delta": -0.03831655267883241,
+      "qhat_terminal_floor_by_action": [
+        9.0,
+        13.0,
+        10.0,
+        10.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.3333333333333333
+    },
+    {
+      "delta_block1": 0.00651808020424785,
+      "delta_block2": 0.0026166700127922132,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210068,
+      "primary_delta": 0.004567375108520032,
+      "qhat_terminal_floor_by_action": [
+        10.5,
+        10.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 1.0
+    },
+    {
+      "delta_block1": -0.0002682617303101653,
+      "delta_block2": 0.008809626598346748,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210069,
+      "primary_delta": 0.004270682434018291,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0,
+        7.5
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.3333333333333333
+    },
+    {
+      "delta_block1": 0.01608244624366463,
+      "delta_block2": -0.01596128002056188,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210070,
+      "primary_delta": 6.0583111551375246e-05,
+      "qhat_terminal_floor_by_action": [
+        10.0,
+        6.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.03373171591392443,
+      "delta_block2": 0.3283221302101067,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210071,
+      "primary_delta": 0.18102692306201557,
+      "qhat_terminal_floor_by_action": [
+        8.0,
+        6.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 1.0
+    },
+    {
+      "delta_block1": 0.00638324815383268,
+      "delta_block2": 0.012087240036262055,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210072,
+      "primary_delta": 0.009235244095047368,
+      "qhat_terminal_floor_by_action": [
+        11.0,
+        11.0,
+        11.0,
+        9.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.5
+    },
+    {
+      "delta_block1": -0.06938523272101715,
+      "delta_block2": 0.04002356662636035,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210073,
+      "primary_delta": -0.014680833047328402,
+      "qhat_terminal_floor_by_action": [
+        12.0,
+        12.0,
+        8.0,
+        12.0,
+        12.0,
+        8.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.26666666666666666
+    },
+    {
+      "delta_block1": -0.0010202351045104016,
+      "delta_block2": 0.0074705506397686125,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210074,
+      "primary_delta": 0.0032251577676291054,
+      "qhat_terminal_floor_by_action": [
+        14.0,
+        16.0,
+        16.0,
+        16.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.012201599442962407,
+      "delta_block2": 0.05674308578821264,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210075,
+      "primary_delta": 0.03447234261558752,
+      "qhat_terminal_floor_by_action": [
+        9.5,
+        9.5,
+        13.5,
+        13.5,
+        9.5,
+        14.5
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.19999999999999998
+    },
+    {
+      "delta_block1": -3.3306690738754696e-16,
+      "delta_block2": -2.914335439641036e-16,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210076,
+      "primary_delta": -3.122502256758253e-16,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.00017641752886940476,
+      "delta_block2": 0.005293333765917785,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210077,
+      "primary_delta": 0.00255845811852419,
+      "qhat_terminal_floor_by_action": [
+        15.0,
+        16.0,
+        16.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.045225866850988734,
+      "delta_block2": -0.07645062169177999,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210078,
+      "primary_delta": -0.015612377420395628,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0,
+        11.0,
+        6.0,
+        6.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.26666666666666666
+    },
+    {
+      "delta_block1": -0.11456708343561431,
+      "delta_block2": -0.11562541513995002,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210079,
+      "primary_delta": -0.11509624928778217,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        7.0,
+        15.0,
+        12.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.3333333333333333
+    },
+    {
+      "delta_block1": 5.828670879282072e-16,
+      "delta_block2": -6.245004513516506e-16,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210080,
+      "primary_delta": -2.0816681711721685e-17,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.005227853098757951,
+      "delta_block2": -0.002374367314014629,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210081,
+      "primary_delta": -0.00380111020638629,
+      "qhat_terminal_floor_by_action": [
+        9.0,
+        9.5
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -1.0
+    },
+    {
+      "delta_block1": -0.0012175442131596298,
+      "delta_block2": 0.0007254105773111669,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210082,
+      "primary_delta": -0.00024606681792423146,
+      "qhat_terminal_floor_by_action": [
+        5.0,
+        6.0,
+        6.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -5.551115123125783e-16,
+      "delta_block2": 3.469446951953614e-16,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210083,
+      "primary_delta": -1.0408340855860843e-16,
+      "qhat_terminal_floor_by_action": [
+        10.0,
+        10.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.005297626586290556,
+      "delta_block2": 0.012042365394492792,
+      "legal_n": 6,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210084,
+      "primary_delta": 0.008669995990391675,
+      "qhat_terminal_floor_by_action": [
+        7.5,
+        7.5,
+        8.5,
+        7.5,
+        6.5,
+        7.5
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.13333333333333333
+    },
+    {
+      "delta_block1": -9.159339953157541e-16,
+      "delta_block2": -1.6653345369377348e-16,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210085,
+      "primary_delta": -5.412337245047638e-16,
+      "qhat_terminal_floor_by_action": [
+        16.0,
+        16.0,
+        16.0,
+        16.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.021273421665484876,
+      "delta_block2": -0.04087578346634933,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210086,
+      "primary_delta": -0.031074602565917105,
+      "qhat_terminal_floor_by_action": [
+        8.0,
+        11.0,
+        8.0,
+        8.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -0.5
+    },
+    {
+      "delta_block1": 0.046143789150579886,
+      "delta_block2": 0.15696235942542971,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210087,
+      "primary_delta": 0.10155307428800481,
+      "qhat_terminal_floor_by_action": [
+        8.0,
+        12.0,
+        10.0,
+        16.0,
+        8.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.3
+    },
+    {
+      "delta_block1": -2.55351295663786e-15,
+      "delta_block2": -1.7763568394002505e-15,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 2,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210088,
+      "primary_delta": -2.1649348980190553e-15,
+      "qhat_terminal_floor_by_action": [
+        16.0,
+        16.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": 0.01431802287004625,
+      "delta_block2": -0.0015676269501434005,
+      "legal_n": 4,
+      "location": {
+        "act": 1,
+        "floor": 3,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210089,
+      "primary_delta": 0.006375197959951425,
+      "qhat_terminal_floor_by_action": [
+        7.0,
+        8.0,
+        7.0,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.33333333333333337
+    },
+    {
+      "delta_block1": -0.0010474666713892328,
+      "delta_block2": 0.008133365784563015,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210090,
+      "primary_delta": 0.0035429495565868913,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        7.0,
+        7.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.3333333333333333
+    },
+    {
+      "delta_block1": -0.0020736099480832756,
+      "delta_block2": -0.007521531056340201,
+      "legal_n": 5,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210091,
+      "primary_delta": -0.0047975705022117385,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0,
+        6.0,
+        5.5,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -1.2490009027033011e-15,
+      "delta_block2": -1.6653345369377348e-16,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210092,
+      "primary_delta": -7.077671781985373e-16,
+      "qhat_terminal_floor_by_action": [
+        12.0,
+        12.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -8.118505867571457e-16,
+      "delta_block2": 1.457167719820518e-16,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210093,
+      "primary_delta": -3.3306690738754696e-16,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": 0.0
+    },
+    {
+      "delta_block1": -0.07825878447839113,
+      "delta_block2": -0.04770336546363152,
+      "legal_n": 2,
+      "location": {
+        "act": 1,
+        "floor": 1,
+        "room_type": "MONSTER"
+      },
+      "owner_seed": 6210094,
+      "primary_delta": -0.06298107497101132,
+      "qhat_terminal_floor_by_action": [
+        12.0,
+        16.0
+      ],
+      "root_screen": "REWARDS",
+      "within_root_tau_a_mean_blocks": -1.0
+    },
+    {
+      "delta_block1": -0.0318221266474896,
+      "delta_block2": -0.04547355013478252,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210095,
+      "primary_delta": -0.03864783839113606,
+      "qhat_terminal_floor_by_action": [
+        15.0,
+        7.5,
+        8.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": -0.3333333333333333
+    },
+    {
+      "delta_block1": 0.01341164036941006,
+      "delta_block2": 0.03240759795906375,
+      "legal_n": 3,
+      "location": {
+        "act": 1,
+        "floor": 0,
+        "room_type": "INVALID"
+      },
+      "owner_seed": 6210096,
+      "primary_delta": 0.022909619164236904,
+      "qhat_terminal_floor_by_action": [
+        6.0,
+        6.0,
+        10.0
+      ],
+      "root_screen": "MAP_SCREEN",
+      "within_root_tau_a_mean_blocks": 0.6666666666666666
+    }
+  ],
+  "owner_screen_counts": {
+    "MAP_SCREEN": 35,
+    "REWARDS": 61
+  },
+  "primary_95pct_owner_cluster_paired_bootstrap_ci": [
+    -0.003963745946181052,
+    0.017863651539886376
+  ],
+  "primary_mean_delta_floor": 0.00614652657963087,
+  "primary_sign_ties": {
+    "negative": 35,
+    "positive": 37,
+    "tie_abs_le_1e-12": 24
+  },
+  "status": "LOCAL_DIRECTION_INCONCLUSIVE"
+}
