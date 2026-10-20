@@ -154,6 +154,37 @@ class NativeSemanticGateTests(unittest.TestCase):
         self.assertEqual(still_missing_capabilities, [])
         self.assertIsNone(no_blocker)
 
+    def test_candidate_binding_is_required_for_potion_inventory_capability(self) -> None:
+        source_without_binding = NATIVE_SOURCE_FIXTURE.replace(
+            '  ret["candidate_action"] = publicChoiceActionSnapshot(action);\n',
+            "",
+        )
+        self.assertNotEqual(source_without_binding, NATIVE_SOURCE_FIXTURE)
+        audit = inspect_source_text(
+            source_without_binding,
+            CONFIG["required_noncombat_screens"],
+            CONFIG["required_noncombat_action_capabilities"],
+        )
+        capability = "legal_potion_and_inventory_actions"
+        self.assertFalse(audit["candidate_action_surface"]["screen_entity_associations"])
+        self.assertFalse(audit["action_capabilities"][capability]["checks"]["candidate_association_binds_semantic_action"])
+        self.assertFalse(audit["action_capabilities"][capability]["semantic_actions"])
+
+        all_screens_supported = {
+            screen: {"semantic_choices": True}
+            for screen in CONFIG["required_noncombat_screens"]
+        }
+        missing_screens, missing_capabilities, blocker = _assess_registered_requirements(
+            CONFIG["required_noncombat_screens"],
+            CONFIG["required_noncombat_action_capabilities"],
+            all_screens_supported,
+            audit["action_capabilities"],
+            snapshot_has_screen_choices=False,
+        )
+        self.assertEqual(missing_screens, [])
+        self.assertEqual(missing_capabilities, [capability])
+        self.assertIn("required_action_semantics", blocker)
+
     def test_config_forbids_index_fallback_and_expert(self) -> None:
         boundary = CONFIG["semantic_boundary"]
         self.assertFalse(boundary["action_ids_or_native_indices_as_semantic_features"])

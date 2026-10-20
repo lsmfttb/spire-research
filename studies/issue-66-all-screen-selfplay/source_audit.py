@@ -183,6 +183,7 @@ def inspect_source_text(
         }
 
     potion_action_checks = {
+        "candidate_association_binds_semantic_action": candidate_semantics["screen_entity_associations"],
         "action_kind_maps_use_and_discard": (
             "action.isPotionAction()" in game_action_kind
             and "action.isPotionDiscard()" in game_action_kind
