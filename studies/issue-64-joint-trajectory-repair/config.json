@@ -107,7 +107,17 @@
   },
   "trajectory_search": {
     "complete_terminal_continuations_per_call_max": 32,
-    "retry_attempts_per_call_max": 64,
+    "candidate_proposal": {
+    "future_target_cycle": [
+      "ANY",
+      "MAP",
+      "REWARD"
+    ],
+    "descendant_root": "inherit_parent_root_identity",
+    "root_baseline_collision": "discard_parent_and_start_fresh_root",
+    "stale_action": "reject_candidate"
+  },
+  "retry_attempts_per_call_max": 64,
     "b1": "root native action fixed, ExpertNonCombatDriver_v1 at every later decision",
     "b2": "bounded elite portfolio; exact checkpoint replay; root and later live action overrides; no stale-identity coercion",
     "elite_fraction": 0.25,

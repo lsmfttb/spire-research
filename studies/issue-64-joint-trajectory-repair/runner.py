@@ -37,6 +37,7 @@ CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 IDENTITY = CONFIG["identity"]
 BATTLE = CONFIG["battle"]
 TRAJECTORY = CONFIG["trajectory_search"]
+PROPOSAL = TRAJECTORY["candidate_proposal"]
 MAX_CPU = CONFIG["resources"]["builder_cpu_ceiling_cpu_seconds"]
 SETUP_ALLOWANCE = CONFIG["resources"]["preflight_setup_allowance_cpu_seconds"]
 REVIEW_RESERVE = CONFIG["resources"]["independent_review_reserve_cpu_seconds"]
@@ -634,7 +635,8 @@ class StudyController:
             root_idx = candidate_index % len(root_identities)
             parent_index: int | None = None
             inherited: list[dict[str, Any]] = []
-            new_target = ("ANY", "MAP", "REWARD")[(candidate_index + call_index) % 3]
+            target_cycle = PROPOSAL["future_target_cycle"]
+            new_target = target_cycle[(candidate_index + call_index) % len(target_cycle)]
             if self.arm == "B2":
                 parents = sorted(
                     (row for row in results if row.get("joint_valid")),
@@ -648,7 +650,15 @@ class StudyController:
                         (i for i, identity in enumerate(root_identities) if same_action(identity, parent["root_identity"])),
                         root_idx,
                     )
-                    root_idx = (parent_root + 1 + candidate_index % (len(root_identities) - 1)) % len(root_identities)
+                    root_idx = parent_root
+                    if root_idx == baseline_root:
+                        # The parent's suffix is tied to its root. If the inherited
+                        # root is now the seeded Expert choice, discard that suffix
+                        # and start a fresh alternative root candidate.
+                        inherited = []
+                        parent_index = None
+                        fresh_roots = [i for i in range(len(root_identities)) if i != baseline_root]
+                        root_idx = fresh_roots[(candidate_index + call_index) % len(fresh_roots)]
                 baseline_driver = ExpertNonCombatDriver(seed=EXPERT_SEED)
                 baseline_driver.reset_for_run(policy_seed)
                 baseline_root = baseline_driver.select_action(context).legal_action_index
