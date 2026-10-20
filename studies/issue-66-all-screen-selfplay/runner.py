@@ -104,7 +104,12 @@ def run_preflight(output: Path, native_source: str, stsrl_source: str) -> dict[s
     ensure_external(output)
     output = output.expanduser().resolve()
     identity = source_identity(native_source, stsrl_source)
-    audit = audit_native_source(native_source, IDENTITY["native_commit"])
+    audit = audit_native_source(
+        native_source,
+        IDENTITY["native_commit"],
+        CONFIG["required_noncombat_screens"],
+        CONFIG["required_noncombat_action_capabilities"],
+    )
     eligible = audit["status"] == "SUPPORTED"
     decision = {
         "schema_id": "issue66-preflight-decision-v1",

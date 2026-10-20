@@ -19,6 +19,14 @@ CARD_SELECT, TREASURE, REST, and SHOP choice content unsupported. NEOW has no
 choice case in this capability. The audited source locations and file digest
 are recorded by `preflight-decision.json`.
 
+The registration keeps the nine screen requirements separate from the
+`legal_potion_and_inventory_actions` action-capability requirement. The source
+audit checks that potion use/discard kinds are exposed semantically, that
+candidate bindings include the native potion identity, and that both MAP and
+REWARDS choice paths cover those candidates. A regression test supplies
+supported results for all nine screens to the final requirement gate while
+marking potion/inventory action semantics missing; the gate must still fail.
+
 That pinned API cannot provide semantic action-conditioned features on all
 required noncombat screens. Using indices or action IDs as substitutes would
 violate the registered model contract; adding Python game rules or an Expert
