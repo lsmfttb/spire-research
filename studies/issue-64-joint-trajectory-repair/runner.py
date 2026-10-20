@@ -4,6 +4,7 @@ import argparse
 import concurrent.futures
 import hashlib
 import importlib
+import importlib.util
 import json
 import math
 import os
@@ -13,6 +14,7 @@ import subprocess
 import sys
 import time
 import traceback
+from contextlib import nullcontext
 from dataclasses import dataclass
 from collections import Counter
 from pathlib import Path
@@ -47,6 +49,16 @@ NATIVE_API = BATTLE["api"]
 NATIVE_PATCH = BATTLE["patch_identity"]
 ACTION_SPACE = ActionSpaceConfig.include_all()
 STOP_FILE: Path | None = None
+_LAST_STOP_POLL_CPU: float | None = None
+_RUNTIME_EXECUTION: Any | None = None
+_RUNTIME_MODULE: Any | None = None
+ENGINEERING_LIMITS: dict[str, int] | None = None
+ENGINEERING_SEEDS = (646901, 646902, 646903, 646904)
+ENGINEERING_BUILDER_SOFT_STOP_CPU = 16000.0
+ENGINEERING_BUILDER_HARD_CPU = 18000.0
+ENGINEERING_TOTAL_CPU = 20000.0
+ENGINEERING_REVIEW_RESERVE_CPU = 2000.0
+ENGINEERING_TRACE_BATCH_LINES = 128
 
 
 class StudyFailure(RuntimeError):
@@ -114,38 +126,73 @@ def ensure_output_is_external(output: Path) -> None:
 def atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(canonical(payload) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+    with runtime_phase("artifact_json_serialize_write"):
+        tmp.write_text(canonical(payload) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
 
 
 def append_jsonl(path: Path, payload: Mapping[str, Any], *, sync: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(canonical(payload) + "\n")
-        handle.flush()
-        if sync:
-            os.fsync(handle.fileno())
+    with runtime_phase("boundary_ledger_serialize_write"):
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(canonical(payload) + "\n")
+            handle.flush()
+            if sync:
+                os.fsync(handle.fileno())
 
 
 class JsonlWriter:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, *, buffered: bool = False, batch_lines: int = 128):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.handle = path.open("a", encoding="utf-8")
+        self.buffered = buffered
+        self.batch_lines = max(1, int(batch_lines))
+        self.pending: list[str] = []
 
     def write(self, payload: Mapping[str, Any], *, sync: bool = False) -> None:
-        self.handle.write(canonical(payload) + "\n")
-        self.handle.flush()
+        with runtime_phase("trace_serialize"):
+            line = canonical(payload) + "\n"
+        if self.buffered and not sync:
+            self.pending.append(line)
+            if len(self.pending) >= self.batch_lines:
+                self.flush(sync=False)
+            return
+        self.pending.append(line)
+        self.flush(sync=sync)
+
+    def flush(self, *, sync: bool = False) -> None:
+        if not self.pending and not sync:
+            return
+        with runtime_phase("trace_write_flush"):
+            if self.pending:
+                self.handle.write("".join(self.pending))
+                self.pending.clear()
+            self.handle.flush()
         if sync:
-            os.fsync(self.handle.fileno())
+            with runtime_phase("trace_fsync"):
+                os.fsync(self.handle.fileno())
 
     def close(self) -> None:
-        self.handle.flush()
+        self.flush(sync=True)
         self.handle.close()
 
 
 def check_stop() -> None:
-    if STOP_FILE is not None and STOP_FILE.exists():
+    global _LAST_STOP_POLL_CPU
+    if STOP_FILE is None:
+        return
+    now = time.process_time()
+    if _LAST_STOP_POLL_CPU is not None and now - _LAST_STOP_POLL_CPU < 0.25:
+        return
+    _LAST_STOP_POLL_CPU = now
+    if STOP_FILE.exists():
         raise StudyFailure("aggregate Builder CPU ceiling reached; stopped at a durable boundary")
+
+
+def runtime_phase(name: str):
+    if _RUNTIME_MODULE is None:
+        return nullcontext()
+    return _RUNTIME_MODULE.phase(name)
 
 
 def derive_seed(*parts: Any) -> int:
@@ -580,6 +627,7 @@ class StudyController:
         branch_writer: JsonlWriter,
         preflight: bool,
         witness_checkpoints: dict[str, Any] | None = None,
+        engineering_limits: Mapping[str, int] | None = None,
     ):
         self.arm = arm
         self.owner_seed = owner_seed
@@ -588,6 +636,19 @@ class StudyController:
         self.actual_writer = actual_writer
         self.branch_writer = branch_writer
         self.preflight = preflight
+        self.engineering_limits = dict(engineering_limits or {})
+        self.planning_call_limit = int(
+            self.engineering_limits.get("planning_calls_max", CONFIG["non_combat"]["planning_calls_max"])
+        )
+        self.continuation_quota = int(
+            self.engineering_limits.get(
+                "complete_terminal_continuations_per_call_max",
+                TRAJECTORY["complete_terminal_continuations_per_call_max"],
+            )
+        )
+        self.retry_attempt_limit = int(
+            self.engineering_limits.get("retry_attempts_per_call_max", TRAJECTORY["retry_attempts_per_call_max"])
+        )
         self.witness_checkpoints = witness_checkpoints if witness_checkpoints is not None else {}
         self.expert = ExpertNonCombatDriver(seed=EXPERT_SEED)
         self.provenance = ControllerProvenance(
@@ -597,9 +658,10 @@ class StudyController:
                 "study_id": CONFIG["study_id"],
                 "information_regime": "full_simulator_state_oracle_like" if arm != "B0" else "normal_public_policy",
                 "owner_seed": owner_seed,
-                "max_planning_calls": CONFIG["non_combat"]["planning_calls_max"] if arm != "B0" else 0,
+                "max_planning_calls": self.planning_call_limit if arm != "B0" else 0,
                 "eligible_decision_cap": CONFIG["non_combat"]["meaningful_decisions_per_owner_max"],
-                "complete_continuations_per_call": TRAJECTORY["complete_terminal_continuations_per_call_max"] if arm != "B0" else 0,
+                "complete_continuations_per_call": self.continuation_quota if arm != "B0" else 0,
+                "engineering_limits": self.engineering_limits or None,
                 "battle_search": BATTLE,
                 "source_policy": "expert_non_combat_v1",
                 "native_source": {
@@ -649,7 +711,7 @@ class StudyController:
                 # Reserve the eighth eligible point as a shared continuation.
                 # A joint trajectory at a root with no later in-cap decision cannot
                 # meet the B2 intervention definition.
-                if self.arm in ("B1", "B2") and self.planning_calls < int(CONFIG["non_combat"]["planning_calls_max"]):
+                if self.arm in ("B1", "B2") and self.planning_calls < self.planning_call_limit:
                     call_index = self.planning_calls
                     self.planning_calls += 1
                     checkpoint = adapter.capture_checkpoint(snapshot)
@@ -718,8 +780,8 @@ class StudyController:
         results: list[dict[str, Any]] = []
         completed = 0
         attempts = 0
-        max_attempts = TRAJECTORY["retry_attempts_per_call_max"]
-        target_completed = TRAJECTORY["complete_terminal_continuations_per_call_max"]
+        max_attempts = self.retry_attempt_limit
+        target_completed = self.continuation_quota
         elite_size = max(1, math.ceil(target_completed * TRAJECTORY["elite_fraction"]))
         while completed < target_completed and attempts < max_attempts:
             check_stop()
@@ -800,6 +862,7 @@ class StudyController:
                     after_transition=branch_controller.after_transition,
                     retain_steps=False,
                 )
+                self.branch_writer.flush(sync=True)
                 if run.problems:
                     rejected = self.arm == "B2" and all(
                         "b2 candidate rejected:" in str(problem).lower()
@@ -866,6 +929,7 @@ class StudyController:
                     "cpu_seconds": time.process_time(),
                 }, sync=True)
             finally:
+                self.branch_writer.flush(sync=True)
                 restored = adapter.restore_checkpoint(checkpoint)
                 restored_ids = action_identity_dicts_for_actions(adapter.legal_actions(restored))
                 if [action_identity(x) for x in restored_ids] != [action_identity(x) for x in root_identities]:
@@ -973,6 +1037,7 @@ def run_checkpoint_witnesses(
     branch_writer: JsonlWriter,
     native_identity: Mapping[str, Any],
     config_hash: str,
+    replay_count: int = 2,
 ) -> dict[str, Any]:
     results: dict[str, Any] = {}
     for screen in ("MAP_SCREEN", "REWARDS"):
@@ -1013,7 +1078,7 @@ def run_checkpoint_witnesses(
                 "restored_root_fingerprint_sha256": hashlib.sha256(root_fingerprint.encode()).hexdigest(),
             })
         replays = []
-        for replay_index in range(2):
+        for replay_index in range(replay_count):
             controller = BranchController(
                 arm="WITNESS", owner_seed=owner_seed, call_index=-1,
                 candidate_index=replay_index, policy_seed=policy_seed,
@@ -1027,6 +1092,10 @@ def run_checkpoint_witnesses(
                 seed=policy_seed, max_steps=MAX_STEPS, action_space=ACTION_SPACE,
                 after_transition=controller.after_transition, retain_steps=False,
             )
+            # Witness digests read the durable JSONL trace by branch id. The
+            # engineering writer batches ordinary candidate rows, so force a
+            # synced boundary here before reading or accepting replay evidence.
+            branch_writer.flush(sync=True)
             if run.problems or not run.terminal:
                 raise StudyFailure(
                     f"{screen} deterministic checkpoint replay failed: "
@@ -1039,20 +1108,35 @@ def run_checkpoint_witnesses(
                 "final_raw_digest": hashlib.sha256(canonical(dict(run.final_raw)).encode()).hexdigest(),
                 "cpu_seconds": time.process_time() - started,
             })
-        equal = (
-            replays[0]["trace_digest"] == replays[1]["trace_digest"]
-            and replays[0]["endpoint"] == replays[1]["endpoint"]
-            and replays[0]["final_raw_digest"] == replays[1]["final_raw_digest"]
+        trace_equal = all(
+            replay["trace_digest"] == replays[0]["trace_digest"] for replay in replays[1:]
         )
+        endpoint_equal = all(
+            replay["endpoint"] == replays[0]["endpoint"] for replay in replays[1:]
+        )
+        final_raw_equal = all(
+            replay["final_raw_digest"] == replays[0]["final_raw_digest"] for replay in replays[1:]
+        )
+        equal = trace_equal and endpoint_equal and final_raw_equal
         results[screen] = {
             "available": True,
             "checkpoint_floor": value.get("floor"),
             "root_legal_actions": value["legal_identities"],
             "alternate_action_restore": alternate_branches,
             "replay_equal": equal,
+            "action_trace_equal": trace_equal,
+            "terminal_endpoint_equal": endpoint_equal,
+            "final_raw_equal": final_raw_equal,
             "replays": replays,
         }
         if not equal:
+            atomic_json(attempt_dir / "checkpoint-witnesses-partial.json", {
+                "owner_seed": owner_seed,
+                "config_sha256": config_hash,
+                "native_identity": dict(native_identity),
+                "witnesses": results,
+                "failed_screen": screen,
+            })
             raise StudyFailure(f"{screen} checkpoint replay was not deterministic")
     atomic_json(attempt_dir / "checkpoint-witnesses.json", {
         "owner_seed": owner_seed,
@@ -1091,6 +1175,7 @@ def run_arm(
     preflight: bool,
     config_hash: str,
     native_identity: Mapping[str, Any],
+    engineering_limits: Mapping[str, int] | None = None,
 ) -> dict[str, Any]:
     result_path = owner_dir / arm / "arm-result.json"
     if result_path.exists():
@@ -1105,13 +1190,18 @@ def run_arm(
     attempt_dir.mkdir()
     ledger = JsonlWriter(attempt_dir / "ledger.jsonl")
     actual_writer = JsonlWriter(attempt_dir / "actual-decisions.jsonl")
-    branch_writer = JsonlWriter(attempt_dir / "branch-decisions.jsonl")
+    branch_writer = JsonlWriter(
+        attempt_dir / "branch-decisions.jsonl",
+        buffered=True,
+        batch_lines=ENGINEERING_TRACE_BATCH_LINES,
+    )
     witness_checkpoints: dict[str, Any] = {}
     adapter = LightSpeedAdapter(seed=owner_seed, ascension=20, player_class="IRONCLAD")
     controller = StudyController(
         arm=arm, owner_seed=owner_seed, attempt_dir=attempt_dir,
         ledger=ledger, actual_writer=actual_writer, branch_writer=branch_writer,
         preflight=preflight, witness_checkpoints=witness_checkpoints,
+        engineering_limits=engineering_limits,
     )
     controller.set_adapter(adapter)
     started_wall = time.monotonic()
@@ -1176,6 +1266,7 @@ def run_arm(
             result["checkpoint_witnesses"] = run_checkpoint_witnesses(
                 adapter, owner_seed, witness_checkpoints, attempt_dir,
                 branch_writer, native_identity, config_hash,
+                replay_count=int((engineering_limits or {}).get("checkpoint_replays", 2)),
             )
         atomic_json(result_path, result)
         return result
@@ -1197,16 +1288,17 @@ def run_arm(
         adapter.close()
 
 
-def run_owner(
+def _run_owner_impl(
     owner_seed: int,
     stage: str,
     output: str,
     config_hash: str,
     native_identity: Mapping[str, Any],
+    engineering_limits: Mapping[str, int] | None = None,
 ) -> dict[str, Any]:
     global STOP_FILE
     output_dir = Path(output)
-    STOP_FILE = output_dir / "budget-stop.flag"
+    STOP_FILE = output_dir / ("issue65-budget-stop.flag" if stage == "engineering" else "budget-stop.flag")
     check_stop()
     owner_dir = output_dir / stage / f"seed-{owner_seed}"
     owner_dir.mkdir(parents=True, exist_ok=True)
@@ -1227,10 +1319,12 @@ def run_owner(
     try:
         for arm in CONFIG["arms"]:
             check_stop()
-            arms[arm] = run_arm(
-                owner_seed, arm, attempt_dir, preflight=(stage == "preflight"),
-                config_hash=config_hash, native_identity=native_identity,
-            )
+            with runtime_phase(f"arm_execution:{arm}"):
+                arms[arm] = run_arm(
+                    owner_seed, arm, attempt_dir, preflight=(stage in ("preflight", "engineering")),
+                    config_hash=config_hash, native_identity=native_identity,
+                    engineering_limits=engineering_limits,
+                )
             append_jsonl(owner_dir / "owner-ledger.jsonl", {
                 "event": "arm_result_durable", "owner_seed": owner_seed,
                 "arm": arm, "terminal": arms[arm]["terminal"],
@@ -1268,6 +1362,68 @@ def run_owner(
         raise
 
 
+def ensure_runtime() -> Any:
+    """Install the study-local optimizer on the exact runner's imported path."""
+    global _RUNTIME_EXECUTION, _RUNTIME_MODULE
+    if _RUNTIME_EXECUTION is not None:
+        return _RUNTIME_EXECUTION
+    root_text = str(ROOT)
+    if root_text not in sys.path:
+        sys.path.insert(0, root_text)
+    _RUNTIME_MODULE = importlib.import_module("public_history_execution")
+    controlled = importlib.import_module("sts_combat_rl.sim.controlled_run")
+    public_context = importlib.import_module("sts_combat_rl.sim.public_run_context")
+    _RUNTIME_EXECUTION = _RUNTIME_MODULE.install(
+        optimized=True,
+        controlled_run_module=controlled,
+        public_context_module=public_context,
+        adapter_class=LightSpeedAdapter,
+        expert_driver_class=ExpertNonCombatDriver,
+        runner_module=sys.modules[__name__],
+    )
+    # Function imports above are aliases; update the namespace used by this
+    # module explicitly so spawn/forkserver workers execute the wrapped path.
+    globals()["execute_controlled_run"] = controlled.execute_controlled_run
+    globals()["action_identity_dicts_for_actions"] = controlled.action_identity_dicts_for_actions
+    return _RUNTIME_EXECUTION
+
+
+def run_owner(
+    owner_seed: int,
+    stage: str,
+    output: str,
+    config_hash: str,
+    native_identity: Mapping[str, Any],
+    engineering_limits: Mapping[str, int] | None = None,
+) -> dict[str, Any]:
+    global _LAST_STOP_POLL_CPU
+    output_dir = Path(output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    result: dict[str, Any] | None = None
+    _LAST_STOP_POLL_CPU = None
+    try:
+        runtime = ensure_runtime()
+        with runtime.scope(
+            metrics_path=output_dir / "issue65-runtime-metrics.jsonl",
+            labels={"stage": stage, "owner_seed": int(owner_seed)},
+            telemetry_enabled=True,
+        ):
+            with runtime_phase("owner_total"):
+                result = _run_owner_impl(
+                    owner_seed, stage, output, config_hash, native_identity, engineering_limits
+                )
+    finally:
+        receipt = (
+            write_worker_cpu_receipt(output_dir, stage, owner_seed)
+            if engineering_limits is not None or stage == "engineering"
+            else {}
+        )
+    if result is None:
+        raise StudyFailure("owner returned without a result")
+    result.update(receipt)
+    return result
+
+
 def memory_available_bytes() -> int:
     try:
         for line in Path("/proc/meminfo").read_text().splitlines():
@@ -1278,39 +1434,90 @@ def memory_available_bytes() -> int:
     return 2 * 1024 * 1024 * 1024
 
 
-def proc_cpu_seconds(pid: int) -> tuple[int | None, int, str | None]:
+def proc_cpu_details(pid: int) -> tuple[int | None, int, str | None, int | None]:
     try:
         row = Path(f"/proc/{pid}/stat").read_text()
         rest = row[row.rfind(")") + 2 :].split()
-        return int(rest[1]), int(rest[11]) + int(rest[12]), rest[0]
+        return int(rest[1]), int(rest[11]) + int(rest[12]), rest[0], int(rest[19])
     except (OSError, ValueError, IndexError):
-        return None, 0, None
+        return None, 0, None, None
 
 
-def process_tree_cpu_seconds(root_pid: int) -> float:
-    process_rows: dict[int, tuple[int | None, int, str | None]] = {}
-    for entry in Path("/proc").iterdir():
-        if entry.name.isdigit():
-            pid = int(entry.name)
-            ppid, ticks, state = proc_cpu_seconds(pid)
-            if state is not None:
-                process_rows[pid] = (ppid, ticks, state)
-    descendants = {root_pid}
-    changed = True
-    while changed:
-        changed = False
-        for pid, (ppid, _, _) in process_rows.items():
-            if ppid in descendants and pid not in descendants:
-                descendants.add(pid)
-                changed = True
-    active_ticks = sum(
-        process_rows[pid][1] for pid in descendants
-        if pid in process_rows and process_rows[pid][2] != "Z"
-    )
-    hz = os.sysconf(os.sysconf_names["SC_CLK_TCK"])
-    children = resource.getrusage(resource.RUSAGE_CHILDREN)
-    own = resource.getrusage(resource.RUSAGE_SELF)
-    return own.ru_utime + own.ru_stime + children.ru_utime + children.ru_stime + active_ticks / hz
+def write_worker_cpu_receipt(output_dir: Path, stage: str, owner_seed: int) -> dict[str, Any]:
+    """Persist a worker's process CPU receipt even when owner execution raises."""
+    _ppid, _ticks, _state, start_ticks = proc_cpu_details(os.getpid())
+    receipt = {
+        "stage": stage,
+        "owner_seed": int(owner_seed),
+        "worker_pid": os.getpid(),
+        "worker_start_ticks": start_ticks,
+        # Linux process_time is the process lifetime CPU clock, including imports
+        # and prior tasks when ProcessPoolExecutor reuses a worker.
+        "worker_process_cpu_seconds": time.process_time(),
+    }
+    receipt_dir = output_dir / "issue65-worker-cpu-receipts"
+    receipt_path = receipt_dir / f"{stage}-seed-{int(owner_seed)}.json"
+    atomic_json(receipt_path, receipt)
+    return receipt
+
+
+class ProcessTreeCPUSampler:
+    """Accumulate process-tree CPU without double-counting the root PID.
+
+    PID/start-time keys and maximum observed ticks keep completed workers in the
+    total even when a short task exits between parent polls. Worker receipts
+    fill in such unseen completions; max() avoids double-counting sampled ones.
+    """
+
+    def __init__(self, root_pid: int):
+        self.root_pid = root_pid
+        self.hz = os.sysconf(os.sysconf_names["SC_CLK_TCK"])
+        self.own_start = time.process_time()
+        self.initial_ticks: dict[tuple[int, int], int] = {}
+        self.max_child_cpu: dict[tuple[int, int], float] = {}
+        for pid, (ppid, ticks, _state, start_ticks) in self._descendants().items():
+            if start_ticks is not None:
+                self.initial_ticks[(pid, start_ticks)] = ticks
+
+    def _descendants(self) -> dict[int, tuple[int | None, int, str | None, int | None]]:
+        rows: dict[int, tuple[int | None, int, str | None, int | None]] = {}
+        for entry in Path("/proc").iterdir():
+            if entry.name.isdigit():
+                pid = int(entry.name)
+                ppid, ticks, state, start_ticks = proc_cpu_details(pid)
+                if state is not None:
+                    rows[pid] = (ppid, ticks, state, start_ticks)
+        descendants = {self.root_pid}
+        changed = True
+        while changed:
+            changed = False
+            for pid, (ppid, _ticks, _state, _start_ticks) in rows.items():
+                if ppid in descendants and pid not in descendants:
+                    descendants.add(pid)
+                    changed = True
+        return {pid: rows[pid] for pid in descendants if pid != self.root_pid and pid in rows}
+
+    def sample(self) -> float:
+        for pid, (_ppid, ticks, state, start_ticks) in self._descendants().items():
+            if state == "Z" or start_ticks is None:
+                continue
+            key = (pid, start_ticks)
+            baseline = self.initial_ticks.get(key, 0)
+            observed = max(0.0, (ticks - baseline) / self.hz)
+            self.max_child_cpu[key] = max(self.max_child_cpu.get(key, 0.0), observed)
+        return max(0.0, time.process_time() - self.own_start) + sum(self.max_child_cpu.values())
+
+    def record_worker_result(self, result: Mapping[str, Any]) -> None:
+        try:
+            key = (int(result["worker_pid"]), int(result["worker_start_ticks"]))
+            worker_cpu = max(0.0, float(result["worker_process_cpu_seconds"]))
+        except (KeyError, TypeError, ValueError):
+            return
+        baseline_ticks = self.initial_ticks.get(key, 0)
+        self.max_child_cpu[key] = max(
+            self.max_child_cpu.get(key, 0.0),
+            worker_cpu - baseline_ticks / self.hz,
+        )
 
 
 def read_budget_state(path: Path) -> dict[str, Any]:
@@ -1332,6 +1539,46 @@ def write_budget_state(path: Path, state: Mapping[str, Any]) -> None:
     atomic_json(path, state)
 
 
+def read_engineering_budget(path: Path, runner_sha256: str) -> dict[str, Any]:
+    if path.exists():
+        state = json.loads(path.read_text(encoding="utf-8"))
+        if state.get("schema_id") != "issue65-engineering-budget-v1":
+            raise StudyFailure("engineering budget file has an unknown schema")
+        if state.get("runner_sha256") != runner_sha256:
+            raise StudyFailure("engineering receipts belong to a different runner source hash")
+        if (
+            float(state.get("aggregate_unique_process_cpu_hard_max", -1)) != ENGINEERING_TOTAL_CPU
+            or float(state.get("independent_review_reserve_cpu_seconds", -1)) != ENGINEERING_REVIEW_RESERVE_CPU
+            or float(state.get("builder_cpu_limit_cpu_seconds", -1)) != ENGINEERING_BUILDER_HARD_CPU
+        ):
+            raise StudyFailure("engineering budget constants differ from the original Issue 65 receipt")
+        return state
+    return {
+        "schema_id": "issue65-engineering-budget-v1",
+        "issue": 65,
+        "runner_sha256": runner_sha256,
+        "builder_cpu_seconds": 0.0,
+        "builder_soft_stop_cpu_seconds": ENGINEERING_BUILDER_SOFT_STOP_CPU,
+        "builder_hard_stop_cpu_seconds": ENGINEERING_BUILDER_HARD_CPU,
+        "aggregate_unique_process_cpu_hard_max": ENGINEERING_TOTAL_CPU,
+        "independent_review_reserve_cpu_seconds": ENGINEERING_REVIEW_RESERVE_CPU,
+        "builder_cpu_limit_cpu_seconds": ENGINEERING_BUILDER_HARD_CPU,
+        "stop_requested": False,
+        "hard_stop_requested": False,
+        "last_process_cpu_checkpoint": 0.0,
+    }
+
+
+def optimized_source_identity() -> dict[str, str]:
+    runtime_path = ROOT / "public_history_execution.py"
+    if not runtime_path.is_file():
+        raise StudyFailure("installed Issue 65 runtime module is missing")
+    return {
+        "runner_sha256": sha256_file(Path(__file__).resolve()),
+        "optimizer_module_sha256": sha256_file(runtime_path),
+    }
+
+
 def select_workers(target: int, estimated_worker_rss_mb: int = 1024) -> int:
     memory_budget = int(memory_available_bytes() * 0.7)
     max_by_memory = max(1, memory_budget // (estimated_worker_rss_mb * 1024 * 1024))
@@ -1348,52 +1595,81 @@ def execute_stage(
     target_workers: int,
     budget_state: dict[str, Any],
     budget_path: Path,
+    engineering_limits: Mapping[str, int] | None = None,
+    soft_stop_cpu_seconds: float | None = None,
+    hard_stop_cpu_seconds: float | None = None,
+    event_log_name: str = "study-events.jsonl",
+    stop_file_name: str = "budget-stop.flag",
 ) -> list[dict[str, Any]]:
     global STOP_FILE
-    STOP_FILE = output / "budget-stop.flag"
+    STOP_FILE = output / stop_file_name
+    if bool(budget_state.get("stop_requested")):
+        raise StudyFailure("a previous budget stop is recorded; resume is refused")
     if STOP_FILE.exists():
         STOP_FILE.unlink()
     workers = select_workers(target_workers)
     base_consumed = float(budget_state["builder_cpu_seconds"])
-    parent_start_cpu = process_tree_cpu_seconds(os.getpid())
+    cpu_sampler = ProcessTreeCPUSampler(os.getpid())
+    parent_start_cpu = cpu_sampler.sample()
     started_wall = time.monotonic()
     results: list[dict[str, Any]] = []
-    append_jsonl(output / "study-events.jsonl", {
+    append_jsonl(output / event_log_name, {
         "event": "stage_started", "stage": stage, "seeds": list(seeds),
         "workers": workers, "mem_available_bytes": memory_available_bytes(),
         "estimated_worker_rss_mb": 1024, "builder_cpu_seconds_before": base_consumed,
     }, sync=True)
     with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(run_owner, int(seed), stage, str(output), config_hash, dict(native_identity)): int(seed)
+            pool.submit(
+                run_owner, int(seed), stage, str(output), config_hash, dict(native_identity),
+                dict(engineering_limits) if engineering_limits is not None else None,
+            ): int(seed)
             for seed in seeds
         }
         pending = set(futures)
-        last_delta = 0.0
         while pending:
-            current = process_tree_cpu_seconds(os.getpid())
+            current = cpu_sampler.sample()
             delta = max(0.0, current - parent_start_cpu)
             consumed = base_consumed + delta
             budget_state = dict(budget_state)
             budget_state.update({
                 "builder_cpu_seconds": consumed,
                 "last_process_cpu_checkpoint": delta,
-                "stop_requested": consumed >= MAX_CPU,
+                "stop_requested": consumed >= (
+                    soft_stop_cpu_seconds if soft_stop_cpu_seconds is not None else MAX_CPU
+                ),
+                "hard_stop_requested": (
+                    hard_stop_cpu_seconds is not None and consumed >= hard_stop_cpu_seconds
+                ),
                 "last_updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             })
             write_budget_state(budget_path, budget_state)
-            last_delta = delta
             if budget_state["stop_requested"]:
                 STOP_FILE.touch()
+            if budget_state.get("hard_stop_requested"):
+                append_jsonl(output / event_log_name, {
+                    "event": "aggregate_cpu_hard_stop",
+                    "stage": stage,
+                    "builder_cpu_seconds": consumed,
+                    "hard_limit_cpu_seconds": hard_stop_cpu_seconds,
+                    "workers": workers,
+                }, sync=True)
+                if hasattr(pool, "terminate_workers"):
+                    pool.terminate_workers()
+                else:
+                    for process in getattr(pool, "_processes", {}).values():
+                        process.terminate()
+                raise StudyFailure("Issue 65 aggregate Builder CPU hard stop; worker pool terminated")
             done, pending = concurrent.futures.wait(
-                pending, timeout=1.0, return_when=concurrent.futures.FIRST_COMPLETED
+                pending, timeout=0.5, return_when=concurrent.futures.FIRST_COMPLETED
             )
             for future in done:
                 seed = futures[future]
                 try:
                     result = future.result()
                     results.append(result)
-                    append_jsonl(output / "study-events.jsonl", {
+                    cpu_sampler.record_worker_result(result)
+                    append_jsonl(output / event_log_name, {
                         "event": "owner_future_completed", "stage": stage,
                         "owner_seed": seed, "owner_cpu_seconds": result["owner_cpu_seconds"],
                         "peak_rss_kib": result["peak_rss_kib"],
@@ -1401,26 +1677,54 @@ def execute_stage(
                     }, sync=True)
                 except Exception as exc:
                     STOP_FILE.touch()
-                    append_jsonl(output / "study-events.jsonl", {
-                        "event": "owner_future_failed", "stage": stage, "owner_seed": seed,
-                        "error_type": type(exc).__name__, "error": str(exc),
-                        "builder_cpu_seconds": budget_state["builder_cpu_seconds"],
-                    }, sync=True)
+                    for receipt_seed in (seed, *[futures[item] for item in pending]):
+                        receipt_path = output / "issue65-worker-cpu-receipts" / f"{stage}-seed-{receipt_seed}.json"
+                        if receipt_path.exists():
+                            cpu_sampler.record_worker_result(json.loads(receipt_path.read_text(encoding="utf-8")))
+                    cpu_sampler.sample()
                     for remaining in pending:
                         remaining.cancel()
+                    if hasattr(pool, "terminate_workers"):
+                        pool.terminate_workers()
+                    else:
+                        for process in getattr(pool, "_processes", {}).values():
+                            process.terminate()
+                    delta = max(0.0, cpu_sampler.sample() - parent_start_cpu)
+                    consumed = base_consumed + delta
+                    budget_state = dict(budget_state)
+                    budget_state.update({
+                        "builder_cpu_seconds": consumed,
+                        "last_process_cpu_checkpoint": delta,
+                        "stop_requested": True,
+                        "hard_stop_requested": (
+                            hard_stop_cpu_seconds is not None and consumed >= hard_stop_cpu_seconds
+                        ),
+                        "last_updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    })
+                    write_budget_state(budget_path, budget_state)
+                    append_jsonl(output / event_log_name, {
+                        "event": "owner_future_failed", "stage": stage, "owner_seed": seed,
+                        "error_type": type(exc).__name__, "error": str(exc),
+                        "builder_cpu_seconds": consumed,
+                    }, sync=True)
                     raise StudyFailure(f"{stage} owner {seed} failed: {exc}") from exc
-        final_cpu = process_tree_cpu_seconds(os.getpid())
-        delta = max(0.0, final_cpu - parent_start_cpu)
-        budget_state = dict(budget_state)
-        budget_state.update({
-            "builder_cpu_seconds": base_consumed + delta,
-            "last_process_cpu_checkpoint": 0.0,
-            "stop_requested": base_consumed + delta >= MAX_CPU,
-            "last_updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        })
-        write_budget_state(budget_path, budget_state)
+    # Sample after executor shutdown so completed worker CPU is in RUSAGE_CHILDREN.
+    final_cpu = cpu_sampler.sample()
+    delta = max(0.0, final_cpu - parent_start_cpu)
+    budget_state = dict(budget_state)
+    effective_soft_stop = soft_stop_cpu_seconds if soft_stop_cpu_seconds is not None else MAX_CPU
+    budget_state.update({
+        "builder_cpu_seconds": base_consumed + delta,
+        "last_process_cpu_checkpoint": delta,
+        "stop_requested": base_consumed + delta >= effective_soft_stop,
+        "hard_stop_requested": (
+            hard_stop_cpu_seconds is not None and base_consumed + delta >= hard_stop_cpu_seconds
+        ),
+        "last_updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    })
+    write_budget_state(budget_path, budget_state)
     results.sort(key=lambda row: row["owner_seed"])
-    append_jsonl(output / "study-events.jsonl", {
+    append_jsonl(output / event_log_name, {
         "event": "stage_completed", "stage": stage, "owner_count": len(results),
         "builder_cpu_seconds": budget_state["builder_cpu_seconds"],
         "wall_seconds": time.monotonic() - started_wall,
@@ -1430,11 +1734,12 @@ def execute_stage(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Issue 64 full-terminal non-combat oracle study")
-    parser.add_argument("mode", choices=("audit", "preflight", "production", "selfcheck"))
+    parser.add_argument("mode", choices=("audit", "preflight", "production", "selfcheck", "engineering"))
     parser.add_argument("--output", type=Path)
     parser.add_argument("--native-source", default="/home/lsmft/stsrl-spikes/sts_lightspeed-issue59")
     parser.add_argument("--stsrl-source", default="/home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c")
     parser.add_argument("--workers", type=int)
+    parser.add_argument("--seeds", type=int, nargs="+")
     args = parser.parse_args()
     code_hash = sha256_file(Path(__file__).resolve())
     config_hash = hashlib.sha256(canonical(CONFIG).encode()).hexdigest()
@@ -1452,8 +1757,113 @@ def main() -> int:
     if args.mode == "audit":
         print(canonical({
             "environment": native_identity, "config_sha256": config_hash,
-            "runner_sha256": code_hash,
+            **optimized_source_identity(),
             "reported_stsrl_native_manifest": "recorded separately; runner uses the pinned native source and binary identity",
+        }))
+        return 0
+
+    if args.mode == "engineering":
+        if args.output is None:
+            parser.error("--output is required for engineering")
+        output = args.output.expanduser().resolve()
+        ensure_output_is_external(output)
+        output.mkdir(parents=True, exist_ok=True)
+        if (output / "budget-state.json").exists():
+            raise StudyFailure("refusing legacy Issue 64 budget-state.json; Issue 65 owns a separate budget")
+        if (output / "study-manifest.json").exists():
+            raise StudyFailure("refusing an Issue 64 study output directory")
+        if (output / "preflight-decision.json").exists():
+            raise StudyFailure("refusing an Issue 64 preflight output directory")
+        seeds = tuple(args.seeds or ENGINEERING_SEEDS[:1])
+        if not seeds or len(seeds) > len(ENGINEERING_SEEDS) or any(seed not in ENGINEERING_SEEDS for seed in seeds):
+            raise StudyFailure(f"engineering seeds must be selected from {ENGINEERING_SEEDS}")
+        if len(set(seeds)) != len(seeds):
+            raise StudyFailure("engineering seeds must be unique")
+        worker_count = args.workers if args.workers is not None else min(2, len(seeds))
+        if worker_count < 1 or worker_count > 2 or worker_count > len(seeds):
+            raise StudyFailure("engineering mode permits one or two workers, no more than selected seeds")
+        source_identity = optimized_source_identity()
+        limits = {
+            "planning_calls_max": 1,
+            "complete_terminal_continuations_per_call_max": 1,
+            "retry_attempts_per_call_max": 8,
+            "checkpoint_replays": 2,
+        }
+        engineering_hash = hashlib.sha256(canonical({
+            "config": CONFIG,
+            "limits": limits,
+            "seeds": list(seeds),
+            "source_identity": source_identity,
+            "optimizer_id": "issue65-demand-driven-public-history-v1",
+        }).encode()).hexdigest()
+        budget_path = output / "engineering-budget-state.json"
+        state = read_engineering_budget(budget_path, source_identity["runner_sha256"])
+        if state.get("engineering_config_sha256") not in (None, engineering_hash):
+            raise StudyFailure("engineering receipts were created with different seeds or limits")
+        consumed = float(state["builder_cpu_seconds"])
+        if state.get("stop_requested") or consumed >= ENGINEERING_BUILDER_SOFT_STOP_CPU:
+            raise StudyFailure("Issue 65 engineering budget is stopped or already at its soft limit")
+        state.update({
+            "engineering_config_sha256": engineering_hash,
+            "native_identity": native_identity,
+            "optimizer_module_sha256": source_identity["optimizer_module_sha256"],
+            "selected_fixed_seeds": list(seeds),
+            "engineering_limits": limits,
+            "workers": worker_count,
+        })
+        write_budget_state(budget_path, state)
+        atomic_json(output / "issue65-engineering-manifest.json", {
+            "schema_id": "issue65-engineering-manifest-v1",
+            "issue_url": "https://github.com/lsmfttb/spire-research/issues/65",
+            "study_only": True,
+            "source_base_commit": "e13f97402a0716c4e2618a6d4800d58602a3058d",
+            "source_identity": source_identity,
+            "engineering_config_sha256": engineering_hash,
+            "native_identity": native_identity,
+            "selected_fixed_seeds": list(seeds),
+            "limits": limits,
+            "budget": {
+                "aggregate_unique_process_cpu_hard_max": ENGINEERING_TOTAL_CPU,
+                "independent_review_reserve_cpu_seconds": ENGINEERING_REVIEW_RESERVE_CPU,
+                "builder_cpu_hard_limit": ENGINEERING_BUILDER_HARD_CPU,
+                "builder_cpu_soft_stop": ENGINEERING_BUILDER_SOFT_STOP_CPU,
+            },
+            "disposition": "EFFICIENCY_NOT_ESTABLISHED until paired baseline, parity, cost projection, and review evidence are complete",
+        })
+        ensure_runtime()
+        results = execute_stage(
+            stage="engineering",
+            seeds=seeds,
+            output=output,
+            native_identity=native_identity,
+            config_hash=engineering_hash,
+            target_workers=worker_count,
+            budget_state=state,
+            budget_path=budget_path,
+            engineering_limits=limits,
+            soft_stop_cpu_seconds=ENGINEERING_BUILDER_SOFT_STOP_CPU,
+            hard_stop_cpu_seconds=ENGINEERING_BUILDER_HARD_CPU,
+            event_log_name="issue65-engineering-events.jsonl",
+            stop_file_name="issue65-budget-stop.flag",
+        )
+        final_state = json.loads(budget_path.read_text(encoding="utf-8"))
+        if final_state.get("stop_requested") or final_state.get("hard_stop_requested"):
+            raise StudyFailure("bounded Issue 65 engineering run reached its fail-closed stop boundary")
+        atomic_json(output / "issue65-engineering-results.json", {
+            "schema_id": "issue65-engineering-results-v1",
+            "engineering_config_sha256": engineering_hash,
+            "source_identity": source_identity,
+            "owner_results": results,
+            "builder_cpu_seconds": final_state["builder_cpu_seconds"],
+            "terminal": "engineering_validation_only",
+            "disposition": "EFFICIENCY_NOT_ESTABLISHED pending baseline comparison, coverage, static audit and Reviewer audit",
+        })
+        print(canonical({
+            "stage": "engineering",
+            "selected_seeds": list(seeds),
+            "owner_count": len(results),
+            "builder_cpu_seconds": final_state["builder_cpu_seconds"],
+            "source_identity": source_identity,
         }))
         return 0
 
@@ -1468,6 +1878,7 @@ def main() -> int:
         raise StudyFailure("Builder CPU ceiling is already exhausted")
     state.update({
         "config_sha256": config_hash, "runner_sha256": code_hash,
+        "optimizer_module_sha256": optimized_source_identity()["optimizer_module_sha256"],
         "native_identity": native_identity, "builder_cpu_ceiling_seconds": MAX_CPU,
         "review_reserve_seconds": REVIEW_RESERVE,
     })
@@ -1475,6 +1886,7 @@ def main() -> int:
     atomic_json(output / "study-manifest.json", {
         "study_id": CONFIG["study_id"], "config": CONFIG,
         "config_sha256": config_hash, "runner_sha256": code_hash,
+        "optimizer_module_sha256": optimized_source_identity()["optimizer_module_sha256"],
         "native_identity": native_identity,
         "issue_url": "https://github.com/lsmfttb/spire-research/issues/64",
         "artifact_consumer": "Issue 64 independent Reviewer and Planner",
@@ -1514,6 +1926,7 @@ def main() -> int:
             "schema": "issue64-preflight-decision-v1",
             "config_sha256": config_hash,
             "runner_sha256": code_hash,
+            "optimizer_module_sha256": optimized_source_identity()["optimizer_module_sha256"],
             "preflight_owner_count": len(results),
             "max_preflight_owner_cpu_seconds": max_owner_cpu,
             "builder_cpu_seconds_after_preflight": current_cpu,

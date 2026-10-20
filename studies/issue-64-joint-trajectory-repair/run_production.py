@@ -40,6 +40,14 @@ def main() -> int:
         raise SystemExit(
             f"runner differs from preflighted source: expected={expected}, actual={actual}"
         )
+    runtime_module = ROOT / "public_history_execution.py"
+    expected_runtime = decision.get("optimizer_module_sha256")
+    actual_runtime = sha256_file(runtime_module) if runtime_module.is_file() else None
+    if not expected_runtime or actual_runtime != expected_runtime:
+        raise SystemExit(
+            "Issue 65 runtime differs from preflighted source: "
+            f"expected={expected_runtime}, actual={actual_runtime}"
+        )
     command = [
         sys.executable,
         str(RUNNER),
@@ -56,6 +64,7 @@ def main() -> int:
     print(json.dumps({
         "event": "production_launch",
         "runner_sha256": actual,
+        "optimizer_module_sha256": actual_runtime,
         "preflight_decision": str(preflight_path),
         "command": command,
     }, sort_keys=True), flush=True)
