@@ -174,6 +174,47 @@ def find_identity_index(actions: Sequence[Any], target: Mapping[str, Any]) -> in
     return matches[0]
 
 
+def choose_b2_root(
+    root_identities: Sequence[Mapping[str, Any]],
+    *,
+    baseline_root: int,
+    proposed_root: int,
+    candidate_index: int,
+    call_index: int,
+    parent: Mapping[str, Any] | None,
+) -> tuple[int, int | None, list[dict[str, Any]], str | None]:
+    """Choose a root and only retain a suffix when its parent's root is retained."""
+    if not root_identities or not 0 <= baseline_root < len(root_identities):
+        raise StudyFailure("candidate Expert root is outside the current legal root actions")
+    if not 0 <= proposed_root < len(root_identities):
+        raise StudyFailure("proposed root is outside the current legal root actions")
+    fresh_roots = [i for i in range(len(root_identities)) if i != baseline_root]
+    if not fresh_roots:
+        raise StudyFailure("B2 requires at least one root action different from the candidate Expert action")
+    fresh_root = fresh_roots[(candidate_index + call_index) % len(fresh_roots)]
+
+    if parent is not None:
+        matches = [
+            i for i, identity in enumerate(root_identities)
+            if same_action(identity, parent["root_identity"])
+        ]
+        if len(matches) != 1:
+            raise StudyFailure("elite parent root is not uniquely present in the current legal root actions")
+        parent_root = matches[0]
+        if parent_root != baseline_root:
+            return (
+                parent_root,
+                int(parent["candidate_index"]),
+                list(parent["materialized_overrides"]),
+                None,
+            )
+        return fresh_root, None, [], "parent_root_matches_candidate_expert"
+
+    if proposed_root == baseline_root:
+        return fresh_root, None, [], "proposed_root_matches_candidate_expert"
+    return proposed_root, None, [], None
+
+
 def terminal_fields(run: ControlledRun) -> dict[str, Any]:
     if not run.terminal:
         raise StudyFailure("run is incomplete and cannot be scored")
@@ -197,6 +238,58 @@ def terminal_fields(run: ControlledRun) -> dict[str, Any]:
 
 def terminal_fitness(fields: Mapping[str, Any]) -> tuple[int, int]:
     return (1 if fields["heart_victory"] else 0, int(fields["terminal_floor"]))
+
+
+def selfcheck_b2_root_selection() -> None:
+    roots = [
+        {
+            "action_id": f"game:{index}",
+            "occurrence": 0,
+            "kind": "map",
+            "label": f"map-{index}",
+            "stable_id": f"root-{index}",
+        }
+        for index in range(3)
+    ]
+    suffix = [{"eligible_ordinal": 3, "action_identity": roots[2]}]
+    parent = {
+        "candidate_index": 7,
+        "root_identity": roots[0],
+        "materialized_overrides": suffix,
+    }
+
+    root, parent_index, inherited, discard_reason = choose_b2_root(
+        roots,
+        baseline_root=0,
+        proposed_root=1,
+        candidate_index=1,
+        call_index=0,
+        parent=parent,
+    )
+    if root == 0 or parent_index is not None or inherited or discard_reason != "parent_root_matches_candidate_expert":
+        raise StudyFailure("B2 root-collision self-check retained a parent suffix or Expert root")
+
+    root, parent_index, inherited, discard_reason = choose_b2_root(
+        roots,
+        baseline_root=2,
+        proposed_root=1,
+        candidate_index=2,
+        call_index=0,
+        parent=parent,
+    )
+    if root != 0 or parent_index != 7 or inherited != suffix or discard_reason is not None:
+        raise StudyFailure("B2 non-colliding parent self-check did not preserve its root and suffix")
+
+    root, parent_index, inherited, discard_reason = choose_b2_root(
+        roots,
+        baseline_root=1,
+        proposed_root=1,
+        candidate_index=0,
+        call_index=0,
+        parent=None,
+    )
+    if root == 1 or parent_index is not None or inherited or discard_reason != "proposed_root_matches_candidate_expert":
+        raise StudyFailure("B2 root-proposal self-check selected the Expert root")
 
 
 def legal_action_record(actions: Sequence[Any]) -> list[dict[str, Any]]:
@@ -635,37 +728,30 @@ class StudyController:
             root_idx = candidate_index % len(root_identities)
             parent_index: int | None = None
             inherited: list[dict[str, Any]] = []
+            parent_discard_reason: str | None = None
+            baseline_root_identity: dict[str, Any] | None = None
             target_cycle = PROPOSAL["future_target_cycle"]
             new_target = target_cycle[(candidate_index + call_index) % len(target_cycle)]
             if self.arm == "B2":
+                baseline_driver = ExpertNonCombatDriver(seed=EXPERT_SEED)
+                baseline_driver.reset_for_run(policy_seed)
+                baseline_root = baseline_driver.select_action(context).legal_action_index
+                baseline_root_identity = action_identity(root_identities[baseline_root])
                 parents = sorted(
                     (row for row in results if row.get("joint_valid")),
                     key=lambda row: (-row["fitness"][0], -row["fitness"][1], row["candidate_index"]),
                 )[:elite_size]
+                parent: Mapping[str, Any] | None = None
                 if parents:
                     parent = parents[(candidate_index + call_index) % len(parents)]
-                    parent_index = int(parent["candidate_index"])
-                    inherited = list(parent["materialized_overrides"])
-                    parent_root = next(
-                        (i for i, identity in enumerate(root_identities) if same_action(identity, parent["root_identity"])),
-                        root_idx,
-                    )
-                    root_idx = parent_root
-                    if root_idx == baseline_root:
-                        # The parent's suffix is tied to its root. If the inherited
-                        # root is now the seeded Expert choice, discard that suffix
-                        # and start a fresh alternative root candidate.
-                        inherited = []
-                        parent_index = None
-                        fresh_roots = [i for i in range(len(root_identities)) if i != baseline_root]
-                        root_idx = fresh_roots[(candidate_index + call_index) % len(fresh_roots)]
-                baseline_driver = ExpertNonCombatDriver(seed=EXPERT_SEED)
-                baseline_driver.reset_for_run(policy_seed)
-                baseline_root = baseline_driver.select_action(context).legal_action_index
-                if root_idx == baseline_root:
-                    root_idx = (root_idx + 1) % len(root_identities)
-                    if root_idx == baseline_root:
-                        root_idx = (root_idx + 1) % len(root_identities)
+                root_idx, parent_index, inherited, parent_discard_reason = choose_b2_root(
+                    root_identities,
+                    baseline_root=baseline_root,
+                    proposed_root=root_idx,
+                    candidate_index=candidate_index,
+                    call_index=call_index,
+                    parent=parent,
+                )
                 plan = CandidatePlan(
                     candidate_index=candidate_index,
                     root_identity=action_identity(root_identities[root_idx]),
@@ -683,6 +769,8 @@ class StudyController:
                 "branch_id": branch_id,
                 "candidate_index": candidate_index,
                 "parent_candidate_index": parent_index,
+                "parent_discard_reason": parent_discard_reason,
+                "baseline_root_identity": baseline_root_identity,
                 "root_identity": root_identity,
                 "inherited_override_count": len(inherited),
                 "new_target": new_target if self.arm == "B2" else None,
@@ -742,6 +830,8 @@ class StudyController:
                 result = {
                     "candidate_index": candidate_index,
                     "parent_candidate_index": parent_index,
+                    "parent_discard_reason": parent_discard_reason,
+                    "baseline_root_identity": baseline_root_identity,
                     "root_identity": root_identity,
                     "materialized_overrides": branch_controller.materialized_overrides,
                     "terminal": terminal,
@@ -1354,7 +1444,8 @@ def main() -> int:
             raise StudyFailure("terminal utility self-check failed")
         if terminal_fitness({"heart_victory": True, "terminal_floor": 3}) != (1, 3):
             raise StudyFailure("Heart-first terminal utility self-check failed")
-        print("selfcheck: terminal utility ordering passed")
+        selfcheck_b2_root_selection()
+        print("selfcheck: terminal utility ordering and B2 root/suffix invariants passed")
         return 0
 
     native_identity = validate_environment(args.native_source, args.stsrl_source)
