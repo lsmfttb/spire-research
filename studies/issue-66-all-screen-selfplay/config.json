@@ -1,0 +1,87 @@
+{
+  "schema_id": "issue66-all-screen-selfplay-registration-v1",
+  "study_id": "issue-66-all-screen-selfplay-v1",
+  "purpose": "STUDY_ONLY",
+  "base": {
+    "remote": "origin/codex/issue-65-receipt-identity",
+    "commit": "30efe12bcedb65a432f1a57756a930baed90c5d5"
+  },
+  "identity": {
+    "native_repository": "https://github.com/lsmfttb/sts_lightspeed",
+    "native_branch": "stsrl/main",
+    "native_commit": "0990ef48d51cd48444a707839d65226d52c1d73e",
+    "native_binary_sha256": "7ce07ec44abda2133742161d7812fa8286438b71ab83a163e328ac617a44f1e5",
+    "stsrl_source_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "python": "3.14.4"
+  },
+  "start": {
+    "character": "IRONCLAD",
+    "ascension": 20,
+    "standard_start": true,
+    "injected_resources": false
+  },
+  "battle": {
+    "api": "StepSimulator.battle_search_v2.v1",
+    "patch_identity": "sts_lightspeed_battle_search_v2_tree_internal_v1",
+    "simulations": 400,
+    "include_potions": true,
+    "root_selection": "highest_mean",
+    "policy_prior_callback": null,
+    "leaf_value_callback": null
+  },
+  "required_noncombat_screens": [
+    "NEOW",
+    "MAP_SCREEN",
+    "REWARDS",
+    "SHOP_ROOM",
+    "REST_ROOM",
+    "EVENT_SCREEN",
+    "CARD_SELECT",
+    "BOSS_RELIC_REWARDS",
+    "TREASURE_ROOM",
+    "legal_potion_and_inventory_actions"
+  ],
+  "required_training": {
+    "blocks": 4,
+    "owners_per_block": 256,
+    "training_seed_range_inclusive": [7100001, 7101024],
+    "max_meaningful_decisions_per_owner": 4,
+    "native_checkpoint_search_cpu_seconds_per_decision": 8,
+    "all_later_choices": "same current frozen policy",
+    "terminal_reward": ["Heart victory indicator", "native terminal floor"],
+    "expert_action_supervision": false,
+    "policy_imitation": false,
+    "future_outcome_features": false
+  },
+  "required_evaluation": {
+    "seed_range_inclusive": [7110001, 7110096],
+    "independent_owners": 96,
+    "arms": ["P0", "P1", "E", "R", "J"],
+    "oracle_roots_max": 7,
+    "oracle_cpu_seconds_per_call": 32,
+    "oracle_candidate_attempts_per_call_max": 32,
+    "oracle_completion_quota": null,
+    "same_trained_suffix_for_R_and_J": true,
+    "paired_bootstrap_resamples": 20000,
+    "paired_bootstrap_seed": 7110999
+  },
+  "resources": {
+    "aggregate_process_cpu_seconds_hard_max": 180000,
+    "builder_cpu_ceiling_cpu_seconds": 165000,
+    "independent_review_reserve_cpu_seconds": 15000,
+    "preflight_owner_seed_range_inclusive": [7120001, 7120008],
+    "preflight_owner_seeds_recycled": false,
+    "full_cohort_changes_after_outcomes": false
+  },
+  "semantic_boundary": {
+    "action_ids_or_native_indices_as_semantic_features": false,
+    "unsupported_screen_fallback": null,
+    "native_screen_choice_semantics_required": true,
+    "native_mechanics_changes_in_this_study": false
+  },
+  "retention": {
+    "artifact_root": "external issue66-artifacts",
+    "named_consumer": "Issue 66 independent Reviewer and Planner",
+    "delete_after": "2027-01-31"
+  }
+}
