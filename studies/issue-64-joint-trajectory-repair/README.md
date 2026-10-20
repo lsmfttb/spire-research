@@ -23,12 +23,12 @@ python3.14 studies/issue-64-joint-trajectory-repair/runner.py audit \
   --stsrl-source /home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c
 
 python3.14 studies/issue-64-joint-trajectory-repair/runner.py preflight \
-  --output /mnt/d/DeadlycatCoding/issue64-artifacts \
+  --output /mnt/d/DeadlycatCoding/issue64-artifacts-rerun2 \
   --native-source /home/lsmft/stsrl-spikes/sts_lightspeed-issue59 \
   --stsrl-source /home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c
 
 python3.14 studies/issue-64-joint-trajectory-repair/run_production.py \
-  --output /mnt/d/DeadlycatCoding/issue64-artifacts \
+  --output /mnt/d/DeadlycatCoding/issue64-artifacts-rerun2 \
   --native-source /home/lsmft/stsrl-spikes/sts_lightspeed-issue59 \
   --stsrl-source /home/lsmft/stsrl-spikes/STSRL-issue59-source-7d172f7c
 ~~~
@@ -43,4 +43,4 @@ A preflight failure, insufficient treatment exposure, unsupported native action,
 
 ## Evidence files
 
-The runner writes its immutable config/code/native hashes, process CPU state, owner and arm ledgers, actual action traces, full branch decision traces, branch terminal endpoints, and preflight decision outside this repository. After all 64 production owner triplets finish, run python3.14 studies/issue-64-joint-trajectory-repair/summarize.py --output /mnt/d/DeadlycatCoding/issue64-artifacts-rerun2 to emit paired owner-bootstrap 95% intervals for B2-B1 and B2-B0 endpoints. The summary fixes 20,000 percentile-bootstrap resamples and records its own hash. It reports, but does not adjudicate, the Act2+ noninferiority criterion because Issue 64 supplies no margin; a strong-Oracle claim stays closed pending Planner disposition. Branch traces omit raw hidden game snapshots; the pinned sources, config, owner seeds, and native binary hash define reproducible branch inputs. The source is study-only and should not be promoted into core.
+The runner writes its immutable config/code/native hashes, process CPU state, owner and arm ledgers, actual action traces, full branch decision traces, branch terminal endpoints, and preflight decision outside this repository. After all 64 production owner triplets finish, run python3.14 studies/issue-64-joint-trajectory-repair/summarize.py --output /mnt/d/DeadlycatCoding/issue64-artifacts-rerun2-rerun2 to emit paired owner-bootstrap 95% intervals for B2-B1 and B2-B0 endpoints. The summary fixes 20,000 percentile-bootstrap resamples and records its own hash. It reports, but does not adjudicate, the Act2+ noninferiority criterion because Issue 64 supplies no margin; a strong-Oracle claim stays closed pending Planner disposition. Branch traces omit raw hidden game snapshots; the pinned sources, config, owner seeds, and native binary hash define reproducible branch inputs. The source is study-only and should not be promoted into core.
