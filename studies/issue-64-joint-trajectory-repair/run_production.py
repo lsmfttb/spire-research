@@ -32,22 +32,45 @@ def main() -> int:
     if not preflight_path.is_file():
         raise SystemExit("preflight-decision.json is missing")
     decision = json.loads(preflight_path.read_text(encoding="utf-8"))
+    if decision.get("schema_id") != "issue65-preflight-decision-v2":
+        raise SystemExit("preflight decision is legacy or has an unknown schema")
     if not decision.get("formal_production_authorized_by_preflight"):
         raise SystemExit("preflight did not authorize the frozen 64-owner production")
-    expected = decision.get("runner_sha256")
     actual = sha256_file(RUNNER)
-    if not expected or actual != expected:
-        raise SystemExit(
-            f"runner differs from preflighted source: expected={expected}, actual={actual}"
-        )
     runtime_module = ROOT / "public_history_execution.py"
-    expected_runtime = decision.get("optimizer_module_sha256")
     actual_runtime = sha256_file(runtime_module) if runtime_module.is_file() else None
-    if not expected_runtime or actual_runtime != expected_runtime:
+    source_identity = decision.get("source_identity")
+    if (
+        not isinstance(source_identity, dict)
+        or not isinstance(source_identity.get("native_identity"), dict)
+    ):
+        raise SystemExit("preflight decision has no complete source identity")
+    if (
+        source_identity.get("runner_sha256") != actual
+        or decision.get("runner_sha256") != actual
+    ):
+        raise SystemExit(
+            f"runner differs from preflighted source: expected={source_identity.get('runner_sha256')}, actual={actual}"
+        )
+    expected_runtime = source_identity.get("optimizer_module_sha256")
+    if (
+        not expected_runtime
+        or actual_runtime != expected_runtime
+        or decision.get("optimizer_module_sha256") != actual_runtime
+    ):
         raise SystemExit(
             "Issue 65 runtime differs from preflighted source: "
             f"expected={expected_runtime}, actual={actual_runtime}"
         )
+    config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+    config_digest = hashlib.sha256(
+        json.dumps(config, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if (
+        decision.get("config_sha256") != config_digest
+        or source_identity.get("config_sha256") != config_digest
+    ):
+        raise SystemExit("preflight decision config differs from the installed Issue 65 config")
     command = [
         sys.executable,
         str(RUNNER),

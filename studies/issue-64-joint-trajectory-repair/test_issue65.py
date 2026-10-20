@@ -194,10 +194,23 @@ class Issue65RuntimeTests(unittest.TestCase):
         spec.loader.exec_module(module)
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
-            decision = {
-                "formal_production_authorized_by_preflight": True,
+            config = json.loads((module.ROOT / "config.json").read_text(encoding="utf-8"))
+            config_hash = hashlib.sha256(
+                json.dumps(config, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
+            source_identity = {
                 "runner_sha256": module.sha256_file(module.RUNNER),
                 "optimizer_module_sha256": module.sha256_file(module.ROOT / "public_history_execution.py"),
+                "config_sha256": config_hash,
+                "native_identity": {"test_identity": "launcher-fixture"},
+            }
+            decision = {
+                "schema_id": "issue65-preflight-decision-v2",
+                "formal_production_authorized_by_preflight": True,
+                "config_sha256": config_hash,
+                "source_identity": source_identity,
+                "runner_sha256": source_identity["runner_sha256"],
+                "optimizer_module_sha256": source_identity["optimizer_module_sha256"],
             }
             (output / "preflight-decision.json").write_text(json.dumps(decision))
             stdout = io.StringIO()
@@ -217,6 +230,65 @@ class Issue65RuntimeTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     module.main()
                 launch.assert_not_called()
+
+            decision["optimizer_module_sha256"] = source_identity["optimizer_module_sha256"]
+            decision["schema_id"] = "issue64-preflight-decision-v1"
+            (output / "preflight-decision.json").write_text(json.dumps(decision))
+            with patch.object(sys, "argv", [str(path), "--output", str(output)]), patch.object(
+                module.subprocess, "run"
+            ) as launch:
+                with self.assertRaisesRegex(SystemExit, "legacy or has an unknown schema"):
+                    module.main()
+                launch.assert_not_called()
+
+    def test_old_owner_result_cannot_be_relabelled_by_preflight_or_launched(self):
+        production_path = Path(__file__).with_name("run_production.py")
+        spec = importlib.util.spec_from_file_location("issue65_stale_receipt_launcher", production_path)
+        production = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = production
+        spec.loader.exec_module(production)
+        config_hash = hashlib.sha256(runner.canonical(runner.CONFIG).encode()).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            owner_dir = output / "preflight" / "seed-646901"
+            owner_dir.mkdir(parents=True)
+            (owner_dir / "owner-result.json").write_text(json.dumps({
+                "schema": "issue64-owner-result-v1",
+                "config_sha256": config_hash,
+                "owner_seed": 646901,
+                "sentinel_measurement": 999999,
+            }))
+            with patch.object(runner, "validate_environment", return_value={"native": "pinned"}), patch.object(
+                runner, "ensure_output_is_external", return_value=None
+            ), patch.object(sys, "argv", [str(runner.ROOT / "runner.py"), "preflight", "--output", str(output)]):
+                with self.assertRaisesRegex(runner.StudyFailure, "legacy or belongs to a different execution identity"):
+                    runner.main()
+            self.assertFalse((output / "study-manifest.json").exists())
+            self.assertFalse((output / "preflight-decision.json").exists())
+            self.assertFalse((output / runner.ISSUE65_PREVIEW_BUDGET_FILE).exists())
+            with patch.object(
+                sys, "argv", [str(production_path), "--output", str(output)]
+            ), patch.object(production.subprocess, "run") as launch:
+                with self.assertRaisesRegex(SystemExit, "preflight-decision.json is missing"):
+                    production.main()
+                launch.assert_not_called()
+
+    def test_preflight_refuses_issue64_budget_receipt_without_relabelling(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            (output / "budget-state.json").write_text(json.dumps({
+                "study_id": runner.CONFIG["study_id"],
+                "builder_cpu_seconds": 123.0,
+            }))
+            with patch.object(runner, "validate_environment", return_value={"native": "pinned"}), patch.object(
+                runner, "ensure_output_is_external", return_value=None
+            ), patch.object(sys, "argv", [str(runner.ROOT / "runner.py"), "preflight", "--output", str(output)]):
+                with self.assertRaisesRegex(runner.StudyFailure, "legacy Issue 64 budget-state.json"):
+                    runner.main()
+            self.assertTrue((output / "budget-state.json").exists())
+            self.assertFalse((output / "study-manifest.json").exists())
+            self.assertFalse((output / "preflight-decision.json").exists())
+            self.assertFalse((output / runner.ISSUE65_PREVIEW_BUDGET_FILE).exists())
 
     def test_process_cpu_watchdog_counts_one_and_two_workers_and_resumes(self):
         original_run_owner = runner.run_owner

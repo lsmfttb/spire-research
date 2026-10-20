@@ -59,6 +59,8 @@ ENGINEERING_BUILDER_HARD_CPU = 18000.0
 ENGINEERING_TOTAL_CPU = 20000.0
 ENGINEERING_REVIEW_RESERVE_CPU = 2000.0
 ENGINEERING_TRACE_BATCH_LINES = 128
+ISSUE65_PREVIEW_BUDGET_FILE = "issue65-preview-budget-state.json"
+LEGACY_ISSUE64_BUDGET_FILE = "budget-state.json"
 
 
 class StudyFailure(RuntimeError):
@@ -1170,18 +1172,30 @@ def controller_trace_digest_path(attempt_dir: Path, branch_id: str) -> str:
 def run_arm(
     owner_seed: int,
     arm: str,
+    stage: str,
     owner_dir: Path,
     *,
     preflight: bool,
     config_hash: str,
     native_identity: Mapping[str, Any],
+    source_identity: Mapping[str, Any],
     engineering_limits: Mapping[str, int] | None = None,
 ) -> dict[str, Any]:
     result_path = owner_dir / arm / "arm-result.json"
     if result_path.exists():
-        existing = json.loads(result_path.read_text(encoding="utf-8"))
-        if existing.get("config_sha256") != config_hash:
-            raise StudyFailure(f"stored {arm} config hash mismatch")
+        existing = read_receipt(result_path, f"stored {stage} {arm} arm result")
+        require_receipt_identity(
+            existing,
+            {
+                "schema_id": "issue65-arm-result-v2",
+                "config_sha256": config_hash,
+                "source_identity": dict(source_identity),
+                "stage": stage,
+                "owner_seed": int(owner_seed),
+                "arm": arm,
+            },
+            f"stored {stage} {arm} arm result",
+        )
         return existing
     arm_dir = owner_dir / arm
     arm_dir.mkdir(parents=True, exist_ok=True)
@@ -1230,8 +1244,10 @@ def run_arm(
         terminal = terminal_fields(run)
         elapsed_cpu = time.process_time() - started_cpu
         result = {
-            "schema": "issue64-arm-result-v1",
+            "schema_id": "issue65-arm-result-v2",
             "config_sha256": config_hash,
+            "source_identity": dict(source_identity),
+            "stage": stage,
             "owner_seed": owner_seed,
             "arm": arm,
             "terminal": terminal,
@@ -1298,15 +1314,28 @@ def _run_owner_impl(
 ) -> dict[str, Any]:
     global STOP_FILE
     output_dir = Path(output)
-    STOP_FILE = output_dir / ("issue65-budget-stop.flag" if stage == "engineering" else "budget-stop.flag")
+    STOP_FILE = output_dir / (
+        "issue65-budget-stop.flag" if stage == "engineering" else "issue65-preview-budget-stop.flag"
+    )
     check_stop()
     owner_dir = output_dir / stage / f"seed-{owner_seed}"
     owner_dir.mkdir(parents=True, exist_ok=True)
     owner_result_path = owner_dir / "owner-result.json"
+    source_identity = issue65_source_identity(config_hash, native_identity)
     if owner_result_path.exists():
-        existing = json.loads(owner_result_path.read_text(encoding="utf-8"))
-        if existing.get("config_sha256") == config_hash:
-            return existing
+        existing = read_receipt(owner_result_path, f"stored {stage} owner {owner_seed} result")
+        require_receipt_identity(
+            existing,
+            {
+                "schema_id": "issue65-owner-result-v2",
+                "config_sha256": config_hash,
+                "source_identity": source_identity,
+                "stage": stage,
+                "owner_seed": int(owner_seed),
+            },
+            f"stored {stage} owner {owner_seed} result",
+        )
+        return existing
     owner_attempts = sorted(owner_dir.glob("owner-attempt-*"))
     attempt_dir = owner_dir / f"owner-attempt-{len(owner_attempts) + 1:03d}"
     attempt_dir.mkdir()
@@ -1321,8 +1350,10 @@ def _run_owner_impl(
             check_stop()
             with runtime_phase(f"arm_execution:{arm}"):
                 arms[arm] = run_arm(
-                    owner_seed, arm, attempt_dir, preflight=(stage in ("preflight", "engineering")),
+                    owner_seed, arm, stage, attempt_dir,
+                    preflight=(stage in ("preflight", "engineering")),
                     config_hash=config_hash, native_identity=native_identity,
+                    source_identity=source_identity,
                     engineering_limits=engineering_limits,
                 )
             append_jsonl(owner_dir / "owner-ledger.jsonl", {
@@ -1330,8 +1361,9 @@ def _run_owner_impl(
                 "arm": arm, "terminal": arms[arm]["terminal"],
             }, sync=True)
         result = {
-            "schema": "issue64-owner-result-v1",
+            "schema_id": "issue65-owner-result-v2",
             "config_sha256": config_hash,
+            "source_identity": source_identity,
             "owner_seed": owner_seed,
             "stage": stage,
             "arms": {arm: arms[arm]["terminal"] for arm in CONFIG["arms"]},
@@ -1520,14 +1552,30 @@ class ProcessTreeCPUSampler:
         )
 
 
-def read_budget_state(path: Path) -> dict[str, Any]:
+def read_budget_state(
+    path: Path,
+    *,
+    config_hash: str,
+    source_identity: Mapping[str, Any],
+) -> dict[str, Any]:
     if path.exists():
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if data.get("study_id") != CONFIG["study_id"]:
-            raise StudyFailure("budget state belongs to a different study")
+        data = read_receipt(path, "Issue 65 preview budget")
+        require_receipt_identity(
+            data,
+            {
+                "schema_id": "issue65-preview-budget-v1",
+                "study_id": CONFIG["study_id"],
+                "config_sha256": config_hash,
+                "source_identity": dict(source_identity),
+            },
+            "Issue 65 preview budget",
+        )
         return data
     return {
+        "schema_id": "issue65-preview-budget-v1",
         "study_id": CONFIG["study_id"],
+        "config_sha256": config_hash,
+        "source_identity": dict(source_identity),
         "builder_cpu_seconds": float(SETUP_ALLOWANCE),
         "setup_allowance_cpu_seconds": float(SETUP_ALLOWANCE),
         "last_process_cpu_checkpoint": 0.0,
@@ -1579,6 +1627,147 @@ def optimized_source_identity() -> dict[str, str]:
     }
 
 
+def issue65_source_identity(
+    config_hash: str, native_identity: Mapping[str, Any]
+) -> dict[str, Any]:
+    return {
+        **optimized_source_identity(),
+        "config_sha256": config_hash,
+        "native_identity": dict(native_identity),
+    }
+
+
+def require_receipt_identity(
+    receipt: Mapping[str, Any], expected: Mapping[str, Any], description: str
+) -> None:
+    for key, value in expected.items():
+        if receipt.get(key) != value:
+            raise StudyFailure(
+                f"{description} is legacy or belongs to a different execution identity ({key})"
+            )
+
+
+def read_receipt(path: Path, description: str) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise StudyFailure(f"{description} is unreadable; refusing to resume") from exc
+    if not isinstance(value, dict):
+        raise StudyFailure(f"{description} has an invalid receipt shape; refusing to resume")
+    return value
+
+
+def validate_cached_stage_receipts(
+    output: Path,
+    stage: str,
+    config_hash: str,
+    native_identity: Mapping[str, Any],
+) -> None:
+    stage_dir = output / stage
+    if not stage_dir.exists():
+        return
+    source_identity = issue65_source_identity(config_hash, native_identity)
+    for owner_path in stage_dir.glob("seed-*/owner-result.json"):
+        try:
+            owner_seed = int(owner_path.parent.name.removeprefix("seed-"))
+        except ValueError as exc:
+            raise StudyFailure(f"unexpected owner receipt path: {owner_path}") from exc
+        receipt = read_receipt(owner_path, f"{stage} owner receipt {owner_seed}")
+        require_receipt_identity(
+            receipt,
+            {
+                "schema_id": "issue65-owner-result-v2",
+                "config_sha256": config_hash,
+                "source_identity": source_identity,
+                "stage": stage,
+                "owner_seed": owner_seed,
+            },
+            f"{stage} owner receipt {owner_seed}",
+        )
+    for arm_path in stage_dir.rglob("arm-result.json"):
+        seed_dir = next((parent for parent in arm_path.parents if parent.parent == stage_dir), None)
+        if seed_dir is None or not seed_dir.name.startswith("seed-"):
+            raise StudyFailure(f"unexpected arm receipt path: {arm_path}")
+        try:
+            owner_seed = int(seed_dir.name.removeprefix("seed-"))
+        except ValueError as exc:
+            raise StudyFailure(f"unexpected arm receipt path: {arm_path}") from exc
+        receipt = read_receipt(arm_path, f"{stage} arm receipt {owner_seed}/{arm_path.parent.name}")
+        require_receipt_identity(
+            receipt,
+            {
+                "schema_id": "issue65-arm-result-v2",
+                "config_sha256": config_hash,
+                "source_identity": source_identity,
+                "stage": stage,
+                "owner_seed": owner_seed,
+                "arm": arm_path.parent.name,
+            },
+            f"{stage} arm receipt {owner_seed}/{arm_path.parent.name}",
+        )
+
+
+def validate_issue65_resume_state(
+    output: Path,
+    *,
+    mode: str,
+    config_hash: str,
+    native_identity: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    source_identity = issue65_source_identity(config_hash, native_identity)
+    legacy_budget_path = output / LEGACY_ISSUE64_BUDGET_FILE
+    if legacy_budget_path.exists():
+        raise StudyFailure(
+            "refusing legacy Issue 64 budget-state.json; Issue 65 requires a fresh budget namespace"
+        )
+    manifest_path = output / "study-manifest.json"
+    if manifest_path.exists():
+        manifest = read_receipt(manifest_path, "study manifest")
+        require_receipt_identity(
+            manifest,
+            {
+                "schema_id": "issue65-study-manifest-v2",
+                "config_sha256": config_hash,
+                "source_identity": source_identity,
+            },
+            "study manifest",
+        )
+    decision_path = output / "preflight-decision.json"
+    decision: dict[str, Any] | None = None
+    if decision_path.exists():
+        decision = read_receipt(decision_path, "preflight decision")
+        require_receipt_identity(
+            decision,
+            {
+                "schema_id": "issue65-preflight-decision-v2",
+                "config_sha256": config_hash,
+                "source_identity": source_identity,
+            },
+            "preflight decision",
+        )
+    if mode == "production":
+        if decision is None:
+            raise StudyFailure("production requires a completed preflight-decision.json")
+        if not decision.get("formal_production_authorized_by_preflight"):
+            raise StudyFailure("preflight did not authorize the frozen 64-owner production")
+    stages = ("preflight", "production") if mode == "production" else ("preflight",)
+    for stage in stages:
+        validate_cached_stage_receipts(output, stage, config_hash, native_identity)
+    complete_path = output / "production-complete.json"
+    if complete_path.exists():
+        complete = read_receipt(complete_path, "production completion receipt")
+        require_receipt_identity(
+            complete,
+            {
+                "schema_id": "issue65-production-complete-v2",
+                "config_sha256": config_hash,
+                "source_identity": source_identity,
+            },
+            "production completion receipt",
+        )
+    return decision
+
+
 def select_workers(target: int, estimated_worker_rss_mb: int = 1024) -> int:
     memory_budget = int(memory_available_bytes() * 0.7)
     max_by_memory = max(1, memory_budget // (estimated_worker_rss_mb * 1024 * 1024))
@@ -1598,8 +1787,8 @@ def execute_stage(
     engineering_limits: Mapping[str, int] | None = None,
     soft_stop_cpu_seconds: float | None = None,
     hard_stop_cpu_seconds: float | None = None,
-    event_log_name: str = "study-events.jsonl",
-    stop_file_name: str = "budget-stop.flag",
+    event_log_name: str = "issue65-preview-events.jsonl",
+    stop_file_name: str = "issue65-preview-budget-stop.flag",
 ) -> list[dict[str, Any]]:
     global STOP_FILE
     STOP_FILE = output / stop_file_name
@@ -1741,7 +1930,6 @@ def main() -> int:
     parser.add_argument("--workers", type=int)
     parser.add_argument("--seeds", type=int, nargs="+")
     args = parser.parse_args()
-    code_hash = sha256_file(Path(__file__).resolve())
     config_hash = hashlib.sha256(canonical(CONFIG).encode()).hexdigest()
 
     if args.mode == "selfcheck":
@@ -1872,21 +2060,32 @@ def main() -> int:
     output = args.output.expanduser().resolve()
     ensure_output_is_external(output)
     output.mkdir(parents=True, exist_ok=True)
-    budget_path = output / "budget-state.json"
-    state = read_budget_state(budget_path)
+    source_identity = issue65_source_identity(config_hash, native_identity)
+    decision = validate_issue65_resume_state(
+        output,
+        mode=args.mode,
+        config_hash=config_hash,
+        native_identity=native_identity,
+    )
+    budget_path = output / ISSUE65_PREVIEW_BUDGET_FILE
+    state = read_budget_state(
+        budget_path,
+        config_hash=config_hash,
+        source_identity=source_identity,
+    )
     if state.get("stop_requested") or float(state["builder_cpu_seconds"]) >= MAX_CPU:
         raise StudyFailure("Builder CPU ceiling is already exhausted")
     state.update({
-        "config_sha256": config_hash, "runner_sha256": code_hash,
-        "optimizer_module_sha256": optimized_source_identity()["optimizer_module_sha256"],
+        "source_identity": source_identity,
         "native_identity": native_identity, "builder_cpu_ceiling_seconds": MAX_CPU,
         "review_reserve_seconds": REVIEW_RESERVE,
     })
     write_budget_state(budget_path, state)
     atomic_json(output / "study-manifest.json", {
+        "schema_id": "issue65-study-manifest-v2",
         "study_id": CONFIG["study_id"], "config": CONFIG,
-        "config_sha256": config_hash, "runner_sha256": code_hash,
-        "optimizer_module_sha256": optimized_source_identity()["optimizer_module_sha256"],
+        "config_sha256": config_hash,
+        "source_identity": source_identity,
         "native_identity": native_identity,
         "issue_url": "https://github.com/lsmfttb/spire-research/issues/64",
         "artifact_consumer": "Issue 64 independent Reviewer and Planner",
@@ -1904,7 +2103,9 @@ def main() -> int:
         if len(results) != len(seeds):
             raise StudyFailure("preflight did not complete all eight disjoint owners")
         max_owner_cpu = max(float(row["owner_cpu_seconds"]) for row in results)
-        current_cpu = float(read_budget_state(budget_path)["builder_cpu_seconds"])
+        current_cpu = float(read_budget_state(
+            budget_path, config_hash=config_hash, source_identity=source_identity
+        )["builder_cpu_seconds"])
         projected = current_cpu + max_owner_cpu * len(CONFIG["owners"]["production"]) + REVIEW_RESERVE
         checkpoint_ok = all(
             row.get("checkpoint_witnesses", {}).get(screen, {}).get("replay_equal") is True
@@ -1923,10 +2124,11 @@ def main() -> int:
         worker_fit = rss_peak * workers16 <= int(memory_available_bytes() * 0.8 / 1024)
         fit = checkpoint_ok and exposure_ok and worker_fit and projected <= 180000
         decision = {
-            "schema": "issue64-preflight-decision-v1",
+            "schema_id": "issue65-preflight-decision-v2",
             "config_sha256": config_hash,
-            "runner_sha256": code_hash,
-            "optimizer_module_sha256": optimized_source_identity()["optimizer_module_sha256"],
+            "source_identity": source_identity,
+            "runner_sha256": source_identity["runner_sha256"],
+            "optimizer_module_sha256": source_identity["optimizer_module_sha256"],
             "preflight_owner_count": len(results),
             "max_preflight_owner_cpu_seconds": max_owner_cpu,
             "builder_cpu_seconds_after_preflight": current_cpu,
@@ -1950,14 +2152,8 @@ def main() -> int:
         print(canonical(decision))
         return 0 if fit else 2
 
-    decision_path = output / "preflight-decision.json"
-    if not decision_path.exists():
+    if decision is None:
         raise StudyFailure("production requires a completed preflight-decision.json")
-    decision = json.loads(decision_path.read_text(encoding="utf-8"))
-    if not decision.get("formal_production_authorized_by_preflight"):
-        raise StudyFailure("preflight did not authorize the frozen 64-owner production")
-    if decision.get("config_sha256") != config_hash:
-        raise StudyFailure("preflight config differs from production config")
     seeds = CONFIG["owners"]["production"]
     target = args.workers or int(decision["production_workers_supported_by_memory"])
     results = execute_stage(
@@ -1968,11 +2164,14 @@ def main() -> int:
     if len(results) != len(seeds):
         raise StudyFailure("production stopped before all 64 independent owners completed")
     atomic_json(output / "production-complete.json", {
-        "schema": "issue64-production-complete-v1",
+        "schema_id": "issue65-production-complete-v2",
         "config_sha256": config_hash,
+        "source_identity": source_identity,
         "owner_count": len(results),
         "owners": results,
-        "builder_cpu_seconds": read_budget_state(budget_path)["builder_cpu_seconds"],
+        "builder_cpu_seconds": read_budget_state(
+            budget_path, config_hash=config_hash, source_identity=source_identity
+        )["builder_cpu_seconds"],
     })
     print("production: all 64 paired owner triplets reached native terminal")
     return 0
