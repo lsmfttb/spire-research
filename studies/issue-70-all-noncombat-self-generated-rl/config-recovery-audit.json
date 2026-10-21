@@ -1,0 +1,50 @@
+{
+  "schema_id": "issue70-config-provenance-recovery-audit-v1",
+  "audited_at_utc": "2026-10-21T11:20:45Z",
+  "study_head_reviewed": "07202a38a8a4e53918eea5f5e17f5f487fe44739",
+  "study_parent": "9525d416b9488bb2455435699893b03fe19fe30a",
+  "locked_config_sha256": "a0321d5e64a8c8d3089f1e421093269ef6637148279bc2719144a179a3c136de",
+  "recovered_exact_config_bytes": false,
+  "recovery_status": "CONFIG_PROVENANCE_UNRECOVERABLE",
+  "scientific_status": "SCIENTIFIC_INCOMPLETE",
+  "code_disposition": "STUDY_ONLY",
+  "current_committed_config": {
+    "path": "studies/issue-70-all-noncombat-self-generated-rl/config.json",
+    "git_blob_oid": "7a4aa6a8e6a4384c70701582322c9bd8b49b6af3",
+    "git_blob_size_bytes": 9542,
+    "git_normalized_sha256": "12bca04461904b4df9714aaf738b2159b0416b2eb72072d9337cd24b0ae598e7"
+  },
+  "bounded_search": [
+    {
+      "source": "Fetched refs and reachable history in lsmfttb/spire-research",
+      "result": "The study config path has one commit in fetched refs and local reflogs: 07202a38a8a4e53918eea5f5e17f5f487fe44739, whose parent is 9525d416b9488bb2455435699893b03fe19fe30a. The parent has no earlier study config; no pre-seed config commit or source timestamp is present."
+    },
+    {
+      "source": "Existing in-repository study lock and handoff evidence",
+      "result": "The committed lock and evidence retain the expected digest, not the payload bytes. The independent review also found the raw execution bundle contains the digest but no matching configuration snapshot (Issue #70 comment 6314327917)."
+    },
+    {
+      "source": "Local repository Git object database, unreachable objects",
+      "result": "Inspected 113 unreachable commit trees; none contains the Issue #70 study config, lock, or handoff-evidence path. SHA-256 checked 651 unreachable blobs sized 1,000 through 100,000 bytes; none matches the locked digest. No exact payload was recovered."
+    },
+    {
+      "source": "Authorized durable backup or contemporaneous runtime snapshot",
+      "result": "No such source is identified or linked in the current Issue/repository context. No external scratch directory or broad filesystem search was used."
+    }
+  ],
+  "preseed_commit_provenance": "UNVERIFIABLE: the study config first appears in the final results commit; no pre-seed source commit or contemporaneous source timestamp was recovered.",
+  "preservation": {
+    "config_json_changed": false,
+    "config_lock_changed": false,
+    "original_result_bundle_changed": false,
+    "manifest_regenerated_or_rewritten": false,
+    "child_exception_receipts_rewritten": false,
+    "seeds_rerun": false,
+    "separate_limitations_retained": [
+      "one coarse-state manifest entry is stale because phase_finished was appended after manifest generation",
+      "the parent receipt replaces child exception details for 2,017 incomplete continuation attempts"
+    ]
+  },
+  "interpretation": "Preserve terminal rows and descriptive comparisons for exploratory audit only. Do not classify the preregistered RL result as positive, null, or harmful without verified intervention identity.",
+  "next_disposition": "Return this bounded recovery result for independent focused review and final Planner adjudication; do not rerun seeds, alter the existing config lock, or extend the study."
+}
