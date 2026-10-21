@@ -371,6 +371,10 @@ class CheckpointAdapter:
     def step(self, action: Any) -> Any:
         return self.base.step(action)
 
+    def battle_search(self, snapshot: Any, **kwargs: Any) -> Any:
+        """Preserve the pinned STSRL oracle controller's native search API."""
+        return self.base.battle_search(snapshot, **kwargs)
+
     def battle_search_v2(self, snapshot: Any, **kwargs: Any) -> Any:
         return self.base.battle_search_v2(snapshot, **kwargs)
 

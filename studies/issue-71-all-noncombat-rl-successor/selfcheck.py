@@ -298,13 +298,17 @@ class Issue71Selfcheck(unittest.TestCase):
         snapshot = object()
         projection = {"availability": "available", "value": "public"}
         fingerprint = (("visible",), {"screen_state": "MAP"})
+        search_result = {"selected_index": 1}
         base = SimpleNamespace(
+            battle_search=mock.Mock(return_value=search_result),
             public_projection=mock.Mock(return_value=projection),
             checkpoint_fingerprint=mock.Mock(return_value=fingerprint),
         )
         adapter = runner.CheckpointAdapter(base, object())
+        self.assertIs(adapter.battle_search(snapshot, simulations=400, include_potions=False), search_result)
         self.assertIs(adapter.public_projection(snapshot), projection)
         self.assertIs(adapter.checkpoint_fingerprint(snapshot), fingerprint)
+        base.battle_search.assert_called_once_with(snapshot, simulations=400, include_potions=False)
         base.public_projection.assert_called_once_with(snapshot)
         base.checkpoint_fingerprint.assert_called_once_with(snapshot)
 
