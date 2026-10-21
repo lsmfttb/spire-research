@@ -1,0 +1,193 @@
+{
+  "study_id": "issue-71-all-noncombat-rl-successor",
+  "disposition": "STUDY_ONLY",
+  "stage_status": "STAGE0_PRESEED_GATE_ONLY",
+  "source_reference": {
+    "implementation_source": "spire-research@07202a38a8a4e53918eea5f5e17f5f487fe44739:studies/issue-70-all-noncombat-self-generated-rl",
+    "design_reference_is_not_an_authenticated_executed_config": true,
+    "historical_issue70_config_or_lock_reused": false
+  },
+  "identity": {
+    "native_repository": "https://github.com/lsmfttb/sts_lightspeed",
+    "native_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+    "native_module": "slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_binary_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+    "stsr_repository": "https://github.com/lsmfttb/STSRL",
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsr_native_integration_commit": "d61c7c2a120aa90730fd8530718a7cd7cd856b46",
+    "python": "3.13.13",
+    "torch": "2.12.0+cpu",
+    "numpy": "2.4.6",
+    "native_build": {
+      "type": "Release",
+      "target": "slaythespire",
+      "tested_source_commit_override": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+      "cmake_policy_version_minimum": "3.5",
+      "jobs": 2,
+      "json_submodule_commit": "0b345b20c888f7dc8888485768e4bf9a6be29de0",
+      "pybind11_submodule_commit": "d03662f0984f652b60e7ddce53d3868002275197"
+    }
+  },
+  "population": {
+    "player_class": "IRONCLAD",
+    "ascension": 20,
+    "start": "native_standard_start",
+    "native_disable_prismatic_shard": true,
+    "shard_exposures_included": true,
+    "primary_analysis_exclusions": [],
+    "known_risk_events": [
+      "FALLING",
+      "WE_MEET_AGAIN",
+      "MYSTERIOUS_SPHERE",
+      "GOLDEN_IDOL"
+    ],
+    "source_qualification_marker_is_authority": false
+  },
+  "information_regime": {
+    "nonbattle_policy": "native_privileged_noncombat_choice_projection_v1",
+    "audience": "training_oracle_only",
+    "visibility_channels": [
+      "public_now",
+      "oracle_only",
+      "unavailable"
+    ],
+    "normal_public_api_safe": false,
+    "model_inputs": "semantic feature values and visibility tags only; no source names, candidate bindings, candidate indices, action ids, labels, bits, native slot indices, or source metadata",
+    "candidate_mapping": "source-ordered projection candidate occurrence i maps only to live legal action i; exact counts and semantic identities are checked before selection",
+    "single_action_states": "native transition, no policy row",
+    "multi_action_states": "one shared action-conditioned categorical policy across all nonbattle screen types",
+    "battle": "same native Battle Search-v2@400 in every arm and continuation suffix",
+    "expert": "external comparison arm only; never in training or branch suffixes"
+  },
+  "action_space": {
+    "stsrl": "ActionSpaceConfig.include_all()",
+    "excluded_kinds": [],
+    "include_potions": true,
+    "battle_root_selection": "highest_mean",
+    "battle_policy_prior_callback": null,
+    "battle_leaf_value_callback": null
+  },
+  "model": {
+    "schema": "issue71-signed-hash-semantic-candidate-v1",
+    "hash_dimension": 2048,
+    "hash_algorithm": "blake2b-64-with-signed-feature-counts",
+    "numeric_transform": "sign(x)*log1p(abs(x))/10; clip input to [-100000,100000]",
+    "architecture": "candidate scorer Linear(2048,128)-Tanh-Linear(128,64)-Tanh-Linear(64,1); state value Linear(2048,64)-Tanh-Linear(64,1) over mean candidate vector",
+    "initialization": "seeded PyTorch default hidden layers; final actor layer N(0,0.0001), bias 0; value layer seeded default initialization",
+    "initial_policy": "near-uniform untrained categorical",
+    "torch_seed": 73507001
+  },
+  "training": {
+    "owner_count": 512,
+    "block_count": 4,
+    "owners_per_block": 128,
+    "seed_first": 7410001,
+    "seed_last": 7410512,
+    "freeze_policy_within_block": true,
+    "optimizer": "Adam",
+    "learning_rate": 0.0003,
+    "one_optimizer_step_per_block": true,
+    "epochs_per_block": 1,
+    "batch_updates_per_block": 1,
+    "terminal_reward": "heart_victory + terminal_floor/100.0; terminal floor in [0,99]",
+    "policy_gradient": "whole-run REINFORCE with within-block mean terminal reward baseline",
+    "value_loss_coefficient": 0.5,
+    "entropy_coefficient": 0.01,
+    "branch_loss": "separate completed-superior terminal branch action log-probability loss weighted by clipped positive terminal-reward delta",
+    "branch_advantage_weight_cap": 0.25,
+    "gradient_clip_norm": 1.0,
+    "no_intermediate_reward_shaping": true,
+    "no_expert_targets_or_decisions": true,
+    "sample_seed_domain": "sha256(study_id, owner_seed, arm, model_sha, purpose)",
+    "adam": {
+      "betas": [0.9, 0.999],
+      "eps": 1e-8,
+      "weight_decay": 0.0,
+      "amsgrad": false
+    }
+  },
+  "continuations": {
+    "roots_per_owner_max": 2,
+    "alternatives_per_root_max": 2,
+    "aggregate_process_cpu_seconds_per_root_max": 6,
+    "continuation_policy": "same frozen policy for all later nonbattle decisions plus same native Battle Search-v2@400",
+    "candidate_order": "descending frozen policy probability excluding sampled root action",
+    "eligible_training_examples": "completed native terminal branch strictly superior by lexicographic (heart victory, terminal floor)",
+    "provenance": "privileged_hindsight_completed_terminal_branch",
+    "expert_suffix_forbidden": true
+  },
+  "evaluation": {
+    "owner_count": 96,
+    "seed_first": 7420001,
+    "seed_last": 7420096,
+    "arms": ["P0", "P1", "E"],
+    "primary": "mean owner-level terminal floor P1-P0",
+    "bootstrap": {
+      "method": "paired_percentile",
+      "confidence": 0.95,
+      "resamples": 20000,
+      "seed": 7470001
+    },
+    "complete_terminal_arms_required": true
+  },
+  "preflight": {
+    "owner_count": 8,
+    "seed_first": 7430001,
+    "seed_last": 7430008,
+    "arms": ["P0", "E"],
+    "purpose": "Stage1 preflight only, after future explicit Planner authorization",
+    "worker_consistency": [1, 2]
+  },
+  "stage0": {
+    "authorized_phase": "debug_terminal_branch_preflight_only",
+    "stage1_authorized": false,
+    "debug_seed_first": 171000071,
+    "debug_seed_last": 171000086,
+    "debug_seed_domain": "nonformal-debug-only-disjoint-from-all-registered-owner-ranges",
+    "required_natural_screens": ["MAP", "REWARDS"],
+    "required_complete_alternative_branches_per_screen": 1,
+    "child_attempts_per_screen": 1,
+    "no_formal_training_or_evaluation_seeds_consumed": true,
+    "stop_after_independent_reviewer_pass": true
+  },
+  "resources": {
+    "builder_cpu_hard_cap_seconds": 4800,
+    "reviewer_cpu_reserve_seconds": 1200,
+    "all_in_ceiling_seconds": 6000,
+    "stage1_cumulative_ceiling_seconds": 60000,
+    "stage1_reviewer_reserve_min_seconds": 8000,
+    "compile_configure_cpu_seconds_already_used": 600,
+    "compile_configure_charge_note": "Conservative pre-lock charge for exact-source native configuration/build and source-gate preparation; each subsequent runner process also records measured setup/phase CPU.",
+    "max_steps_per_natural_run": 4096,
+    "branch_limits_enforced_in_forked_linux_children": true,
+    "branch_cpu_upper_bound_seconds": 12,
+    "cpu_margin_seconds": 2,
+    "no_selective_retries": true,
+    "preflight_projection": {
+      "future_natural_owner_arm_runs": 800,
+      "run_cpu_inflation_factor": 1.25,
+      "engineering_margin_seconds": 2000,
+      "method": "measured Stage0 setup and debug costs plus 800 still-unrun Stage1 owner-arm runs at 1.25 times maximum observed natural-run CPU plus full registered branch allowance and fixed engineering margin"
+    }
+  },
+  "runtime_optimizer": {
+    "source_repository": "https://github.com/lsmfttb/spire-research",
+    "source_commit": "30efe12bcedb65a432f1a57756a930baed90c5d5",
+    "source_path": "studies/issue-64-joint-trajectory-repair/public_history_execution.py",
+    "optimizer_id": "issue65-demand-driven-public-history-v1",
+    "sha256": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+    "study_local_copy": true,
+    "telemetry": true,
+    "reused_features": [
+      "demand_driven_public_history",
+      "validated_append_only_history",
+      "phase_telemetry"
+    ],
+    "excluded_features": [
+      "expert_training_decisions",
+      "expert_policy_continuation",
+      "legacy_source_pins",
+      "legacy_policy_schema"
+    ]
+  }
+}
