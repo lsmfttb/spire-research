@@ -67,6 +67,17 @@
     "battle_policy_prior_callback": null,
     "battle_leaf_value_callback": null
   },
+  "battle_search": {
+    "native_api": "StepSimulator.battle_search_v2.v1",
+    "patch_identity": "sts_lightspeed_battle_search_v2_tree_internal_v1",
+    "simulations": 400,
+    "root_selection_rule": "highest_mean",
+    "include_potions": true,
+    "policy_prior_callback": null,
+    "leaf_value_callback": null,
+    "rollout_policy": "BattleScumSearcher2::playoutRandom",
+    "terminal_utility": "BattleScumSearcher2::evaluateEndState"
+  },
   "model": {
     "schema": "issue71-signed-hash-semantic-candidate-v1",
     "hash_dimension": 2048,

@@ -294,23 +294,72 @@ class Issue71Selfcheck(unittest.TestCase):
         self.assertEqual(runner._stage0_screen_key("REWARDS"), "REWARDS")
         self.assertEqual(runner._stage0_screen_key("REWARD_SCREEN"), "REWARDS")
 
-    def test_checkpoint_adapter_delegates_optional_projection_and_fingerprint(self):
+    def test_checkpoint_adapter_delegates_v2_search_projection_and_fingerprint(self):
         snapshot = object()
         projection = {"availability": "available", "value": "public"}
         fingerprint = (("visible",), {"screen_state": "MAP"})
         search_result = {"selected_index": 1}
         base = SimpleNamespace(
-            battle_search=mock.Mock(return_value=search_result),
+            battle_search_v2=mock.Mock(return_value=search_result),
             public_projection=mock.Mock(return_value=projection),
             checkpoint_fingerprint=mock.Mock(return_value=fingerprint),
         )
         adapter = runner.CheckpointAdapter(base, object())
-        self.assertIs(adapter.battle_search(snapshot, simulations=400, include_potions=False), search_result)
+        self.assertIs(adapter.battle_search_v2(snapshot, simulations=400, include_potions=True), search_result)
         self.assertIs(adapter.public_projection(snapshot), projection)
         self.assertIs(adapter.checkpoint_fingerprint(snapshot), fingerprint)
-        base.battle_search.assert_called_once_with(snapshot, simulations=400, include_potions=False)
+        base.battle_search_v2.assert_called_once_with(snapshot, simulations=400, include_potions=True)
         base.public_projection.assert_called_once_with(snapshot)
         base.checkpoint_fingerprint.assert_called_once_with(snapshot)
+
+    def test_issue71_search_controller_calls_v2_and_locks_null_guidance(self):
+        controller = runner.StudyBattleSearchV2Controller()
+        snapshot, actions, context = object(), [object(), object()], object()
+        raw_search = {"native_api": controller.native_search_api}
+        adapter = SimpleNamespace(
+            battle_search_v2=mock.Mock(return_value=raw_search),
+            battle_search=mock.Mock(side_effect=AssertionError("v1 search must not be called")),
+        )
+        report = SimpleNamespace(search_ok=True, problems=())
+        target = SimpleNamespace(legal_action_index=1, score=0.75)
+        with (
+            mock.patch(
+                "sts_combat_rl.sim.oracle_search.build_oracle_search_report",
+                return_value=report,
+            ) as build_report,
+            mock.patch(
+                "sts_combat_rl.sim.oracle_search.select_oracle_root_action",
+                return_value=target,
+            ) as select_target,
+            mock.patch(
+                "sts_combat_rl.sim.oracle_search.oracle_search_controller_metadata",
+                return_value={"native_search_api": controller.native_search_api},
+            ) as metadata,
+        ):
+            decision = controller.select_action(adapter, snapshot, actions, context, 0)
+        adapter.battle_search_v2.assert_called_once_with(
+            snapshot, simulations=400, include_potions=True
+        )
+        adapter.battle_search.assert_not_called()
+        self.assertEqual(build_report.call_args.args, (raw_search, actions, context))
+        self.assertEqual(
+            build_report.call_args.kwargs["expected_native_api"],
+            "StepSimulator.battle_search_v2.v1",
+        )
+        self.assertEqual(
+            build_report.call_args.kwargs["expected_patch_identity"],
+            "sts_lightspeed_battle_search_v2_tree_internal_v1",
+        )
+        select_target.assert_called_once_with(report, selection_rule="highest_mean")
+        metadata.assert_called_once_with(report, target)
+        self.assertEqual(decision.selected_index, 1)
+        self.assertEqual(decision.reason, "oracle_search_v2:highest_mean")
+        self.assertEqual(
+            controller.provenance.config["native_search_api"],
+            "StepSimulator.battle_search_v2.v1",
+        )
+        self.assertIsNone(controller.provenance.config["policy_prior"])
+        self.assertIsNone(controller.provenance.config["learned_leaf_value"])
 
     def test_child_failure_classification_preserves_distinct_boundaries(self):
         exited_nonzero = 1 << 8

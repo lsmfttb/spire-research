@@ -56,6 +56,8 @@ STUDY_ID = CONFIG["study_id"]
 EXPECTED_NATIVE = CONFIG["identity"]["native_commit"]
 EXPECTED_STSRL = CONFIG["identity"]["stsr_commit"]
 EXPECTED_STSRL_NATIVE_INTEGRATION = CONFIG["identity"]["stsr_native_integration_commit"]
+BATTLE_SEARCH_PROTOCOL = CONFIG["battle_search"]
+NATIVE_SEARCH_API = str(BATTLE_SEARCH_PROTOCOL["native_api"])
 MAX_CPU = float(CONFIG["resources"]["builder_cpu_hard_cap_seconds"])
 REVIEWER_RESERVE = float(CONFIG["resources"]["reviewer_cpu_reserve_seconds"])
 SETUP_CPU = float(CONFIG["resources"]["compile_configure_cpu_seconds_already_used"])
@@ -371,10 +373,6 @@ class CheckpointAdapter:
     def step(self, action: Any) -> Any:
         return self.base.step(action)
 
-    def battle_search(self, snapshot: Any, **kwargs: Any) -> Any:
-        """Preserve the pinned STSRL oracle controller's native search API."""
-        return self.base.battle_search(snapshot, **kwargs)
-
     def battle_search_v2(self, snapshot: Any, **kwargs: Any) -> Any:
         return self.base.battle_search_v2(snapshot, **kwargs)
 
@@ -385,6 +383,123 @@ class CheckpointAdapter:
     def checkpoint_fingerprint(self, snapshot: Any) -> Any:
         """Delegate the pinned exact-restore snapshot fingerprint."""
         return self.base.checkpoint_fingerprint(snapshot)
+
+
+class StudyBattleSearchV2Controller:
+    """Study-only null-guidance controller using the pinned native Search-v2 API."""
+
+    def __init__(self):
+        from sts_combat_rl.sim.action_space import ActionSpaceConfig
+        from sts_combat_rl.sim.battle_search_v2 import (
+            BATTLE_SEARCH_V2_NATIVE_API,
+            BATTLE_SEARCH_V2_PATCH_IDENTITY,
+        )
+        from sts_combat_rl.sim.controller_contract import ControllerProvenance
+        from sts_combat_rl.sim.lightspeed_source import lightspeed_source_identity_dict
+        from sts_combat_rl.sim.online_controller import NATIVE_SEARCH_INFORMATION_REGIME
+        from sts_combat_rl.sim.oracle_search import (
+            ORACLE_SEARCH_SCHEMA_ID,
+            _include_potions_for_battle_search,
+            validate_oracle_root_selection_rule,
+        )
+
+        simulations = int(BATTLE_SEARCH_PROTOCOL["simulations"])
+        root_selection_rule = str(BATTLE_SEARCH_PROTOCOL["root_selection_rule"])
+        if simulations <= 0:
+            raise ValueError("Issue 71 Search-v2 simulations must be positive")
+        validate_oracle_root_selection_rule(root_selection_rule)
+        if BATTLE_SEARCH_V2_NATIVE_API != NATIVE_SEARCH_API:
+            raise RuntimeError("pinned STSRL Search-v2 API disagrees with committed study config")
+        if BATTLE_SEARCH_V2_PATCH_IDENTITY != BATTLE_SEARCH_PROTOCOL["patch_identity"]:
+            raise RuntimeError("pinned STSRL Search-v2 patch identity disagrees with committed study config")
+        self.simulations = int(simulations)
+        self.root_selection_rule = root_selection_rule
+        self.action_space = ActionSpaceConfig.include_all()
+        self.include_potions = _include_potions_for_battle_search(self.action_space)
+        if self.include_potions != bool(BATTLE_SEARCH_PROTOCOL["include_potions"]):
+            raise RuntimeError("native action-space potion setting disagrees with committed study config")
+        if BATTLE_SEARCH_PROTOCOL["policy_prior_callback"] is not None:
+            raise RuntimeError("Issue 71 Battle Search-v2 requires a null policy prior")
+        if BATTLE_SEARCH_PROTOCOL["leaf_value_callback"] is not None:
+            raise RuntimeError("Issue 71 Battle Search-v2 requires a null learned leaf value")
+        self.native_search_api = BATTLE_SEARCH_V2_NATIVE_API
+        self.native_search_patch_identity = BATTLE_SEARCH_V2_PATCH_IDENTITY
+        self.provenance = ControllerProvenance(
+            kind="oracle_battle_search",
+            name=f"oracle_search_v2_{root_selection_rule}_s{self.simulations}",
+            config={
+                "controller_version": "issue71-native-search-v2-null-guidance-v1",
+                "information_regime": NATIVE_SEARCH_INFORMATION_REGIME,
+                "native_search_schema_id": ORACLE_SEARCH_SCHEMA_ID,
+                "native_search_api": self.native_search_api,
+                "native_search_patch_identity": self.native_search_patch_identity,
+                "native_source_identity": lightspeed_source_identity_dict(),
+                "search_budget": {
+                    "simulations": self.simulations,
+                    "budget_unit": "native_tree_search_playouts",
+                },
+                "root_selection_rule": self.root_selection_rule,
+                "action_space": self.action_space.to_dict(),
+                "include_potions": self.include_potions,
+                "policy_prior": BATTLE_SEARCH_PROTOCOL["policy_prior_callback"],
+                "learned_leaf_value": BATTLE_SEARCH_PROTOCOL["leaf_value_callback"],
+                "rollout_configuration": {
+                    "rollout_policy": BATTLE_SEARCH_PROTOCOL["rollout_policy"],
+                    "leaf_value": BATTLE_SEARCH_PROTOCOL["terminal_utility"],
+                    "model_calls": 0,
+                },
+                "reproducibility": {
+                    "deterministic_given_restored_checkpoint": True,
+                    "native_rng_seed_source": "BattleContext.seed+floorNum",
+                    "python_rng_seed": None,
+                },
+                "root_mapping": "occurrence_safe_action_identity_v1",
+            },
+        )
+
+    def select_action(
+        self,
+        adapter: Any,
+        snapshot: Any,
+        actions: Sequence[Any],
+        context: Any,
+        step_index: int,
+    ) -> Any:
+        del step_index
+        from sts_combat_rl.sim.controller_contract import ControllerDecision
+        from sts_combat_rl.sim.oracle_search import (
+            build_oracle_search_report,
+            oracle_search_controller_metadata,
+            select_oracle_root_action,
+        )
+
+        search_fn = getattr(adapter, "battle_search_v2", None)
+        if not callable(search_fn):
+            raise ValueError("Issue 71 Search-v2 controller requires battle_search_v2 adapter")
+        started = time.perf_counter()
+        raw_search = search_fn(
+            snapshot,
+            simulations=self.simulations,
+            include_potions=self.include_potions,
+        )
+        report = build_oracle_search_report(
+            raw_search,
+            actions,
+            context,
+            expected_native_api=self.native_search_api,
+            expected_patch_identity=self.native_search_patch_identity,
+            wall_clock_time_s=time.perf_counter() - started,
+        )
+        if not report.search_ok:
+            raise ValueError("Issue 71 Search-v2 root mapping failed: " + "; ".join(report.problems))
+        target = select_oracle_root_action(report, selection_rule=self.root_selection_rule)
+        return ControllerDecision(
+            selected_index=target.legal_action_index,
+            provenance=self.provenance,
+            reason=f"oracle_search_v2:{self.root_selection_rule}",
+            score=target.score,
+            metadata=oracle_search_controller_metadata(report, target),
+        )
 
 
 class StudyController:
@@ -403,9 +518,7 @@ class StudyController:
         sampling_purpose: str = "policy",
         capture_trace: bool = True,
     ) -> None:
-        from sts_combat_rl.sim.action_space import ActionSpaceConfig
         from sts_combat_rl.sim.controller_contract import ControllerProvenance
-        from sts_combat_rl.sim.oracle_search import OracleSearchController
 
         if arm not in {"TRAIN", "BRANCH", "P0", "P1", "E"}:
             raise ValueError(f"unknown study arm {arm}")
@@ -435,11 +548,7 @@ class StudyController:
             "mysterious_sphere_golden_idol_case",
         )}
         self.native_identity_digest: str | None = None
-        self.oracle = OracleSearchController(
-            simulations=400,
-            root_selection_rule="highest_mean",
-            action_space=ActionSpaceConfig.include_all(),
-        )
+        self.oracle = StudyBattleSearchV2Controller()
         self.expert = None
         if arm == "E":
             from sts_combat_rl.sim.non_combat_policy import ExpertNonCombatDriver
@@ -1497,7 +1606,7 @@ def _run_branches_for_owner(
                 "actual_episode_target_rewritten": False,
                 "policy_used_for_all_suffix_nonbattle_choices": True,
                 "expert_decisions": 0,
-                "native_search_api": "StepSimulator.battle_search_v2.v1",
+                "native_search_api": NATIVE_SEARCH_API,
                 "native_source_commit": EXPECTED_NATIVE,
                 "child_status": int(child_status),
                 "child_exit_code": result.get("child_exit_code") if isinstance(result, Mapping) else None,
