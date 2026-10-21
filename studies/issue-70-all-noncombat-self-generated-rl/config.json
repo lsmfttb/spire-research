@@ -1,0 +1,201 @@
+{
+  "study_id": "issue-70-all-noncombat-self-generated-rl",
+  "disposition": "STUDY_ONLY",
+  "identity": {
+    "native_repository": "https://github.com/lsmfttb/sts_lightspeed",
+    "native_commit": "abf6eadbd2eb1ddf1aa8af4ede21922f9eaf0e16",
+    "native_binary_sha256": "440ebb810e94f730db96ff97468933625fa0c573dbf7dcd4af02a0182fb3608d",
+    "stsr_repository": "https://github.com/lsmfttb/STSRL",
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsr_native_integration_commit": "d61c7c2a120aa90730fd8530718a7cd7cd856b46",
+    "python": "3.13.13",
+    "torch": "2.12.0+cpu",
+    "numpy": "2.4.6",
+    "native_module": "slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_build": {
+      "type": "Release",
+      "target": "slaythespire",
+      "tested_source_commit_override": "abf6eadbd2eb1ddf1aa8af4ede21922f9eaf0e16",
+      "python_executable": "/home/lsmft/stsrl-spikes/py313-torch/bin/python3.13",
+      "cmake_policy_version_minimum": "3.5",
+      "jobs": 2
+    }
+  },
+  "population": {
+    "player_class": "IRONCLAD",
+    "ascension": 20,
+    "start": "native_standard_start",
+    "native_disable_prismatic_shard": true,
+    "shard_exposures_included": true,
+    "primary_analysis_exclusions": [],
+    "known_risk_events": [
+      "FALLING",
+      "WE_MEET_AGAIN",
+      "MYSTERIOUS_SPHERE",
+      "GOLDEN_IDOL"
+    ],
+    "source_qualification_marker_is_authority": false
+  },
+  "information_regime": {
+    "nonbattle_policy": "native_privileged_noncombat_choice_projection_v1",
+    "audience": "training_oracle_only",
+    "visibility_channels": [
+      "public_now",
+      "oracle_only",
+      "unavailable"
+    ],
+    "normal_public_api_safe": false,
+    "model_inputs": "semantic feature values and visibility tags only; no source names, candidate bindings, candidate indices, action ids, labels, bits, native slot indices, or source metadata",
+    "candidate_mapping": "ordered projection candidate occurrence i is mapped only to live native legal action i; candidate_order_source and exact counts are checked before selection",
+    "single_action_states": "native transition, no policy row",
+    "multi_action_states": "one shared action-conditioned categorical policy across all nonbattle screen types",
+    "battle": "same native Search-v2@400 in all arms and continuation suffixes",
+    "expert": "external comparison arm E only"
+  },
+  "action_space": {
+    "stsrl": "ActionSpaceConfig.include_all()",
+    "excluded_kinds": [],
+    "include_potions": true,
+    "battle_root_selection": "highest_mean",
+    "battle_policy_prior_callback": null,
+    "battle_leaf_value_callback": null
+  },
+  "model": {
+    "schema": "issue70-signed-hash-semantic-candidate-v1",
+    "hash_dimension": 2048,
+    "hash_algorithm": "blake2b-64-with-signed-feature-counts",
+    "numeric_transform": "sign(x)*log1p(abs(x))/10; clipped input to [-100000,100000]",
+    "architecture": "candidate scorer Linear(2048,128)-Tanh-Linear(128,64)-Tanh-Linear(64,1); state value Linear(2048,64)-Tanh-Linear(64,1) over mean candidate vector",
+    "initialization": "seeded PyTorch default hidden layers; final actor layer N(0,0.0001), bias 0; value layer default seeded initialization",
+    "initial_policy": "near-uniform untrained categorical",
+    "torch_seed": 73507001
+  },
+  "training": {
+    "owner_count": 512,
+    "block_count": 4,
+    "owners_per_block": 128,
+    "seed_first": 7300001,
+    "seed_last": 7300512,
+    "freeze_policy_within_block": true,
+    "optimizer": "Adam",
+    "learning_rate": 0.0003,
+    "one_optimizer_step_per_block": true,
+    "epochs_per_block": 1,
+    "batch_updates_per_block": 1,
+    "terminal_reward": "heart_victory + terminal_floor/100.0; floor must be in [0,99]",
+    "policy_gradient": "whole-run REINFORCE with within-block mean terminal reward baseline",
+    "value_loss_coefficient": 0.5,
+    "entropy_coefficient": 0.01,
+    "branch_loss": "separate completed-superior terminal branch action log-probability loss weighted by clipped positive terminal-reward delta",
+    "branch_advantage_weight_cap": 0.25,
+    "gradient_clip_norm": 1.0,
+    "no_intermediate_reward_shaping": true,
+    "no_expert_targets_or_decisions": true,
+    "sample_seed_domain": "sha256(study_id, owner_seed, arm, model_sha, purpose)",
+    "adam": {
+      "betas": [
+        0.9,
+        0.999
+      ],
+      "eps": 1E-08,
+      "weight_decay": 0.0,
+      "amsgrad": false
+    }
+  },
+  "continuations": {
+    "roots_per_owner_max": 2,
+    "alternatives_per_root_max": 2,
+    "aggregate_process_cpu_seconds_per_root_max": 6,
+    "continuation_policy": "same frozen policy on all later nonbattle choices plus same native Search-v2@400",
+    "candidate_order": "descending frozen policy probability excluding sampled root action",
+    "eligible_training_examples": "completed native terminal branch strictly superior to original sampled full run by lexicographic (heart victory, terminal floor)",
+    "provenance": "privileged_hindsight_completed_terminal_branch",
+    "expert_suffix_forbidden": true
+  },
+  "evaluation": {
+    "owner_count": 96,
+    "seed_first": 7310001,
+    "seed_last": 7310096,
+    "arms": [
+      "P0",
+      "P1",
+      "E"
+    ],
+    "primary": "mean owner-level terminal floor P1-P0",
+    "bootstrap": {
+      "method": "paired_percentile",
+      "confidence": 0.95,
+      "resamples": 20000,
+      "seed": 7370001
+    },
+    "complete_terminal_arms_required": true
+  },
+  "preflight": {
+    "owner_count": 8,
+    "seed_first": 7390001,
+    "seed_last": 7390008,
+    "arms": [
+      "P0",
+      "E"
+    ],
+    "forced_native_fixtures": [
+      "MATCH_AND_KEEP_FIRST_AND_SECOND_PICK",
+      "COLOSSEUM_RESTORED_CONTINUATION"
+    ],
+    "worker_consistency": [
+      1,
+      2
+    ]
+  },
+  "resources": {
+    "builder_cpu_hard_cap_seconds": 52000,
+    "reviewer_cpu_reserve_seconds": 8000,
+    "all_in_ceiling_seconds": 60000,
+    "compile_configure_cpu_seconds_already_used": 827.775141,
+    "compile_cpu_measurement": "Native CMake configure/build measured 65.18 CPU-s; separately built the pinned-source forced-projection fixture target and charged a conservative 150 CPU-s upper bound for its 50-translation-unit compile. Two required fixture invocations used 0.088656 CPU-s total; a wrong-mode smoke invocation that segfaulted used 0.031221 CPU-s and is charged. Historical native probes are charged 2 CPU-s; implementation plus validation is charged a conservative 600 CPU-s upper bound; the first protected preflight startup detected a missing config lock in 2.326358 CPU-s; the first source-identity preflight discovered separate but fixed native integration identities in 2.628354 CPU-s; the first candidate-binding preflight rejected a valid source-ordered candidate because the controller wrongly required omitted opaque bits/sanitized labels (2.710484 CPU-s); and the next preflight rejected an explicitly unavailable optional future field because the encoder wrongly required visibility/source (2.810066 CPU-s). No failed attempt consumed a training seed; each CPU-s remains charged.",
+    "max_steps_per_natural_run": 4096,
+    "branch_limits_enforced_in_forked_linux_children": true,
+    "resume_boundary": "atomic per-owner artifacts and per-block optimizer checkpoint; interrupted owner is deterministically replayed and all replay CPU remains charged",
+    "no_selective_retries": true,
+    "native_fixture_test_build_cpu_seconds_charged_upper_bound": 150.0,
+    "native_fixture_test_execution_cpu_seconds_observed": 0.088656,
+    "native_fixture_test_execution_wall_seconds_observed": 0.135683,
+    "native_failed_wrong_mode_smoke_cpu_seconds_charged": 0.031221,
+    "native_failed_wrong_mode_smoke_wall_seconds_observed": 0.054933,
+    "historical_unmetered_native_probe_cpu_seconds_charged": 2.0,
+    "study_implementation_and_validation_cpu_seconds_charged_upper_bound": 600.0,
+    "failed_missing_config_lock_preflight_cpu_seconds_observed_and_charged": 2.326358,
+    "failed_separate_source_identity_preflight_cpu_seconds_observed_and_charged": 2.628354,
+    "failed_sanitized_candidate_binding_preflight_cpu_seconds_observed_and_charged": 2.710484,
+    "failed_optional_unavailable_feature_preflight_cpu_seconds_observed_and_charged": 2.810066,
+    "branch_cpu_upper_bound_seconds": 6144.0,
+    "cpu_margin_seconds": 2.0,
+    "preflight_projection": {
+      "future_natural_owner_arm_runs": 800,
+      "run_cpu_inflation_factor": 1.25,
+      "engineering_margin_seconds": 2000.0,
+      "method": "actual setup and preflight CPU + worker check CPU + 800 still-unrun training/evaluation owner arms at 1.25 times maximum observed full-run CPU + full registered branch allowance + fixed engineering margin"
+    },
+    "native_fixture_test_invocation": "test-public-noncombat-projection --privileged-noncombat-only"
+  },
+  "runtime_optimizer": {
+    "source_repository": "https://github.com/lsmfttb/spire-research",
+    "source_commit": "30efe12bcedb65a432f1a57756a930baed90c5d5",
+    "source_path": "studies/issue-64-joint-trajectory-repair/public_history_execution.py",
+    "optimizer_id": "issue65-demand-driven-public-history-v1",
+    "sha256": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+    "study_local_copy": true,
+    "telemetry": true,
+    "reused_features": [
+      "demand_driven_public_history",
+      "validated_append_only_history",
+      "phase_telemetry"
+    ],
+    "excluded_features": [
+      "expert_training_decisions",
+      "expert_policy_continuation",
+      "legacy_source_pins",
+      "legacy_policy_schema"
+    ]
+  }
+}

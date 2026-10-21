@@ -1,0 +1,64 @@
+{
+  "child_cpu_seconds": 0.047292,
+  "fixture_test_binary_sha256": "90215701887be831c69124cb6c9148af3381803b1c1563103e6cedbc18bf523d",
+  "invocation": "test-public-noncombat-projection --privileged-noncombat-only",
+  "limitations": [
+    "LAB forced EVENT_SCREEN remains unsupported; native setup auto-resolves it to REWARDS, so the forced state is not treated as reachable",
+    "Colosseum and Match and Keep have native transition coverage, but no matched live CommunicationMod trace was available",
+    "per-family event execution witnesses are representative rather than an execution of every event branch",
+    "the bounded source TODO scan retains unresolved reachable Falling, We Meet Again bottled-card, and Mysterious Sphere Golden Idol reward cases; this is not a full STS mechanics audit"
+  ],
+  "native_module_sha256": "440ebb810e94f730db96ff97468933625fa0c573dbf7dcd4af02a0182fb3608d",
+  "native_source_commit": "abf6eadbd2eb1ddf1aa8af4ede21922f9eaf0e16",
+  "no_training_or_evaluation_ran": true,
+  "passed": true,
+  "required_fixtures": {
+    "COLOSSEUM_RESTORED_CONTINUATION": {
+      "checkpoint_replay_exact": true,
+      "first_fight_ordinary_rewards": false,
+      "opening_encounter": "COLOSSEUM_EVENT_SLAVERS",
+      "post_victory_native_choices": 2,
+      "second_encounter": "COLOSSEUM_EVENT_NOBS",
+      "second_reward_replay": {
+        "card_reward": [
+          279,
+          119,
+          264
+        ],
+        "card_rng_counter": 8,
+        "gold": 100,
+        "misc_rng_counter": 0,
+        "potion_chance": 80,
+        "potion_count": 1,
+        "potion_rng_counter": 7,
+        "relic_rng_counter": 0,
+        "relics": [
+          31,
+          177
+        ]
+      },
+      "source_trace_parity": "REAL_GAME_TRACE_NOT_VERIFIED",
+      "status": "supported"
+    },
+    "MATCH_AND_KEEP_FIRST_AND_SECOND_PICK": {
+      "checkpoint_rng_replay": true,
+      "first_card_revealed_before_second_choice": true,
+      "matches_awarded": 2,
+      "mismatch_match_and_five_attempt_progression": true,
+      "pair_actions_rejected": true,
+      "privileged_first_and_second_choice_candidate_counts": [
+        12,
+        11
+      ],
+      "second_pick_actions_after_first_reveal": 11,
+      "source_trace_parity": "REAL_GAME_TRACE_NOT_VERIFIED",
+      "starting_first_pick_actions": 12,
+      "status": "supported"
+    }
+  },
+  "returncode": 0,
+  "schema_id": "issue70-exact-source-native-forced-fixture-evidence-v1",
+  "test_binary": "test-public-noncombat-projection",
+  "test_runner_note": "CMake configured no CTest registration for this EXCLUDE_FROM_ALL target; the exact-source native executable was invoked directly with its privileged projection fixture selector.",
+  "wall_seconds": 0.07060370399999982
+}
