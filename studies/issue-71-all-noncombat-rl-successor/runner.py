@@ -75,6 +75,8 @@ BASELINE_CHARGED_CPU = 0.0
 BASELINE_PARENT_CPU = 0.0
 BASELINE_BRANCH_CPU = 0.0
 INITIAL_BRANCH_RESERVE = BRANCH_CPU_UPPER
+ACTIVE_STAGE1_PHASE: str | None = None
+STAGE1_STAGE0_BASELINE_CACHE: dict[str, Any] | None = None
 
 
 class StudyFailure(RuntimeError):
@@ -1277,12 +1279,302 @@ def _charged_now(out: Path) -> float:
     return SETUP_CPU + BASELINE_PARENT_CPU + BASELINE_BRANCH_CPU + time.process_time() + CPU_CHILD_CHARGE
 
 
+def _stage1_budget_contract() -> dict[str, Any]:
+    """Validate the locked Stage 1 totals against the registered design."""
+    budget = CONFIG["resources"]["stage1_budget"]
+    preflight_runs = (
+        int(CONFIG["preflight"]["seed_last"]) - int(CONFIG["preflight"]["seed_first"]) + 1
+    ) * len(CONFIG["preflight"]["arms"])
+    preflight_owners = int(CONFIG["preflight"]["seed_last"]) - int(CONFIG["preflight"]["seed_first"]) + 1
+    training_owners = int(CONFIG["training"]["seed_last"]) - int(CONFIG["training"]["seed_first"]) + 1
+    evaluation_owners = int(CONFIG["evaluation"]["seed_last"]) - int(CONFIG["evaluation"]["seed_first"]) + 1
+    future_owner_runs = (
+        int(CONFIG["training"]["owner_count"])
+        + int(CONFIG["evaluation"]["owner_count"]) * len(CONFIG["evaluation"]["arms"])
+    )
+    branch_allowance = (
+        int(CONFIG["training"]["owner_count"])
+        * int(CONFIG["continuations"]["roots_per_owner_max"])
+        * float(CONFIG["continuations"]["aggregate_process_cpu_seconds_per_root_max"])
+    )
+    reviewer_total = float(budget["reviewer_reserve_min_seconds"])
+    stage0_reviewer_credit = float(budget["stage0_reviewer_reserve_credit_seconds"])
+    launch_gate_repair_cap = float(budget["launch_gate_repair_cpu_cap_seconds"])
+    launch_gate_reviewer_credit = float(budget["launch_gate_repair_reviewer_credit_seconds"])
+    cumulative_ceiling = float(budget["cumulative_ceiling_seconds"])
+    if preflight_runs != int(budget["mandatory_preflight_owner_arm_count"]):
+        raise StudyFailure("Stage 1 budget does not cover every mandatory P0/E preflight arm")
+    if (
+        preflight_owners != int(CONFIG["preflight"]["owner_count"])
+        or training_owners != int(CONFIG["training"]["owner_count"])
+        or evaluation_owners != int(CONFIG["evaluation"]["owner_count"])
+    ):
+        raise StudyFailure("Stage 1 CPU budget seed ranges differ from the registered owner counts")
+    if future_owner_runs != int(PROJECTION["future_natural_owner_arm_runs"]):
+        raise StudyFailure("Stage 1 future owner-arm budget differs from the registered training/evaluation design")
+    if branch_allowance != float(budget["branch_allowance_seconds"]):
+        raise StudyFailure("Stage 1 branch allowance must equal owners × roots × per-root CPU cap")
+    if cumulative_ceiling != 60000 or int(budget["worker_consistency_repeat_run_count"]) != 2:
+        raise StudyFailure("Stage 1 must retain the 60000-second ceiling and both worker-consistency runs")
+    if reviewer_total < 8000 or stage0_reviewer_credit != REVIEWER_RESERVE:
+        raise StudyFailure("Stage 1 reviewer reserve must include, not add to, the Stage 0 reviewer allocation")
+    if reviewer_total <= stage0_reviewer_credit:
+        raise StudyFailure("Stage 1 reviewer reserve leaves no incremental Stage 1 review allocation")
+    if launch_gate_repair_cap != 2000 or launch_gate_reviewer_credit < 400 or launch_gate_reviewer_credit > launch_gate_repair_cap:
+        raise StudyFailure("Stage 1 launch-gate repair reserve must stay within 2000 CPU-s including at least 400 Reviewer CPU-s")
+    if reviewer_total <= stage0_reviewer_credit + launch_gate_reviewer_credit:
+        raise StudyFailure("Stage 1 reviewer reserve does not cover both the Stage 0 and launch-gate review credits")
+    return {
+        **budget,
+        "mandatory_preflight_owner_arm_count": preflight_runs,
+        "worker_consistency_repeat_run_count": int(budget["worker_consistency_repeat_run_count"]),
+        "future_natural_owner_arm_runs": future_owner_runs,
+        "branch_allowance_seconds": branch_allowance,
+        "run_cpu_inflation_factor": float(PROJECTION["run_cpu_inflation_factor"]),
+        "engineering_margin_seconds": float(PROJECTION["engineering_margin_seconds"]),
+        "reviewer_reserve_min_seconds": reviewer_total,
+        "stage0_reviewer_reserve_credit_seconds": stage0_reviewer_credit,
+        "launch_gate_repair_cpu_cap_seconds": launch_gate_repair_cap,
+        "launch_gate_reviewer_reserve_credit_seconds": launch_gate_reviewer_credit,
+        "launch_gate_builder_reserve_seconds": launch_gate_repair_cap - launch_gate_reviewer_credit,
+        "stage1_reviewer_reserve_seconds": reviewer_total - stage0_reviewer_credit - launch_gate_reviewer_credit,
+    }
+
+
+def _stage1_budget_projection(
+    *, stage0_builder_cpu: float, stage1_charged_cpu: float,
+    pending_preflight_runs: int, pending_worker_repeats: int,
+    pending_owner_runs: int, max_run_cpu: float, branch_cpu_remaining: float,
+) -> dict[str, Any]:
+    """Project cumulative Stage 0 + Stage 1 CPU without double-counting review."""
+    contract = _stage1_budget_contract()
+    future_runs = (
+        max(0, int(pending_preflight_runs))
+        + max(0, int(pending_worker_repeats))
+        + max(0, int(pending_owner_runs))
+    )
+    inflation = float(contract["run_cpu_inflation_factor"])
+    estimated_future_run_cpu = future_runs * max(0.0, float(max_run_cpu)) * inflation
+    branches = max(0.0, float(branch_cpu_remaining))
+    margin = float(contract["engineering_margin_seconds"])
+    launch_gate_builder_reserve = float(contract["launch_gate_builder_reserve_seconds"])
+    reviewer_total = float(contract["reviewer_reserve_min_seconds"])
+    ceiling = float(contract["cumulative_ceiling_seconds"])
+    projected_builder = (
+        max(0.0, float(stage0_builder_cpu))
+        + max(0.0, float(stage1_charged_cpu))
+        + estimated_future_run_cpu + branches + margin + launch_gate_builder_reserve
+    )
+    projected_all_in = projected_builder + reviewer_total
+    builder_ceiling = ceiling - reviewer_total
+    return {
+        "stage0_builder_cpu_charged_seconds": max(0.0, float(stage0_builder_cpu)),
+        "stage1_cpu_charged_seconds": max(0.0, float(stage1_charged_cpu)),
+        "pending_preflight_owner_arm_runs": max(0, int(pending_preflight_runs)),
+        "pending_worker_consistency_repeat_runs": max(0, int(pending_worker_repeats)),
+        "pending_training_and_evaluation_owner_arm_runs": max(0, int(pending_owner_runs)),
+        "run_cpu_max_observed_seconds": max(0.0, float(max_run_cpu)),
+        "run_cpu_inflation_factor": inflation,
+        "projected_future_owner_arm_cpu_seconds": estimated_future_run_cpu,
+        "remaining_branch_allowance_cpu_seconds": branches,
+        "engineering_margin_cpu_seconds": margin,
+        "launch_gate_repair_cpu_cap_seconds": float(contract["launch_gate_repair_cpu_cap_seconds"]),
+        "launch_gate_builder_repair_reserve_seconds": launch_gate_builder_reserve,
+        "launch_gate_reviewer_reserve_credited_seconds": float(contract["launch_gate_reviewer_reserve_credit_seconds"]),
+        "stage0_reviewer_reserve_credited_seconds": float(contract["stage0_reviewer_reserve_credit_seconds"]),
+        "incremental_stage1_reviewer_reserve_seconds": float(contract["stage1_reviewer_reserve_seconds"]),
+        "reviewer_reserve_total_seconds": reviewer_total,
+        "projected_builder_cpu_seconds": projected_builder,
+        "projected_cumulative_all_in_cpu_seconds": projected_all_in,
+        "cumulative_ceiling_seconds": ceiling,
+        "builder_ceiling_after_reviewer_reserve_seconds": builder_ceiling,
+        "within_builder_ceiling": projected_builder <= builder_ceiling,
+        "within_all_in_ceiling": projected_all_in <= ceiling,
+        "remaining_builder_headroom_seconds": max(0.0, builder_ceiling - projected_builder),
+    }
+
+
+def _require_stage1_projection(projection: Mapping[str, Any]) -> None:
+    if not projection.get("within_builder_ceiling") or not projection.get("within_all_in_ceiling"):
+        raise CpuBudgetExceeded(
+            "SCIENTIFIC_INCOMPLETE_RESOURCE_PROJECTION: Stage 1 cumulative CPU projection exceeds the locked ceiling"
+        )
+
+
+def _stage1_stage0_baseline() -> dict[str, Any]:
+    """Load and verify the accepted Stage 0 report that anchors cumulative CPU."""
+    global STAGE1_STAGE0_BASELINE_CACHE
+    if STAGE1_STAGE0_BASELINE_CACHE is not None:
+        return STAGE1_STAGE0_BASELINE_CACHE
+    contract = _stage1_budget_contract()
+    stage0 = ROOT / str(contract["stage0_artifact_directory"])
+    report_path = stage0 / "stage0-report.json"
+    manifest_path = stage0 / "artifact-manifest.json"
+    if not report_path.is_file() or not manifest_path.is_file():
+        raise StudyFailure("Stage 1 requires the reviewed, checksummed Stage 0 evidence bundle")
+    if sha256_file(report_path) != str(contract["stage0_report_sha256"]):
+        raise StudyFailure("Stage 0 report differs from the accepted preseed baseline")
+    if sha256_file(manifest_path) != str(contract["stage0_manifest_sha256"]):
+        raise StudyFailure("Stage 0 artifact manifest differs from the accepted preseed baseline")
+    if not _validate_artifact_manifest(stage0):
+        raise StudyFailure("Stage 0 artifact manifest does not match its files")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    if (
+        report.get("status") != "STAGE0_ENGINEERING_PASS_PENDING_INDEPENDENT_REVIEW"
+        or report.get("config_sha256") != contract["stage0_config_sha256"]
+        or report.get("formal_training_seed_consumed") is not False
+        or report.get("formal_evaluation_seed_consumed") is not False
+    ):
+        raise StudyFailure("Stage 0 report does not carry the accepted no-formal-seed disposition")
+    projection = report.get("resource_projection", {})
+    charged = float(projection.get("current_builder_cpu_charged_seconds", -1.0))
+    maximum = float(projection.get("observed_max_natural_run_cpu_seconds", -1.0))
+    if not math.isclose(charged, float(contract["stage0_builder_cpu_seconds"]), rel_tol=0.0, abs_tol=1e-9):
+        raise StudyFailure("Stage 0 cumulative CPU baseline differs from the locked accepted value")
+    if maximum <= 0:
+        raise StudyFailure("Stage 0 report has no positive observed natural-run CPU for conservative projection")
+    STAGE1_STAGE0_BASELINE_CACHE = {
+        "builder_cpu_seconds": charged, "max_run_cpu_seconds": maximum, "report": report,
+    }
+    return STAGE1_STAGE0_BASELINE_CACHE
+
+
+def _stage1_completed_run(path: Path, *, seed: int, arm: str) -> bool:
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    try:
+        return bool(
+            record.get("terminal_complete") is True
+            and int(record.get("seed", -1)) == int(seed)
+            and str(record.get("arm")) == arm
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def _stage1_budget_projection_for(out: Path, phase: str) -> dict[str, Any]:
+    contract = _stage1_budget_contract()
+    stage0 = _stage1_stage0_baseline()
+    preflight_specs = [
+        (int(seed), str(arm))
+        for seed in range(int(CONFIG["preflight"]["seed_first"]), int(CONFIG["preflight"]["seed_last"]) + 1)
+        for arm in CONFIG["preflight"]["arms"]
+    ]
+    completed_preflight = sum(
+        _stage1_completed_run(out / "runs" / f"PRE_{seed}_{arm}.json", seed=seed, arm=arm)
+        for seed, arm in preflight_specs
+    )
+    pending_preflight = max(0, len(preflight_specs) - completed_preflight)
+    worker_repeats = 0
+    worker_path = out / "worker-consistency.json"
+    if not worker_path.is_file():
+        worker_repeats = int(contract["worker_consistency_repeat_run_count"])
+    else:
+        try:
+            worker = json.loads(worker_path.read_text(encoding="utf-8"))
+            seed = int(CONFIG["preflight"]["seed_first"])
+            worker_ok = bool(
+                worker.get("terminal_and_decision_trace_equal") is True
+                and (out / "runs" / f"PRE_WORKER_CHECK_{seed}_P0.json").is_file()
+                and _stage1_completed_run(
+                    out / "runs" / f"PRE_WORKER_CHECK_{seed}_P0.json", seed=seed, arm="P0"
+                )
+                and _stage1_completed_run(
+                    out / "runs" / f"PRE_WORKER_COMPANION_{seed}_E.json", seed=seed, arm="E"
+                )
+            )
+            if not worker_ok:
+                worker_repeats = int(contract["worker_consistency_repeat_run_count"])
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            worker_repeats = int(contract["worker_consistency_repeat_run_count"])
+
+    pending_training = 0
+    for seed in range(int(CONFIG["training"]["seed_first"]), int(CONFIG["training"]["seed_last"]) + 1):
+        if not _stage1_completed_run(out / "runs" / f"TRAIN_{seed}.json", seed=seed, arm="TRAIN"):
+            pending_training += 1
+    pending_evaluation = 0
+    for seed in range(int(CONFIG["evaluation"]["seed_first"]), int(CONFIG["evaluation"]["seed_last"]) + 1):
+        for arm in CONFIG["evaluation"]["arms"]:
+            if not _stage1_completed_run(out / "runs" / f"EVAL_{seed}_{arm}.json", seed=seed, arm=str(arm)):
+                pending_evaluation += 1
+    training_status_path = out / "training-status.json"
+    training_complete = False
+    if training_status_path.is_file():
+        try:
+            training_complete = json.loads(training_status_path.read_text(encoding="utf-8")).get("status") == "TRAINING_COMPLETE"
+        except (OSError, json.JSONDecodeError):
+            training_complete = False
+    if phase == "evaluate":
+        pending_owner_runs = pending_evaluation
+        branch_remaining = 0.0
+    elif training_complete:
+        pending_owner_runs = pending_evaluation
+        branch_remaining = 0.0
+    else:
+        pending_owner_runs = pending_training + pending_evaluation
+        branch_remaining = max(
+            0.0,
+            float(contract["branch_allowance_seconds"])
+            - BASELINE_BRANCH_CPU - CPU_BRANCH_CHARGE_CURRENT,
+        )
+
+    observed = [float(stage0["max_run_cpu_seconds"])]
+    for path in _json_paths(out / "runs", "*.json"):
+        try:
+            item = json.loads(path.read_text(encoding="utf-8"))
+            if item.get("terminal_complete") and float(item.get("cpu_seconds", 0.0)) > 0:
+                observed.append(float(item["cpu_seconds"]))
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            continue
+    max_run_cpu = max(observed)
+    stage1_charged = BASELINE_PARENT_CPU + BASELINE_BRANCH_CPU + time.process_time() + CPU_CHILD_CHARGE
+    return _stage1_budget_projection(
+        stage0_builder_cpu=float(stage0["builder_cpu_seconds"]),
+        stage1_charged_cpu=stage1_charged,
+        pending_preflight_runs=pending_preflight,
+        pending_worker_repeats=worker_repeats,
+        pending_owner_runs=pending_owner_runs,
+        max_run_cpu=max_run_cpu,
+        branch_cpu_remaining=branch_remaining,
+    )
+
+
 def _check_budget(out: Path, *, reserve_branches: float = 0.0) -> None:
+    if ACTIVE_STAGE1_PHASE is not None:
+        del reserve_branches
+        _require_stage1_projection(_stage1_budget_projection_for(out, ACTIVE_STAGE1_PHASE))
+        return
     if _charged_now(out) + max(0.0, reserve_branches) + CPU_MARGIN >= MAX_CPU:
         raise CpuBudgetExceeded("Builder CPU ceiling plus current branch reserve is exhausted")
 
 
 def _install_cpu_cap(out: Path) -> dict[str, Any]:
+    if ACTIVE_STAGE1_PHASE is not None:
+        projection = _stage1_budget_projection_for(out, ACTIVE_STAGE1_PHASE)
+        _require_stage1_projection(projection)
+        absolute_process_limit = int(math.floor(
+            time.process_time() + float(projection["remaining_builder_headroom_seconds"])
+        ))
+        current = int(time.process_time())
+        if absolute_process_limit <= current:
+            raise CpuBudgetExceeded("remaining cumulative Stage 1 CPU budget is below the process start allowance")
+        soft, hard = resource.getrlimit(resource.RLIMIT_CPU)
+        if hard != resource.RLIM_INFINITY:
+            absolute_process_limit = min(absolute_process_limit, int(hard))
+        resource.setrlimit(resource.RLIMIT_CPU, (absolute_process_limit, absolute_process_limit))
+        return {
+            "rlimit_cpu_seconds": absolute_process_limit,
+            "stage0_builder_cpu_seconds": projection["stage0_builder_cpu_charged_seconds"],
+            "stage1_prior_parent_cpu_seconds": BASELINE_PARENT_CPU,
+            "stage1_prior_branch_cpu_seconds": BASELINE_BRANCH_CPU,
+            "projected_future_owner_cpu_seconds": projection["projected_future_owner_arm_cpu_seconds"],
+            "reserved_branch_cpu_seconds": projection["remaining_branch_allowance_cpu_seconds"],
+            "reviewer_reserve_total_seconds": projection["reviewer_reserve_total_seconds"],
+            "cumulative_ceiling_seconds": projection["cumulative_ceiling_seconds"],
+            "engineering_margin_seconds": projection["engineering_margin_cpu_seconds"],
+        }
     del out
     old_runs, old_branches = BASELINE_PARENT_CPU, BASELINE_BRANCH_CPU
     child_reserved = max(0.0, INITIAL_BRANCH_RESERVE - old_branches)
@@ -1824,6 +2116,11 @@ def _commit_model_checkpoint(
 def _require_stage1_authorized(phase: str) -> None:
     if CONFIG.get("stage0", {}).get("stage1_authorized") is not True:
         raise StudyFailure(f"STAGE1_NOT_AUTHORIZED: {phase} is gated until explicit Planner authorization")
+    expected_phase = {"training": "train", "evaluation": "evaluate"}.get(phase, phase)
+    if ACTIVE_STAGE1_PHASE != expected_phase:
+        raise StudyFailure(
+            f"STAGE1_BUDGETED_CLI_REQUIRED: {phase} must run through the locked cumulative-budget launcher"
+        )
 
 
 def run_training(out: Path) -> dict[str, Any]:
@@ -2077,9 +2374,9 @@ def run_preflight(out: Path) -> dict[str, Any]:
     initial_model, initial_digest = _load_policy(init_path, initial=not init_path.exists())
     if init_path.exists() and initial_sha != sha256_file(init_path):
         raise StudyFailure("initial policy checkpoint changed during preflight")
-    # Count all Python setup, native compilation and prior unmetered probes.
+    # Keep measured setup as a diagnostic. Cumulative CPU is charged through
+    # the Stage 1 resume ledger, not by re-adding the Stage 0 fixed setup debit.
     setup_cpu = max(0.0, time.process_time() - setup_started)
-    actual_before = SETUP_CPU + setup_cpu
     model_specs = [(int(seed), arm) for seed in range(
         int(CONFIG["preflight"]["seed_first"]), int(CONFIG["preflight"]["seed_last"]) + 1
     ) for arm in CONFIG["preflight"]["arms"]]
@@ -2106,8 +2403,6 @@ def run_preflight(out: Path) -> dict[str, Any]:
         if not result.get("terminal_complete"):
             raise StudyFailure(f"preflight arm {run_id} did not complete")
         _check_budget(out, reserve_branches=INITIAL_BRANCH_RESERVE)
-        if _charged_now(out) + INITIAL_BRANCH_RESERVE + REVIEWER_RESERVE >= ALL_IN_CPU:
-            raise CpuBudgetExceeded("preflight consumed the all-in budget reserve")
 
     # Verify deterministic behavior across one and two concurrent workers with
     # an exact repeated preflight seed; this is a systems check, not a new owner.
@@ -2150,22 +2445,18 @@ def run_preflight(out: Path) -> dict[str, Any]:
         if not check.get("terminal_and_decision_trace_equal"):
             raise StudyFailure("durable one/two worker check did not pass")
 
-    worker_cpu = float(check.get("cpu_seconds", 0.0)) if check else 0.0
     owner_results = [item for item in results if "WORKER" not in str(item.get("run_id", ""))]
-    cpu = sum(float(item.get("cpu_seconds", 0.0)) for item in owner_results) + worker_cpu + actual_before
+    cpu = BASELINE_PARENT_CPU + BASELINE_BRANCH_CPU + time.process_time() + CPU_CHILD_CHARGE
     individual = [float(item["cpu_seconds"]) for item in results if item.get("terminal_complete") and item.get("arm") in {"P0", "E"} and "WORKER" not in str(item.get("run_id", ""))]
     if len(individual) < 16:
         raise StudyFailure("fewer than eight independent P0/E preflight owner arms completed")
     maximum_run = max(individual)
     mean_run = float(np.mean(individual))
-    # Preflight outcomes are already included in actual_before. Project only
-    # the still-unrun training and held-out owner arms, with frozen factors.
-    future_owner_runs = int(PROJECTION["future_natural_owner_arm_runs"])
-    projected = (
-        actual_before + worker_cpu
-        + future_owner_runs * maximum_run * float(PROJECTION["run_cpu_inflation_factor"])
-        + BRANCH_CPU_UPPER + float(PROJECTION["engineering_margin_seconds"])
-    )
+    # The cumulative projection charges Stage 0 once, all durable Stage 1
+    # receipts across resume, every still-mandatory arm/repeat, the complete
+    # remaining branch allowance, margin, and the total reviewer reserve.
+    projection = _stage1_budget_projection_for(out, "preflight")
+    projected = float(projection["projected_builder_cpu_seconds"])
     report = {
         "study_id": STUDY_ID,
         "status": "PREFLIGHT_COMPLETE",
@@ -2180,17 +2471,20 @@ def run_preflight(out: Path) -> dict[str, Any]:
         "run_cpu_seconds_min": min(individual),
         "run_cpu_seconds_mean": mean_run,
         "run_cpu_seconds_max": maximum_run,
-        "setup_and_preflight_cpu_seconds_charged": cpu,
+        "cumulative_stage1_cpu_seconds_charged": cpu,
         "projected_all_in_cpu_seconds_builder": projected,
-        "reviewer_reserve_seconds": REVIEWER_RESERVE,
-        "projected_all_in_with_reviewer_reserve": projected + REVIEWER_RESERVE,
-        "within_builder_ceiling": projected <= MAX_CPU,
+        "reviewer_reserve_seconds": projection["reviewer_reserve_total_seconds"],
+        "stage0_reviewer_reserve_credited_seconds": projection["stage0_reviewer_reserve_credited_seconds"],
+        "incremental_stage1_reviewer_reserve_seconds": projection["incremental_stage1_reviewer_reserve_seconds"],
+        "projected_all_in_with_reviewer_reserve": projection["projected_cumulative_all_in_cpu_seconds"],
+        "stage1_budget_projection": projection,
+        "within_builder_ceiling": projection["within_builder_ceiling"],
         "projection_factors": dict(PROJECTION),
-        "within_all_in_ceiling": projected + REVIEWER_RESERVE <= ALL_IN_CPU,
+        "within_all_in_ceiling": projection["within_all_in_ceiling"],
         "training_seed_consumed": False,
     }
     atomic_json(out / "preflight-report.json", report)
-    if projected > MAX_CPU or projected + REVIEWER_RESERVE > ALL_IN_CPU:
+    if not projection["within_builder_ceiling"] or not projection["within_all_in_ceiling"]:
         report["status"] = "SCIENTIFIC_INCOMPLETE_RESOURCE_PROJECTION"
         atomic_json(out / "preflight-report.json", report)
         atomic_json(out / "study-status.json", {
@@ -2205,7 +2499,7 @@ def run_preflight(out: Path) -> dict[str, Any]:
         "training_seed_consumed": False,
         "preflight_report_sha256": sha256_file(out / "preflight-report.json"),
         "projected_all_in_cpu_seconds_builder": projected,
-        "projected_all_in_with_reviewer_reserve": projected + REVIEWER_RESERVE,
+        "projected_all_in_with_reviewer_reserve": projection["projected_cumulative_all_in_cpu_seconds"],
     })
     return report
 
@@ -2673,22 +2967,37 @@ def run_stage0_debug(out: Path, debug_seed: int) -> dict[str, Any]:
 
         maximum_run_cpu = float(run_result.get("cpu_seconds", 0.0))
         projection = CONFIG["resources"]["preflight_projection"]
-        projected_stage1_run_cpu = (
+        projected_stage1_owner_arm_cpu = (
             int(projection["future_natural_owner_arm_runs"])
             * maximum_run_cpu
             * float(projection["run_cpu_inflation_factor"])
+        )
+        stage1_contract = _stage1_budget_contract()
+        projected_stage1_preflight_cpu = (
+            int(stage1_contract["mandatory_preflight_owner_arm_count"])
+            * maximum_run_cpu * float(stage1_contract["run_cpu_inflation_factor"])
+        )
+        projected_stage1_worker_repeat_cpu = (
+            int(stage1_contract["worker_consistency_repeat_run_count"])
+            * maximum_run_cpu * float(stage1_contract["run_cpu_inflation_factor"])
+        )
+        projected_stage1_run_cpu = (
+            projected_stage1_owner_arm_cpu
+            + projected_stage1_preflight_cpu
+            + projected_stage1_worker_repeat_cpu
         )
         projected_stage1_branch_cpu = (
             int(CONFIG["training"]["owner_count"])
             * int(CONFIG["continuations"]["roots_per_owner_max"])
             * float(CONFIG["continuations"]["aggregate_process_cpu_seconds_per_root_max"])
         )
-        stage1_reviewer_reserve = int(CONFIG["resources"]["stage1_reviewer_reserve_min_seconds"])
-        stage1_ceiling = int(CONFIG["resources"]["stage1_cumulative_ceiling_seconds"])
+        stage1_reviewer_reserve = int(stage1_contract["reviewer_reserve_min_seconds"])
+        stage1_ceiling = int(stage1_contract["cumulative_ceiling_seconds"])
         projected_total = (
             _charged_now(out) + projected_stage1_run_cpu
             + projected_stage1_branch_cpu
             + float(projection["engineering_margin_seconds"])
+            + float(stage1_contract["launch_gate_builder_reserve_seconds"])
             + stage1_reviewer_reserve
         )
         phase_metrics = run_result.get("phase_metrics", {})
@@ -2738,12 +3047,21 @@ def run_stage0_debug(out: Path, debug_seed: int) -> dict[str, Any]:
             },
             "resource_projection": {
                 "observed_max_natural_run_cpu_seconds": maximum_run_cpu,
-                "projected_stage1_owner_arm_cpu_seconds": projected_stage1_run_cpu,
+                "projected_stage1_owner_arm_cpu_seconds": projected_stage1_owner_arm_cpu,
+                "projected_stage1_mandatory_preflight_owner_arm_count": stage1_contract["mandatory_preflight_owner_arm_count"],
+                "projected_stage1_mandatory_preflight_cpu_seconds": projected_stage1_preflight_cpu,
+                "projected_stage1_worker_consistency_repeat_run_count": stage1_contract["worker_consistency_repeat_run_count"],
+                "projected_stage1_worker_consistency_cpu_seconds": projected_stage1_worker_repeat_cpu,
+                "projected_stage1_total_future_run_cpu_seconds": projected_stage1_run_cpu,
                 "projected_stage1_branch_cpu_upper_bound_seconds": projected_stage1_branch_cpu,
                 "engineering_margin_seconds": float(projection["engineering_margin_seconds"]),
+                "launch_gate_repair_cpu_cap_seconds": stage1_contract["launch_gate_repair_cpu_cap_seconds"],
+                "launch_gate_builder_repair_reserve_seconds": stage1_contract["launch_gate_builder_reserve_seconds"],
+                "launch_gate_reviewer_reserve_credited_seconds": stage1_contract["launch_gate_reviewer_reserve_credit_seconds"],
                 "current_builder_cpu_charged_seconds": _charged_now(out),
                 "stage0_reviewer_reserve_seconds": REVIEWER_RESERVE,
                 "stage1_reviewer_reserve_min_seconds": stage1_reviewer_reserve,
+                "incremental_stage1_reviewer_reserve_seconds": stage1_contract["stage1_reviewer_reserve_seconds"],
                 "projected_full_study_cpu_seconds_including_reviewer": projected_total,
                 "absolute_ceiling_seconds": stage1_ceiling,
                 "within_absolute_ceiling": projected_total <= stage1_ceiling,
@@ -2818,16 +3136,168 @@ def _validate_artifact_manifest(out: Path) -> bool:
     return actual_manifest == expected
 
 
+def _stage1_has_open_phase(out: Path) -> bool:
+    started: set[str] = set()
+    closed: set[str] = set()
+    states = out / "coarse-state.jsonl"
+    if not states.exists():
+        return False
+    for line in states.read_text(encoding="utf-8").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        phase_id = str(event.get("phase_id", ""))
+        if not phase_id:
+            continue
+        if event.get("boundary") == "phase_started" and str(event.get("phase", "")) in {"preflight", "train", "evaluate"}:
+            started.add(phase_id)
+        elif event.get("boundary") in {"phase_finished", "phase_failed"}:
+            closed.add(phase_id)
+    return bool(started - closed)
+
+
+def _run_stage1_cli_phase(phase: str, out: Path) -> int:
+    """Run one gated Stage 1 phase with a single durable cumulative ledger."""
+    global BASELINE_PARENT_CPU, BASELINE_BRANCH_CPU, INITIAL_BRANCH_RESERVE
+    global ACTIVE_STAGE1_PHASE, STAGE1_STAGE0_BASELINE_CACHE
+    phase_id: str | None = None
+    try:
+        expected_out = (ROOT / str(CONFIG["resources"]["stage1_budget"]["artifact_directory"])).resolve()
+        if out != expected_out:
+            raise StudyFailure(f"Stage 1 output must use the single locked ledger directory: {expected_out}")
+        baseline = _stage1_stage0_baseline()
+        lock_config(out)
+        manifest_path = out / "artifact-manifest.json"
+        if manifest_path.exists() and not _validate_artifact_manifest(out) and not _stage1_has_open_phase(out):
+            raise StudyFailure("completed Stage 1 artifact manifest is missing or does not match its files")
+        BASELINE_PARENT_CPU, BASELINE_BRANCH_CPU = _existing_cpu_charge(out)
+        INITIAL_BRANCH_RESERVE = float(_stage1_budget_contract()["branch_allowance_seconds"])
+        ACTIVE_STAGE1_PHASE = phase
+        resource_guard = _install_cpu_cap(out)
+        atomic_json(out / f"resource-guard-{phase}.json", resource_guard)
+        phase_id = f"stage1-{phase}:{time.time_ns()}:{os.getpid()}"
+        phase_run_cpu_before = _run_and_replay_cpu_total(out)
+        phase_branch_parent_cpu_before = _branch_parent_cpu_total(out)
+        append_jsonl(out / "coarse-state.jsonl", {
+            "study_id": STUDY_ID, "boundary": "phase_started", "phase": phase,
+            "phase_id": phase_id,
+            "charged_prior_stage0_builder_cpu_seconds": baseline["builder_cpu_seconds"],
+            "charged_prior_stage1_parent_cpu_seconds": BASELINE_PARENT_CPU,
+            "charged_prior_stage1_branch_cpu_seconds": BASELINE_BRANCH_CPU,
+            "reviewer_reserve_total_seconds": _stage1_budget_contract()["reviewer_reserve_min_seconds"],
+            "rlimit_cpu_seconds": resource_guard["rlimit_cpu_seconds"],
+            "formal_training_seed_consumed": False,
+            "formal_evaluation_seed_consumed": False,
+        })
+        runners = {"preflight": run_preflight, "train": run_training, "evaluate": run_evaluation}
+        result = runners[phase](out)
+        phase_cpu = _phase_unattributed_cpu(
+            out, process_cpu=_phase_process_cpu(),
+            run_cpu_before=phase_run_cpu_before,
+            branch_parent_cpu_before=phase_branch_parent_cpu_before,
+        )
+        append_jsonl(out / "coarse-state.jsonl", {
+            "study_id": STUDY_ID, "boundary": "phase_finished", "phase": phase,
+            "phase_id": phase_id, **phase_cpu, "status": result.get("status"),
+        })
+        projection = _stage1_budget_projection_for(out, phase)
+        result = dict(result)
+        result["stage1_budget_projection"] = projection
+        result["phase_cpu_accounting"] = phase_cpu
+        if not projection["within_builder_ceiling"] or not projection["within_all_in_ceiling"]:
+            result["status"] = "SCIENTIFIC_INCOMPLETE_RESOURCE_PROJECTION"
+            result["training_seed_consumed"] = any(_json_paths(out / "runs", "TRAIN_*.json"))
+            result["evaluation_seed_consumed"] = any(_json_paths(out / "runs", "EVAL_*.json"))
+            atomic_json(out / "study-status.json", {
+                "status": result["status"],
+                "training_seed_consumed": result["training_seed_consumed"],
+                "evaluation_seed_consumed": result["evaluation_seed_consumed"],
+                "stage1_budget_projection": projection,
+            })
+        if phase == "preflight":
+            result.update({
+                "projected_all_in_cpu_seconds_builder": projection["projected_builder_cpu_seconds"],
+                "reviewer_reserve_seconds": projection["reviewer_reserve_total_seconds"],
+                "stage0_reviewer_reserve_credited_seconds": projection["stage0_reviewer_reserve_credited_seconds"],
+                "incremental_stage1_reviewer_reserve_seconds": projection["incremental_stage1_reviewer_reserve_seconds"],
+                "projected_all_in_with_reviewer_reserve": projection["projected_cumulative_all_in_cpu_seconds"],
+                "within_builder_ceiling": projection["within_builder_ceiling"],
+                "within_all_in_ceiling": projection["within_all_in_ceiling"],
+            })
+            atomic_json(out / "preflight-report.json", result)
+        atomic_json(out / f"stage1-{phase}-report.json", result)
+        atomic_json(out / "stage1-status.json", {
+            "status": result.get("status"), "latest_phase": phase,
+            "config_sha256": CONFIG_SHA256,
+            "training_seed_consumed": any(_json_paths(out / "runs", "TRAIN_*.json")),
+            "evaluation_seed_consumed": any(_json_paths(out / "runs", "EVAL_*.json")),
+            "stage1_budget_projection": projection,
+        })
+        _write_artifact_manifest(out)
+        print(canonical(result))
+        return 0 if result.get("status") in {
+            "PREFLIGHT_COMPLETE", "TRAINING_COMPLETE", "EVALUATION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+        } and projection["within_all_in_ceiling"] else 2
+    except Exception as exc:
+        failure = {
+            "status": "STAGE1_LAUNCH_GATE_FAILED",
+            "phase": phase, "error_type": type(exc).__name__, "error": str(exc),
+            "config_sha256": CONFIG_SHA256,
+            "formal_training_seed_consumed": any(_json_paths(out / "runs", "TRAIN_*.json")) if out.is_dir() else False,
+            "formal_evaluation_seed_consumed": any(_json_paths(out / "runs", "EVAL_*.json")) if out.is_dir() else False,
+        }
+        if phase_id is not None and out.is_relative_to(ROOT):
+            phase_cpu = _phase_unattributed_cpu(
+                out, process_cpu=_phase_process_cpu(),
+                run_cpu_before=locals().get("phase_run_cpu_before", 0.0),
+                branch_parent_cpu_before=locals().get("phase_branch_parent_cpu_before", 0.0),
+            )
+            append_jsonl(out / "coarse-state.jsonl", {
+                "study_id": STUDY_ID, "boundary": "phase_failed", "phase": phase,
+                "phase_id": phase_id, **phase_cpu, **failure,
+            })
+            failure["phase_cpu_accounting"] = phase_cpu
+            atomic_json(out / f"stage1-{phase}-failure.json", failure)
+            atomic_json(out / "study-status.json", failure)
+            atomic_json(out / "stage1-status.json", failure)
+            _write_artifact_manifest(out)
+        print(canonical(failure), file=sys.stderr)
+        expected_out = (ROOT / str(CONFIG["resources"]["stage1_budget"]["artifact_directory"])).resolve()
+        if phase_id is None and out == expected_out and out.is_dir():
+            atomic_json(out / "stage1-launch-failure.json", failure)
+            atomic_json(out / "study-status.json", failure)
+            atomic_json(out / "stage1-status.json", failure)
+            if not (out / "artifact-manifest.json").exists():
+                _write_artifact_manifest(out)
+        return 2
+    finally:
+        ACTIVE_STAGE1_PHASE = None
+        STAGE1_STAGE0_BASELINE_CACHE = None
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("phase", choices=("stage0-debug",))
-    parser.add_argument("--output", required=True, type=Path, help="repo-contained, checksummed Stage 0 artifact directory")
+    parser.add_argument("phase", choices=("stage0-debug", "preflight", "train", "evaluate"))
+    parser.add_argument("--output", required=True, type=Path, help="repo-contained Stage 0 or single Stage 1 artifact directory")
     parser.add_argument(
         "--debug-seed", type=int, default=int(CONFIG["stage0"]["debug_seed_first"]),
         help="precommitted nonformal debug seed; formal owner IDs are rejected",
     )
     args = parser.parse_args(argv)
     out = args.output.expanduser().resolve()
+    if args.phase in {"preflight", "train", "evaluate"}:
+        if CONFIG.get("stage0", {}).get("stage1_authorized") is not True:
+            print(canonical({
+                "status": "STAGE1_NOT_AUTHORIZED",
+                "phase": args.phase,
+                "formal_preflight_seed_consumed": False,
+                "formal_training_seed_consumed": False,
+                "formal_evaluation_seed_consumed": False,
+                "config_sha256": CONFIG_SHA256,
+            }), file=sys.stderr)
+            return 2
+        return _run_stage1_cli_phase(args.phase, out)
     phase_id: str | None = None
     try:
         if out == ROOT or not out.is_relative_to(ROOT):

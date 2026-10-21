@@ -262,14 +262,116 @@ class Issue71Selfcheck(unittest.TestCase):
                         phase(output)
             self.assertFalse((output / "config-lock.json").exists())
             self.assertFalse((output / "runs").exists())
-            cli = subprocess.run(
-                [sys.executable, os.fspath(runner.ROOT / "runner.py"), "train",
-                 "--output", os.fspath(output / "formal")],
-                cwd=runner.ROOT, capture_output=True, text=True, timeout=30,
+            for phase in ("preflight", "train", "evaluate"):
+                target = output / phase
+                cli = subprocess.run(
+                    [sys.executable, os.fspath(runner.ROOT / "runner.py"), phase,
+                     "--output", os.fspath(target)],
+                    cwd=runner.ROOT, capture_output=True, text=True, timeout=30,
+                )
+                with self.subTest(cli_phase=phase):
+                    self.assertEqual(cli.returncode, 2)
+                    self.assertIn("STAGE1_NOT_AUTHORIZED", cli.stderr)
+                    self.assertFalse(target.exists())
+
+    def test_authorized_library_call_cannot_bypass_the_cumulative_budget_launcher(self):
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(
+            runner.CONFIG["stage0"], {"stage1_authorized": True}
+        ):
+            output = Path(temporary)
+            for phase in (runner.run_preflight, runner.run_training, runner.run_evaluation):
+                with self.subTest(phase=phase.__name__):
+                    with self.assertRaisesRegex(runner.StudyFailure, "STAGE1_BUDGETED_CLI_REQUIRED"):
+                        phase(output)
+            self.assertFalse(output.exists() and any(output.iterdir()))
+
+    def test_stage1_budget_counts_all_mandatory_runs_and_credits_reviewer_reserve_once(self):
+        contract = runner._stage1_budget_contract()
+        self.assertEqual(contract["mandatory_preflight_owner_arm_count"], 16)
+        self.assertEqual(contract["worker_consistency_repeat_run_count"], 2)
+        self.assertEqual(contract["future_natural_owner_arm_runs"], 800)
+        self.assertEqual(contract["branch_allowance_seconds"], 6144)
+        self.assertEqual(contract["cumulative_ceiling_seconds"], 60000)
+        self.assertEqual(contract["reviewer_reserve_min_seconds"], 8000)
+        self.assertEqual(contract["stage0_reviewer_reserve_credit_seconds"], 1200)
+        self.assertEqual(contract["launch_gate_repair_cpu_cap_seconds"], 2000)
+        self.assertEqual(contract["launch_gate_reviewer_reserve_credit_seconds"], 400)
+        self.assertEqual(contract["launch_gate_builder_reserve_seconds"], 1600)
+        self.assertEqual(contract["stage1_reviewer_reserve_seconds"], 6400)
+        projection = runner._stage1_budget_projection(
+            stage0_builder_cpu=605.167155335, stage1_charged_cpu=0,
+            pending_preflight_runs=16, pending_worker_repeats=2,
+            pending_owner_runs=800, max_run_cpu=0.490868816,
+            branch_cpu_remaining=6144,
+        )
+        self.assertAlmostEqual(projection["projected_cumulative_all_in_cpu_seconds"], 18851.080519695)
+        self.assertEqual(projection["reviewer_reserve_total_seconds"], 8000)
+        self.assertEqual(projection["launch_gate_builder_repair_reserve_seconds"], 1600)
+        self.assertEqual(projection["launch_gate_reviewer_reserve_credited_seconds"], 400)
+        self.assertTrue(projection["within_all_in_ceiling"])
+
+    def test_stage1_budget_anchors_the_exact_reviewed_stage0_bundle_and_resume_counts(self):
+        previous_cache = runner.STAGE1_STAGE0_BASELINE_CACHE
+        previous_parent = runner.BASELINE_PARENT_CPU
+        previous_branches = runner.BASELINE_BRANCH_CPU
+        previous_branch_current = runner.CPU_BRANCH_CHARGE_CURRENT
+        previous_child = runner.CPU_CHILD_CHARGE
+        try:
+            runner.STAGE1_STAGE0_BASELINE_CACHE = None
+            runner.BASELINE_PARENT_CPU = 0.0
+            runner.BASELINE_BRANCH_CPU = 0.0
+            runner.CPU_BRANCH_CHARGE_CURRENT = 0.0
+            runner.CPU_CHILD_CHARGE = 0.0
+            baseline = runner._stage1_stage0_baseline()
+            self.assertEqual(baseline["builder_cpu_seconds"], 605.167155335)
+            self.assertGreater(baseline["max_run_cpu_seconds"], 0.0)
+            with tempfile.TemporaryDirectory() as temporary:
+                projection = runner._stage1_budget_projection_for(Path(temporary), "preflight")
+            self.assertEqual(projection["pending_preflight_owner_arm_runs"], 16)
+            self.assertEqual(projection["pending_worker_consistency_repeat_runs"], 2)
+            self.assertEqual(projection["pending_training_and_evaluation_owner_arm_runs"], 800)
+            self.assertEqual(projection["remaining_branch_allowance_cpu_seconds"], 6144)
+            self.assertEqual(projection["reviewer_reserve_total_seconds"], 8000)
+            self.assertAlmostEqual(
+                projection["projected_cumulative_all_in_cpu_seconds"],
+                18851.080519695 + projection["stage1_cpu_charged_seconds"], places=4,
             )
-            self.assertEqual(cli.returncode, 2)
-            self.assertIn("invalid choice", cli.stderr)
-            self.assertFalse((output / "formal").exists())
+            with tempfile.TemporaryDirectory() as temporary:
+                resumed_out = Path(temporary)
+                runs = resumed_out / "runs"
+                runner.atomic_json(runs / "PRE_7430001_P0.json", {
+                    "seed": 7430001, "arm": "P0", "terminal_complete": True, "cpu_seconds": 0.7,
+                })
+                runner.atomic_json(runs / "PRE_WORKER_CHECK_7430001_P0.json", {
+                    "seed": 7430001, "arm": "P0", "terminal_complete": True, "cpu_seconds": 0.8,
+                })
+                runner.atomic_json(runs / "PRE_WORKER_COMPANION_7430001_E.json", {
+                    "seed": 7430001, "arm": "E", "terminal_complete": True, "cpu_seconds": 0.9,
+                })
+                runner.atomic_json(resumed_out / "worker-consistency.json", {
+                    "terminal_and_decision_trace_equal": True,
+                })
+                resumed = runner._stage1_budget_projection_for(resumed_out, "preflight")
+                self.assertEqual(resumed["pending_preflight_owner_arm_runs"], 15)
+                self.assertEqual(resumed["pending_worker_consistency_repeat_runs"], 0)
+                self.assertGreaterEqual(resumed["run_cpu_max_observed_seconds"], 0.9)
+        finally:
+            runner.STAGE1_STAGE0_BASELINE_CACHE = previous_cache
+            runner.BASELINE_PARENT_CPU = previous_parent
+            runner.BASELINE_BRANCH_CPU = previous_branches
+            runner.CPU_BRANCH_CHARGE_CURRENT = previous_branch_current
+            runner.CPU_CHILD_CHARGE = previous_child
+
+    def test_synthetic_excess_cost_fails_stage1_projection_closed(self):
+        projection = runner._stage1_budget_projection(
+            stage0_builder_cpu=605.167155335, stage1_charged_cpu=0,
+            pending_preflight_runs=16, pending_worker_repeats=2,
+            pending_owner_runs=800, max_run_cpu=1000,
+            branch_cpu_remaining=6144,
+        )
+        self.assertFalse(projection["within_all_in_ceiling"])
+        with self.assertRaisesRegex(runner.CpuBudgetExceeded, "SCIENTIFIC_INCOMPLETE_RESOURCE_PROJECTION"):
+            runner._require_stage1_projection(projection)
 
     def test_one_byte_config_mutation_fails_at_fresh_import(self):
         with tempfile.TemporaryDirectory() as temporary:

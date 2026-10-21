@@ -1,7 +1,7 @@
 {
   "study_id": "issue-71-all-noncombat-rl-successor",
   "disposition": "STUDY_ONLY",
-  "stage_status": "STAGE0_PRESEED_GATE_ONLY",
+  "stage_status": "STAGE1_LAUNCH_GATE_REPAIRED_FORMAL_SEEDS_BLOCKED",
   "source_reference": {
     "implementation_source": "spire-research@07202a38a8a4e53918eea5f5e17f5f487fe44739:studies/issue-70-all-noncombat-self-generated-rl",
     "design_reference_is_not_an_authenticated_executed_config": true,
@@ -165,8 +165,6 @@
     "builder_cpu_hard_cap_seconds": 4800,
     "reviewer_cpu_reserve_seconds": 1200,
     "all_in_ceiling_seconds": 6000,
-    "stage1_cumulative_ceiling_seconds": 60000,
-    "stage1_reviewer_reserve_min_seconds": 8000,
     "compile_configure_cpu_seconds_already_used": 600,
     "compile_configure_charge_note": "Conservative pre-lock charge for exact-source native configuration/build and source-gate preparation; each subsequent runner process also records measured setup/phase CPU.",
     "max_steps_per_natural_run": 4096,
@@ -178,7 +176,24 @@
       "future_natural_owner_arm_runs": 800,
       "run_cpu_inflation_factor": 1.25,
       "engineering_margin_seconds": 2000,
-      "method": "measured Stage0 setup and debug costs plus 800 still-unrun Stage1 owner-arm runs at 1.25 times maximum observed natural-run CPU plus full registered branch allowance and fixed engineering margin"
+      "method": "Stage1 gate counts all remaining 16 mandatory preflight arms and 2 worker repeats plus every missing one of the 800 registered owner-arm runs at 1.25 times the maximum observed natural-run CPU, plus the remaining full 6144-second branch allowance and 2000-second engineering margin; Stage0 reviewer allocation is credited inside the total 8000-second reviewer reserve"
+    },
+    "stage1_budget": {
+      "artifact_directory": "stage1-artifacts",
+      "stage0_artifact_directory": "stage0-artifacts/debug-171000075",
+      "stage0_config_sha256": "b76ae51a8ad9abb4ec0e068e9c210a834506e5075928d4f36a583e3895f1eada",
+      "stage0_report_sha256": "48682a9555a15c09a53534cd3ceda15c3d68cd995e4bd5d5e94e07ac8c51fd30",
+      "stage0_manifest_sha256": "3fff33c57d87b9aeaff9a50cf9115a5fc1894fbe1e0f7b0d2e4f48aa8177a4e2",
+      "stage0_builder_cpu_seconds": 605.167155335,
+      "stage0_reviewer_reserve_credit_seconds": 1200,
+      "launch_gate_repair_cpu_cap_seconds": 2000,
+      "launch_gate_repair_reviewer_credit_seconds": 400,
+      "cumulative_ceiling_seconds": 60000,
+      "reviewer_reserve_min_seconds": 8000,
+      "mandatory_preflight_owner_arm_count": 16,
+      "worker_consistency_repeat_run_count": 2,
+      "branch_allowance_seconds": 6144,
+      "reserve_accounting": "The 2000-second launch-gate repair cap includes at least 400 Reviewer seconds; credit the Stage0 1200 and launch-gate 400 inside the total 8000-second reviewer reserve, add only the remaining 6400 Reviewer seconds, and add only the 1600 Builder portion of the launch-gate cap"
     }
   },
   "runtime_optimizer": {
