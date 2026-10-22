@@ -2342,7 +2342,11 @@ def _native_fixture_record(out: Path) -> dict[str, Any]:
     if not path.exists():
         raise StudyFailure("exact-source Match-and-Keep/Colosseum native fixture evidence is missing")
     evidence = json.loads(path.read_text(encoding="utf-8"))
-    if evidence.get("native_source_commit") != EXPECTED_NATIVE or evidence.get("passed") is not True:
+    if (
+        evidence.get("native_source_commit") != EXPECTED_NATIVE
+        or evidence.get("passed") is not True
+        or evidence.get("required_fixture_gate_passed") is not True
+    ):
         raise StudyFailure("required exact-source native forced-fixture checks did not pass")
     target = out / "native-fixture-evidence.json"
     if not target.exists():
