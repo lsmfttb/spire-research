@@ -248,17 +248,17 @@ class Issue71Selfcheck(unittest.TestCase):
             self.assertEqual(runner._run_and_replay_cpu_total(out), 0.125)
 
 
-    def test_committed_config_lock_is_exact_and_stage1_remains_closed(self):
+    def test_committed_config_lock_matches_current_stage1_authorization(self):
         config_bytes = runner.CONFIG_PATH.read_bytes()
         locked = runner.CONFIG_LOCK_PATH.read_text(encoding="ascii").strip().lower()
         self.assertEqual(hashlib.sha256(config_bytes).hexdigest(), locked)
         self.assertEqual(runner.CONFIG_SHA256, locked)
-        self.assertIs(runner.CONFIG["stage0"]["stage1_authorized"], False)
+        self.assertIs(runner.CONFIG["stage0"]["stage1_authorized"], True)
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
             for phase in (runner.run_preflight, runner.run_training, runner.run_evaluation):
                 with self.subTest(phase=phase.__name__):
-                    with self.assertRaisesRegex(runner.StudyFailure, "STAGE1_NOT_AUTHORIZED"):
+                    with self.assertRaisesRegex(runner.StudyFailure, "STAGE1_BUDGETED_CLI_REQUIRED"):
                         phase(output)
             self.assertFalse((output / "config-lock.json").exists())
             self.assertFalse((output / "runs").exists())
@@ -271,7 +271,7 @@ class Issue71Selfcheck(unittest.TestCase):
                 )
                 with self.subTest(cli_phase=phase):
                     self.assertEqual(cli.returncode, 2)
-                    self.assertIn("STAGE1_NOT_AUTHORIZED", cli.stderr)
+                    self.assertIn("single locked ledger directory", cli.stderr)
                     self.assertFalse(target.exists())
 
     def test_authorized_library_call_cannot_bypass_the_cumulative_budget_launcher(self):
