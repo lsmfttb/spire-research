@@ -200,6 +200,61 @@ class Issue71Selfcheck(unittest.TestCase):
             _, branches = runner._existing_cpu_charge(out)
             self.assertEqual(branches, 0.0)
 
+    def test_root_checkpoint_restores_accounting_from_durable_receipt_without_double_charging(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            root_execution_id = "TRAIN_7410001_ROOT_0:session-1"
+            attempt_id = "TRAIN_7410001_ROOT_0_ALT_1:attempt-1"
+            runner.atomic_json(out / "branches" / "TRAIN_7410001_ROOT_0_ALT_1.json", {
+                "run_id": "TRAIN_7410001_ROOT_0_ALT_1", "seed": 7410001,
+                "root_index": 0, "root_execution_id": root_execution_id,
+                "attempt_id": attempt_id, "cpu_seconds_total": 1.5,
+                "child_cpu_seconds": 1.2, "parent_cpu_seconds": 0.3,
+            })
+            runner.append_jsonl(out / "coarse-state.jsonl", {
+                "boundary": "branch_root_started", "root_execution_id": root_execution_id,
+                "seed": 7410001, "root_index": 0, "root_aggregate_cpu_cap_seconds": 6.0,
+            })
+            runner.append_jsonl(out / "coarse-state.jsonl", {
+                "boundary": "branch_attempt_started", "attempt_id": attempt_id,
+                "root_execution_id": root_execution_id, "seed": 7410001,
+                "root_index": 0, "cpu_limit_seconds": 4,
+            })
+            # Simulate a crash after atomic receipt replacement but before the
+            # subsequent coarse-state commit append.
+            runner.append_jsonl(out / "coarse-state.jsonl", {
+                "boundary": "branch_root_checkpoint", "root_execution_id": root_execution_id,
+                "seed": 7410001, "root_index": 0,
+                "parent_elapsed_cpu_seconds": 2.0,
+                "committed_parent_wait_cpu_seconds": 0.3,
+                "aggregate_root_cpu_seconds": 3.2,
+                "root_aggregate_cpu_cap_seconds": 6.0,
+                "root_cpu_remaining_seconds": 2.8,
+            })
+
+            accounting = runner._branch_accounting_from_disk(out)
+            self.assertAlmostEqual(accounting.per_root[(7410001, 0)]["total"], 3.2)
+            self.assertAlmostEqual(accounting.per_root[(7410001, 0)]["child"], 1.2)
+            self.assertAlmostEqual(accounting.per_root[(7410001, 0)]["parent"], 2.0)
+            self.assertEqual(accounting.last_committed_attempt_by_root[(7410001, 0)], attempt_id)
+            run_and_phase, branch_attempts = runner._existing_cpu_charge(
+                out, branch_accounting=accounting,
+            )
+            self.assertEqual(run_and_phase, 0.0)
+            self.assertAlmostEqual(branch_attempts, 1.5)
+
+    def test_root_started_without_checkpoint_consumes_root_cap_on_resume(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            runner.append_jsonl(out / "coarse-state.jsonl", {
+                "boundary": "branch_root_started", "root_execution_id": "root-session",
+                "seed": 7410001, "root_index": 1,
+                "root_aggregate_cpu_cap_seconds": 6.0,
+            })
+            accounting = runner._branch_accounting_from_disk(out)
+            self.assertEqual(accounting.per_root[(7410001, 1)]["total"], 6.0)
+            self.assertEqual(accounting.attempt_cpu_seconds, 0.0)
+
     def test_unclosed_phase_charges_full_persisted_process_limit(self):
         with tempfile.TemporaryDirectory() as temporary:
             out = Path(temporary)
@@ -312,10 +367,12 @@ class Issue71Selfcheck(unittest.TestCase):
 
     def test_stage1_budget_anchors_the_exact_reviewed_stage0_bundle_and_resume_counts(self):
         previous_cache = runner.STAGE1_STAGE0_BASELINE_CACHE
+        previous_accounting = runner.STAGE1_ACCOUNTING_SNAPSHOT
         previous_parent = runner.BASELINE_PARENT_CPU
         previous_branches = runner.BASELINE_BRANCH_CPU
         previous_branch_current = runner.CPU_BRANCH_CHARGE_CURRENT
         previous_child = runner.CPU_CHILD_CHARGE
+        previous_reserve = runner.INITIAL_BRANCH_RESERVE
         try:
             runner.STAGE1_STAGE0_BASELINE_CACHE = None
             runner.BASELINE_PARENT_CPU = 0.0
@@ -351,16 +408,53 @@ class Issue71Selfcheck(unittest.TestCase):
                 runner.atomic_json(resumed_out / "worker-consistency.json", {
                     "terminal_and_decision_trace_equal": True,
                 })
-                resumed = runner._stage1_budget_projection_for(resumed_out, "preflight")
+                runner.STAGE1_ACCOUNTING_SNAPSHOT = runner._load_stage1_accounting_snapshot(resumed_out)
+                with mock.patch.object(
+                    runner, "_stage1_completed_record",
+                    side_effect=AssertionError("budget projection rescanned receipt contents"),
+                ):
+                    resumed = runner._stage1_budget_projection_for(resumed_out, "preflight")
                 self.assertEqual(resumed["pending_preflight_owner_arm_runs"], 15)
                 self.assertEqual(resumed["pending_worker_consistency_repeat_runs"], 0)
-                self.assertGreaterEqual(resumed["run_cpu_max_observed_seconds"], 0.9)
+                self.assertEqual(resumed["pending_training_and_evaluation_owner_arm_runs"], 800)
+                self.assertAlmostEqual(resumed["run_cpu_max_observed_seconds"], 0.9)
+
+                training_path = runs / "TRAIN_7410001.json"
+                runner.atomic_json(training_path, {
+                    "seed": 7410001, "arm": "TRAIN", "terminal_complete": True,
+                    "cpu_seconds": 1.7,
+                })
+                runner._record_run_if_new(resumed_out, {
+                    "run_id": "TRAIN_7410001", "seed": 7410001, "arm": "TRAIN",
+                    "terminal_complete": True, "cpu_seconds": 1.7,
+                })
+                with mock.patch.object(
+                    runner, "_stage1_completed_record",
+                    side_effect=AssertionError("budget projection rescanned receipt contents"),
+                ):
+                    updated = runner._stage1_budget_projection_for(resumed_out, "train")
+                self.assertEqual(updated["pending_training_and_evaluation_owner_arm_runs"], 799)
+                self.assertAlmostEqual(updated["run_cpu_max_observed_seconds"], 1.7)
+
+                runner._record_run_if_new(resumed_out, {
+                    "run_id": "TRAIN_7410002", "seed": 7410002, "arm": "TRAIN",
+                    "terminal_complete": True, "cpu_seconds": 2.7,
+                })
+                with mock.patch.object(
+                    runner, "_stage1_completed_record",
+                    side_effect=AssertionError("budget projection rescanned receipt contents"),
+                ):
+                    undurable = runner._stage1_budget_projection_for(resumed_out, "train")
+                self.assertEqual(undurable["pending_training_and_evaluation_owner_arm_runs"], 799)
+                self.assertAlmostEqual(undurable["run_cpu_max_observed_seconds"], 1.7)
         finally:
             runner.STAGE1_STAGE0_BASELINE_CACHE = previous_cache
+            runner.STAGE1_ACCOUNTING_SNAPSHOT = previous_accounting
             runner.BASELINE_PARENT_CPU = previous_parent
             runner.BASELINE_BRANCH_CPU = previous_branches
             runner.CPU_BRANCH_CHARGE_CURRENT = previous_branch_current
             runner.CPU_CHILD_CHARGE = previous_child
+            runner.INITIAL_BRANCH_RESERVE = previous_reserve
 
     def test_synthetic_excess_cost_fails_stage1_projection_closed(self):
         projection = runner._stage1_budget_projection(

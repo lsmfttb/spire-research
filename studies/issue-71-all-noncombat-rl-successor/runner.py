@@ -10,6 +10,7 @@ import argparse
 import base64
 import concurrent.futures
 import contextlib
+from dataclasses import dataclass
 import hashlib
 import importlib
 import json
@@ -77,6 +78,32 @@ BASELINE_BRANCH_CPU = 0.0
 INITIAL_BRANCH_RESERVE = BRANCH_CPU_UPPER
 ACTIVE_STAGE1_PHASE: str | None = None
 STAGE1_STAGE0_BASELINE_CACHE: dict[str, Any] | None = None
+STAGE1_ACCOUNTING_SNAPSHOT: "Stage1AccountingSnapshot | None" = None
+
+
+@dataclass
+class BranchAccounting:
+    """One-time crash/resume reconstruction for branch CPU charges."""
+
+    per_root: dict[tuple[int, int], dict[str, float]]
+    attempt_cpu_seconds: float
+    last_committed_attempt_by_root: dict[tuple[int, int], str]
+
+
+@dataclass
+class Stage1AccountingSnapshot:
+    """Phase-local receipt/accounting view, refreshed only after durable writes."""
+
+    out: Path
+    expected_run_receipts: dict[str, tuple[int, str]]
+    completed_run_receipts: set[str]
+    completed_preflight_runs: int
+    completed_training_runs: int
+    completed_evaluation_runs: int
+    worker_repeats: int
+    max_run_cpu_seconds: float
+    branch_per_root: dict[tuple[int, int], dict[str, float]]
+    last_committed_attempt_by_root: dict[tuple[int, int], str]
 
 
 class StudyFailure(RuntimeError):
@@ -1036,6 +1063,7 @@ def _record_run_if_new(out: Path, result: Mapping[str, Any]) -> None:
         "native_source_commit": EXPECTED_NATIVE,
         "terminal_complete": bool(result.get("terminal_complete")),
     })
+    _stage1_note_durable_run_receipt(out, result)
 
 
 def _json_paths(directory: Path, pattern: str) -> list[Path]:
@@ -1175,30 +1203,90 @@ def _phase_unattributed_cpu(
     }
 
 
-def _branch_cpu_charge_by_root(out: Path) -> dict[tuple[int, int], float]:
-    charges: dict[tuple[int, int], float] = Counter()
+def _branch_accounting_from_disk(out: Path) -> BranchAccounting:
+    charges: dict[tuple[int, int], dict[str, float]] = {}
+    attempt_cpu_seconds = 0.0
+    last_committed: dict[tuple[int, int], str] = {}
+    last_committed_order: dict[tuple[int, int], int] = {}
+    durable_attempt_ids: set[str] = set()
+    receipt_parent_wait_by_execution: Counter[str] = Counter()
+
+    def attempt_order(attempt_id: str) -> int:
+        try:
+            return int(attempt_id.rsplit(":", 2)[-2])
+        except (IndexError, TypeError, ValueError):
+            return -1
+
+    def note_committed_attempt(key: tuple[int, int], attempt_id: str) -> None:
+        order = attempt_order(attempt_id)
+        if order >= last_committed_order.get(key, -1):
+            last_committed[key] = attempt_id
+            last_committed_order[key] = order
+
+    def charge_for(key: tuple[int, int]) -> dict[str, float]:
+        return charges.setdefault(key, {"total": 0.0, "child": 0.0, "parent": 0.0, "other": 0.0})
+
     for path in _json_paths(out / "branches", "*.json"):
         try:
             item = json.loads(path.read_text(encoding="utf-8"))
             key = (int(item["seed"]), int(item["root_index"]))
-            charges[key] += max(0.0, float(item.get("cpu_seconds_total", 0.0)))
+            total = max(0.0, float(item.get("cpu_seconds_total", 0.0)))
+            child = max(0.0, float(item.get("child_cpu_seconds", 0.0)))
+            parent = max(0.0, float(item.get("parent_cpu_seconds", 0.0)))
+            # Preserve the receipt's aggregate charge if an older schema lacks
+            # its child/parent split; do not invent an attribution.
+            other = max(0.0, total - child - parent)
+            charge = charge_for(key)
+            charge["total"] += total
+            charge["child"] += child
+            charge["parent"] += parent
+            charge["other"] += other
+            attempt_cpu_seconds += total
+            attempt_id = str(item.get("attempt_id", ""))
+            if attempt_id:
+                # The atomic branch receipt is the durable commit point. If a
+                # crash lands before the following coarse-state append, do not
+                # reclassify the completed child as an interrupted attempt.
+                durable_attempt_ids.add(attempt_id)
+                note_committed_attempt(key, attempt_id)
+            root_execution_id = str(item.get("root_execution_id", ""))
+            if root_execution_id:
+                receipt_parent_wait_by_execution[root_execution_id] += parent
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
             continue
     states_path = out / "coarse-state.jsonl"
     started: dict[str, Mapping[str, Any]] = {}
-    committed: set[str] = set()
+    committed: set[str] = set(durable_attempt_ids)
+    root_started: dict[str, Mapping[str, Any]] = {}
+    latest_root_event: dict[str, Mapping[str, Any]] = {}
     if states_path.exists():
         for line in states_path.read_text(encoding="utf-8").splitlines():
             try:
                 event = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            root_execution_id = str(event.get("root_execution_id", ""))
+            boundary = event.get("boundary")
+            if root_execution_id and boundary == "branch_root_started":
+                root_started[root_execution_id] = event
+            elif root_execution_id and boundary in {
+                "branch_root_checkpoint", "branch_root_finished", "branch_root_failed",
+                "branch_attempt_started", "branch_attempt_committed", "branch_attempt_cancelled",
+            }:
+                latest_root_event[root_execution_id] = event
             attempt_id = str(event.get("attempt_id", ""))
             if not attempt_id:
                 continue
-            if event.get("boundary") == "branch_attempt_started":
+            if boundary == "branch_attempt_started":
                 started[attempt_id] = event
-            elif event.get("boundary") == "branch_attempt_committed":
+            elif boundary == "branch_attempt_committed":
+                committed.add(attempt_id)
+                try:
+                    key = (int(event["seed"]), int(event["root_index"]))
+                    note_committed_attempt(key, attempt_id)
+                except (KeyError, TypeError, ValueError):
+                    pass
+            elif boundary == "branch_attempt_cancelled":
                 committed.add(attempt_id)
     for attempt_id, event in started.items():
         if attempt_id in committed:
@@ -1207,16 +1295,62 @@ def _branch_cpu_charge_by_root(out: Path) -> dict[tuple[int, int], float]:
             key = (int(event["seed"]), int(event["root_index"]))
             # A hard RLIMIT_CPU child can consume through the configured limit;
             # charge one extra second for the kernel tick and parent wait path.
-            charges[key] += max(0.0, float(event["cpu_limit_seconds"])) + 1.0
+            child = max(0.0, float(event["cpu_limit_seconds"]))
+            parent = 1.0
+            charge = charge_for(key)
+            charge["total"] += child + parent
+            charge["child"] += child
+            charge["parent"] += parent
+            attempt_cpu_seconds += child + parent
         except (KeyError, TypeError, ValueError):
             continue
-    return dict(charges)
+
+    # Branch receipts already contain each child's CPU and parent wait. Add
+    # only the surrounding root-session CPU from durable progress checkpoints,
+    # avoiding double charging waits while still carrying root overhead across
+    # a process crash/resume boundary.
+    for root_execution_id, event in latest_root_event.items():
+        try:
+            key = (int(event["seed"]), int(event["root_index"]))
+            parent_elapsed = max(0.0, float(event.get("parent_elapsed_cpu_seconds", 0.0)))
+            committed_wait = max(0.0, float(event.get(
+                "committed_parent_wait_cpu_seconds",
+                receipt_parent_wait_by_execution[root_execution_id],
+            )))
+        except (KeyError, TypeError, ValueError):
+            continue
+        overhead = max(0.0, parent_elapsed - committed_wait)
+        charge = charge_for(key)
+        charge["total"] += overhead
+        charge["parent"] += overhead
+
+    # A crash between the durable start marker and its first checkpoint leaves
+    # no reconstructible elapsed value. Conservatively consume the full root
+    # allowance on resume instead of granting an unmeasured retry.
+    for root_execution_id, event in root_started.items():
+        if root_execution_id in latest_root_event:
+            continue
+        try:
+            key = (int(event["seed"]), int(event["root_index"]))
+            root_cap = max(0.0, float(event["root_aggregate_cpu_cap_seconds"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        charge = charge_for(key)
+        charge["total"] += root_cap
+        charge["other"] += root_cap
+
+    return BranchAccounting(charges, attempt_cpu_seconds, last_committed)
 
 
-def _existing_cpu_charge(out: Path) -> tuple[float, float]:
+def _existing_cpu_charge(
+    out: Path, *, branch_accounting: BranchAccounting | None = None,
+) -> tuple[float, float]:
     """Return durable run, replay, phase-overhead and branch CPU across resumes."""
     runs = _run_and_replay_cpu_total(out)
-    branches = sum(_branch_cpu_charge_by_root(out).values())
+    accounting = branch_accounting or _branch_accounting_from_disk(out)
+    # Root-session parent overhead is already included in phase overhead. The
+    # global branch allowance charges only attempts, not that same CPU twice.
+    branches = accounting.attempt_cpu_seconds
     phase_started: dict[str, Mapping[str, Any]] = {}
     phase_closed: set[str] = set()
     phase_overhead = 0.0
@@ -1440,11 +1574,7 @@ def _stage1_stage0_baseline() -> dict[str, Any]:
     return STAGE1_STAGE0_BASELINE_CACHE
 
 
-def _stage1_completed_run(path: Path, *, seed: int, arm: str) -> bool:
-    try:
-        record = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return False
+def _stage1_completed_record(record: Mapping[str, Any], *, seed: int, arm: str) -> bool:
     try:
         return bool(
             record.get("terminal_complete") is True
@@ -1455,51 +1585,281 @@ def _stage1_completed_run(path: Path, *, seed: int, arm: str) -> bool:
         return False
 
 
+def _stage1_expected_run_receipts() -> dict[str, tuple[int, str]]:
+    expected: dict[str, tuple[int, str]] = {}
+    for seed in range(int(CONFIG["preflight"]["seed_first"]), int(CONFIG["preflight"]["seed_last"]) + 1):
+        for arm in CONFIG["preflight"]["arms"]:
+            expected[f"PRE_{seed}_{arm}.json"] = (seed, str(arm))
+    worker_seed = int(CONFIG["preflight"]["seed_first"])
+    expected[f"PRE_WORKER_CHECK_{worker_seed}_P0.json"] = (worker_seed, "P0")
+    expected[f"PRE_WORKER_COMPANION_{worker_seed}_E.json"] = (worker_seed, "E")
+    for seed in range(int(CONFIG["training"]["seed_first"]), int(CONFIG["training"]["seed_last"]) + 1):
+        expected[f"TRAIN_{seed}.json"] = (seed, "TRAIN")
+    for seed in range(int(CONFIG["evaluation"]["seed_first"]), int(CONFIG["evaluation"]["seed_last"]) + 1):
+        for arm in CONFIG["evaluation"]["arms"]:
+            expected[f"EVAL_{seed}_{arm}.json"] = (seed, str(arm))
+    return expected
+
+
+def _refresh_stage1_worker_repeat_snapshot(snapshot: Stage1AccountingSnapshot) -> None:
+    repeats = int(_stage1_budget_contract()["worker_consistency_repeat_run_count"])
+    worker_path = snapshot.out / "worker-consistency.json"
+    if not worker_path.is_file():
+        snapshot.worker_repeats = repeats
+        return
+    try:
+        worker = json.loads(worker_path.read_text(encoding="utf-8"))
+        seed = int(CONFIG["preflight"]["seed_first"])
+        worker_ok = bool(
+            worker.get("terminal_and_decision_trace_equal") is True
+            and f"PRE_WORKER_CHECK_{seed}_P0.json" in snapshot.completed_run_receipts
+            and f"PRE_WORKER_COMPANION_{seed}_E.json" in snapshot.completed_run_receipts
+        )
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        worker_ok = False
+    snapshot.worker_repeats = 0 if worker_ok else repeats
+
+
+def _load_stage1_accounting_snapshot(
+    out: Path, *, branch_accounting: BranchAccounting | None = None,
+) -> Stage1AccountingSnapshot:
+    """Read receipts once at phase start; runtime updates follow durable commits."""
+    expected = _stage1_expected_run_receipts()
+    completed: set[str] = set()
+    completed_preflight = 0
+    completed_training = 0
+    completed_evaluation = 0
+    max_run_cpu = 0.0
+    for path in _json_paths(out / "runs", "*.json"):
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if record.get("terminal_complete"):
+            try:
+                cpu_seconds = float(record.get("cpu_seconds", 0.0))
+                if cpu_seconds > 0.0:
+                    max_run_cpu = max(max_run_cpu, cpu_seconds)
+            except (TypeError, ValueError):
+                pass
+        specification = expected.get(path.name)
+        if specification is not None and _stage1_completed_record(
+            record, seed=specification[0], arm=specification[1],
+        ):
+            completed.add(path.name)
+            if path.name.startswith("PRE_") and not path.name.startswith("PRE_WORKER_"):
+                completed_preflight += 1
+            elif path.name.startswith("TRAIN_"):
+                completed_training += 1
+            elif path.name.startswith("EVAL_"):
+                completed_evaluation += 1
+
+    accounting = branch_accounting or _branch_accounting_from_disk(out)
+    snapshot = Stage1AccountingSnapshot(
+        out=out.resolve(), expected_run_receipts=expected,
+        completed_run_receipts=completed,
+        completed_preflight_runs=completed_preflight,
+        completed_training_runs=completed_training,
+        completed_evaluation_runs=completed_evaluation,
+        worker_repeats=0,
+        max_run_cpu_seconds=max_run_cpu,
+        branch_per_root={key: dict(value) for key, value in accounting.per_root.items()},
+        last_committed_attempt_by_root=dict(accounting.last_committed_attempt_by_root),
+    )
+    _refresh_stage1_worker_repeat_snapshot(snapshot)
+    return snapshot
+
+
+def _stage1_accounting_snapshot_for(out: Path) -> Stage1AccountingSnapshot:
+    global STAGE1_ACCOUNTING_SNAPSHOT
+    resolved = out.resolve()
+    if STAGE1_ACCOUNTING_SNAPSHOT is None or STAGE1_ACCOUNTING_SNAPSHOT.out != resolved:
+        STAGE1_ACCOUNTING_SNAPSHOT = _load_stage1_accounting_snapshot(out)
+    return STAGE1_ACCOUNTING_SNAPSHOT
+
+
+def _stage1_note_durable_run_receipt(out: Path, result: Mapping[str, Any]) -> None:
+    snapshot = STAGE1_ACCOUNTING_SNAPSHOT
+    if snapshot is None or snapshot.out != out.resolve():
+        return
+    run_id = str(result.get("run_id", ""))
+    receipt_path = out / "runs" / f"{run_id}.json"
+    specification = snapshot.expected_run_receipts.get(receipt_path.name)
+    if not receipt_path.is_file():
+        return
+    try:
+        durable_record = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if specification is not None and _stage1_completed_record(
+        durable_record, seed=specification[0], arm=specification[1],
+    ) and receipt_path.name not in snapshot.completed_run_receipts:
+        snapshot.completed_run_receipts.add(receipt_path.name)
+        if receipt_path.name.startswith("PRE_") and not receipt_path.name.startswith("PRE_WORKER_"):
+            snapshot.completed_preflight_runs += 1
+        elif receipt_path.name.startswith("TRAIN_"):
+            snapshot.completed_training_runs += 1
+        elif receipt_path.name.startswith("EVAL_"):
+            snapshot.completed_evaluation_runs += 1
+    if durable_record.get("terminal_complete"):
+        try:
+            cpu_seconds = float(durable_record.get("cpu_seconds", 0.0))
+            if cpu_seconds > 0.0:
+                snapshot.max_run_cpu_seconds = max(snapshot.max_run_cpu_seconds, cpu_seconds)
+        except (TypeError, ValueError):
+            pass
+    worker_seed = int(CONFIG["preflight"]["seed_first"])
+    if receipt_path.name in {
+        f"PRE_WORKER_CHECK_{worker_seed}_P0.json",
+        f"PRE_WORKER_COMPANION_{worker_seed}_E.json",
+    }:
+        _refresh_stage1_worker_repeat_snapshot(snapshot)
+
+
+def _branch_root_snapshot_for(
+    out: Path, key: tuple[int, int],
+) -> tuple[dict[str, float], str | None]:
+    snapshot = STAGE1_ACCOUNTING_SNAPSHOT
+    if snapshot is not None and snapshot.out == out.resolve():
+        return (
+            dict(snapshot.branch_per_root.get(key, {"total": 0.0, "child": 0.0, "parent": 0.0, "other": 0.0})),
+            snapshot.last_committed_attempt_by_root.get(key),
+        )
+    accounting = _branch_accounting_from_disk(out)
+    return (
+        dict(accounting.per_root.get(key, {"total": 0.0, "child": 0.0, "parent": 0.0, "other": 0.0})),
+        accounting.last_committed_attempt_by_root.get(key),
+    )
+
+
+def _stage1_note_durable_branch_receipt(out: Path, record: Mapping[str, Any]) -> None:
+    snapshot = STAGE1_ACCOUNTING_SNAPSHOT
+    if snapshot is None or snapshot.out != out.resolve():
+        return
+    receipt_path = out / "branches" / f"{record.get('run_id', '')}.json"
+    if not receipt_path.is_file():
+        raise StudyFailure("branch accounting snapshot cannot advance before its receipt is durable")
+    try:
+        durable_record = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise StudyFailure("durable branch receipt cannot be read for accounting snapshot update") from exc
+    if (
+        durable_record.get("run_id") != record.get("run_id")
+        or durable_record.get("attempt_id") != record.get("attempt_id")
+        or durable_record.get("root_execution_id") != record.get("root_execution_id")
+    ):
+        raise StudyFailure("durable branch receipt identity changed before accounting snapshot update")
+    try:
+        key = (int(durable_record["seed"]), int(durable_record["root_index"]))
+        total = max(0.0, float(durable_record.get("cpu_seconds_total", 0.0)))
+        child = max(0.0, float(durable_record.get("child_cpu_seconds", 0.0)))
+        parent = max(0.0, float(durable_record.get("parent_cpu_seconds", 0.0)))
+    except (KeyError, TypeError, ValueError):
+        raise StudyFailure("durable branch receipt has invalid CPU accounting fields")
+    charge = snapshot.branch_per_root.setdefault(
+        key, {"total": 0.0, "child": 0.0, "parent": 0.0, "other": 0.0},
+    )
+    charge["total"] += total
+    charge["child"] += child
+    charge["parent"] += parent
+    charge["other"] += max(0.0, total - child - parent)
+    attempt_id = str(durable_record.get("attempt_id", ""))
+    if attempt_id:
+        snapshot.last_committed_attempt_by_root[key] = attempt_id
+
+
+def _stage1_note_durable_root_overhead(
+    out: Path, *, key: tuple[int, int], overhead_seconds: float,
+) -> None:
+    snapshot = STAGE1_ACCOUNTING_SNAPSHOT
+    if snapshot is None or snapshot.out != out.resolve():
+        return
+    overhead = max(0.0, overhead_seconds)
+    charge = snapshot.branch_per_root.setdefault(
+        key, {"total": 0.0, "child": 0.0, "parent": 0.0, "other": 0.0},
+    )
+    charge["total"] += overhead
+    charge["parent"] += overhead
+
+
+def _branch_root_cpu_fields(
+    *, seed: int, root_index: int, root_execution_id: str,
+    root_started: float, root_cap: float, historical_charge: Mapping[str, float],
+    current_child_cpu: float, committed_parent_wait: float,
+    last_committed_attempt_id: str | None,
+) -> dict[str, Any]:
+    parent_elapsed = max(0.0, time.process_time() - root_started)
+    historical_total = max(0.0, float(historical_charge.get("total", 0.0)))
+    child_cpu = max(0.0, float(historical_charge.get("child", 0.0))) + max(0.0, current_child_cpu)
+    parent_cpu = (
+        max(0.0, float(historical_charge.get("parent", 0.0)))
+        + max(0.0, float(historical_charge.get("other", 0.0)))
+        + parent_elapsed
+    )
+    aggregate_cpu = historical_total + parent_elapsed + max(0.0, current_child_cpu)
+    return {
+        "root_execution_id": root_execution_id,
+        "process_id": os.getpid(),
+        "seed": seed,
+        "root_index": root_index,
+        "root_started_process_cpu_seconds": root_started,
+        "historical_root_charge_seconds": historical_total,
+        "historical_child_cpu_seconds": max(0.0, float(historical_charge.get("child", 0.0))),
+        "historical_parent_cpu_seconds": (
+            max(0.0, float(historical_charge.get("parent", 0.0)))
+            + max(0.0, float(historical_charge.get("other", 0.0)))
+        ),
+        "parent_elapsed_cpu_seconds": parent_elapsed,
+        "current_child_cpu_seconds": max(0.0, current_child_cpu),
+        "committed_parent_wait_cpu_seconds": max(0.0, committed_parent_wait),
+        "cumulative_child_cpu_seconds": child_cpu,
+        "cumulative_parent_cpu_seconds": parent_cpu,
+        "aggregate_root_cpu_seconds": aggregate_cpu,
+        "root_aggregate_cpu_cap_seconds": root_cap,
+        "root_cpu_remaining_seconds": root_cap - aggregate_cpu,
+        "last_committed_attempt_id": last_committed_attempt_id,
+    }
+
+
+def _append_branch_root_event(
+    out: Path, *, boundary: str, event_fields: Mapping[str, Any],
+    checkpoint_kind: str, candidate_index: int | None = None,
+    child_cpu_limit_seconds: int | None = None, stop_reason: str | None = None,
+) -> dict[str, Any]:
+    event = {
+        "study_id": STUDY_ID,
+        "boundary": boundary,
+        "checkpoint_kind": checkpoint_kind,
+        **dict(event_fields),
+        "candidate_index": candidate_index,
+        "child_cpu_limit_seconds": child_cpu_limit_seconds,
+        "stop_reason": stop_reason,
+    }
+    append_jsonl(out / "coarse-state.jsonl", event)
+    return event
+
+
 def _stage1_budget_projection_for(out: Path, phase: str) -> dict[str, Any]:
     contract = _stage1_budget_contract()
     stage0 = _stage1_stage0_baseline()
-    preflight_specs = [
-        (int(seed), str(arm))
-        for seed in range(int(CONFIG["preflight"]["seed_first"]), int(CONFIG["preflight"]["seed_last"]) + 1)
-        for arm in CONFIG["preflight"]["arms"]
-    ]
-    completed_preflight = sum(
-        _stage1_completed_run(out / "runs" / f"PRE_{seed}_{arm}.json", seed=seed, arm=arm)
-        for seed, arm in preflight_specs
-    )
-    pending_preflight = max(0, len(preflight_specs) - completed_preflight)
-    worker_repeats = 0
-    worker_path = out / "worker-consistency.json"
-    if not worker_path.is_file():
-        worker_repeats = int(contract["worker_consistency_repeat_run_count"])
-    else:
-        try:
-            worker = json.loads(worker_path.read_text(encoding="utf-8"))
-            seed = int(CONFIG["preflight"]["seed_first"])
-            worker_ok = bool(
-                worker.get("terminal_and_decision_trace_equal") is True
-                and (out / "runs" / f"PRE_WORKER_CHECK_{seed}_P0.json").is_file()
-                and _stage1_completed_run(
-                    out / "runs" / f"PRE_WORKER_CHECK_{seed}_P0.json", seed=seed, arm="P0"
-                )
-                and _stage1_completed_run(
-                    out / "runs" / f"PRE_WORKER_COMPANION_{seed}_E.json", seed=seed, arm="E"
-                )
-            )
-            if not worker_ok:
-                worker_repeats = int(contract["worker_consistency_repeat_run_count"])
-        except (OSError, json.JSONDecodeError, TypeError, ValueError):
-            worker_repeats = int(contract["worker_consistency_repeat_run_count"])
+    snapshot = _stage1_accounting_snapshot_for(out)
+    preflight_specs_count = (
+        int(CONFIG["preflight"]["seed_last"])
+        - int(CONFIG["preflight"]["seed_first"]) + 1
+    ) * len(CONFIG["preflight"]["arms"])
+    pending_preflight = max(0, preflight_specs_count - snapshot.completed_preflight_runs)
+    worker_repeats = snapshot.worker_repeats
 
-    pending_training = 0
-    for seed in range(int(CONFIG["training"]["seed_first"]), int(CONFIG["training"]["seed_last"]) + 1):
-        if not _stage1_completed_run(out / "runs" / f"TRAIN_{seed}.json", seed=seed, arm="TRAIN"):
-            pending_training += 1
-    pending_evaluation = 0
-    for seed in range(int(CONFIG["evaluation"]["seed_first"]), int(CONFIG["evaluation"]["seed_last"]) + 1):
-        for arm in CONFIG["evaluation"]["arms"]:
-            if not _stage1_completed_run(out / "runs" / f"EVAL_{seed}_{arm}.json", seed=seed, arm=str(arm)):
-                pending_evaluation += 1
+    training_specs_count = (
+        int(CONFIG["training"]["seed_last"])
+        - int(CONFIG["training"]["seed_first"]) + 1
+    )
+    evaluation_specs_count = (
+        int(CONFIG["evaluation"]["seed_last"])
+        - int(CONFIG["evaluation"]["seed_first"]) + 1
+    ) * len(CONFIG["evaluation"]["arms"])
+    pending_training = max(0, training_specs_count - snapshot.completed_training_runs)
+    pending_evaluation = max(0, evaluation_specs_count - snapshot.completed_evaluation_runs)
     training_status_path = out / "training-status.json"
     training_complete = False
     if training_status_path.is_file():
@@ -1521,14 +1881,7 @@ def _stage1_budget_projection_for(out: Path, phase: str) -> dict[str, Any]:
             - BASELINE_BRANCH_CPU - CPU_BRANCH_CHARGE_CURRENT,
         )
 
-    observed = [float(stage0["max_run_cpu_seconds"])]
-    for path in _json_paths(out / "runs", "*.json"):
-        try:
-            item = json.loads(path.read_text(encoding="utf-8"))
-            if item.get("terminal_complete") and float(item.get("cpu_seconds", 0.0)) > 0:
-                observed.append(float(item["cpu_seconds"]))
-        except (OSError, json.JSONDecodeError, TypeError, ValueError):
-            continue
+    observed = [float(stage0["max_run_cpu_seconds"]), snapshot.max_run_cpu_seconds]
     max_run_cpu = max(observed)
     stage1_charged = BASELINE_PARENT_CPU + BASELINE_BRANCH_CPU + time.process_time() + CPU_CHILD_CHARGE
     return _stage1_budget_projection(
@@ -1807,8 +2160,62 @@ def _run_branches_for_owner(
     for fallback_root_index, root in enumerate(roots[:root_limit]):
         root_index = int(root.get("root_index", fallback_root_index))
         root_name = f"{phase_label}_{seed}_ROOT_{root_index}"
+        root_key = (seed, root_index)
+        historical_charge, historical_last_attempt = _branch_root_snapshot_for(out, root_key)
+        root_execution_id = f"{root_name}:{time.time_ns()}:{os.getpid()}"
         root_started = time.process_time()
-        root_child_cpu = _branch_cpu_charge_by_root(out).get((seed, root_index), 0.0)
+        current_child_cpu = 0.0
+        current_parent_wait_cpu = 0.0
+        last_committed_attempt_id = historical_last_attempt
+        root_overhead_accounted = 0.0
+
+        def root_fields() -> dict[str, Any]:
+            fields = _branch_root_cpu_fields(
+                seed=seed, root_index=root_index,
+                root_execution_id=root_execution_id, root_started=root_started,
+                root_cap=root_cpu_cap, historical_charge=historical_charge,
+                current_child_cpu=current_child_cpu,
+                committed_parent_wait=current_parent_wait_cpu,
+                last_committed_attempt_id=last_committed_attempt_id,
+            )
+            fields.update({
+                "phase_label": phase_label,
+                "root_screen": str(root.get("screen")),
+                "native_checkpoint_id": root.get("native_checkpoint_id"),
+                "branch_allowance_remaining_cpu_seconds": max(
+                    0.0, INITIAL_BRANCH_RESERVE - BASELINE_BRANCH_CPU - CPU_BRANCH_CHARGE_CURRENT,
+                ),
+            })
+            return fields
+
+        def checkpoint(
+            checkpoint_kind: str, *, candidate_index: int | None = None,
+            child_cpu_limit_seconds: int | None = None, stop_reason: str | None = None,
+            boundary: str = "branch_root_checkpoint",
+        ) -> dict[str, Any]:
+            return _append_branch_root_event(
+                out, boundary=boundary, event_fields=root_fields(),
+                checkpoint_kind=checkpoint_kind, candidate_index=candidate_index,
+                child_cpu_limit_seconds=child_cpu_limit_seconds, stop_reason=stop_reason,
+            )
+
+        def close_root(boundary: str, checkpoint_kind: str, stop_reason: str | None) -> dict[str, Any]:
+            nonlocal root_overhead_accounted
+            event = checkpoint(
+                checkpoint_kind, stop_reason=stop_reason, boundary=boundary,
+            )
+            accumulated_overhead = max(
+                0.0,
+                float(event["parent_elapsed_cpu_seconds"]) - current_parent_wait_cpu,
+            )
+            overhead_delta = max(0.0, accumulated_overhead - root_overhead_accounted)
+            _stage1_note_durable_root_overhead(
+                out, key=root_key, overhead_seconds=overhead_delta,
+            )
+            root_overhead_accounted = max(root_overhead_accounted, accumulated_overhead)
+            return event
+
+        checkpoint("root_started", boundary="branch_root_started")
         alternatives = _root_alternatives(root)
         if phase_label == "DEBUG":
             alternatives = alternatives[:1]
@@ -1819,18 +2226,34 @@ def _run_branches_for_owner(
                 record = json.loads(path.read_text(encoding="utf-8"))
                 completed.append(record)
                 continue
-            _check_budget(out, reserve_branches=0.0)
-            root_spent = (time.process_time() - root_started) + root_child_cpu
-            root_remaining = max(0.0, root_cpu_cap - root_spent)
-            global_remaining = max(0.0, INITIAL_BRANCH_RESERVE - BASELINE_BRANCH_CPU - CPU_BRANCH_CHARGE_CURRENT)
+            checkpoint("before_phase_budget_check", candidate_index=candidate_index)
+            try:
+                _check_budget(out, reserve_branches=0.0)
+            except Exception as exc:
+                close_root(
+                    "branch_root_failed", "phase_budget_gate_failed",
+                    f"phase_budget_gate:{type(exc).__name__}:{exc}",
+                )
+                raise
+
+            root_metrics = root_fields()
+            if float(root_metrics["aggregate_root_cpu_seconds"]) > root_cpu_cap:
+                reason = "aggregate_root_cpu_cap_exceeded_before_next_child"
+                close_root("branch_root_failed", "root_cpu_cap_exceeded", reason)
+                raise StudyFailure(f"{root_name} exceeded the registered aggregate six-CPU-second cap")
+            root_remaining = max(0.0, float(root_metrics["root_cpu_remaining_seconds"]))
+            global_remaining = max(
+                0.0, INITIAL_BRANCH_RESERVE - BASELINE_BRANCH_CPU - CPU_BRANCH_CHARGE_CURRENT,
+            )
             limit = min(root_remaining, global_remaining)
-            cpu_limit = int(math.floor(limit)) - 1  # one-second kernel tick margin
+            cpu_limit = int(math.floor(limit)) - 1  # retain the registered kernel-tick margin
             if cpu_limit < 1:
                 record = {
                     "study_id": STUDY_ID, "run_id": label, "seed": seed,
                     "root_index": root_index, "candidate_index": candidate_index,
                     "status": "NOT_ATTEMPTED_CPU_MARGIN",
                     "terminal_complete": False, "cpu_seconds_total": 0.0,
+                    "child_cpu_seconds": 0.0, "parent_cpu_seconds": 0.0,
                     "branch_provenance": "privileged_hindsight_completed_terminal_branch",
                     "expert_decisions": 0, "native_source_commit": EXPECTED_NATIVE,
                 }
@@ -1838,12 +2261,64 @@ def _run_branches_for_owner(
                 completed.append(record)
                 continue
             attempt_id = f"{label}:{time.time_ns()}:{os.getpid()}"
-            append_jsonl(out / "coarse-state.jsonl", {
-                "study_id": STUDY_ID, "boundary": "branch_attempt_started",
-                "attempt_id": attempt_id, "run_id": label, "seed": seed,
-                "root_index": root_index, "candidate_index": candidate_index,
-                "cpu_limit_seconds": cpu_limit,
-            })
+            while True:
+                fields = root_fields()
+                append_jsonl(out / "coarse-state.jsonl", {
+                    "study_id": STUDY_ID, "boundary": "branch_attempt_started",
+                    "attempt_id": attempt_id, "root_execution_id": root_execution_id,
+                    "run_id": label, "seed": seed, "root_index": root_index,
+                    "candidate_index": candidate_index, "cpu_limit_seconds": cpu_limit,
+                    "root_parent_elapsed_cpu_seconds": fields["parent_elapsed_cpu_seconds"],
+                    "root_child_cpu_seconds": fields["cumulative_child_cpu_seconds"],
+                    "root_aggregate_cpu_seconds": fields["aggregate_root_cpu_seconds"],
+                    "root_aggregate_cpu_cap_seconds": root_cpu_cap,
+                    "root_cpu_remaining_seconds": fields["root_cpu_remaining_seconds"],
+                    "branch_allowance_remaining_cpu_seconds": fields["branch_allowance_remaining_cpu_seconds"],
+                    "last_committed_attempt_id": last_committed_attempt_id,
+                    **fields,
+                })
+                after_start = root_fields()
+                if float(after_start["aggregate_root_cpu_seconds"]) > root_cpu_cap:
+                    reason = "aggregate_root_cpu_cap_exceeded_before_child_launch"
+                    append_jsonl(out / "coarse-state.jsonl", {
+                        "study_id": STUDY_ID, "boundary": "branch_attempt_cancelled",
+                        "attempt_id": attempt_id, "run_id": label,
+                        "candidate_index": candidate_index, "reason": reason,
+                        "stop_reason": reason, **root_fields(),
+                    })
+                    close_root("branch_root_failed", "root_cpu_cap_exceeded", reason)
+                    raise StudyFailure(f"{root_name} exceeded the registered aggregate six-CPU-second cap")
+                after_remaining = min(
+                    max(0.0, float(after_start["root_cpu_remaining_seconds"])),
+                    max(0.0, INITIAL_BRANCH_RESERVE - BASELINE_BRANCH_CPU - CPU_BRANCH_CHARGE_CURRENT),
+                )
+                safe_limit = int(math.floor(after_remaining)) - 1
+                if safe_limit >= cpu_limit:
+                    break
+                cpu_limit = safe_limit
+                if cpu_limit < 1:
+                    append_jsonl(out / "coarse-state.jsonl", {
+                        "study_id": STUDY_ID, "boundary": "branch_attempt_cancelled",
+                        "attempt_id": attempt_id, "run_id": label,
+                        "candidate_index": candidate_index,
+                        "reason": "telemetry write consumed the remaining registered child CPU margin",
+                        "stop_reason": "telemetry_write_consumed_registered_child_cpu_margin",
+                        **root_fields(),
+                    })
+                    record = {
+                        "study_id": STUDY_ID, "run_id": label, "seed": seed,
+                        "root_index": root_index, "candidate_index": candidate_index,
+                        "status": "NOT_ATTEMPTED_CPU_MARGIN",
+                        "terminal_complete": False, "cpu_seconds_total": 0.0,
+                        "child_cpu_seconds": 0.0, "parent_cpu_seconds": 0.0,
+                        "branch_provenance": "privileged_hindsight_completed_terminal_branch",
+                        "expert_decisions": 0, "native_source_commit": EXPECTED_NATIVE,
+                    }
+                    atomic_json(path, record)
+                    completed.append(record)
+                    break
+            if cpu_limit < 1:
+                continue
             root_checkpoint = root["checkpoint"]
             result, child_cpu, parent_cpu, child_status = _branch_child(
                 out=out, module=module, base_adapter=adapter,
@@ -1851,7 +2326,8 @@ def _run_branches_for_owner(
                 encoder=encoder, seed=seed, root_index=root_index, root=root,
                 candidate_index=candidate_index, cpu_limit=cpu_limit, label=label,
             )
-            root_child_cpu += child_cpu
+            current_child_cpu += child_cpu
+            current_parent_wait_cpu += parent_cpu
             cpu_total = child_cpu + parent_cpu
             terminal = result.get("terminal") if isinstance(result, Mapping) else None
             forced_receipt = result.get("forced_root_receipt") if isinstance(result, Mapping) else None
@@ -1901,6 +2377,7 @@ def _run_branches_for_owner(
                 "expert_decisions": 0,
                 "native_search_api": NATIVE_SEARCH_API,
                 "native_source_commit": EXPECTED_NATIVE,
+                "root_execution_id": root_execution_id,
                 "child_status": int(child_status),
                 "child_exit_code": result.get("child_exit_code") if isinstance(result, Mapping) else None,
                 "child_signal_number": result.get("child_signal_number") if isinstance(result, Mapping) else None,
@@ -1917,22 +2394,53 @@ def _run_branches_for_owner(
                     float(CONFIG["training"]["branch_advantage_weight_cap"]),
                 ) if superior and terminal is not None else 0.0,
             }
-            if root_child_cpu + (time.process_time() - root_started) > root_cpu_cap:
-                raise StudyFailure(f"{root_name} exceeded the registered aggregate six-CPU-second cap")
-            CPU_BRANCH_CHARGE_CURRENT += cpu_total
             atomic_json(path, record)
+            last_committed_attempt_id = attempt_id
+            root_metrics = root_fields()
             append_jsonl(out / "coarse-state.jsonl", {
                 "study_id": STUDY_ID, "boundary": "branch_attempt_committed",
-                "attempt_id": attempt_id,
+                "attempt_id": attempt_id, "root_execution_id": root_execution_id,
                 "run_id": label, "seed": seed, "root_index": root_index,
                 "status": record["status"], "cpu_seconds": cpu_total,
+                **root_metrics,
             })
+            CPU_BRANCH_CHARGE_CURRENT += cpu_total
+            _stage1_note_durable_branch_receipt(out, record)
             completed.append(record)
+            over_cap = float(root_metrics["aggregate_root_cpu_seconds"]) > root_cpu_cap
+            if over_cap:
+                close_root(
+                    "branch_root_failed", "root_cpu_cap_exceeded_after_attempt",
+                    "aggregate_root_cpu_cap_exceeded_after_attempt",
+                )
+                raise StudyFailure(f"{root_name} exceeded the registered aggregate six-CPU-second cap")
             if stop_on_incomplete and (
                 not record["terminal_complete"] or not record["forced_root_choice_valid"]
             ):
+                closed_root = close_root(
+                    "branch_root_failed", "incomplete_child_stopped_root",
+                    f"child_incomplete:{record.get('child_failure_class') or record.get('status')}",
+                )
+                if float(closed_root["aggregate_root_cpu_seconds"]) > root_cpu_cap:
+                    raise StudyFailure(
+                        f"{root_name} exceeded the registered aggregate six-CPU-second cap"
+                    )
                 return completed
-        if (time.process_time() - root_started) + root_child_cpu > root_cpu_cap:
+        root_metrics = root_fields()
+        if float(root_metrics["aggregate_root_cpu_seconds"]) > root_cpu_cap:
+            close_root(
+                "branch_root_failed", "root_cpu_cap_exceeded_at_root_end",
+                "aggregate_root_cpu_cap_exceeded_at_root_end",
+            )
+            raise StudyFailure(f"{root_name} exceeded the registered aggregate six-CPU-second cap")
+        close_root("branch_root_finished", "root_alternatives_complete", None)
+        # Include the durable finish checkpoint itself in the cap decision.
+        after_finish = root_fields()
+        if float(after_finish["aggregate_root_cpu_seconds"]) > root_cpu_cap:
+            close_root(
+                "branch_root_failed", "root_cpu_cap_exceeded_after_finish_checkpoint",
+                "aggregate_root_cpu_cap_exceeded_after_finish_checkpoint",
+            )
             raise StudyFailure(f"{root_name} exceeded the registered aggregate six-CPU-second cap")
     return completed
 
@@ -3165,18 +3673,35 @@ def _stage1_has_open_phase(out: Path) -> bool:
 def _run_stage1_cli_phase(phase: str, out: Path) -> int:
     """Run one gated Stage 1 phase with a single durable cumulative ledger."""
     global BASELINE_PARENT_CPU, BASELINE_BRANCH_CPU, INITIAL_BRANCH_RESERVE
-    global ACTIVE_STAGE1_PHASE, STAGE1_STAGE0_BASELINE_CACHE
+    global ACTIVE_STAGE1_PHASE, STAGE1_STAGE0_BASELINE_CACHE, STAGE1_ACCOUNTING_SNAPSHOT
     phase_id: str | None = None
+    source_identity: dict[str, Any] | None = None
     try:
         expected_out = (ROOT / str(CONFIG["resources"]["stage1_budget"]["artifact_directory"])).resolve()
         if out != expected_out:
             raise StudyFailure(f"Stage 1 output must use the single locked ledger directory: {expected_out}")
         baseline = _stage1_stage0_baseline()
+        source_commit, source_dirty = _git_identity(os.fspath(ROOT))
+        if source_dirty:
+            raise StudyFailure("Stage 1 requires a clean committed study source before phase execution")
+        source_identity = {
+            "study_source_commit": source_commit,
+            "study_source_worktree_clean": True,
+            "study_runner_sha256": sha256_file(ROOT / "runner.py"),
+            "study_policy_sha256": sha256_file(ROOT / "policy.py"),
+            "study_config_sha256": CONFIG_SHA256,
+        }
         lock_config(out)
         manifest_path = out / "artifact-manifest.json"
         if manifest_path.exists() and not _validate_artifact_manifest(out) and not _stage1_has_open_phase(out):
             raise StudyFailure("completed Stage 1 artifact manifest is missing or does not match its files")
-        BASELINE_PARENT_CPU, BASELINE_BRANCH_CPU = _existing_cpu_charge(out)
+        branch_accounting = _branch_accounting_from_disk(out)
+        BASELINE_PARENT_CPU, BASELINE_BRANCH_CPU = _existing_cpu_charge(
+            out, branch_accounting=branch_accounting,
+        )
+        STAGE1_ACCOUNTING_SNAPSHOT = _load_stage1_accounting_snapshot(
+            out, branch_accounting=branch_accounting,
+        )
         INITIAL_BRANCH_RESERVE = float(_stage1_budget_contract()["branch_allowance_seconds"])
         ACTIVE_STAGE1_PHASE = phase
         resource_guard = _install_cpu_cap(out)
@@ -3192,6 +3717,7 @@ def _run_stage1_cli_phase(phase: str, out: Path) -> int:
             "charged_prior_stage1_branch_cpu_seconds": BASELINE_BRANCH_CPU,
             "reviewer_reserve_total_seconds": _stage1_budget_contract()["reviewer_reserve_min_seconds"],
             "rlimit_cpu_seconds": resource_guard["rlimit_cpu_seconds"],
+            **source_identity,
             "formal_training_seed_consumed": False,
             "formal_evaluation_seed_consumed": False,
         })
@@ -3265,6 +3791,7 @@ def _run_stage1_cli_phase(phase: str, out: Path) -> int:
             "status": "STAGE1_LAUNCH_GATE_FAILED",
             "phase": phase, "error_type": type(exc).__name__, "error": str(exc),
             "config_sha256": CONFIG_SHA256,
+            **(source_identity or {}),
             "formal_training_seed_consumed": any(_json_paths(out / "runs", "TRAIN_*.json")) if out.is_dir() else False,
             "formal_evaluation_seed_consumed": any(_json_paths(out / "runs", "EVAL_*.json")) if out.is_dir() else False,
         }
@@ -3295,6 +3822,7 @@ def _run_stage1_cli_phase(phase: str, out: Path) -> int:
     finally:
         ACTIVE_STAGE1_PHASE = None
         STAGE1_STAGE0_BASELINE_CACHE = None
+        STAGE1_ACCOUNTING_SNAPSHOT = None
 
 
 def main(argv: Sequence[str] | None = None) -> int:
