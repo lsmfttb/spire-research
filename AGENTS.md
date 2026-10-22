@@ -36,10 +36,12 @@ Data:
 
 Routing:
 
-- GitHub is the durable handoff surface. Direct agent messages are notifications, not authority.
+- GitHub is the durable handoff surface. Direct agent messages are optional notifications, never authority or required delivery.
 - When an open work Issue is routed to your role, that is sufficient authority to act within the Issue scope.
+- Builder ↔ Reviewer must close the loop for progress, ordinary implementation/receipt repairs, focused PASS/repairable FAIL, and the next already-authorized study phase. Post the actionable finding on the Issue and route directly to the counterpart; do not insert a Planner acknowledgment between registered phases.
+- **Do not proactively message Planner** about progress, routine review outcomes, transport errors, conversation lookup/status, or an issue already resolved within the Builder/Reviewer loop. A failed direct send (including `Invalid conversation`) is not an escalation: do not retry/flood, inspect the Planner conversation, or change an Issue to `route:planner` solely because delivery failed. GitHub's Issue/comment/labels remain sufficient.
+- Escalate to Planner only for a **new, specific, actionable decision** about scientific meaning, population, intervention, information regime, evaluation/endpoints, irreparable provenance/cohort validity, budget or registered caps, long-lived architecture, or final independent scientific acceptance. First record on the Issue the exact source/evidence, why the active contract cannot decide it, and the concrete choice requested; set `route:planner` only then. Do not resend unchanged requests without new material evidence.
 - Ordinary repair, rerun, push, review, cleanup, and handoff do not require Planner approval.
-- Stop for Planner only when a decision would materially change scientific meaning, information regime, evaluation meaning, or long-lived architecture.
 
 Roles are intentionally lightweight:
 
