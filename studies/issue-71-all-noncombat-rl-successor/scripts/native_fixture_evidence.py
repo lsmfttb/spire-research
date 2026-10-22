@@ -166,7 +166,7 @@ def main() -> int:
     parser.add_argument("--study-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--study-script-source-commit", required=True)
     parser.add_argument("--study-parent-commit", required=True)
-    parser.add_argument("--prior-builder-fixture-work-cpu-seconds", type=float, default=353.172884)
+    parser.add_argument("--prior-builder-fixture-work-cpu-seconds", type=float, default=353.974872)
     args = parser.parse_args()
 
     native_source = args.native_source.resolve()
@@ -201,6 +201,7 @@ def main() -> int:
     lock_value = lock_path.read_text(encoding="utf-8").strip()
     config_lock_matches = config_sha256 == lock_value
     historical_artifacts_before = tree_file_hashes(study_root / "stage1-artifacts")
+    study_adapter_py_present = (study_root / "adapter.py").is_file()
     prior_evidence_path = study_root / "native-fixture-evidence.json"
     prior_evidence_sha256 = sha256_file(prior_evidence_path) if prior_evidence_path.is_file() else None
     prior_evidence_source_commit = (
@@ -336,6 +337,7 @@ def main() -> int:
             "stderr_bytes": len(default_result.stderr or b""),
             "stderr_sha256": sha256_bytes(default_result.stderr or b""),
             "cause_isolated": None,
+            "study_root_adapter_py_present": study_adapter_py_present,
         }
     else:
         generic_diagnostic = {
@@ -349,6 +351,7 @@ def main() -> int:
             "stderr_bytes": len(default_result.stderr or b"") if default_result is not None else None,
             "stderr_sha256": sha256_bytes(default_result.stderr or b"") if default_result is not None else None,
             "cause_isolated": False,
+            "study_root_adapter_py_present": study_adapter_py_present,
         }
 
     recipe = {
@@ -447,6 +450,10 @@ def main() -> int:
             "and checks.generic_no_argument_mode_passed; this diagnostic is not required for the named "
             "native event-fixture gate."
         )
+        if not study_adapter_py_present:
+            limitations.append(
+                "The study root has no adapter.py; this absence is recorded but does not establish the cause of the generic-mode signal."
+            )
     limitations.extend([
         "No live CommunicationMod parity was tested; real-game parity remains unverified, Prismatic Shard remains restricted, and Mysterious Sphere/Golden Idol scaling remains unresolved.",
         "The focused native suite is semantic fixture evidence only. It is not a natural experimental owner, an RL outcome, or permission to train/evaluate.",
