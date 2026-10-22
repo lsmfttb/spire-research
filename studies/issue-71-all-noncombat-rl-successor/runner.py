@@ -919,6 +919,7 @@ def _run_one(
             "controller_provenance": controller.provenance.to_dict(),
             "decision_artifact": str(decision_path) if capture_trace and durable else None,
             "decision_artifact_sha256": sha256_file(decision_path) if capture_trace and durable else None,
+            "decision_artifact_bytes": decision_path.stat().st_size if capture_trace and durable else None,
             "decisions": trace_summary,
             "screen_counts": dict(controller.screen_counts),
             "action_kind_counts": dict(controller.action_kind_counts),
@@ -3209,6 +3210,12 @@ def _run_stage1_cli_phase(phase: str, out: Path) -> int:
         result = dict(result)
         result["stage1_budget_projection"] = projection
         result["phase_cpu_accounting"] = phase_cpu
+        if "cumulative_stage1_cpu_seconds_charged" in result:
+            # run_preflight returns before this wrapper records phase_finished;
+            # publish the final cumulative value from the now-closed ledger.
+            result["cumulative_stage1_cpu_seconds_charged"] = float(
+                projection["stage1_cpu_charged_seconds"]
+            )
         if not projection["within_builder_ceiling"] or not projection["within_all_in_ceiling"]:
             result["status"] = "SCIENTIFIC_INCOMPLETE_RESOURCE_PROJECTION"
             result["training_seed_consumed"] = any(_json_paths(out / "runs", "TRAIN_*.json"))
@@ -3230,6 +3237,16 @@ def _run_stage1_cli_phase(phase: str, out: Path) -> int:
                 "within_all_in_ceiling": projection["within_all_in_ceiling"],
             })
             atomic_json(out / "preflight-report.json", result)
+            study_status_path = out / "study-status.json"
+            if study_status_path.is_file():
+                study_status = json.loads(study_status_path.read_text(encoding="utf-8"))
+                if study_status.get("status") == result.get("status"):
+                    study_status.update({
+                        "preflight_report_sha256": sha256_file(out / "preflight-report.json"),
+                        "projected_all_in_cpu_seconds_builder": projection["projected_builder_cpu_seconds"],
+                        "projected_all_in_with_reviewer_reserve": projection["projected_cumulative_all_in_cpu_seconds"],
+                    })
+                    atomic_json(study_status_path, study_status)
         atomic_json(out / f"stage1-{phase}-report.json", result)
         atomic_json(out / "stage1-status.json", {
             "status": result.get("status"), "latest_phase": phase,
