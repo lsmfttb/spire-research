@@ -12,6 +12,10 @@ The active system should stay small enough that a new contributor or coding agen
 
 Historical scientific results may be reused selectively. Historical software structure is not automatically reused.
 
+This separation from STSRL also addresses **documentation and task-history bloat**: agents should not have to read extensive archives or overlapping governance files to find actionable context. The current Issue and directly relevant code are the working scope; cite prior evidence selectively instead of copying history into new documents.
+
+**Documentation authorization:** Do not create, modify, or expand repository-wide documentation—including `AGENTS.md`, this README, workflow guides, task archives, or status registries—without an **explicit request from the research owner**. Authorization for code fixes, research execution, or Issue handoffs does not implicitly authorize documentation changes. Continue to record required experimental evidence and review receipts in the existing authorized Issue and study artifacts; keep explicitly approved documentation edits small and avoid duplicate instructions.
+
 ## Working model
 
 Research studies and platform code have different lifecycles.
