@@ -3060,7 +3060,9 @@ def _shared_probe_rank_flips(out: Path, initial: AllNoncombatPolicy, final: AllN
             raise StudyFailure(f"shared P0 probe root run {seed} is missing")
         run = json.loads(run_path.read_text(encoding="utf-8"))
         artifact = run.get("decision_artifact")
-        if not artifact or sha256_file(Path(artifact)) != run.get("decision_artifact_sha256"):
+        decision_path = out / "decisions" / f"{run_path.stem}.npz"
+        if (not artifact or not decision_path.is_file()
+                or sha256_file(decision_path) != run.get("decision_artifact_sha256")):
             raise StudyFailure(f"shared P0 probe feature artifact for seed {seed} is missing or corrupt")
         matrices = _load_decision_artifact(out, run_path.stem)
         rows = [item for item in run.get("decisions", []) if item.get("kind") == "categorical"]
