@@ -1,7 +1,7 @@
 {
   "attempts": [],
   "schema_id": "issue73-stage0-resource-ledger-v1",
-  "setup_process_cpu_seconds": 300.0,
+  "setup_process_cpu_seconds": 360.0,
   "setup_segments": [
     {
       "basis": "A single conservative pre-execution debit covers source editing, static checks, external source verification, config hashing, and preseed commits/pushes whose per-process CPU counters were not captured before the ledger existed. This is a budget charge, not a claim that exactly 300 CPU seconds were consumed.",
@@ -11,6 +11,14 @@
       "observed_prepare_wall_seconds": 15.1,
       "process_cpu_seconds": 300.0,
       "stage1_authorized": false
+    },
+    {
+      "basis": "The source-locked launch failed before any debug owner attempt while serializing/checking the deterministic initial policy; process CPU counters were not captured at exit. Conservative 60-second debit preserves the failed setup cost without treating it as an observed measurement.",
+      "formal_seed_consumed": false,
+      "label": "initial-runtime-policy-roundtrip-startup-failure",
+      "measurement_status": "CONSERVATIVE_BUDGET_DEBIT_NOT_OBSERVED_PROCESS_COUNTER",
+      "observed_wall_seconds": 17.4,
+      "process_cpu_seconds": 60.0
     }
   ]
 }
