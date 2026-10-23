@@ -1,0 +1,41 @@
+{
+  "schema_id": "issue73-v5-runtime-inventory-correction-v1",
+  "recorded_at_utc": "2026-10-23T16:18:55.2119957Z",
+  "correction_of": {
+    "path": "receipts/source-qualification-v5/reports/pre-capture-runtime-readiness-v5-blocked.json",
+    "sha256": "6366552413fed99b1c9db50ba8d7b8fe9ba56d2e19eca3e0be2288bc341c113f",
+    "incorrect_finding": "No Python 3.13.13 runtime found",
+    "reason": "Initial bounded candidate-path inventory omitted the preexisting task environment path under /home/lsmft/stsrl-spikes/py313-torch."
+  },
+  "status": "PINNED_RUNTIME_FOUND_SMOKE_PENDING",
+  "runtime": {
+    "python_executable": "/home/lsmft/stsrl-spikes/py313-torch/bin/python3.13",
+    "python": "3.13.13",
+    "torch": "2.12.0+cpu",
+    "numpy": "2.4.6",
+    "runtime_matches_lock": true
+  },
+  "native_module": {
+    "path": "/home/lsmft/stsrl-spikes/build-issue71-8ded-py313/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+    "expected_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+    "hash_verified_read_only": true
+  },
+  "execution": {
+    "runner_validate_environment_invoked": false,
+    "runner__setup_invoked": false,
+    "pre_capture_smoke_run": false,
+    "native_adapter_created": false,
+    "native_game_step_started": false,
+    "formal_seed_consumed": false
+  },
+  "resource_accounting": {
+    "one_time_static_reservation_cpu_seconds": 120.0,
+    "fixed_conservative_charge_cpu_seconds": 120.0,
+    "additional_charge_cpu_seconds": 0.0,
+    "builder_total_cpu_seconds": 2017.891659,
+    "native_gate_bc_cpu_seconds": 1200.0,
+    "reviewer_reserve_cpu_seconds": 1200.0
+  },
+  "next_step": "Continue same one-time v5 static attempt, with no additional reservation; exact pre-capture smoke remains mandatory and no capture is permitted before Reviewer PASS."
+}
