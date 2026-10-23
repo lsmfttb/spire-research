@@ -1886,12 +1886,15 @@ def write_evidence_manifest() -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("prepare-lock", "capture", "parity", "gate-a", "gate-c", "finalize"))
+    parser.add_argument("command", choices=("prepare-lock", "verify-lock", "capture", "parity", "gate-a", "gate-c", "finalize"))
     args = parser.parse_args(argv)
     OUT.mkdir(parents=True, exist_ok=True)
     if args.command == "prepare-lock":
         lock = prepare_lock()
         print(json.dumps({"status": lock["status"], "config_sha256": lock["qualification_config_sha256"], "gate_c_plan_sha256": lock["gate_c_plan_sha256"], "source_commit": lock["code_source_commit"], "stream_count": 64}, sort_keys=True))
+    elif args.command == "verify-lock":
+        lock, _config = verify_lock()
+        print(json.dumps({"status": lock["status"], "source_commit": lock["code_source_commit"], "lock_revision": lock["lock_revision"]}, sort_keys=True))
     elif args.command == "capture":
         print(json.dumps(capture_source_history(), sort_keys=True))
     elif args.command == "parity":
