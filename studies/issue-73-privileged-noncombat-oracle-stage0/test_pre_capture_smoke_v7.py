@@ -53,7 +53,7 @@ def _case(
     missing_file: Path | None = None,
     remaining_cpu_seconds: float,
 ) -> dict[str, Any]:
-    case_dir = v7.PREFLIGHT_TEST_ROOT / name
+    case_dir = v7.PREFLIGHT_REPAIR_TEST_ROOT / name
     report_path = case_dir / "capture-launch-preflight-v7.json"
     failure_path = case_dir / "capture-launch-preflight-v7-failure.json"
     if report_path.exists() or failure_path.exists():
@@ -175,12 +175,12 @@ def _mutate_first(items: list[Any]) -> None:
 
 
 def _run() -> dict[str, Any]:
-    if v7.STATIC_TEST_REPORT_PATH.exists() or v7.STATIC_TEST_FAILURE_PATH.exists():
+    if v7.STATIC_TEST_REPORT_PATH.exists() or v7.STATIC_TEST_REPAIR_FAILURE_PATH.exists():
         raise RuntimeError("v7 production preflight suite has an immutable receipt; no retry or overwrite")
     reservation, ledger = v7.ensure_static_precharge_v7()
     if reservation["reserved_cpu_seconds"] != 60.0:
         raise AssertionError("v7 static reservation differs from the one-time 60 CPU-s authorization")
-    prelock_path = v7.V7_OUT / "reports" / "input-manifest-prelock-v7.json"
+    prelock_path = v7.INPUT_AUDIT_REPAIR_REPORT_PATH
     if not prelock_path.is_file():
         raise RuntimeError("v7 pre-lock manifest qualification report is missing")
     prelock = v7.read_json(prelock_path)
@@ -288,6 +288,13 @@ def _run() -> dict[str, Any]:
         "schema_id": "issue73-v7-static-input-manifest-and-capture-preflight-v1",
         "status": "PASS" if all(row["observed"] == ("PASS" if row["expected"] == "PASS" else "FAIL_OR_INCOMPLETE") for row in cases) else "FAIL",
         "source_lock_sha256": v7.sha256_file(v7.LOCK_PATH),
+        "prior_static_failure": {
+            "path": v7.STATIC_TEST_FAILURE_PATH.relative_to(v7.STUDY).as_posix(),
+            "sha256": v7.sha256_file(v7.STATIC_TEST_FAILURE_PATH),
+            "status": v7.read_json(v7.STATIC_TEST_FAILURE_PATH).get("status"),
+            "measured_process_tree_cpu_seconds": v7.read_json(v7.STATIC_TEST_FAILURE_PATH).get("measured_process_tree_cpu_seconds"),
+            "preserved_unchanged": True,
+        },
         "source_commit": lock["code_source_commit"],
         "remote_branch": lock["remote_branch"],
         "historical_input_count": len(lock["historical_input_sha256"]),
@@ -326,8 +333,8 @@ def main() -> int:
     q.install_process_cpu_ceiling(v7.STATIC_RESERVATION_CPU_SECONDS)
     if "STS_LIGHTSPEED_SOURCE_DIR" not in os.environ or "STSRL_SOURCE_DIR" not in os.environ:
         raise RuntimeError("exact pinned external source worktree environment is required")
-    if v7.STATIC_TEST_FAILURE_PATH.exists():
-        raise RuntimeError("immutable v7 static qualification failure already exists; no rerun")
+    if v7.STATIC_TEST_REPAIR_FAILURE_PATH.exists():
+        raise RuntimeError("immutable v7 static repair qualification failure already exists; no rerun")
     try:
         report = _run()
     except BaseException as exc:
@@ -341,8 +348,8 @@ def main() -> int:
             "no_refund": True,
             "no_retry_or_overwrite": True,
         }
-        runner.atomic_json(v7.STATIC_TEST_FAILURE_PATH, failure)
-        v7.push_v7("Issue 73: preserve v7 static qualification failure")
+        runner.atomic_json(v7.STATIC_TEST_REPAIR_FAILURE_PATH, failure)
+        v7.push_v7("Issue 73: preserve v7 static repair qualification failure")
         raise
     runner.atomic_json(v7.STATIC_TEST_REPORT_PATH, report)
     v7.push_v7("Issue 73: preserve v7 static input manifest and launcher preflight")

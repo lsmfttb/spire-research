@@ -73,8 +73,11 @@ SOURCE_HASH_PATHS_V7 = (
 )
 STATIC_TEST_REPORT_PATH = V7_OUT / "reports" / "static-qualification-report-v7.json"
 STATIC_TEST_FAILURE_PATH = V7_OUT / "reports" / "static-qualification-failure-v7.json"
+STATIC_TEST_REPAIR_FAILURE_PATH = V7_OUT / "reports" / "static-qualification-repair1-failure-v7.json"
 INPUT_AUDIT_REPORT_PATH = V7_OUT / "reports" / "input-manifest-prelock-v7.json"
+INPUT_AUDIT_REPAIR_REPORT_PATH = V7_OUT / "reports" / "input-manifest-prelock-repair1-v7.json"
 PREFLIGHT_TEST_ROOT = V7_OUT / "reports" / "capture-preflight-tests-v7"
+PREFLIGHT_REPAIR_TEST_ROOT = V7_OUT / "reports" / "capture-preflight-tests-repair1-v7"
 V7_NATIVE_MODULE_PATH = q.V6_CONFIGURED_NATIVE_MODULE_PATH
 
 
@@ -147,8 +150,51 @@ def git_tree_paths(commit: str) -> list[str]:
     return sorted(result)
 
 
-def source_file_entry(source_commit: str, repository_path: str) -> dict[str, Any]:
-    blob = q.external_git_blob(REPOSITORY, source_commit, repository_path)
+def external_git_blobs(source_commit: str, repository_paths: Sequence[str]) -> dict[str, bytes]:
+    """Fetch exact committed blobs in one Git process to keep bounded manifest work practical."""
+    if not repository_paths:
+        return {}
+    command, env = runner.git_invocation(REPOSITORY)
+    specs = [f"{source_commit}:{relative}" for relative in repository_paths]
+    result = subprocess.run(
+        [*command, "cat-file", "--batch"],
+        input=("\n".join(specs) + "\n").encode("utf-8"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        env=env,
+    )
+    if result.returncode:
+        detail = result.stderr.decode("utf-8", errors="replace")[-800:]
+        raise QualificationV7Failure(f"git cat-file --batch failed: {detail}")
+    payload = result.stdout
+    cursor = 0
+    blobs: dict[str, bytes] = {}
+    for relative, spec in zip(repository_paths, specs, strict=True):
+        header_end = payload.find(b"\n", cursor)
+        if header_end < 0:
+            raise QualificationV7Failure(f"git cat-file --batch omitted the header for {spec}")
+        header = payload[cursor:header_end].decode("ascii", errors="replace").split()
+        cursor = header_end + 1
+        if len(header) != 3 or header[1] != "blob":
+            raise QualificationV7Failure(f"git cat-file --batch did not return a blob for {spec}: {header}")
+        try:
+            size = int(header[2])
+        except ValueError as exc:
+            raise QualificationV7Failure(f"git cat-file --batch returned an invalid size for {spec}") from exc
+        end = cursor + size
+        if end >= len(payload) or payload[end:end + 1] != b"\n":
+            raise QualificationV7Failure(f"git cat-file --batch returned a truncated blob for {spec}")
+        blobs[relative] = payload[cursor:end]
+        cursor = end + 1
+    if cursor != len(payload):
+        raise QualificationV7Failure("git cat-file --batch returned unexpected trailing bytes")
+    return blobs
+
+
+def source_file_entry(source_commit: str, repository_path: str, *, blob: bytes | None = None) -> dict[str, Any]:
+    if blob is None:
+        blob = external_git_blobs(source_commit, (repository_path,))[repository_path]
     checkout = REPOSITORY / repository_path
     try:
         checkout_bytes = checkout.read_bytes()
@@ -186,7 +232,8 @@ def historical_input_manifest(source_commit: str) -> dict[str, Any]:
     current_paths = git_tree_paths(source_commit)
     included_paths = exact_membership(baseline_paths, current_paths)
     ensure_inputs_present(STUDY, included_paths)
-    entries = [source_file_entry(source_commit, path) for path in included_paths]
+    blobs = external_git_blobs(source_commit, included_paths)
+    entries = [source_file_entry(source_commit, path, blob=blobs[path]) for path in included_paths]
     optional = REPOSITORY / OPTIONAL_RUNTIME_OUTPUT
     optional_present = optional.is_file()
     return {
@@ -242,8 +289,10 @@ def _verify_source_commit_and_remote() -> str:
 
 def _source_hashes(source_commit: str) -> dict[str, str]:
     hashes: dict[str, str] = {}
+    source_paths = [f"{STUDY_RELATIVE}/{name}" for name in SOURCE_HASH_PATHS_V7]
+    blobs = external_git_blobs(source_commit, source_paths)
     for name in SOURCE_HASH_PATHS_V7:
-        blob = q.external_git_blob(REPOSITORY, source_commit, f"{STUDY_RELATIVE}/{name}")
+        blob = blobs[f"{STUDY_RELATIVE}/{name}"]
         checkout_path = STUDY / name
         q.verify_locked_source_payload(
             label=f"study/{name}",
@@ -377,7 +426,7 @@ def _manifest_digest(manifest: Mapping[str, Any]) -> str:
 
 
 def prepare_lock_v7() -> dict[str, Any]:
-    lock_paths = (LOCK_PATH, CONFIG_PATH, PLAN_PATH, INPUT_MANIFEST_PATH, INPUT_AUDIT_REPORT_PATH)
+    lock_paths = (LOCK_PATH, CONFIG_PATH, PLAN_PATH, INPUT_MANIFEST_PATH)
     existing = [path.exists() for path in lock_paths]
     if any(existing):
         if not all(existing):
@@ -393,8 +442,6 @@ def prepare_lock_v7() -> dict[str, Any]:
     input_paths = exact_membership(baseline_paths, current_paths)
     # This check deliberately precedes config/plan/manifest creation.
     ensure_inputs_present(STUDY, input_paths)
-    if STATIC_TEST_FAILURE_PATH.exists():
-        raise QualificationV7Failure("an immutable v7 static qualification failure exists")
     if not q.V5_RESOURCE_LEDGER_PATH.is_file() or not q.V5_STATIC_PREFLIGHT_REPORT_PATH.is_file():
         raise QualificationV7Failure("mandatory v5 ledger or smoke receipt is missing")
     q.configure_stsr_python_root()
@@ -428,12 +475,12 @@ def prepare_lock_v7() -> dict[str, Any]:
     plan["schema_id"] = "issue73-checkpoint-replay-gate-c-plan-v7"
     plan["qualification_config_file"] = CONFIG_PATH.relative_to(STUDY).as_posix()
     plan["source_qualification_version"] = "v7"
+    root_paths = [q.root_path(str(root["root_id"])).relative_to(REPOSITORY).as_posix() for root in plan.get("roots", [])]
+    root_blobs = external_git_blobs(source_commit, root_paths)
     for root in plan.get("roots", []):
         root_path = q.root_path(str(root["root_id"]))
         root_relative = root_path.relative_to(REPOSITORY).as_posix()
-        root["historical_root_receipt_sha256"] = sha256_bytes(
-            q.external_git_blob(REPOSITORY, source_commit, root_relative)
-        )
+        root["historical_root_receipt_sha256"] = sha256_bytes(root_blobs[root_relative])
     if (
         [row.get("root_id") for row in plan.get("roots", [])] != list(q.GATE_C_ROOTS)
         or len(plan.get("policy_rng_seed_streams", [])) != 64
@@ -554,11 +601,14 @@ def verify_lock_v7(*, require_remote_current: bool = True) -> tuple[dict[str, An
     if set(lock.get("historical_input_sha256", {})) != set(included_paths):
         raise QualificationV7Failure("v7 historical source hash map differs from the explicit manifest membership")
     # Reject source and optimizer mutations before reopening every historical Git blob.
+    code_names = list(lock.get("study_source_sha256", {}))
+    code_paths = [f"{STUDY_RELATIVE}/{name}" for name in code_names]
+    code_blobs = external_git_blobs(source_commit, code_paths)
     for name, expected in lock.get("study_source_sha256", {}).items():
         path = STUDY / name
         if not path.is_file():
             raise QualificationV7Failure(f"v7 locked study source is missing: {name}")
-        blob = q.external_git_blob(REPOSITORY, source_commit, f"{STUDY_RELATIVE}/{name}")
+        blob = code_blobs[f"{STUDY_RELATIVE}/{name}"]
         q.verify_locked_source_payload(
             label=f"study/{name}",
             expected_sha256=str(expected),
@@ -566,12 +616,13 @@ def verify_lock_v7(*, require_remote_current: bool = True) -> tuple[dict[str, An
             checkout_bytes=path.read_bytes(),
         )
     ensure_inputs_present(STUDY, included_paths)
+    historical_blobs = external_git_blobs(source_commit, included_paths)
     for repository_path in included_paths:
         expected = str(lock["historical_input_sha256"][repository_path])
         entry = next(row for row in manifest["included"] if row.get("path") == repository_path)
         if entry.get("git_blob_sha256") != expected:
             raise QualificationV7Failure(f"v7 manifest hash map differs for {repository_path}")
-        source_file_entry(source_commit, repository_path)
+        source_file_entry(source_commit, repository_path, blob=historical_blobs[repository_path])
     fixed_roots = [row.get("root_id") for row in plan.get("roots", [])]
     if (
         fixed_roots != list(q.GATE_C_ROOTS)

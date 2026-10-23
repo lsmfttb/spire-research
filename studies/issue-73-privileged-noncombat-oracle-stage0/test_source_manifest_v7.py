@@ -16,7 +16,7 @@ import runner
 import source_qualification_v7 as v7
 
 
-REPORT_PATH = v7.INPUT_AUDIT_REPORT_PATH
+REPORT_PATH = v7.INPUT_AUDIT_REPAIR_REPORT_PATH
 
 
 def _preexec_cpu_cap(remaining_seconds: float) -> Any:
@@ -55,11 +55,15 @@ def _run_cli(*args: str, remaining_seconds: float) -> dict[str, Any]:
 
 
 def run() -> dict[str, Any]:
-    if REPORT_PATH.exists() or v7.STATIC_TEST_FAILURE_PATH.exists():
+    if REPORT_PATH.exists() or v7.STATIC_TEST_REPAIR_FAILURE_PATH.exists():
         raise RuntimeError("v7 pre-lock test already has an immutable report; no retry or overwrite")
     if any(path.exists() for path in (v7.LOCK_PATH, v7.CONFIG_PATH, v7.PLAN_PATH, v7.INPUT_MANIFEST_PATH)):
         raise RuntimeError("v7 pre-lock test requires all prospective lock artifacts to be absent")
     v7.ensure_static_precharge_v7()
+    prior_failure = v7.read_json(v7.STATIC_TEST_FAILURE_PATH) if v7.STATIC_TEST_FAILURE_PATH.is_file() else None
+    prior_failure_cpu = float((prior_failure or {}).get("measured_process_tree_cpu_seconds", 0.0))
+    if prior_failure is not None and prior_failure.get("no_refund") is not True:
+        raise RuntimeError("prior v7 static failure does not preserve the required no-refund accounting")
     if (v7.REPOSITORY / v7.OPTIONAL_RUNTIME_OUTPUT).exists():
         raise AssertionError("the known optional v6 runtime-metrics output is unexpectedly present")
 
@@ -94,11 +98,14 @@ def run() -> dict[str, Any]:
         child_after_missing.ru_utime + child_after_missing.ru_stime
         - child_start.ru_utime - child_start.ru_stime,
     )
-    prepared = _run_cli("prepare-lock", remaining_seconds=v7.STATIC_RESERVATION_CPU_SECONDS - prelock_probe_cpu - 2.0)
+    prepared = _run_cli(
+        "prepare-lock",
+        remaining_seconds=v7.STATIC_RESERVATION_CPU_SECONDS - prior_failure_cpu - prelock_probe_cpu - 2.0,
+    )
     prepare_cpu = float(prepared.get("lock_preparation_process_cpu_seconds", 0.0))
     verified = _run_cli(
         "verify-lock",
-        remaining_seconds=v7.STATIC_RESERVATION_CPU_SECONDS - prelock_probe_cpu - prepare_cpu - 2.0,
+        remaining_seconds=v7.STATIC_RESERVATION_CPU_SECONDS - prior_failure_cpu - prelock_probe_cpu - prepare_cpu - 2.0,
     )
     lock = v7.read_json(v7.LOCK_PATH)
     manifest = v7.read_json(v7.INPUT_MANIFEST_PATH)
@@ -131,6 +138,13 @@ def run() -> dict[str, Any]:
     report = {
         "schema_id": "issue73-v7-input-manifest-prelock-qualification-v1",
         "status": "PASS",
+        "qualification_run": "repair1_after_immutable_prepare_lock_timeout",
+        "prior_static_failure": {
+            "path": v7.STATIC_TEST_FAILURE_PATH.relative_to(v7.STUDY).as_posix() if prior_failure else None,
+            "sha256": v7.sha256_file(v7.STATIC_TEST_FAILURE_PATH) if prior_failure else None,
+            "preserved_unchanged": prior_failure is not None,
+            "measured_process_tree_cpu_seconds": prior_failure_cpu,
+        },
         "source_commit": lock["code_source_commit"],
         "missing_mandatory_input": {
             "path": missing_input_path.relative_to(v7.REPOSITORY).as_posix(),
@@ -158,7 +172,7 @@ def run() -> dict[str, Any]:
             "measured_test_process_cpu_seconds": prelock_probe_cpu,
             "prepare_lock_reported_process_tree_cpu_seconds": float(prepared.get("lock_preparation_process_cpu_seconds", 0.0)),
             "verify_lock_reported_process_tree_cpu_seconds": float(verified.get("measured_process_tree_cpu_seconds", 0.0)),
-            "conservative_sum_cpu_seconds": prelock_probe_cpu + cli_cpu,
+            "conservative_sum_cpu_seconds": prior_failure_cpu + prelock_probe_cpu + cli_cpu,
             "fixed_reservation_cpu_seconds": v7.STATIC_RESERVATION_CPU_SECONDS,
             "no_refund": True,
         },
@@ -175,8 +189,8 @@ def main() -> int:
     try:
         report = run()
     except BaseException as exc:
-        if not v7.STATIC_TEST_FAILURE_PATH.exists():
-            runner.atomic_json(v7.STATIC_TEST_FAILURE_PATH, {
+        if not v7.STATIC_TEST_REPAIR_FAILURE_PATH.exists():
+            runner.atomic_json(v7.STATIC_TEST_REPAIR_FAILURE_PATH, {
                 "schema_id": "issue73-v7-input-manifest-prelock-qualification-failure-v1",
                 "status": "FAIL_OR_INCOMPLETE",
                 "failure_type": type(exc).__name__,
@@ -186,7 +200,7 @@ def main() -> int:
                 "no_refund": True,
                 "no_retry_or_overwrite": True,
             })
-            v7.push_v7("Issue 73: preserve v7 input manifest pre-lock qualification failure")
+            v7.push_v7("Issue 73: preserve v7 input manifest repair qualification failure")
         raise
     print(json.dumps(report, sort_keys=True))
     return 0
