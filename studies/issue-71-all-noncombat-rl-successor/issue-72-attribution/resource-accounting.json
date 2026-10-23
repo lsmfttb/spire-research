@@ -1,0 +1,119 @@
+{
+  "issue": 72,
+  "scope": "diagnostic-only retrospective; no new formal study seeds or native probes",
+  "limits": {
+    "aggregate_process_cpu_seconds": 4000,
+    "builder_max_process_cpu_seconds": 3200,
+    "reviewer_reserved_process_cpu_seconds": 800,
+    "debug_native_probe_max_process_cpu_seconds": 400
+  },
+  "measured_processes": [
+    {
+      "phase": "identity initial failure",
+      "user_cpu_seconds": 2.32,
+      "system_cpu_seconds": 0.42,
+      "process_cpu_seconds": 2.74,
+      "wall_seconds": 2.34,
+      "max_rss_kib": 240224,
+      "exit_code": 4,
+      "preserved_receipt": "cpu-identity.txt"
+    },
+    {
+      "phase": "identity corrected retry",
+      "user_cpu_seconds": 6.25,
+      "system_cpu_seconds": 3.6,
+      "process_cpu_seconds": 9.85,
+      "wall_seconds": 40.94,
+      "max_rss_kib": 265984,
+      "exit_code": 0,
+      "preserved_receipt": "cpu-identity-retry.txt"
+    },
+    {
+      "phase": "policy fixed-input analysis",
+      "user_cpu_seconds": 8.84,
+      "system_cpu_seconds": 0.7,
+      "process_cpu_seconds": 9.54,
+      "wall_seconds": 10.51,
+      "max_rss_kib": 315528,
+      "exit_code": 0,
+      "preserved_receipt": "cpu-policy.txt"
+    },
+    {
+      "phase": "four exact historical optimizer replays",
+      "user_cpu_seconds": 67.87,
+      "system_cpu_seconds": 3.51,
+      "process_cpu_seconds": 71.38,
+      "wall_seconds": 95.16,
+      "max_rss_kib": 626384,
+      "exit_code": 0,
+      "preserved_receipt": "cpu-replay.txt"
+    },
+    {
+      "phase": "branch receipt initial reader failure",
+      "user_cpu_seconds": 2.34,
+      "system_cpu_seconds": 0.45,
+      "process_cpu_seconds": 2.79,
+      "wall_seconds": 2.81,
+      "max_rss_kib": null,
+      "exit_code": 4,
+      "preserved_receipt": "cpu-branches.txt"
+    },
+    {
+      "phase": "branch receipt corrected retry",
+      "user_cpu_seconds": 4.4,
+      "system_cpu_seconds": 1.59,
+      "process_cpu_seconds": 5.99,
+      "wall_seconds": 19.09,
+      "max_rss_kib": 241212,
+      "exit_code": 0,
+      "preserved_receipt": "cpu-branches-retry.txt"
+    },
+    {
+      "phase": "exact duplicate-vector audit",
+      "user_cpu_seconds": 2.7,
+      "system_cpu_seconds": 0.6,
+      "process_cpu_seconds": 3.3,
+      "wall_seconds": 4.04,
+      "max_rss_kib": 242384,
+      "exit_code": 0,
+      "preserved_receipt": "cpu-collisions.txt"
+    },
+    {
+      "phase": "syntax check 1",
+      "user_cpu_seconds": 0.11,
+      "system_cpu_seconds": 0.02,
+      "process_cpu_seconds": 0.13,
+      "wall_seconds": 0.18,
+      "max_rss_kib": null,
+      "exit_code": 0,
+      "preserved_receipt": "cpu-syntax.txt"
+    },
+    {
+      "phase": "syntax check 2",
+      "user_cpu_seconds": 0.11,
+      "system_cpu_seconds": 0.02,
+      "process_cpu_seconds": 0.13,
+      "wall_seconds": 0.18,
+      "max_rss_kib": null,
+      "exit_code": 0,
+      "preserved_receipt": "cpu-syntax2.txt"
+    },
+    {
+      "phase": "final syntax, CLI help, and receipt consistency verification",
+      "user_cpu_seconds": 3.71,
+      "system_cpu_seconds": 0.51,
+      "process_cpu_seconds": 4.22,
+      "wall_seconds": 3.85,
+      "max_rss_kib": 246848,
+      "exit_code": 0,
+      "preserved_receipt": "cpu-final-verification.txt"
+    }
+  ],
+  "measured_process_cpu_seconds": 110.07,
+  "unmetered_preparation_allowance_process_cpu_seconds": 150.0,
+  "builder_process_cpu_accounting_upper_bound_seconds": 260.07,
+  "native_debug_probe_process_cpu_seconds": 0.0,
+  "formal_owner_seeds_consumed": 0,
+  "historical_issue_71_branch_process_cpu_seconds_excluded_from_issue_72": 1569.0769,
+  "method": "Sum user+system CPU from /usr/bin/time receipts; conservatively reserve 150 process CPU-s for pre-instrumentation source inspection, worktree/fetch/setup, report and receipt writing, Windows orchestration, and other unmetered preparation. The allowance is not measured runtime. Existing Issue #71 execution receipts are identified but are not recharged to Issue #72."
+}

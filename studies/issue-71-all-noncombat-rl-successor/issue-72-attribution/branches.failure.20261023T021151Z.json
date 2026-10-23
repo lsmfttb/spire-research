@@ -1,0 +1,8 @@
+{
+  "exception": "'NoneType' object has no attribute 'get'",
+  "exception_type": "AttributeError",
+  "generated_at_utc": "2026-10-23T02:11:51.933133+00:00",
+  "phase": "branches",
+  "status": "FAILED",
+  "traceback": "Traceback (most recent call last):\n  File \"/mnt/c/Users/lsmft/.codex/worktrees/issue-72-attribution/spire-research/studies/issue-71-all-noncombat-rl-successor/issue-72-attribution/analyze.py\", line 1212, in main\n    result = PHASES[name]()\n  File \"/mnt/c/Users/lsmft/.codex/worktrees/issue-72-attribution/spire-research/studies/issue-71-all-noncombat-rl-successor/issue-72-attribution/analyze.py\", line 1058, in branch_phase\n    if not forced.get(\"forced_root_consumed\") or int(forced.get(\"candidate_index\", -1)) != candidate:\n           ^^^^^^^^^^\nAttributeError: 'NoneType' object has no attribute 'get'\n"
+}

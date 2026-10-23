@@ -1,0 +1,747 @@
+{
+  "blocks": [
+    {
+      "block": 1,
+      "block_start_digest": "a7a91b18f1ab44af53b9fb5fd2810e55a1fe5c8ee963e97651d992edb86e4d0c",
+      "gradient_and_loss_breakdown": {
+        "actor_gradient_components": {
+          "cancellation_ratio_norm_sum_over_sum_norms": 0.8528884883884129,
+          "component_norm_share": {
+            "branch_loss": 0.1980394550617453,
+            "entropy_component": 6.530282635226423e-07,
+            "policy_gradient": 0.8019598919099912
+          },
+          "component_pair_cosines": {
+            "branch_loss_vs_entropy_component": -0.5117658668028967,
+            "policy_gradient_vs_branch_loss": 0.14185753306700044,
+            "policy_gradient_vs_entropy_component": -0.12893402855744357
+          },
+          "layerwise_actor_gradient_norms": {
+            "0.bias": {
+              "branch_loss": 2.633940108336651e-08,
+              "combined_actor": 1.2151354028062113e-07,
+              "entropy_component": 9.882867975023078e-14,
+              "policy_gradient": 1.0845034347174015e-07
+            },
+            "0.weight": {
+              "branch_loss": 3.3904225122187764e-06,
+              "combined_actor": 1.6666655345757095e-05,
+              "entropy_component": 9.363148114197289e-12,
+              "policy_gradient": 1.6265757643240674e-05
+            },
+            "2.bias": {
+              "branch_loss": 1.3538016732166288e-08,
+              "combined_actor": 5.852096590066138e-08,
+              "entropy_component": 5.697546534181192e-14,
+              "policy_gradient": 5.6960567778592646e-08
+            },
+            "2.weight": {
+              "branch_loss": 8.615248513732388e-07,
+              "combined_actor": 4.115591040561428e-06,
+              "entropy_component": 2.5081102967216745e-12,
+              "policy_gradient": 3.955771879413159e-06
+            },
+            "4.bias": {
+              "branch_loss": 8.103597792796791e-10,
+              "combined_actor": 1.073153371722313e-10,
+              "entropy_component": 4.0953846217051115e-12,
+              "policy_gradient": 6.989466783124954e-10
+            },
+            "4.weight": {
+              "branch_loss": 0.00043799691682439344,
+              "combined_actor": 0.0018862855973998628,
+              "entropy_component": 1.4442874346998799e-09,
+              "policy_gradient": 0.0017736441390865155
+            }
+          },
+          "norm_of_component_sum": 0.0018863634526835977,
+          "norms_before_clipping": {
+            "branch_loss": 0.0004380108870967184,
+            "combined_actor": 0.001886363721194415,
+            "entropy_component": 1.4443257729405579e-09,
+            "policy_gradient": 0.0017737231379573559,
+            "value_component_actor": 0.0
+          },
+          "sum_of_component_norms": 0.0022117354693798473
+        },
+        "baseline": 0.09062500000000002,
+        "critic_gradient": {
+          "actor_value_all_grads_unused": true,
+          "actor_value_gradient_norm": 0.0,
+          "combined_critic_gradient_norm_before_clipping": 4.022544703774209,
+          "critic_parameter_gradient_norms": {
+            "0.bias": 0.12860290567136207,
+            "0.weight": 3.970891296355332,
+            "2.bias": 0.24555791914463043,
+            "2.weight": 0.5796988937281571
+          },
+          "policy_and_branch_critic_all_grads_unused": true,
+          "value_component_gradient_norm_before_clipping": 4.022544703774209
+        },
+        "episode_decision_count": {
+          "max": 52.0,
+          "mean": 22.1875,
+          "min": 9.0,
+          "n": 128,
+          "p10": 12.0,
+          "p50": 19.0,
+          "p90": 37.0,
+          "sd": 9.442532357521188
+        },
+        "episode_length_vs_absolute_advantage_pearson": 0.5900117621653803,
+        "episode_length_vs_absolute_episode_policy_term_pearson": 0.7716910092870171,
+        "episode_policy_term_magnitude": {
+          "max": 9.819488525390625,
+          "mean": 1.0296399178914726,
+          "min": 0.16302266716957092,
+          "n": 128,
+          "p10": 0.28002639710903166,
+          "p50": 0.514962762594223,
+          "p90": 2.9165413141250607,
+          "sd": 1.382594990711287
+        },
+        "gradient_clipping": {
+          "actor_clipped": false,
+          "actor_preclip_norm": 0.001886363721194415,
+          "actor_scale_applied": 1.0,
+          "clip_norm": 1.0,
+          "critic_clipped": true,
+          "critic_postclip_norm": 1.0,
+          "critic_preclip_norm": 4.022544703774209,
+          "critic_scale_applied": 0.24859885312442545
+        },
+        "loss_terms": {
+          "branch_example_count": 192,
+          "branch_loss": 0.06179503723978996,
+          "branch_positive_weight_stats": {
+            "max": 0.13,
+            "mean": 0.04375000000000001,
+            "min": 0.009999999999999995,
+            "n": 192,
+            "p10": 0.010000000000000002,
+            "p50": 0.04000000000000001,
+            "p90": 0.09,
+            "sd": 0.029560480197872222
+          },
+          "branch_reduction": "mean over completed superior branch alternatives with positive clipped reward delta",
+          "entropy_component": -0.012825456447899342,
+          "entropy_unscaled": 1.2825456857681274,
+          "policy_gradient": 0.4086097478866577,
+          "policy_reduction": "mean over 128 owner terms; each owner term sums its chosen log-probabilities over all categorical decisions",
+          "total": 0.49005216360092163,
+          "value_and_entropy_reduction": "mean over every categorical decision across the 128 owners",
+          "value_component": 0.03247285634279251,
+          "value_loss_unscaled": 0.06494571268558502
+        },
+        "owner_advantage": {
+          "max": 0.12937499999999996,
+          "mean": -2.2985086056692694e-17,
+          "min": -0.050625000000000024,
+          "n": 128,
+          "p10": -0.030625000000000027,
+          "p50": -0.02062500000000002,
+          "p90": 0.06937499999999998,
+          "sd": 0.0375583535483099
+        },
+        "owner_terminal_reward": {
+          "max": 0.22,
+          "mean": 0.09062500000000002,
+          "min": 0.04,
+          "n": 128,
+          "p10": 0.06,
+          "p50": 0.07,
+          "p90": 0.16,
+          "sd": 0.0375583535483099
+        }
+      },
+      "historical_optimizer_state_source": "empty Adam state before block 1; exact saved block_{n-1} optimizer_state for subsequent blocks",
+      "non_numeric_metric_mismatches": [],
+      "optimizer_state_reconstruction": {
+        "errors": [],
+        "max_abs_tensor_difference": 0.0,
+        "max_relative_tensor_difference": 0.0,
+        "passed_exact": true,
+        "scalar_mismatch_count": 0,
+        "state_parameter_count": 10,
+        "state_tensor_count": 30
+      },
+      "owner_count": 128,
+      "passed": true,
+      "recorded_block_start_digest": "a7a91b18f1ab44af53b9fb5fd2810e55a1fe5c8ee963e97651d992edb86e4d0c",
+      "recorded_loss_metric_deltas": {
+        "actor_gradient_norm_before_clip": 0.0,
+        "branch_loss_term": 0.0,
+        "critic_gradient_norm_before_clip": 0.0,
+        "entropy_mean": 0.0,
+        "policy_gradient_term": 0.0,
+        "terminal_reward_baseline": 0.0,
+        "total_loss": 0.0,
+        "value_loss_term": 0.0
+      },
+      "recorded_model_digest": "53003fe0f27bc41df576b5e947d49c3ec19b2e0a2e648a69d60829fa8bd17dda",
+      "replayed_model_digest": "53003fe0f27bc41df576b5e947d49c3ec19b2e0a2e648a69d60829fa8bd17dda",
+      "replayed_vs_checkpoint_model_max_abs_difference": 0.0,
+      "seed_first": 7410001,
+      "seed_last": 7410128
+    },
+    {
+      "block": 2,
+      "block_start_digest": "53003fe0f27bc41df576b5e947d49c3ec19b2e0a2e648a69d60829fa8bd17dda",
+      "gradient_and_loss_breakdown": {
+        "actor_gradient_components": {
+          "cancellation_ratio_norm_sum_over_sum_norms": 0.8079207510004444,
+          "component_norm_share": {
+            "branch_loss": 0.3127800629866272,
+            "entropy_component": 3.4250324355792255e-06,
+            "policy_gradient": 0.6872165119809371
+          },
+          "component_pair_cosines": {
+            "branch_loss_vs_entropy_component": -0.5908034277606103,
+            "policy_gradient_vs_branch_loss": 0.19222837702482523,
+            "policy_gradient_vs_entropy_component": -0.28088227859220255
+          },
+          "layerwise_actor_gradient_norms": {
+            "0.bias": {
+              "branch_loss": 2.3864012571346925e-07,
+              "combined_actor": 6.058646375323318e-07,
+              "entropy_component": 1.9607310979977008e-12,
+              "policy_gradient": 4.4676688902544695e-07
+            },
+            "0.weight": {
+              "branch_loss": 2.645462887850664e-05,
+              "combined_actor": 6.715356022979654e-05,
+              "entropy_component": 2.170257355887951e-10,
+              "policy_gradient": 5.700899225673044e-05
+            },
+            "2.bias": {
+              "branch_loss": 1.1251604623500978e-07,
+              "combined_actor": 2.4034431363645253e-07,
+              "entropy_component": 1.0847484583237025e-12,
+              "policy_gradient": 1.940068828440679e-07
+            },
+            "2.weight": {
+              "branch_loss": 6.270623245994765e-06,
+              "combined_actor": 1.5774326413641093e-05,
+              "entropy_component": 5.673229842773579e-11,
+              "policy_gradient": 1.3204823739705127e-05
+            },
+            "4.bias": {
+              "branch_loss": 7.958078640513122e-10,
+              "combined_actor": 9.576254234033854e-10,
+              "entropy_component": 3.112139235553202e-12,
+              "policy_gradient": 1.5870682545937598e-10
+            },
+            "4.weight": {
+              "branch_loss": 0.000942132531553683,
+              "combined_actor": 0.0024335936152629065,
+              "entropy_component": 1.0318480992661693e-08,
+              "policy_gradient": 0.002070016548085627
+            }
+          },
+          "norm_of_component_sum": 0.002434566396475298,
+          "norms_before_clipping": {
+            "branch_loss": 0.0009425247714125862,
+            "combined_actor": 0.002434571161233943,
+            "entropy_component": 1.0320919698654266e-08,
+            "policy_gradient": 0.0020708435815280225,
+            "value_component_actor": 0.0
+          },
+          "sum_of_component_norms": 0.0030133786738603075
+        },
+        "baseline": 0.09203125000000001,
+        "critic_gradient": {
+          "actor_value_all_grads_unused": true,
+          "actor_value_gradient_norm": 0.0,
+          "combined_critic_gradient_norm_before_clipping": 1.0915699098274394,
+          "critic_parameter_gradient_norms": {
+            "0.bias": 0.03538797098162551,
+            "0.weight": 1.0775267541106714,
+            "2.bias": 0.0671214684844017,
+            "2.weight": 0.1571730326573414
+          },
+          "policy_and_branch_critic_all_grads_unused": true,
+          "value_component_gradient_norm_before_clipping": 1.0915699098274394
+        },
+        "episode_decision_count": {
+          "max": 65.0,
+          "mean": 22.7109375,
+          "min": 4.0,
+          "n": 128,
+          "p10": 13.0,
+          "p50": 21.0,
+          "p90": 35.0,
+          "sd": 9.860565175022481
+        },
+        "episode_length_vs_absolute_advantage_pearson": 0.4914846652063016,
+        "episode_length_vs_absolute_episode_policy_term_pearson": 0.7628077444181657,
+        "episode_policy_term_magnitude": {
+          "max": 12.649703979492188,
+          "mean": 1.0458438044879586,
+          "min": 0.18752123415470123,
+          "n": 128,
+          "p10": 0.2654325008392334,
+          "p50": 0.5846013426780701,
+          "p90": 2.485425925254822,
+          "sd": 1.555179656024133
+        },
+        "gradient_clipping": {
+          "actor_clipped": false,
+          "actor_preclip_norm": 0.002434571161233943,
+          "actor_scale_applied": 1.0,
+          "clip_norm": 1.0,
+          "critic_clipped": true,
+          "critic_postclip_norm": 1.0,
+          "critic_preclip_norm": 1.0915699098274394,
+          "critic_scale_applied": 0.9161117313668758
+        },
+        "loss_terms": {
+          "branch_example_count": 166,
+          "branch_loss": 0.06280875951051712,
+          "branch_positive_weight_stats": {
+            "max": 0.15,
+            "mean": 0.04331325301204819,
+            "min": 0.009999999999999995,
+            "n": 166,
+            "p10": 0.010000000000000002,
+            "p50": 0.04,
+            "p90": 0.09,
+            "sd": 0.02896996468061711
+          },
+          "branch_reduction": "mean over completed superior branch alternatives with positive clipped reward delta",
+          "entropy_component": -0.012727836146950722,
+          "entropy_unscaled": 1.272783637046814,
+          "policy_gradient": 0.4458898901939392,
+          "policy_reduction": "mean over 128 owner terms; each owner term sums its chosen log-probabilities over all categorical decisions",
+          "total": 0.5001499652862549,
+          "value_and_entropy_reduction": "mean over every categorical decision across the 128 owners",
+          "value_component": 0.004179136361926794,
+          "value_loss_unscaled": 0.008358272723853588
+        },
+        "owner_advantage": {
+          "max": 0.13796875,
+          "mean": -6.5052130349130266e-18,
+          "min": -0.08203125000000001,
+          "n": 128,
+          "p10": -0.03203125000000001,
+          "p50": -0.012031250000000007,
+          "p90": 0.06796875,
+          "sd": 0.038767617280486805
+        },
+        "owner_terminal_reward": {
+          "max": 0.23,
+          "mean": 0.09203125000000001,
+          "min": 0.01,
+          "n": 128,
+          "p10": 0.06,
+          "p50": 0.08,
+          "p90": 0.16,
+          "sd": 0.038767617280486805
+        }
+      },
+      "historical_optimizer_state_source": "empty Adam state before block 1; exact saved block_{n-1} optimizer_state for subsequent blocks",
+      "non_numeric_metric_mismatches": [],
+      "optimizer_state_reconstruction": {
+        "errors": [],
+        "max_abs_tensor_difference": 0.0,
+        "max_relative_tensor_difference": 0.0,
+        "passed_exact": true,
+        "scalar_mismatch_count": 0,
+        "state_parameter_count": 10,
+        "state_tensor_count": 30
+      },
+      "owner_count": 128,
+      "passed": true,
+      "recorded_block_start_digest": "53003fe0f27bc41df576b5e947d49c3ec19b2e0a2e648a69d60829fa8bd17dda",
+      "recorded_loss_metric_deltas": {
+        "actor_gradient_norm_before_clip": 0.0,
+        "branch_loss_term": 0.0,
+        "critic_gradient_norm_before_clip": 0.0,
+        "entropy_mean": 0.0,
+        "policy_gradient_term": 0.0,
+        "terminal_reward_baseline": 0.0,
+        "total_loss": 0.0,
+        "value_loss_term": 0.0
+      },
+      "recorded_model_digest": "c401de9c001c3a4a17ff47ee76c7eff27dc36f16f6f46a5c1671fc34851046f3",
+      "replayed_model_digest": "c401de9c001c3a4a17ff47ee76c7eff27dc36f16f6f46a5c1671fc34851046f3",
+      "replayed_vs_checkpoint_model_max_abs_difference": 0.0,
+      "seed_first": 7410129,
+      "seed_last": 7410256
+    },
+    {
+      "block": 3,
+      "block_start_digest": "c401de9c001c3a4a17ff47ee76c7eff27dc36f16f6f46a5c1671fc34851046f3",
+      "gradient_and_loss_breakdown": {
+        "actor_gradient_components": {
+          "cancellation_ratio_norm_sum_over_sum_norms": 0.6814419769940765,
+          "component_norm_share": {
+            "branch_loss": 0.37014660066228244,
+            "entropy_component": 8.241858937986186e-06,
+            "policy_gradient": 0.6298451574787797
+          },
+          "component_pair_cosines": {
+            "branch_loss_vs_entropy_component": -0.6876712452897004,
+            "policy_gradient_vs_branch_loss": -0.14873348640511552,
+            "policy_gradient_vs_entropy_component": -0.03460978767326554
+          },
+          "layerwise_actor_gradient_norms": {
+            "0.bias": {
+              "branch_loss": 3.6015527631740996e-07,
+              "combined_actor": 6.367090936061464e-07,
+              "entropy_component": 6.812028421640965e-12,
+              "policy_gradient": 4.698584156136828e-07
+            },
+            "0.weight": {
+              "branch_loss": 4.0365833519863825e-05,
+              "combined_actor": 9.702852662049144e-05,
+              "entropy_component": 7.849380178934699e-10,
+              "policy_gradient": 8.44565889749381e-05
+            },
+            "2.bias": {
+              "branch_loss": 1.8731232539610222e-07,
+              "combined_actor": 3.6439462547016077e-07,
+              "entropy_component": 3.638044096979358e-12,
+              "policy_gradient": 3.2211089696626844e-07
+            },
+            "2.weight": {
+              "branch_loss": 9.836503295671322e-06,
+              "combined_actor": 1.902881052009746e-05,
+              "entropy_component": 1.9551884566894237e-10,
+              "policy_gradient": 1.7256017768632152e-05
+            },
+            "4.bias": {
+              "branch_loss": 6.807567842770368e-10,
+              "combined_actor": 1.3062406711839003e-09,
+              "entropy_component": 6.6164369989796246e-12,
+              "policy_gradient": 6.320988177321851e-10
+            },
+            "4.weight": {
+              "branch_loss": 0.0010396520078456643,
+              "combined_actor": 0.0019129792930402648,
+              "entropy_component": 2.3153732934346663e-08,
+              "policy_gradient": 0.001768394621271239
+            }
+          },
+          "norm_of_component_sum": 0.001915524276676526,
+          "norms_before_clipping": {
+            "branch_loss": 0.0010404819169637471,
+            "combined_actor": 0.0019155330705556623,
+            "entropy_component": 2.3167861522426498e-08,
+            "policy_gradient": 0.0017704944356405987,
+            "value_component_actor": 0.0
+          },
+          "sum_of_component_norms": 0.002810999520465868
+        },
+        "baseline": 0.09078125000000001,
+        "critic_gradient": {
+          "actor_value_all_grads_unused": true,
+          "actor_value_gradient_norm": 0.0,
+          "combined_critic_gradient_norm_before_clipping": 1.9864843516364012,
+          "critic_parameter_gradient_norms": {
+            "0.bias": 0.06443369576605601,
+            "0.weight": 1.9600711325237374,
+            "2.bias": 0.12283558398485184,
+            "2.weight": 0.29154922894844704
+          },
+          "policy_and_branch_critic_all_grads_unused": true,
+          "value_component_gradient_norm_before_clipping": 1.9864843516364012
+        },
+        "episode_decision_count": {
+          "max": 51.0,
+          "mean": 23.1484375,
+          "min": 9.0,
+          "n": 128,
+          "p10": 12.0,
+          "p50": 20.5,
+          "p90": 38.3,
+          "sd": 9.960623137505081
+        },
+        "episode_length_vs_absolute_advantage_pearson": 0.5136369865612415,
+        "episode_length_vs_absolute_episode_policy_term_pearson": 0.8186388279511289,
+        "episode_policy_term_magnitude": {
+          "max": 4.610311508178711,
+          "mean": 1.1171879401663318,
+          "min": 0.22586818039417267,
+          "n": 128,
+          "p10": 0.3206914812326431,
+          "p50": 0.6264876127243042,
+          "p90": 3.069453907012939,
+          "sd": 1.082100598191923
+        },
+        "gradient_clipping": {
+          "actor_clipped": false,
+          "actor_preclip_norm": 0.0019155330705556623,
+          "actor_scale_applied": 1.0,
+          "clip_norm": 1.0,
+          "critic_clipped": true,
+          "critic_postclip_norm": 1.0,
+          "critic_preclip_norm": 1.9864843516364012,
+          "critic_scale_applied": 0.5034019015434139
+        },
+        "loss_terms": {
+          "branch_example_count": 177,
+          "branch_loss": 0.06082126870751381,
+          "branch_positive_weight_stats": {
+            "max": 0.14,
+            "mean": 0.04062146892655368,
+            "min": 0.009999999999999995,
+            "n": 177,
+            "p10": 0.009999999999999995,
+            "p50": 0.039999999999999994,
+            "p90": 0.09,
+            "sd": 0.029870139241130772
+          },
+          "branch_reduction": "mean over completed superior branch alternatives with positive clipped reward delta",
+          "entropy_component": -0.012876208871603012,
+          "entropy_unscaled": 1.2876209020614624,
+          "policy_gradient": 0.4429556131362915,
+          "policy_reduction": "mean over 128 owner terms; each owner term sums its chosen log-probabilities over all categorical decisions",
+          "total": 0.5004742741584778,
+          "value_and_entropy_reduction": "mean over every categorical decision across the 128 owners",
+          "value_component": 0.009573600254952908,
+          "value_loss_unscaled": 0.019147200509905815
+        },
+        "owner_advantage": {
+          "max": 0.06921875,
+          "mean": -5.312590645178972e-18,
+          "min": -0.05078125000000001,
+          "n": 128,
+          "p10": -0.03078125000000001,
+          "p50": -0.02078125,
+          "p90": 0.06921875,
+          "sd": 0.038096631694372836
+        },
+        "owner_terminal_reward": {
+          "max": 0.16,
+          "mean": 0.09078125000000001,
+          "min": 0.04,
+          "n": 128,
+          "p10": 0.06,
+          "p50": 0.07,
+          "p90": 0.16,
+          "sd": 0.038096631694372836
+        }
+      },
+      "historical_optimizer_state_source": "empty Adam state before block 1; exact saved block_{n-1} optimizer_state for subsequent blocks",
+      "non_numeric_metric_mismatches": [],
+      "optimizer_state_reconstruction": {
+        "errors": [],
+        "max_abs_tensor_difference": 0.0,
+        "max_relative_tensor_difference": 0.0,
+        "passed_exact": true,
+        "scalar_mismatch_count": 0,
+        "state_parameter_count": 10,
+        "state_tensor_count": 30
+      },
+      "owner_count": 128,
+      "passed": true,
+      "recorded_block_start_digest": "c401de9c001c3a4a17ff47ee76c7eff27dc36f16f6f46a5c1671fc34851046f3",
+      "recorded_loss_metric_deltas": {
+        "actor_gradient_norm_before_clip": 0.0,
+        "branch_loss_term": 0.0,
+        "critic_gradient_norm_before_clip": 0.0,
+        "entropy_mean": 0.0,
+        "policy_gradient_term": 0.0,
+        "terminal_reward_baseline": 0.0,
+        "total_loss": 0.0,
+        "value_loss_term": 0.0
+      },
+      "recorded_model_digest": "7229296c0b3459b788ca6e2e7906d7189dc1cf2c9693134f5dfc1e398d5c81ac",
+      "replayed_model_digest": "7229296c0b3459b788ca6e2e7906d7189dc1cf2c9693134f5dfc1e398d5c81ac",
+      "replayed_vs_checkpoint_model_max_abs_difference": 0.0,
+      "seed_first": 7410257,
+      "seed_last": 7410384
+    },
+    {
+      "block": 4,
+      "block_start_digest": "7229296c0b3459b788ca6e2e7906d7189dc1cf2c9693134f5dfc1e398d5c81ac",
+      "gradient_and_loss_breakdown": {
+        "actor_gradient_components": {
+          "cancellation_ratio_norm_sum_over_sum_norms": 0.6268602642685556,
+          "component_norm_share": {
+            "branch_loss": 0.29520689132681244,
+            "entropy_component": 1.3591781014082379e-05,
+            "policy_gradient": 0.7047795168921734
+          },
+          "component_pair_cosines": {
+            "branch_loss_vs_entropy_component": -0.7648781464171792,
+            "policy_gradient_vs_branch_loss": -0.4587992995446175,
+            "policy_gradient_vs_entropy_component": 0.6693455417452401
+          },
+          "layerwise_actor_gradient_norms": {
+            "0.bias": {
+              "branch_loss": 4.0232199282474634e-07,
+              "combined_actor": 7.520427215043583e-07,
+              "entropy_component": 1.454448537653068e-11,
+              "policy_gradient": 8.83777284877465e-07
+            },
+            "0.weight": {
+              "branch_loss": 4.251348140665819e-05,
+              "combined_actor": 0.00010936303083102216,
+              "entropy_component": 1.7276998661611042e-09,
+              "policy_gradient": 0.00011325842169083362
+            },
+            "2.bias": {
+              "branch_loss": 2.1361654556526385e-07,
+              "combined_actor": 4.2993313968170354e-07,
+              "entropy_component": 7.763367378318623e-12,
+              "policy_gradient": 4.706176041422458e-07
+            },
+            "2.weight": {
+              "branch_loss": 1.0379316706708907e-05,
+              "combined_actor": 2.437459353354901e-05,
+              "entropy_component": 4.108694654465738e-10,
+              "policy_gradient": 2.629672869305974e-05
+            },
+            "4.bias": {
+              "branch_loss": 5.638867150992155e-11,
+              "combined_actor": 1.1744718531048193e-09,
+              "entropy_component": 1.0773546985087812e-11,
+              "policy_gradient": 1.1073097994085401e-09
+            },
+            "4.weight": {
+              "branch_loss": 0.0008168556274929858,
+              "combined_actor": 0.0017334309379648416,
+              "entropy_component": 3.7621337398264146e-08,
+              "policy_gradient": 0.0019495007525546022
+            }
+          },
+          "norm_of_component_sum": 0.00173705412348885,
+          "norms_before_clipping": {
+            "branch_loss": 0.0008180271694623531,
+            "combined_actor": 0.0017370486350209895,
+            "entropy_component": 3.7663233744069835e-08,
+            "policy_gradient": 0.0019529652262084084,
+            "value_component_actor": 0.0
+          },
+          "sum_of_component_norms": 0.0027710300589045057
+        },
+        "baseline": 0.09015625000000002,
+        "critic_gradient": {
+          "actor_value_all_grads_unused": true,
+          "actor_value_gradient_norm": 0.0,
+          "combined_critic_gradient_norm_before_clipping": 2.6946886614428864,
+          "critic_parameter_gradient_norms": {
+            "0.bias": 0.08769389338814566,
+            "0.weight": 2.6583465946869187,
+            "2.bias": 0.16721883416175842,
+            "2.weight": 0.39860758546385644
+          },
+          "policy_and_branch_critic_all_grads_unused": true,
+          "value_component_gradient_norm_before_clipping": 2.6946886614428864
+        },
+        "episode_decision_count": {
+          "max": 47.0,
+          "mean": 22.7890625,
+          "min": 10.0,
+          "n": 128,
+          "p10": 13.0,
+          "p50": 20.0,
+          "p90": 36.3,
+          "sd": 8.984371683498189
+        },
+        "episode_length_vs_absolute_advantage_pearson": 0.42391546068814645,
+        "episode_length_vs_absolute_episode_policy_term_pearson": 0.7497242854520056,
+        "episode_policy_term_magnitude": {
+          "max": 5.331997394561768,
+          "mean": 0.9447762300260365,
+          "min": 0.1832311451435089,
+          "n": 128,
+          "p10": 0.2869102329015732,
+          "p50": 0.570200651884079,
+          "p90": 2.458446359634399,
+          "sd": 0.9961431434597242
+        },
+        "gradient_clipping": {
+          "actor_clipped": false,
+          "actor_preclip_norm": 0.0017370486350209895,
+          "actor_scale_applied": 1.0,
+          "clip_norm": 1.0,
+          "critic_clipped": true,
+          "critic_postclip_norm": 1.0,
+          "critic_preclip_norm": 2.6946886614428864,
+          "critic_scale_applied": 0.3711003851051736
+        },
+        "loss_terms": {
+          "branch_example_count": 180,
+          "branch_loss": 0.060413461178541183,
+          "branch_positive_weight_stats": {
+            "max": 0.15,
+            "mean": 0.041999999999999996,
+            "min": 0.009999999999999995,
+            "n": 180,
+            "p10": 0.009999999999999995,
+            "p50": 0.030000000000000006,
+            "p90": 0.09,
+            "sd": 0.030496817308069833
+          },
+          "branch_reduction": "mean over completed superior branch alternatives with positive clipped reward delta",
+          "entropy_component": -0.012779919430613518,
+          "entropy_unscaled": 1.2779920101165771,
+          "policy_gradient": 0.34094199538230896,
+          "policy_reduction": "mean over 128 owner terms; each owner term sums its chosen log-probabilities over all categorical decisions",
+          "total": 0.4042658805847168,
+          "value_and_entropy_reduction": "mean over every categorical decision across the 128 owners",
+          "value_component": 0.015690341591835022,
+          "value_loss_unscaled": 0.031380683183670044
+        },
+        "owner_advantage": {
+          "max": 0.09984374999999998,
+          "mean": -1.8214596497756474e-17,
+          "min": -0.05015625000000002,
+          "n": 128,
+          "p10": -0.030156250000000023,
+          "p50": -0.01015625000000002,
+          "p90": 0.04984374999999999,
+          "sd": 0.034504008097656566
+        },
+        "owner_terminal_reward": {
+          "max": 0.19,
+          "mean": 0.09015625000000002,
+          "min": 0.04,
+          "n": 128,
+          "p10": 0.06,
+          "p50": 0.08,
+          "p90": 0.14,
+          "sd": 0.034504008097656566
+        }
+      },
+      "historical_optimizer_state_source": "empty Adam state before block 1; exact saved block_{n-1} optimizer_state for subsequent blocks",
+      "non_numeric_metric_mismatches": [],
+      "optimizer_state_reconstruction": {
+        "errors": [],
+        "max_abs_tensor_difference": 0.0,
+        "max_relative_tensor_difference": 0.0,
+        "passed_exact": true,
+        "scalar_mismatch_count": 0,
+        "state_parameter_count": 10,
+        "state_tensor_count": 30
+      },
+      "owner_count": 128,
+      "passed": true,
+      "recorded_block_start_digest": "7229296c0b3459b788ca6e2e7906d7189dc1cf2c9693134f5dfc1e398d5c81ac",
+      "recorded_loss_metric_deltas": {
+        "actor_gradient_norm_before_clip": 0.0,
+        "branch_loss_term": 0.0,
+        "critic_gradient_norm_before_clip": 0.0,
+        "entropy_mean": 0.0,
+        "policy_gradient_term": 0.0,
+        "terminal_reward_baseline": 0.0,
+        "total_loss": 0.0,
+        "value_loss_term": 0.0
+      },
+      "recorded_model_digest": "bd424e96cfa29f6a7a4a29917ea5b72001fb69d8b4ba232516013c4ec36288f3",
+      "replayed_model_digest": "bd424e96cfa29f6a7a4a29917ea5b72001fb69d8b4ba232516013c4ec36288f3",
+      "replayed_vs_checkpoint_model_max_abs_difference": 0.0,
+      "seed_first": 7410385,
+      "seed_last": 7410512
+    }
+  ],
+  "generated_at_utc": "2026-10-23T02:11:25.764194+00:00",
+  "initial_digest": "a7a91b18f1ab44af53b9fb5fd2810e55a1fe5c8ee963e97651d992edb86e4d0c",
+  "passed": true,
+  "phase": "historical_update_replay",
+  "replay_count": 4,
+  "replay_scope": "exactly the four historical authorized Adam steps; one in-memory step for each original 128-owner block; no new formal data or checkpoint writes",
+  "status": "PASS"
+}

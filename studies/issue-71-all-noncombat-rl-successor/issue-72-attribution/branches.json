@@ -1,0 +1,899 @@
+{
+  "block_reconciliation": {
+    "1": {
+      "branch_cpu_seconds": 375.4836168450003,
+      "by_screen": {
+        "CARD_SELECT": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 48,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 48,
+          "positive_weight_labels": 15,
+          "selected_candidate_probability_stats": {
+            "max": 0.10000171512365341,
+            "mean": 0.1000015246681869,
+            "min": 0.10000111907720566,
+            "n": 48,
+            "p10": 0.10000116378068924,
+            "p50": 0.1000014990568161,
+            "p90": 0.10000171512365341,
+            "sd": 1.9315889496290073e-07
+          },
+          "signed_delta_counts": {
+            "negative": 19,
+            "positive": 15,
+            "zero": 14
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.1,
+            "mean": -0.005833333333333335,
+            "min": -0.09000000000000001,
+            "n": 48,
+            "p10": -0.07300000000000001,
+            "p50": 0.0,
+            "p90": 0.05300000000000005,
+            "sd": 0.043848546560416264
+          }
+        },
+        "EVENT_SCREEN": {
+          "decision_depth_stats": {
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 254,
+            "p10": 0.0,
+            "p50": 0.0,
+            "p90": 0.0,
+            "sd": 0.0
+          },
+          "n": 254,
+          "positive_weight_labels": 97,
+          "selected_candidate_probability_stats": {
+            "max": 0.2500041127204895,
+            "mean": 0.2500008608647219,
+            "min": 0.24999746680259705,
+            "n": 254,
+            "p10": 0.24999919533729553,
+            "p50": 0.250000923871994,
+            "p90": 0.2500026851892471,
+            "sd": 1.2877697341672275e-06
+          },
+          "signed_delta_counts": {
+            "negative": 107,
+            "positive": 97,
+            "zero": 50
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.13,
+            "mean": -0.002440944881889764,
+            "min": -0.14,
+            "n": 254,
+            "p10": -0.07,
+            "p50": 0.0,
+            "p90": 0.06,
+            "sd": 0.04785050064264627
+          }
+        },
+        "MAP_SCREEN": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 123,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 123,
+          "positive_weight_labels": 46,
+          "selected_candidate_probability_stats": {
+            "max": 0.5000013113021851,
+            "mean": 0.2926835686695285,
+            "min": 0.20000021159648895,
+            "n": 123,
+            "p10": 0.24999905228614808,
+            "p50": 0.2500035762786865,
+            "p90": 0.33333595395088195,
+            "sd": 0.06051293029698804
+          },
+          "signed_delta_counts": {
+            "negative": 50,
+            "positive": 46,
+            "zero": 27
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.1,
+            "mean": -0.0015447154471544707,
+            "min": -0.12,
+            "n": 123,
+            "p10": -0.06,
+            "p50": 0.0,
+            "p90": 0.06,
+            "sd": 0.047512423230023304
+          }
+        },
+        "REWARDS": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 78,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 78,
+          "positive_weight_labels": 34,
+          "selected_candidate_probability_stats": {
+            "max": 0.2500055134296417,
+            "mean": 0.2478641172250112,
+            "min": 0.16666728258132935,
+            "n": 78,
+            "p10": 0.24999890029430388,
+            "p50": 0.25000056624412537,
+            "p90": 0.2500026673078537,
+            "sd": 0.013257031675813895
+          },
+          "signed_delta_counts": {
+            "negative": 26,
+            "positive": 34,
+            "zero": 18
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.1,
+            "mean": 0.01230769230769231,
+            "min": -0.08,
+            "n": 78,
+            "p10": -0.030000000000000002,
+            "p50": 0.0,
+            "p90": 0.07299999999999998,
+            "sd": 0.03860970461826004
+          }
+        }
+      },
+      "loss_reconstruction_label_count_matches": true,
+      "positive_weight_label_count": 192,
+      "positive_weight_sum": 8.4,
+      "seed_first": 7410001,
+      "seed_last": 7410128,
+      "signed_reward_delta_counts": {
+        "negative": 202,
+        "positive": 192,
+        "zero": 109
+      },
+      "signed_reward_delta_shares_of_completed_suffixes": {
+        "negative": 0.40159045725646125,
+        "positive": 0.3817097415506958,
+        "zero": 0.21669980119284293
+      },
+      "signed_reward_delta_stats": {
+        "max": 0.13,
+        "mean": -0.0002584493041749504,
+        "min": -0.14,
+        "n": 503,
+        "p10": -0.06,
+        "p50": 0.0,
+        "p90": 0.06,
+        "sd": 0.04627706275286693
+      },
+      "terminal_suffix_count": 503,
+      "training_update_branch_examples_completed_superior": 192
+    },
+    "2": {
+      "branch_cpu_seconds": 387.9500438220006,
+      "by_screen": {
+        "CARD_SELECT": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 42,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 42,
+          "positive_weight_labels": 18,
+          "selected_candidate_probability_stats": {
+            "max": 0.10000865161418915,
+            "mean": 0.10000823633301825,
+            "min": 0.10000760108232498,
+            "n": 42,
+            "p10": 0.10000793635845184,
+            "p50": 0.1000080555677414,
+            "p90": 0.10000860691070557,
+            "sd": 3.2022515632291274e-07
+          },
+          "signed_delta_counts": {
+            "negative": 16,
+            "positive": 18,
+            "zero": 8
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.1,
+            "mean": 0.008333333333333331,
+            "min": -0.08000000000000002,
+            "n": 42,
+            "p10": -0.05799999999999999,
+            "p50": 0.0,
+            "p90": 0.08899999999999998,
+            "sd": 0.04918440495784117
+          }
+        },
+        "EVENT_SCREEN": {
+          "decision_depth_stats": {
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 253,
+            "p10": 0.0,
+            "p50": 0.0,
+            "p90": 0.0,
+            "sd": 0.0
+          },
+          "n": 253,
+          "positive_weight_labels": 81,
+          "selected_candidate_probability_stats": {
+            "max": 0.2500297725200653,
+            "mean": 0.2500073126417846,
+            "min": 0.24998295307159424,
+            "n": 253,
+            "p10": 0.24999362826347352,
+            "p50": 0.25000929832458496,
+            "p90": 0.2500181317329407,
+            "sd": 9.741013649610825e-06
+          },
+          "signed_delta_counts": {
+            "negative": 111,
+            "positive": 81,
+            "zero": 61
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.13999999999999999,
+            "mean": -0.006482213438735177,
+            "min": -0.16,
+            "n": 253,
+            "p10": -0.06799999999999996,
+            "p50": 0.0,
+            "p90": 0.05,
+            "sd": 0.04606625533723718
+          }
+        },
+        "MAP_SCREEN": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 135,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 135,
+          "positive_weight_labels": 49,
+          "selected_candidate_probability_stats": {
+            "max": 0.5000049471855164,
+            "mean": 0.32160558082439283,
+            "min": 0.24999380111694336,
+            "n": 135,
+            "p10": 0.2500016510486603,
+            "p50": 0.3333299458026886,
+            "p90": 0.3333436131477356,
+            "sd": 0.06531671526299707
+          },
+          "signed_delta_counts": {
+            "negative": 61,
+            "positive": 49,
+            "zero": 25
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.15,
+            "mean": -0.004888888888888888,
+            "min": -0.16,
+            "n": 135,
+            "p10": -0.055999999999999994,
+            "p50": 0.0,
+            "p90": 0.05,
+            "sd": 0.04661475435292011
+          }
+        },
+        "REWARDS": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 64,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 64,
+          "positive_weight_labels": 18,
+          "selected_candidate_probability_stats": {
+            "max": 0.2500235140323639,
+            "mean": 0.2484426531009376,
+            "min": 0.19999927282333374,
+            "n": 64,
+            "p10": 0.24999556541442872,
+            "p50": 0.25000394880771637,
+            "p90": 0.2500147342681885,
+            "sd": 0.008767788743484358
+          },
+          "signed_delta_counts": {
+            "negative": 31,
+            "positive": 18,
+            "zero": 15
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.1,
+            "mean": -0.01125,
+            "min": -0.17,
+            "n": 64,
+            "p10": -0.08,
+            "p50": 0.0,
+            "p90": 0.06400000000000006,
+            "sd": 0.054408799475061574
+          }
+        }
+      },
+      "loss_reconstruction_label_count_matches": true,
+      "positive_weight_label_count": 166,
+      "positive_weight_sum": 7.19,
+      "seed_first": 7410129,
+      "seed_last": 7410256,
+      "signed_reward_delta_counts": {
+        "negative": 219,
+        "positive": 166,
+        "zero": 109
+      },
+      "signed_reward_delta_shares_of_completed_suffixes": {
+        "negative": 0.4433198380566802,
+        "positive": 0.3360323886639676,
+        "zero": 0.22064777327935223
+      },
+      "signed_reward_delta_stats": {
+        "max": 0.15,
+        "mean": -0.005404858299595142,
+        "min": -0.17,
+        "n": 494,
+        "p10": -0.06,
+        "p50": 0.0,
+        "p90": 0.056999999999999884,
+        "sd": 0.04770746362868726
+      },
+      "terminal_suffix_count": 494,
+      "training_update_branch_examples_completed_superior": 166
+    },
+    "3": {
+      "branch_cpu_seconds": 367.34962800099896,
+      "by_screen": {
+        "CARD_SELECT": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 52,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 52,
+          "positive_weight_labels": 24,
+          "selected_candidate_probability_stats": {
+            "max": 0.10001999884843826,
+            "mean": 0.100019120826171,
+            "min": 0.1000172570347786,
+            "n": 52,
+            "p10": 0.10001862049102783,
+            "p50": 0.10001878812909126,
+            "p90": 0.10001987963914871,
+            "sd": 8.090865134271056e-07
+          },
+          "signed_delta_counts": {
+            "negative": 16,
+            "positive": 24,
+            "zero": 12
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.1,
+            "mean": 0.008076923076923077,
+            "min": -0.1,
+            "n": 52,
+            "p10": -0.04000000000000001,
+            "p50": 0.0,
+            "p90": 0.06899999999999999,
+            "sd": 0.047775556205439045
+          }
+        },
+        "EVENT_SCREEN": {
+          "decision_depth_stats": {
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 246,
+            "p10": 0.0,
+            "p50": 0.0,
+            "p90": 0.0,
+            "sd": 0.0
+          },
+          "n": 246,
+          "positive_weight_labels": 83,
+          "selected_candidate_probability_stats": {
+            "max": 0.25005143880844116,
+            "mean": 0.25001604297781377,
+            "min": 0.24996384978294373,
+            "n": 246,
+            "p10": 0.2499837428331375,
+            "p50": 0.25002221763134,
+            "p90": 0.25004008412361145,
+            "sd": 2.118228662770323e-05
+          },
+          "signed_delta_counts": {
+            "negative": 109,
+            "positive": 83,
+            "zero": 54
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.12,
+            "mean": -0.006747967479674798,
+            "min": -0.11,
+            "n": 246,
+            "p10": -0.060000000000000005,
+            "p50": 0.0,
+            "p90": 0.04999999999999999,
+            "sd": 0.04368712386699732
+          }
+        },
+        "MAP_SCREEN": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 124,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 124,
+          "positive_weight_labels": 46,
+          "selected_candidate_probability_stats": {
+            "max": 0.5000259280204773,
+            "mean": 0.3057820591474733,
+            "min": 0.166670560836792,
+            "n": 124,
+            "p10": 0.2499992311000824,
+            "p50": 0.3333149254322052,
+            "p90": 0.3333487242460251,
+            "sd": 0.06896350887510336
+          },
+          "signed_delta_counts": {
+            "negative": 50,
+            "positive": 46,
+            "zero": 28
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.14,
+            "mean": -0.004516129032258067,
+            "min": -0.1,
+            "n": 124,
+            "p10": -0.08,
+            "p50": 0.0,
+            "p90": 0.060000000000000005,
+            "sd": 0.050900106836338714
+          }
+        },
+        "REWARDS": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 56,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 56,
+          "positive_weight_labels": 24,
+          "selected_candidate_probability_stats": {
+            "max": 0.2500268518924713,
+            "mean": 0.24703294491129263,
+            "min": 0.1666756272315979,
+            "n": 56,
+            "p10": 0.2499908059835434,
+            "p50": 0.2500101327896118,
+            "p90": 0.2500205785036087,
+            "sd": 0.015603558090252535
+          },
+          "signed_delta_counts": {
+            "negative": 18,
+            "positive": 24,
+            "zero": 14
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.1,
+            "mean": 0.004821428571428572,
+            "min": -0.1,
+            "n": 56,
+            "p10": -0.055,
+            "p50": 0.0,
+            "p90": 0.06,
+            "sd": 0.044065697705649845
+          }
+        }
+      },
+      "loss_reconstruction_label_count_matches": true,
+      "positive_weight_label_count": 177,
+      "positive_weight_sum": 7.19,
+      "seed_first": 7410257,
+      "seed_last": 7410384,
+      "signed_reward_delta_counts": {
+        "negative": 193,
+        "positive": 177,
+        "zero": 108
+      },
+      "signed_reward_delta_shares_of_completed_suffixes": {
+        "negative": 0.40376569037656906,
+        "positive": 0.3702928870292887,
+        "zero": 0.22594142259414227
+      },
+      "signed_reward_delta_stats": {
+        "max": 0.14,
+        "mean": -0.0032008368200836827,
+        "min": -0.11,
+        "n": 478,
+        "p10": -0.07,
+        "p50": 0.0,
+        "p90": 0.06,
+        "sd": 0.04631047170624219
+      },
+      "terminal_suffix_count": 478,
+      "training_update_branch_examples_completed_superior": 177
+    },
+    "4": {
+      "branch_cpu_seconds": 384.0016729309986,
+      "by_screen": {
+        "CARD_SELECT": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 63,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 63,
+          "positive_weight_labels": 20,
+          "selected_candidate_probability_stats": {
+            "max": 0.1000317856669426,
+            "mean": 0.10002996252169685,
+            "min": 0.10002624988555908,
+            "n": 63,
+            "p10": 0.10002847462892532,
+            "p50": 0.10002877563238144,
+            "p90": 0.10003172010183334,
+            "sd": 1.7171377019155142e-06
+          },
+          "signed_delta_counts": {
+            "negative": 23,
+            "positive": 20,
+            "zero": 20
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.1,
+            "mean": 0.0012698412698412705,
+            "min": -0.1,
+            "n": 63,
+            "p10": -0.048,
+            "p50": 0.0,
+            "p90": 0.058000000000000045,
+            "sd": 0.04105433313706651
+          }
+        },
+        "EVENT_SCREEN": {
+          "decision_depth_stats": {
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 243,
+            "p10": 0.0,
+            "p50": 0.0,
+            "p90": 0.0,
+            "sd": 0.0
+          },
+          "n": 243,
+          "positive_weight_labels": 88,
+          "selected_candidate_probability_stats": {
+            "max": 0.25008291006088257,
+            "mean": 0.2500216703356048,
+            "min": 0.2499396800994873,
+            "n": 243,
+            "p10": 0.24996322393417358,
+            "p50": 0.2500336170196533,
+            "p90": 0.2500683069229126,
+            "sd": 3.9276180311207197e-05
+          },
+          "signed_delta_counts": {
+            "negative": 104,
+            "positive": 88,
+            "zero": 51
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.12000000000000001,
+            "mean": -0.004320987654320987,
+            "min": -0.13,
+            "n": 243,
+            "p10": -0.06,
+            "p50": 0.0,
+            "p90": 0.058000000000000114,
+            "sd": 0.0459231734909873
+          }
+        },
+        "MAP_SCREEN": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 122,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 122,
+          "positive_weight_labels": 50,
+          "selected_candidate_probability_stats": {
+            "max": 0.5000380873680115,
+            "mean": 0.30519474200049385,
+            "min": 0.2000020444393158,
+            "n": 122,
+            "p10": 0.2499999225139618,
+            "p50": 0.3333139270544052,
+            "p90": 0.33335451781749725,
+            "sd": 0.058290590099805
+          },
+          "signed_delta_counts": {
+            "negative": 56,
+            "positive": 50,
+            "zero": 16
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.15,
+            "mean": -0.005000000000000001,
+            "min": -0.1,
+            "n": 122,
+            "p10": -0.07,
+            "p50": 0.0,
+            "p90": 0.06,
+            "sd": 0.05032538751067073
+          }
+        },
+        "REWARDS": {
+          "decision_depth_stats": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 55,
+            "p10": 1.0,
+            "p50": 1.0,
+            "p90": 1.0,
+            "sd": 0.0
+          },
+          "n": 55,
+          "positive_weight_labels": 22,
+          "selected_candidate_probability_stats": {
+            "max": 0.25004783272743225,
+            "mean": 0.2469892593947324,
+            "min": 0.16669009625911713,
+            "n": 55,
+            "p10": 0.24999306797981263,
+            "p50": 0.2500196695327759,
+            "p90": 0.25003528594970703,
+            "sd": 0.01574119952727329
+          },
+          "signed_delta_counts": {
+            "negative": 25,
+            "positive": 22,
+            "zero": 8
+          },
+          "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+            "max": 0.1,
+            "mean": -0.003272727272727273,
+            "min": -0.1,
+            "n": 55,
+            "p10": -0.06,
+            "p50": 0.0,
+            "p90": 0.06,
+            "sd": 0.04955560085154428
+          }
+        }
+      },
+      "loss_reconstruction_label_count_matches": true,
+      "positive_weight_label_count": 180,
+      "positive_weight_sum": 7.5600000000000005,
+      "seed_first": 7410385,
+      "seed_last": 7410512,
+      "signed_reward_delta_counts": {
+        "negative": 208,
+        "positive": 180,
+        "zero": 95
+      },
+      "signed_reward_delta_shares_of_completed_suffixes": {
+        "negative": 0.4306418219461698,
+        "positive": 0.37267080745341613,
+        "zero": 0.19668737060041408
+      },
+      "signed_reward_delta_stats": {
+        "max": 0.15,
+        "mean": -0.003643892339544513,
+        "min": -0.13,
+        "n": 483,
+        "p10": -0.06999999999999999,
+        "p50": 0.0,
+        "p90": 0.06,
+        "sd": 0.046802018555131344
+      },
+      "terminal_suffix_count": 483,
+      "training_update_branch_examples_completed_superior": 180
+    }
+  },
+  "branch_receipts": {
+    "all_receipt_attempt_cpu_seconds": 1569.0769441509988,
+    "attempted_alternative_count": 2004,
+    "attempted_rows_equal_distinct_attempt_ids": true,
+    "attempted_rows_without_forced_root_receipt_by_status": {
+      "INCOMPLETE_CPU_CAP": 45,
+      "INCOMPLETE_INCOMPLETE_TERMINAL": 1
+    },
+    "completed_terminal_suffix_cpu_seconds": 1514.7849615990008,
+    "distinct_attempt_id_count": 2004,
+    "file_count": 2020,
+    "forced_root_consumed_receipt_count": 1958,
+    "max_aggregate_root_cpu_seconds": 4.392491859,
+    "max_alternatives_per_root_observed": 2,
+    "max_roots_per_owner_observed": 2,
+    "no_debug_or_formal_suffix_launched_by_issue72": true,
+    "not_attempted_alternative_count": 16,
+    "one_terminal_payload_per_completed_alternative": true,
+    "owners_with_any_branch_root": 512,
+    "root_status_count": 1024,
+    "roots_over_cap": [],
+    "status_counts": {
+      "COMPLETED_NATIVE_TERMINAL": 1958,
+      "INCOMPLETE_CPU_CAP": 45,
+      "INCOMPLETE_INCOMPLETE_TERMINAL": 1,
+      "NOT_ATTEMPTED_CPU_MARGIN": 16
+    },
+    "unique_seed_root_alt_targets": 2020
+  },
+  "config_contract": {
+    "aggregate_process_cpu_seconds_per_root_max": 6.0,
+    "alternatives_per_root_max": 2,
+    "battle_search_api": "StepSimulator.battle_search_v2.v1",
+    "battle_search_simulations": 400,
+    "owners": 512,
+    "owners_per_block": 128,
+    "registered_terminal_arm_populations_unchanged": true,
+    "roots_per_owner_max": 2,
+    "suffix_policy": "same frozen policy for all later nonbattle decisions plus same native Battle Search-v2@400"
+  },
+  "depth_reconciliation": {
+    "0": {
+      "n_completed_distinct_root_alternatives": 996,
+      "screens": {
+        "EVENT_SCREEN": 996
+      },
+      "selected_candidate_probability_stats": {
+        "max": 0.25008291006088257,
+        "mean": 0.2500113265282179,
+        "min": 0.2499396800994873,
+        "n": 996,
+        "p10": 0.24998793005943298,
+        "p50": 0.25000348687171936,
+        "p90": 0.2500447630882263,
+        "sd": 2.395436109195274e-05
+      },
+      "signed_reward_delta_counts": {
+        "negative": 431,
+        "positive": 349,
+        "zero": 216
+      },
+      "signed_reward_delta_shares": {
+        "negative": 0.4327309236947791,
+        "positive": 0.35040160642570284,
+        "zero": 0.21686746987951808
+      },
+      "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+        "max": 0.13999999999999999,
+        "mean": -0.00498995983935743,
+        "min": -0.16,
+        "n": 996,
+        "p10": -0.06999999999999999,
+        "p50": 0.0,
+        "p90": 0.05,
+        "sd": 0.04588712281018914
+      }
+    },
+    "1": {
+      "n_completed_distinct_root_alternatives": 962,
+      "screens": {
+        "CARD_SELECT": 205,
+        "MAP_SCREEN": 504,
+        "REWARDS": 253
+      },
+      "selected_candidate_probability_stats": {
+        "max": 0.5000380873680115,
+        "mean": 0.24711315215346472,
+        "min": 0.10000111907720566,
+        "n": 962,
+        "p10": 0.10001862272620202,
+        "p50": 0.2500044107437134,
+        "p90": 0.33333837389945986,
+        "sd": 0.09314974979385651
+      },
+      "signed_reward_delta_counts": {
+        "negative": 391,
+        "positive": 366,
+        "zero": 205
+      },
+      "signed_reward_delta_shares": {
+        "negative": 0.40644490644490644,
+        "positive": 0.3804573804573805,
+        "zero": 0.2130977130977131
+      },
+      "signed_reward_delta_stats_pooled_across_distinct_roots_and_actions": {
+        "max": 0.15,
+        "mean": -0.0011642411642411648,
+        "min": -0.17,
+        "n": 962,
+        "p10": -0.06,
+        "p50": 0.0,
+        "p90": 0.06,
+        "sd": 0.04763388000515521
+      }
+    }
+  },
+  "diagnostic_cpu_seconds": 0.0,
+  "errors": [],
+  "generated_at_utc": "2026-10-23T02:15:19.313860+00:00",
+  "interpretation": {
+    "CRN": "The nominal owner seed does not establish common random numbers across alternatives: actions can consume different native RNG streams and transition into different states before subsequent random draws.",
+    "one suffix per completed alternative": "Each unique seed/root/alt target has one retained branch receipt/attempt_id and, when complete, one terminal outcome. Interrupted and not-attempted receipts remain outcomes; no retry was launched.",
+    "selection": "The branch alternatives are selected from the frozen policy's highest-probability nonchosen actions, so labels are action-selected and screen/depth selected rather than an unselected random sample.",
+    "variance": "These signed deltas describe realized paired root/alternative suffixes only. One realized suffix per action cannot estimate E[R|s,a], Var(R|s,a), or the action-conditional expected advantage."
+  },
+  "native_debug_probe_cpu_seconds": 0.0,
+  "phase": "branch_receipts",
+  "selection_dependence_descriptive_only": {
+    "branch_selection_rule": "up to two frozen-policy highest-probability nonchosen legal actions at each of up to two earliest categorical roots per owner",
+    "selected_candidate_probability_stats": {
+      "max": 0.5000380873680115,
+      "mean": 0.2485874022439929,
+      "min": 0.10000111907720566,
+      "n": 1958,
+      "p10": 0.10003166645765305,
+      "p50": 0.25000418722629547,
+      "p90": 0.33333154022693634,
+      "sd": 0.0652912525579601
+    },
+    "selected_candidate_probability_vs_signed_reward_delta_pearson": -0.02754787444748484,
+    "warning": "These pooled descriptive relationships mix distinct owners, states, screens, action identities, and episode depths; they are not causal or inferential estimates and do not identify conditional terminal variance."
+  },
+  "status": "PASS"
+}
