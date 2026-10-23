@@ -53,8 +53,10 @@ CAPTURE_REPORT_PATH = OUT / "reports" / "source-history-capture-report-v3.json"
 CAPTURE_FAILURE_PATH = OUT / "reports" / "source-history-capture-failure-v3.json"
 RESOURCE_LEDGER_PATH = OUT / "resource-ledger.json"
 LEGACY_MANIFEST_RECONCILIATION_PATH = OUT / "reports" / "stage0-manifest-integrity-reconciliation-v1.json"
-PRELOCK_STATIC_DEBIT_PATH = OUT / "attempts" / "builder-prelock-static-verification-v1.json"
+PRELOCK_STATIC_DEBIT_PATH = OUT / "attempts" / "builder-prelock-static-verification-20261023.json"
 PRELOCK_STATIC_DEBIT_KEY = "builder-prelock-static-verification-20261023"
+PRELOCK_STATIC_DEBIT_PRESERVED_PATH = OUT / "reports" / "builder-prelock-static-verification-v1-initial.json"
+PRELOCK_STATIC_DEBIT_RECONCILIATION_PATH = OUT / "reports" / "prelock-static-debit-path-key-reconciliation-v1.json"
 PRELOCK_STATIC_DEBIT_CPU_SECONDS = 30.0
 PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH = OUT / "ledgers" / "resource-ledger-before-v3.json"
 NATIVE_GATE_BC_CAP = 2520.0
@@ -75,6 +77,8 @@ PRIOR_QUALIFICATION_FILES = (
     OUT / "attempts" / "runtime-metrics-after-failed-attempt-v2.jsonl",
     LEGACY_MANIFEST_RECONCILIATION_PATH,
     PRELOCK_STATIC_DEBIT_PATH,
+    PRELOCK_STATIC_DEBIT_PRESERVED_PATH,
+    PRELOCK_STATIC_DEBIT_RECONCILIATION_PATH,
     PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH,
 )
 BRANCH = "codex/issue-73-stage0-replay-qualification"
@@ -268,6 +272,52 @@ def ensure_prelock_static_debit() -> None:
             raise QualificationFailure("prelock static debit receipt is immutable and differs from its registered reservation")
         return
     runner.atomic_json(PRELOCK_STATIC_DEBIT_PATH, receipt)
+
+
+def ensure_prelock_static_debit_reconciliation() -> None:
+    """Preserve and account for the first prelock receipt's filename/key typo."""
+    preserved_path = PRELOCK_STATIC_DEBIT_PRESERVED_PATH
+    if not preserved_path.is_file():
+        raise QualificationFailure("the initial prelock debit receipt must be preserved before reconciliation")
+    preserved = json.loads(preserved_path.read_text(encoding="utf-8"))
+    expected_initial = {
+        "schema_id": "issue73-checkpoint-replay-attempt-v1",
+        "key": "builder-prelock-static-verification-20261023",
+        "kind": "prelock_static_source_config_and_manifest_verification",
+        "status": "COMPLETE_CONSERVATIVE_STATIC_DEBIT",
+        "native_gate_bc": False,
+        "reserved_cpu_seconds": PRELOCK_STATIC_DEBIT_CPU_SECONDS,
+        "cpu_charged_seconds": PRELOCK_STATIC_DEBIT_CPU_SECONDS,
+        "measurement_status": "CONSERVATIVE_FIXED_RESERVATION; UNUSED_CPU_NOT_RECLAIMED",
+        "source_lock_sha256": None,
+        "formal_seed_consumed": False,
+        "note": "Covers the bounded prelock source/static verification pass; charged before verification and remains charged regardless of measured use.",
+    }
+    if preserved != expected_initial:
+        raise QualificationFailure("the preserved initial prelock debit differs from the exact task-created receipt")
+    receipt = {
+        "schema_id": "issue73-prelock-static-debit-path-key-reconciliation-v1",
+        "status": "INITIAL_RECEIPT_PRESERVED_AND_CORRECTED_WITHOUT_DUPLICATE_CHARGE",
+        "initial_attempt_path": "attempts/builder-prelock-static-verification-v1.json",
+        "preserved_initial_receipt_path": preserved_path.relative_to(OUT).as_posix(),
+        "preserved_initial_receipt_sha256": runner.sha256_text_file(preserved_path),
+        "initial_filename_stem": "builder-prelock-static-verification-v1",
+        "initial_receipt_key": preserved["key"],
+        "corrected_attempt_path": PRELOCK_STATIC_DEBIT_PATH.relative_to(OUT).as_posix(),
+        "corrected_receipt_key": PRELOCK_STATIC_DEBIT_KEY,
+        "fixed_debit_seconds": PRELOCK_STATIC_DEBIT_CPU_SECONDS,
+        "charge_count": 1,
+        "native_execution_started": False,
+        "source_lock_created_at_failure": False,
+        "cause": "Initial static debit receipt key and path stem did not match the ledger's attempt integrity invariant.",
+        "disposition": "Preserve the original bytes as a report input and create a corrected same-reservation attempt receipt; no result or failure receipt was overwritten.",
+    }
+    if PRELOCK_STATIC_DEBIT_RECONCILIATION_PATH.exists():
+        existing = json.loads(PRELOCK_STATIC_DEBIT_RECONCILIATION_PATH.read_text(encoding="utf-8"))
+        if existing != receipt:
+            raise QualificationFailure("prelock static debit reconciliation is immutable and differs from the recorded correction")
+        return
+    runner.atomic_json(PRELOCK_STATIC_DEBIT_RECONCILIATION_PATH, receipt)
 
 
 def ensure_prelock_resource_ledger_snapshot() -> None:
@@ -610,6 +660,7 @@ def prepare_lock() -> dict[str, Any]:
         push_scoped_commit("Issue 73: commit prospective replay source lock")
         return lock
     ensure_prelock_static_debit()
+    ensure_prelock_static_debit_reconciliation()
     ensure_legacy_manifest_reconciliation()
     ensure_prelock_resource_ledger_snapshot()
     mutable_run_outputs = {OUT / "environment.json", OUT / "runtime-metrics.jsonl"}
