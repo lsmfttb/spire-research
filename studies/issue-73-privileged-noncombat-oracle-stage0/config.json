@@ -1,0 +1,305 @@
+{
+  "action_space": {
+    "battle_leaf_value_callback": null,
+    "battle_policy_prior_callback": null,
+    "battle_root_selection": "highest_mean",
+    "excluded_kinds": [],
+    "include_potions": true,
+    "stsrl": "ActionSpaceConfig.include_all()"
+  },
+  "battle_search": {
+    "include_potions": true,
+    "leaf_value_callback": null,
+    "native_api": "StepSimulator.battle_search_v2.v1",
+    "patch_identity": "sts_lightspeed_battle_search_v2_tree_internal_v1",
+    "policy_prior_callback": null,
+    "rollout_policy": "BattleScumSearcher2::playoutRandom",
+    "root_selection_rule": "highest_mean",
+    "simulations": 400,
+    "terminal_utility": "BattleScumSearcher2::evaluateEndState"
+  },
+  "continuations": {
+    "reason": "Gate C is separately registered under stage0.gate_c; no Stage 1 continuation work is authorized.",
+    "stage1_authorized": false,
+    "stage1_registered": false
+  },
+  "disposition": "STUDY_ONLY_STAGE0_A_B_C",
+  "evaluation": {
+    "arms": [],
+    "formal_evaluation_authorized": false,
+    "formal_seed_ids": [],
+    "owner_count": 0,
+    "reason": "Stage 1 is unregistered and requires separate explicit Planner activation after independent Stage 0 review.",
+    "stage1_registered": false
+  },
+  "identity": {
+    "base_study_commit": "ba2eb50a1145916deec8ea1a37e0d5c7e669d178",
+    "base_study_remote": "https://github.com/lsmfttb/spire-research.git",
+    "native_binary_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+    "native_build": {
+      "cmake_policy_version_minimum": "3.5",
+      "jobs": 2,
+      "json_submodule_commit": "0b345b20c888f7dc8888485768e4bf9a6be29de0",
+      "pybind11_submodule_commit": "d03662f0984f652b60e7ddce53d3868002275197",
+      "target": "slaythespire",
+      "tested_source_commit_override": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+      "type": "Release"
+    },
+    "native_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+    "native_module": "slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_repository": "https://github.com/lsmfttb/sts_lightspeed",
+    "native_source_branch": "stsrl/main",
+    "native_source_files_sha256": {
+      "bindings/slaythespire.cpp": "72e1df24c3f1c2663480593e2884db72deedf5d05c026b8f7bdedb967d14a666",
+      "src/game/GameContext.cpp": "d56e84da34c234b4d53d45b1d68ef0627b271c94b9ce334999d8887407dc7712",
+      "src/sim/search/GameAction.cpp": "72c5fac3188b5830cc2d6b6a897da8d0ffbfc2d413059f8d1ad13ba4c1b014dc"
+    },
+    "native_source_remote": "https://github.com/lsmfttb/sts_lightspeed.git",
+    "numpy": "2.4.6",
+    "python": "3.13.13",
+    "source_lock": "issue73-config-lock plus study source-file SHA256s, exact native/STSRL commits, loaded binary digest, and Python runtime pins",
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stsr_native_integration_commit": "d61c7c2a120aa90730fd8530718a7cd7cd856b46",
+    "stsr_repository": "https://github.com/lsmfttb/STSRL",
+    "stsr_source_files_sha256": {
+      "src/sts_combat_rl/sim/controller_contract.py": "6fbeb3600b6bee7686f65d3cde0b2716a2b17dfb2b34e0a9251a088e0e5aa042",
+      "src/sts_combat_rl/sim/decision_record.py": "bce0b268d1eefc958ca2c3c793377a62058b4f91103e17dcb0c51e8a986325b0",
+      "src/sts_combat_rl/sim/lightspeed.py": "d2ba18eced21589fdfb853a3f2389828997330f84b9c34fc996d09a9d54e426b",
+      "src/sts_combat_rl/sim/lightspeed_source.py": "ba107b8c5b3081c70a4d645afd772a3e3a5c74386c0b2fef8040a316ab060378",
+      "src/sts_combat_rl/sim/online_controller.py": "5bbc2499d757a5a5b405d5c9f489bf6b712260c1d44a4615e9d22c6b6981198a"
+    },
+    "stsr_source_remote": "https://github.com/lsmfttb/STSRL.git",
+    "study_source_sha256": {
+      ".gitignore": "f020e1078fae512ca68fcb3a78a3db1cee7c1ded84a0ee507117ea6217ad5042",
+      "gate-a-target-direction.json": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+      "gate_a.py": "f85baf3499022c75637e7d7f35e9e824a0741ec3b087d067de7353badaa2dfa6",
+      "policy.py": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
+      "public_history_execution.py": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+      "runner.py": "a363d68b99092e8d9ab371c05cbb839ac48cb28b398505fcc8691f8458a1ff9b",
+      "stage0.py": "e110daf0ef900a346aa50b341dbb6383a8f56652166fed6a2b335594222364a8"
+    },
+    "torch": "2.12.0+cpu"
+  },
+  "information_regime": {
+    "audience": "training_oracle_only",
+    "battle": "same native Battle Search-v2@400 in every arm and continuation suffix",
+    "candidate_mapping": "source-ordered projection candidate occurrence i maps only to live legal action i; exact counts and semantic identities are checked before selection",
+    "candidate_mapping_source": "StepSimulator::legalActions ordered candidate occurrence i maps only to live legal action i; exact counts/identities validated before choice",
+    "expert": "expert_non_combat_v1 + uniform over live legal actions only under fixed \u03c0_suffix for Gate C",
+    "model_inputs": "semantic feature values and visibility tags only; no source names, candidate bindings, candidate indices, action ids, labels, bits, native slot indices, or source metadata",
+    "multi_action_states": "one shared action-conditioned categorical policy across all nonbattle screen types",
+    "nonbattle_policy": "native_privileged_noncombat_choice_projection_v1",
+    "normal_public_api_safe": false,
+    "single_action_states": "native transition, no policy row",
+    "visibility_channels": [
+      "public_now",
+      "oracle_only",
+      "unavailable"
+    ]
+  },
+  "model": {
+    "architecture": "candidate scorer Linear(2048,128)-Tanh-Linear(128,64)-Tanh-Linear(64,1); state value Linear(2048,64)-Tanh-Linear(64,1) over mean candidate vector",
+    "hash_algorithm": "blake2b-64-with-signed-feature-counts",
+    "hash_dimension": 2048,
+    "initial_policy": "near-uniform untrained categorical",
+    "initialization": "seeded PyTorch default hidden layers; final actor layer N(0,0.0001), bias 0; value layer seeded default initialization",
+    "numeric_transform": "sign(x)*log1p(abs(x))/10; clip input to [-100000,100000]",
+    "schema": "issue73-signed-hash-semantic-candidate-v1",
+    "torch_seed": 730073
+  },
+  "population": {
+    "ascension": 20,
+    "known_risk_events": [
+      "FALLING",
+      "WE_MEET_AGAIN",
+      "MYSTERIOUS_SPHERE",
+      "GOLDEN_IDOL"
+    ],
+    "native_disable_prismatic_shard": true,
+    "player_class": "IRONCLAD",
+    "primary_analysis_exclusions": [],
+    "shard_exposures_included": false,
+    "source_qualification_marker_is_authority": false,
+    "start": "native_standard_start"
+  },
+  "preflight": {
+    "arms": [],
+    "formal_preflight_authorized": false,
+    "owner_count": 0,
+    "reason": "Stage 1 preflight is unregistered and unauthorized.",
+    "seed_ids": [],
+    "stage1_registered": false
+  },
+  "resources": {
+    "all_in_ceiling_seconds": 6000,
+    "branch_cpu_upper_bound_seconds": 2400,
+    "branch_limits_enforced_in_forked_linux_children": false,
+    "builder_cpu_hard_cap_seconds": 4800,
+    "compile_configure_charge_note": "No build or formal seed; setup and all failed or incomplete Stage0 processes debit the 4800 Builder ceiling",
+    "compile_configure_cpu_seconds_already_used": 0,
+    "cpu_margin_seconds": 0,
+    "max_steps_per_natural_run": 4096,
+    "native_gate_bc_cpu_ceiling_seconds": 2400,
+    "native_process_topology": "single pinned Linux Python process; no branch subprocesses; worker RLIMIT_CPU hard ceiling and per-attempt process CPU checks",
+    "native_worker_cpu_rlimit_hard_seconds": 2400,
+    "native_worker_cpu_rlimit_soft_seconds": 2399,
+    "no_selective_retries": true,
+    "preflight_projection": {
+      "engineering_margin_seconds": 0,
+      "future_natural_owner_arm_runs": 0,
+      "method": "Stage 1 projection is not activated or charged in this Stage 0 config",
+      "run_cpu_inflation_factor": 0,
+      "stage1_authorized": false
+    },
+    "reviewer_cpu_reserve_seconds": 1200,
+    "root_attempt_cpu_cap_seconds": 120,
+    "stage1_budget": {
+      "cpu_ceiling_seconds": null,
+      "formal_execution_authorized": false,
+      "reason": "Planner activation required after independent review of all Stage0 gates and measured cohort budget"
+    }
+  },
+  "runtime_optimizer": {
+    "excluded_features": [
+      "expert_training_decisions",
+      "expert_policy_continuation",
+      "legacy_source_pins",
+      "legacy_policy_schema"
+    ],
+    "optimizer_id": "issue65-demand-driven-public-history-v1",
+    "reused_features": [
+      "demand_driven_public_history",
+      "validated_append_only_history",
+      "phase_telemetry"
+    ],
+    "sha256": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+    "source_commit": "30efe12bcedb65a432f1a57756a930baed90c5d5",
+    "source_path": "studies/issue-64-joint-trajectory-repair/public_history_execution.py",
+    "source_repository": "https://github.com/lsmfttb/spire-research",
+    "study_local_copy": true,
+    "telemetry": true
+  },
+  "source_reference": {
+    "design_reference": "issue-73-authorized-stage0-contract; exact issue body plus latest Planner dispatch comment",
+    "design_reference_is_not_an_authenticated_executed_config": true,
+    "historical_issue70_config_or_lock_reused": false,
+    "historical_issues_not_replayed": [
+      71,
+      72
+    ],
+    "implementation_source": "spire-research@ba2eb50a1145916deec8ea1a37e0d5c7e669d178:studies/issue-71-all-noncombat-rl-successor"
+  },
+  "stage0": {
+    "authorized_phase": "debug-only-gates-A-B-C",
+    "capture_all_multichoice_roots": true,
+    "debug_owner_seeds": [
+      173730001,
+      173730002,
+      173730003,
+      173730004,
+      173730005,
+      173730006,
+      173730007,
+      173730008
+    ],
+    "debug_seed_domain": "issue73-precommitted-nonformal-debug-only-disjoint-from-all-registered-owner-ranges",
+    "debug_seed_first": 173730001,
+    "debug_seed_last": 173730008,
+    "formal_evaluation_seed_consumed": false,
+    "formal_training_seed_consumed": false,
+    "gate_b": {
+      "checkpoint_persistence_required": true,
+      "hidden_semantic": {
+        "candidate_feature": "oracle_destination_room",
+        "screen": "MAP_SCREEN",
+        "source": "MapNode::room",
+        "visibility": "oracle_only"
+      },
+      "minimum_distinct_screen_families": 3,
+      "post_two": {
+        "policy_decision_index_min": 2,
+        "screen_family_must_differ_from_hidden_and_rng_families": true
+      },
+      "public_negative_test": "public-only PrivilegedNoncombatProjectionAccess audience rejected; sanitized public projection must not contain oracle-only field names or values",
+      "rng_consequence": {
+        "availability": "unavailable",
+        "candidate_feature": "unrevealed_loot",
+        "consequence": "public relic/gold reward revealed by legal open-chest transition",
+        "native_rng_sources": [
+          "GameContext::openTreasureRoomChest uses treasureRng.random and returnRandomRelic"
+        ],
+        "reason_contains": "specific chest loot is not materialized until openTreasureRoomChest executes",
+        "reveal_action_feature": "choice_type=open_chest",
+        "screen": "TREASURE_ROOM",
+        "screen_family": "TREASURE_ROOM"
+      }
+    },
+    "gate_c": {
+      "abstention_rule": "abstain unless absolute mean floor difference exceeds 2*sqrt(var0/n+var1/n)",
+      "bootstrap_repetitions": 20000,
+      "bootstrap_seed": 730732,
+      "checkpoint_requirement": "Serialize each exact opaque checkpoint, reload it on a fresh pinned adapter, verify adapter-bound exact native/public fingerprints before every forced legal action; if unsupported, block Gate C without substitutes.",
+      "independence_claim": "independent expert and uniform policy-sampling streams conditional on each persisted full-native-state root; no game-future RNG independence claim",
+      "native_rng_resampling": "none; each suffix restores identical GameContext/BattleContext RNG state. Only separately seeded expert/uniform policy decisions are resampled.",
+      "no_seed_reuse": true,
+      "nominal_total": 64,
+      "paired_actions": false,
+      "per_suffix_cpu_cap_seconds": 20,
+      "repetitions_per_action": 8,
+      "require_policy_decision_index_min": 2,
+      "root_count": 4,
+      "root_selection": "earliest roots in fixed seed/decision order; reserve earliest two distinct families; include earliest root with policy_decision_index >= 2; fill to four",
+      "screen_family_min": 2,
+      "seed_derivation": "sha256(issue73|gateC|suffix-or-expert|native_seed|run_id|root_index|candidate_index|replicate); first 64 bits masked to 63-bit positive integer; separate suffix and Expert tags",
+      "two_action_indices": [
+        "0",
+        "last_legal_occurrence"
+      ],
+      "uncertainty": "Per-action sample variance and SE; unpaired Welch mean-difference SE; independent bootstrap percentile interval; empirical pairwise rank probability with ties half-weighted; predeclared two-SE abstention."
+    },
+    "no_formal_training_or_evaluation_seeds_consumed": true,
+    "pi_suffix": "0.80 expert_non_combat_v1 + 0.20 uniform over all currently legal actions at each multichoice",
+    "pi_suffix_expert_probability": 0.8,
+    "pi_suffix_uniform_probability": 0.2,
+    "required_multichoice_roots": 24,
+    "required_natural_screens": [
+      "EVENT_SCREEN",
+      "MAP_SCREEN",
+      "REWARDS",
+      "REST_ROOM",
+      "SHOP_ROOM",
+      "TREASURE_ROOM",
+      "CARD_SELECT"
+    ],
+    "required_screen_family_count": 4,
+    "root_attempt_cpu_cap_seconds": 120,
+    "root_collection_stop": "At least 24 valid multichoice roots across four distinct families plus MAP hidden, TREASURE RNG, and third-family post-two witness; otherwise exhaust the fixed eight debug seeds. No seed reruns.",
+    "root_selection_rule": "roots sorted by debug seed then categorical decision index; first four distinct screen families first, then fill to 24 with earliest remaining roots",
+    "stage1_authorized": false,
+    "stop_after_independent_reviewer_pass": true,
+    "synthetic_target": {
+      "actor_seed": 735073,
+      "direction_file": "gate-a-target-direction.json",
+      "direction_rng": "NumPy 2.4.6 PCG64 standard_normal; float32; L2-normalized",
+      "direction_seed": 730731,
+      "direction_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+      "learning_rate": 0.003,
+      "loss": "mean cross entropy over 24 roots, one fixed target occurrence/root",
+      "minimum_tv_fraction": 0.8,
+      "target": "argmax candidate dot fixed unit direction over corrected-encoder features",
+      "target_reselection_allowed": false,
+      "total_gradient_updates_max": 128,
+      "updates_per_encoding": 64
+    }
+  },
+  "stage_status": "STAGE0_PRESEED_ONLY_AUTHORIZED",
+  "study_id": "issue-73-privileged-noncombat-oracle-stage0",
+  "training": {
+    "formal_seed_ids": [],
+    "formal_training_authorized": false,
+    "owner_count": 0,
+    "reason": "No Stage 1 training is authorized in Issue 73; Stage 0 only.",
+    "stage1_registered": false,
+    "student_training_authorized": false
+  }
+}
