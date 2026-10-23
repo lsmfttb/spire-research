@@ -164,7 +164,7 @@ def run() -> dict[str, Any]:
             "included_bytes": manifest["included_bytes"],
             "all_required_anchors_included": True,
             "all_exact_git_blob_checks_passed": True,
-            "manifest_sha256": v7.sha256_file(v7.INPUT_MANIFEST_PATH),
+            "manifest_sha256": v7.sha256_checkout_text_file(v7.INPUT_MANIFEST_PATH),
         },
         "production_prepare_lock": prepared,
         "production_verify_lock": verified,

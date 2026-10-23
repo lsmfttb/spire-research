@@ -287,7 +287,7 @@ def _run() -> dict[str, Any]:
     report = {
         "schema_id": "issue73-v7-static-input-manifest-and-capture-preflight-v1",
         "status": "PASS" if all(row["observed"] == ("PASS" if row["expected"] == "PASS" else "FAIL_OR_INCOMPLETE") for row in cases) else "FAIL",
-        "source_lock_sha256": v7.sha256_file(v7.LOCK_PATH),
+        "source_lock_sha256": v7.sha256_checkout_text_file(v7.LOCK_PATH),
         "prior_static_failure": {
             "path": v7.STATIC_TEST_FAILURE_PATH.relative_to(v7.STUDY).as_posix(),
             "sha256": v7.sha256_file(v7.STATIC_TEST_FAILURE_PATH),

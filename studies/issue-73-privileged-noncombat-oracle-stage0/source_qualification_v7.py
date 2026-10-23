@@ -18,10 +18,13 @@ REPOSITORY = q.REPOSITORY
 STUDY_RELATIVE = q.STUDY_RELATIVE
 V7_OUT = STUDY / "receipts" / "source-qualification-v7"
 V7_RELATIVE = V7_OUT.relative_to(REPOSITORY).as_posix()
-CONFIG_PATH = V7_OUT / "qualification-config-v7.json"
-PLAN_PATH = V7_OUT / "plans" / "gate-c-replay-plan-v7.json"
-LOCK_PATH = V7_OUT / "preseed-source-lock-v7.json"
-INPUT_MANIFEST_PATH = V7_OUT / "input-manifest-v7.json"
+# Keep the reviewed v7 lock and receipts immutable.  The repaired checker gets a
+# distinct prospective lock lineage after its source code is pushed.
+V7_LOCK_OUT = V7_OUT / "autocrlf-lock-repair1"
+CONFIG_PATH = V7_LOCK_OUT / "qualification-config-v7.json"
+PLAN_PATH = V7_LOCK_OUT / "plans" / "gate-c-replay-plan-v7.json"
+LOCK_PATH = V7_LOCK_OUT / "preseed-source-lock-v7.json"
+INPUT_MANIFEST_PATH = V7_LOCK_OUT / "input-manifest-v7.json"
 RESOURCE_LEDGER_PATH = V7_OUT / "resource-ledger.json"
 RESOURCE_SNAPSHOT_PATH = V7_OUT / "ledgers" / "resource-ledger-before-v7.json"
 STATIC_RESERVATION_PATH = V7_OUT / "attempts" / "builder-prelock-static-verification-v7.json"
@@ -68,6 +71,7 @@ SOURCE_HASH_PATHS_V7 = (
     "source_lock_integrity.py",
     "source_qualification_v7.py",
     "stage0.py",
+    "test_autocrlf_lock_v7.py",
     "test_pre_capture_smoke_v7.py",
     "test_source_manifest_v7.py",
 )
@@ -91,6 +95,11 @@ def sha256_bytes(payload: bytes) -> str:
 
 def sha256_file(path: Path) -> str:
     return sha256_bytes(path.read_bytes())
+
+
+def sha256_checkout_text_file(path: Path) -> str:
+    """Hash exact UTF-8 text content while ignoring only CRLF/LF checkout conversion."""
+    return sha256_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
 
 
 def read_json(path: Path) -> Any:
@@ -465,7 +474,7 @@ def prepare_lock_v7() -> dict[str, Any]:
     config["resource_caps"] = {
         **config["resource_caps"],
         **resource_projection,
-        "prelock_resource_ledger_sha256": sha256_file(RESOURCE_SNAPSHOT_PATH),
+        "prelock_resource_ledger_sha256": sha256_checkout_text_file(RESOURCE_SNAPSHOT_PATH),
         "prelock_static_debit_cpu_seconds": STATIC_RESERVATION_CPU_SECONDS,
         "no_prior_charge_reclaimed": True,
     }
@@ -490,7 +499,7 @@ def prepare_lock_v7() -> dict[str, Any]:
     config["historical_input_manifest_sha256"] = _manifest_digest(manifest)
     runner.atomic_json(INPUT_MANIFEST_PATH, manifest)
     runner.atomic_json(CONFIG_PATH, config)
-    plan["qualification_config_sha256"] = sha256_file(CONFIG_PATH)
+    plan["qualification_config_sha256"] = sha256_checkout_text_file(CONFIG_PATH)
     runner.atomic_json(PLAN_PATH, plan)
 
     lock = {
@@ -513,9 +522,9 @@ def prepare_lock_v7() -> dict[str, Any]:
         },
         "optional_runtime_output_exclusions": manifest["excluded"],
         "qualification_config": CONFIG_PATH.relative_to(STUDY).as_posix(),
-        "qualification_config_sha256": sha256_file(CONFIG_PATH),
+        "qualification_config_sha256": sha256_checkout_text_file(CONFIG_PATH),
         "gate_c_plan": PLAN_PATH.relative_to(STUDY).as_posix(),
-        "gate_c_plan_sha256": sha256_file(PLAN_PATH),
+        "gate_c_plan_sha256": sha256_checkout_text_file(PLAN_PATH),
         "study_source_sha256": code_hashes,
         "native": {
             "repository": q.OLD_CONFIG["identity"]["native_repository"],
@@ -540,9 +549,9 @@ def prepare_lock_v7() -> dict[str, Any]:
         "external_source_verification": external_sources,
         "v7_static_reservation": {
             "path": STATIC_RESERVATION_PATH.relative_to(STUDY).as_posix(),
-            "sha256": sha256_file(STATIC_RESERVATION_PATH),
+            "sha256": sha256_checkout_text_file(STATIC_RESERVATION_PATH),
             "prior_ledger_snapshot": RESOURCE_SNAPSHOT_PATH.relative_to(STUDY).as_posix(),
-            "prior_ledger_snapshot_sha256": sha256_file(RESOURCE_SNAPSHOT_PATH),
+            "prior_ledger_snapshot_sha256": sha256_checkout_text_file(RESOURCE_SNAPSHOT_PATH),
         },
         "resource_caps": resource_projection,        "fixed_gate_contract": {
             "gate_a_root_count": 24,
@@ -576,11 +585,11 @@ def verify_lock_v7(*, require_remote_current: bool = True) -> tuple[dict[str, An
         raise QualificationV7Failure("prospective v7 source lock has an invalid status")
     if lock.get("code_source_commit") != manifest.get("code_source_commit"):
         raise QualificationV7Failure("v7 lock and input manifest name different source commits")
-    if sha256_file(CONFIG_PATH) != lock.get("qualification_config_sha256"):
+    if sha256_checkout_text_file(CONFIG_PATH) != lock.get("qualification_config_sha256"):
         raise QualificationV7Failure("v7 qualification config changed after source lock")
-    if sha256_file(PLAN_PATH) != lock.get("gate_c_plan_sha256"):
+    if sha256_checkout_text_file(PLAN_PATH) != lock.get("gate_c_plan_sha256"):
         raise QualificationV7Failure("v7 Gate C roots/actions/streams plan changed after source lock")
-    if sha256_file(INPUT_MANIFEST_PATH) != lock.get("historical_input_manifest_sha256"):
+    if sha256_checkout_text_file(INPUT_MANIFEST_PATH) != lock.get("historical_input_manifest_sha256"):
         raise QualificationV7Failure("v7 bounded historical input manifest changed after source lock")
     if config.get("historical_input_manifest_sha256") != lock.get("historical_input_manifest_sha256"):
         raise QualificationV7Failure("v7 config and source lock disagree on historical input manifest")
@@ -717,7 +726,7 @@ def capture_preflight_v7(
     result = {
         "schema_id": "issue73-capture-launch-preflight-v7-v1",
         "status": "PASS",
-        "source_lock_sha256": sha256_file(LOCK_PATH),
+        "source_lock_sha256": sha256_checkout_text_file(LOCK_PATH),
         "code_source_commit": lock["code_source_commit"],
         "remote_branch": lock["remote_branch"],
         "command_argv": list(sys.argv),
