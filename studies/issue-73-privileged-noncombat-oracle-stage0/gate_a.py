@@ -13,7 +13,7 @@ import torch
 from torch import nn
 
 import runner
-from policy import AllNoncombatPolicy, SemanticHashEncoder
+from policy import AllNoncombatPolicy, PROJECTION_ORDER, SemanticHashEncoder
 
 
 def _sha_bytes(value: bytes) -> str:
@@ -235,7 +235,7 @@ def run_gate_a(roots: Sequence[Mapping[str, Any]], out: Path) -> dict[str, Any]:
         old_matrices.append(legacy)
         target_scores.append(scores)
         targets.append(target)
-        if audit.get("candidate_order_source") != runner.CONFIG["information_regime"]["candidate_mapping_source"]:
+        if audit.get("candidate_order_source") != PROJECTION_ORDER:
             raise AssertionError("candidate occurrence mapping source changed")
     steps_each = int(runner.CONFIG["stage0"]["synthetic_target"]["updates_per_encoding"])
     if steps_each * 2 > int(runner.CONFIG["stage0"]["synthetic_target"]["total_gradient_updates_max"]):

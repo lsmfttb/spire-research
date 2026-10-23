@@ -413,12 +413,18 @@ def budget_summary() -> dict[str, Any]:
     measured_attempts = sum(max(0.0, float(row.get("measured_process_cpu_seconds", 0.0))) for row in value.get("attempts", []))
     return {"charged_builder_cpu_budget_seconds": charged_cpu(value), "measured_attempt_process_cpu_seconds": measured_attempts, "observed_setup_process_cpu_seconds": observed_setup, "conservative_setup_debit_seconds": conservative_setup, "builder_ceiling_seconds": BUILDER_CEILING, "reviewer_cpu_reserve_seconds": float(CONFIG["resources"]["reviewer_cpu_reserve_seconds"]), "all_in_ceiling_seconds": float(CONFIG["resources"]["all_in_ceiling_seconds"]), "charged_native_root_gate_bc_budget_seconds": native, "native_gate_bc_ceiling_seconds": GATE_CEILING, "remaining_builder_cpu_budget_seconds": max(0.0, BUILDER_CEILING - charged_cpu(value)), "remaining_native_gate_bc_budget_seconds": max(0.0, GATE_CEILING - native)}
 
+def is_mapnode_room_source(value: Any) -> bool:
+    return isinstance(value, str) and (
+        value == "MapNode::room" or value.startswith("MapNode::room;")
+    )
+
+
 def root_has_hidden_semantic(root: Mapping[str, Any]) -> bool:
     if str(root.get("screen", "")).upper() != "MAP_SCREEN": return False
     for candidate in root.get("projection", {}).get("candidates", []):
         feature = candidate.get("features", {}) if isinstance(candidate, Mapping) else {}
         item = feature.get("oracle_destination_room") if isinstance(feature, Mapping) else None
-        if isinstance(item, Mapping) and item.get("source") == "MapNode::room" and item.get("visibility") == "oracle_only": return True
+        if isinstance(item, Mapping) and is_mapnode_room_source(item.get("source")) and item.get("visibility") == "oracle_only": return True
     return False
 
 
@@ -726,7 +732,7 @@ def run_gate_b(roots: Sequence[Mapping[str, Any]], module: Any, encoder: Any, mo
                 if replay.get("repeated_restore_and_step_equal") is not True: raise Stage0Failure("repeat restore/action-step did not agree")
                 if name == "hidden_semantic":
                     evidence = [{"field": row.get("field"), "source": row.get("source"), "visibility": row.get("visibility"), "availability": row.get("availability"), "reason": row.get("reason")} for row in root["source_tag_mapping"] if row.get("field") == "oracle_destination_room"]
-                    if not evidence or not any(row.get("source") == "MapNode::room" and row.get("visibility") == "oracle_only" for row in evidence): raise Stage0Failure("MAP_SCREEN did not expose the predeclared hidden MapNode::room semantic")
+                    if not evidence or not any(is_mapnode_room_source(row.get("source")) and row.get("visibility") == "oracle_only" for row in evidence): raise Stage0Failure("MAP_SCREEN did not expose the predeclared hidden MapNode::room semantic")
                     target_indices = [i for i in range(len(root["legal_action_identities"])) if candidate_feature(root, i, "oracle_destination_room") is not None]
                     if not target_indices: raise Stage0Failure("no live legal candidate occurrence carries the hidden MapNode::room feature")
                     step = transition_witness(root, target_indices[0])
