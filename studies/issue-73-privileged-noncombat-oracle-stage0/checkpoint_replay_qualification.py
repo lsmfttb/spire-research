@@ -42,9 +42,22 @@ REPOSITORY = STUDY.parents[1]
 STUDY_RELATIVE = STUDY.relative_to(REPOSITORY).as_posix()
 HISTORICAL = STUDY / "receipts" / "stage0"
 OUT = STUDY / "receipts" / "source-qualification-v1"
-CONFIG_PATH = OUT / "qualification-config-v1.json"
-LOCK_PATH = OUT / "preseed-source-lock-v1.json"
-PLAN_PATH = OUT / "plans" / "gate-c-replay-plan.json"
+CONFIG_PATH = OUT / "qualification-config-v2.json"
+LOCK_PATH = OUT / "preseed-source-lock-v2.json"
+PLAN_PATH = OUT / "plans" / "gate-c-replay-plan-v2.json"
+HISTORY_PATH = OUT / "histories" / "actual-action-step-history-v2.json"
+CAPTURE_ATTEMPT_KEY = "source-history-capture-173730001-pythonpath-fix-v2"
+CAPTURE_REPORT_PATH = OUT / "reports" / "source-history-capture-report-v2.json"
+CAPTURE_FAILURE_PATH = OUT / "reports" / "source-history-capture-failure-v2.json"
+RESOURCE_LEDGER_PATH = OUT / "resource-ledger.json"
+PRIOR_QUALIFICATION_FILES = (
+    OUT / "config-lock.json",
+    OUT / "qualification-config-v1.json",
+    OUT / "preseed-source-lock-v1.json",
+    OUT / "plans" / "gate-c-replay-plan.json",
+    OUT / "attempts" / "source-history-capture-173730001.json",
+    OUT / "reports" / "source-history-capture-failure.json",
+)
 BRANCH = "codex/issue-73-stage0-replay-qualification"
 OLD_CONFIG = runner.CONFIG
 SOURCE_QUAL_SEED = 173730001
@@ -257,7 +270,7 @@ def gate_c_plan(root_values: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     if len({row["screen"] for row in roots}) < 2 or not any(row["policy_decision_index"] >= 2 for row in roots):
         raise QualificationFailure("fixed Gate C roots miss screen-family or post-two coverage")
     return {
-        "schema_id": "issue73-checkpoint-replay-gate-c-plan-v1",
+        "schema_id": "issue73-checkpoint-replay-gate-c-plan-v2",
         "status": "PRECOMMITTED_BEFORE_ANY_NEW_SUFFIX_RESULT",
         "selection_rule": "original Stage 0 rule over every immutable pre-existing debug-owner root receipt, in fixed seed/decision order; reserve earliest two distinct families; include the earliest policy decision index >=2; fill to four; selected roots are fixed before new replay and never replaced after parity failure",
         "candidate_root_ids": candidate_root_ids,
@@ -326,7 +339,7 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
         "gate-b-report.json", "gate-c-report.json", "resource-ledger.json",
     ]
     config = {
-        "schema_id": "issue73-checkpoint-replay-qualification-config-v1",
+        "schema_id": "issue73-checkpoint-replay-qualification-config-v2",
         "study_id": runner.STUDY_ID,
         "source_qualification_only": True,
         "formal_training_seed_consumed": False,
@@ -349,6 +362,10 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
         "setup_resume_policy": "a crashed environment-only setup may be rerun only under a new immutable setup attempt key and a fresh CPU reservation; completed/failed Gate C suffix attempts are never rerun or replaced",
         "suffixed_policy": "0.80 expert_non_combat_v1 + 0.20 uniform among all currently legal actions at each multichoice; exact frozen existing Stage 0 rule",
         "old_debug_seeds_replay_scope": [SOURCE_QUAL_SEED],
+        "source_history_attempt_key": CAPTURE_ATTEMPT_KEY,
+        "prior_failed_attempt": {"key": "source-history-capture-173730001", "status": "FAIL_OR_INCOMPLETE", "cause": "ModuleNotFoundError: sts_combat_rl import search path omitted STSRL src/"},
+        "prior_failed_attempt_receipt_is_immutable": True,
+        "required_stsr_python_package_root": "STSRL_SOURCE_DIR/src",
         "old_debug_seeds_not_replayed": [173730002, 173730003, 173730004, 173730005, 173730006, 173730007, 173730008],
         "gates": {
             "A": "run corrected exact original fixed 24-root target/encoder test; no target reselection; <=128 gradient updates; TV>=0.05 with targeted action preference rising on >=80% roots",
@@ -394,8 +411,19 @@ def prepare_lock() -> dict[str, Any]:
         # scoped Git commit/push. This only commits the already-hashed bytes.
         push_scoped_commit("Issue 73: commit prospective replay source lock")
         return lock
-    if any(OUT.rglob("*.json")) or any(OUT.rglob("*.jsonl")):
-        raise QualificationFailure("source qualification output already contains receipts; lock cannot be regenerated")
+    allowed_prior = set(PRIOR_QUALIFICATION_FILES) | {RESOURCE_LEDGER_PATH}
+    missing_prior = [path.relative_to(STUDY).as_posix() for path in PRIOR_QUALIFICATION_FILES if not path.is_file()]
+    if missing_prior:
+        raise QualificationFailure(f"prior qualification evidence is incomplete; cannot create revision 2: {missing_prior}")
+    unexpected_prior = [path.relative_to(STUDY).as_posix() for path in OUT.rglob("*") if path.is_file() and path.suffix.lower() in {".json", ".jsonl"} and path not in allowed_prior]
+    if unexpected_prior:
+        raise QualificationFailure(f"source qualification output has unregistered receipts; lock cannot be regenerated: {unexpected_prior}")
+    stsr_root_value = os.environ.get("STSRL_SOURCE_DIR")
+    if not stsr_root_value:
+        raise QualificationFailure("STSRL_SOURCE_DIR is required to lock the Python package root")
+    stsr_python_root = (Path(stsr_root_value).resolve() / "src").resolve()
+    if not (stsr_python_root / "sts_combat_rl").is_dir() or str(stsr_python_root) not in sys.path:
+        raise QualificationFailure("STSRL_SOURCE_DIR/src must contain sts_combat_rl and be present on the Python import path")
     config, roots, plan = make_qualification_config()
     runner.atomic_json(CONFIG_PATH, config)
     plan = {**plan, "qualification_config_sha256": runner.sha256_text_file(CONFIG_PATH)}
@@ -408,6 +436,7 @@ def prepare_lock() -> dict[str, Any]:
             "preseed-source-lock-v3.json", "stage0-report.json", "gate-a-report.json",
             "gate-b-report.json", "gate-c-report.json", "resource-ledger.json",
         )),
+        *PRIOR_QUALIFICATION_FILES,
     }
     code_hashes = {name: runner.sha256_text_file(STUDY / name) for name in SOURCE_HASH_PATHS}
     current_commit = git("rev-parse", "HEAD")
@@ -422,8 +451,8 @@ def prepare_lock() -> dict[str, Any]:
     if not remote or remote[0] != current_commit:
         raise QualificationFailure("prospective source code commit must be pushed before creating the source/config lock")
     lock = {
-        "schema_id": "issue73-checkpoint-replay-preseed-source-lock-v1",
-        "lock_revision": 1,
+        "schema_id": "issue73-checkpoint-replay-preseed-source-lock-v2",
+        "lock_revision": 2,
         "status": "PRESEED_LOCKED_BEFORE_NEW_DEBUG_EXECUTION",
         "study_only": True,
         "formal_training_seed_consumed": False,
@@ -452,6 +481,7 @@ def prepare_lock() -> dict[str, Any]:
             "source_file_sha256": OLD_CONFIG["identity"]["stsr_source_files_sha256"],
         },
         "runtime": {name: OLD_CONFIG["identity"][name] for name in ("python", "torch", "numpy")},
+        "stsr_python_package_root": str(stsr_python_root),
         "historical_input_sha256": {
             path.relative_to(STUDY).as_posix(): runner.sha256_text_file(path)
             for path in sorted(old_input_paths)
@@ -475,6 +505,11 @@ def verify_lock(*, require_remote_current: bool = True) -> tuple[dict[str, Any],
     plan = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
     if lock.get("status") != "PRESEED_LOCKED_BEFORE_NEW_DEBUG_EXECUTION":
         raise QualificationFailure("prospective source lock has an invalid status")
+    stsr_root_value = os.environ.get("STSRL_SOURCE_DIR")
+    if not stsr_root_value or str((Path(stsr_root_value).resolve() / "src").resolve()) != lock.get("stsr_python_package_root"):
+        raise QualificationFailure("STSRL Python package root differs from the locked import path")
+    if lock.get("stsr_python_package_root") not in sys.path:
+        raise QualificationFailure("locked STSRL Python package root is absent from sys.path")
     if runner.sha256_text_file(CONFIG_PATH) != lock.get("qualification_config_sha256"):
         raise QualificationFailure("qualification config changed after source lock")
     if runner.sha256_text_file(PLAN_PATH) != lock.get("gate_c_plan_sha256"):
@@ -718,7 +753,7 @@ def compare_capture_run(result: Mapping[str, Any], roots: Sequence[Mapping[str, 
         root_checks[root_id_value] = fields
     target_roots = all(root_checks.get(rid) and all(root_checks[rid].values()) for rid in REQUIRED_REPLAY_ROOTS)
     report = {
-        "schema_id": "issue73-source-history-capture-v1",
+        "schema_id": "issue73-source-history-capture-v2",
         "status": "PASS" if all(checks.values()) and target_roots else "FAIL_SOURCE_HISTORY_CAPTURE_PARITY",
         "replayed_seed": SOURCE_QUAL_SEED,
         "historical_owner_treatment": "exact provenance/parity replay only; not a new owner",
@@ -776,9 +811,9 @@ def capture_transition_witness(base: Any, module: Any, root: Mapping[str, Any], 
 
 
 def load_history() -> list[dict[str, Any]]:
-    path = OUT / "histories" / "actual-action-step-history.json"
+    path = HISTORY_PATH
     value = json.loads(path.read_text(encoding="utf-8"))
-    if value.get("schema_id") != "issue73-actual-action-step-history-v1":
+    if value.get("schema_id") != "issue73-actual-action-step-history-v2":
         raise QualificationFailure("complete action/step history schema mismatch")
     events = value.get("events")
     if not isinstance(events, list) or not events:
@@ -905,12 +940,12 @@ def replay_forced_transition(adapter: Any, history: Sequence[Mapping[str, Any]],
 
 def capture_source_history() -> dict[str, Any]:
     lock, config = verify_lock()
-    attempt_key = "source-history-capture-173730001"
+    attempt_key = CAPTURE_ATTEMPT_KEY
     attempt_path = OUT / "attempts" / f"{attempt_key}.json"
     if attempt_path.exists():
         prior = json.loads(attempt_path.read_text(encoding="utf-8"))
         if prior.get("status") == "COMPLETE":
-            saved = read_json(OUT / "reports" / "source-history-capture-report.json")
+            saved = read_json(CAPTURE_REPORT_PATH)
             if saved is None:
                 raise QualificationFailure("completed source-history attempt has no durable report")
             return saved
@@ -938,9 +973,9 @@ def capture_source_history() -> dict[str, Any]:
             if len(history) != int(result.get("completed_transitions", -1)):
                 raise QualificationFailure("history does not contain one actual legal action/step receipt per native transition")
             report = compare_capture_run(result, roots, history)
-            history_path = OUT / "histories" / "actual-action-step-history.json"
+            history_path = HISTORY_PATH
             runner.atomic_json(history_path, {
-                "schema_id": "issue73-actual-action-step-history-v1",
+                "schema_id": "issue73-actual-action-step-history-v2",
                 "source_lock_sha256": runner.sha256_text_file(LOCK_PATH),
                 "owner_seed": SOURCE_QUAL_SEED,
                 "role": "historical debug owner provenance/prefix replay only; not a new owner",
@@ -1002,33 +1037,33 @@ def capture_source_history() -> dict[str, Any]:
             report["history_bytes"] = history_path.stat().st_size
             report["all_locked_transition_witnesses_repeated_equal"] = all(row.get("status") == "PASS" for row in transition_receipts.values())
             report["status"] = "PASS" if report["status"] == "PASS" and report["all_locked_transition_witnesses_repeated_equal"] and all(gate_b[name]["status"] == "PASS" for name in GATE_B_ROOTS) else "FAIL_SOURCE_HISTORY_OR_GATE_B_CAPTURE"
-            runner.atomic_json(OUT / "reports" / "source-history-capture-report.json", report)
+            runner.atomic_json(CAPTURE_REPORT_PATH, report)
         finally:
             adapter.close()
     except BaseException as exc:
         failure = {
-            "schema_id": "issue73-source-history-capture-failure-v1",
+            "schema_id": "issue73-source-history-capture-failure-v2",
             "status": "FAIL_OR_INCOMPLETE",
             "failure_type": type(exc).__name__,
             "failure": str(exc)[:1200],
             "formal_seed_consumed": False,
             "no_retry": True,
         }
-        runner.atomic_json(OUT / "reports" / "source-history-capture-failure.json", failure)
+        runner.atomic_json(CAPTURE_FAILURE_PATH, failure)
         finish_attempt(attempt_key, started_cpu=phase_start, status="FAIL_OR_INCOMPLETE", details=failure)
         raise
     finished = finish_attempt(attempt_key, started_cpu=phase_start, status="COMPLETE" if report["status"] == "PASS" else "FAIL_OR_INCOMPLETE", details={"report_status": report["status"], "history_event_count": len(history), "formal_seed_consumed": False})
     if finished.get("status") != "COMPLETE":
         report["status"] = "FAIL_CPU_RESERVATION_EXCEEDED"
     report["attempt_receipt"] = finished
-    runner.atomic_json(OUT / "reports" / "source-history-capture-report.json", report)
+    runner.atomic_json(CAPTURE_REPORT_PATH, report)
     push_scoped_commit("Issue 73: preserve source-history capture report and resource receipt")
     return report
 
 
 def fresh_process_prefix_parity() -> dict[str, Any]:
     lock, config = verify_lock()
-    capture_report_path = OUT / "reports" / "source-history-capture-report.json"
+    capture_report_path = CAPTURE_REPORT_PATH
     if not capture_report_path.exists():
         raise QualificationFailure("source history capture report is missing")
     capture_report = json.loads(capture_report_path.read_text(encoding="utf-8"))
@@ -1087,7 +1122,7 @@ def fresh_process_prefix_parity() -> dict[str, Any]:
                 "fresh_process": True,
                 "source_identity": env["identity"],
                 "runtime_identity": runtime,
-                "history_sha256": runner.sha256_text_file(OUT / "histories" / "actual-action-step-history.json"),
+                "history_sha256": runner.sha256_text_file(HISTORY_PATH),
                 "replayed_transition_count": len(results),
                 "witnesses": results,
                 "gate_b_source_capture": gate_b,
@@ -1224,7 +1259,7 @@ def setup_gate_c() -> tuple[dict[str, Any], dict[str, Any], Any, Any, Any, str, 
             "runtime_identity": runtime,
             "policy_artifact_sha256": runner.sha256_file(model_path),
             "policy_tensor_digest": model_digest,
-            "source_history_sha256": runner.sha256_text_file(OUT / "histories" / "actual-action-step-history.json"),
+            "source_history_sha256": runner.sha256_text_file(HISTORY_PATH),
             "gate_c_plan_sha256": runner.sha256_text_file(PLAN_PATH),
             "suffix_policy": config["suffixed_policy"],
             "native_rng_resampling": "none",
@@ -1455,13 +1490,13 @@ def finalize_report() -> dict[str, Any]:
     parity = read_json(OUT / "reports" / "fresh-process-prefix-parity-report.json", {})
     gate_a_report = read_json(OUT / "reports" / "gate-a-source-qualification-report.json", {})
     gate_c_report = read_json(OUT / "reports" / "gate-c-replay-uncertainty-report.json", {})
-    gate_b = read_json(OUT / "reports" / "source-history-capture-report.json", {}).get("gate_b", {})
+    gate_b = read_json(CAPTURE_REPORT_PATH, {}).get("gate_b", {})
     all_pass = parity.get("status") == "PASS" and gate_a_report.get("status") == "PASS" and gate_c_report.get("status") == "PASS" and all(gate_b.get(name, {}).get("status") == "PASS" for name in GATE_B_ROOTS)
     report = {
         "schema_id": "issue73-checkpoint-replay-source-qualification-final-v1",
         "status": "STAGE0_SOURCE_QUALIFICATION_PASS_ALL_GATES" if all_pass else "STAGE0_SOURCE_QUALIFICATION_BLOCKED_OR_FAILED",
         "durability_method": "deterministic complete action/step prefix replay in a fresh process; no native API change",
-        "source_history_capture_status": read_json(OUT / "reports" / "source-history-capture-report.json", {}).get("status"),
+        "source_history_capture_status": read_json(CAPTURE_REPORT_PATH, {}).get("status"),
         "fresh_process_parity_status": parity.get("status"),
         "gate_a_status": gate_a_report.get("status"),
         "gate_b_statuses": {name: gate_b.get(name, {}).get("status") for name in GATE_B_ROOTS},
