@@ -43,7 +43,17 @@ from policy import (
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "config.json"
-CONFIG_BYTES = CONFIG_PATH.read_bytes()
+def normalize_text_bytes(payload: bytes) -> bytes:
+    """Return canonical LF bytes for locked UTF-8 source/config artifacts."""
+    return payload.replace(b"\r\n", b"\n")
+
+
+def sha256_text_file(path: Path) -> str:
+    """Hash a text artifact independently of checkout CRLF conversion."""
+    return sha256_bytes(normalize_text_bytes(path.read_bytes()))
+
+
+CONFIG_BYTES = normalize_text_bytes(CONFIG_PATH.read_bytes())
 CONFIG_SHA256 = hashlib.sha256(CONFIG_BYTES).hexdigest()
 CONFIG_LOCK_PATH = ROOT / "config.lock.sha256"
 try:
@@ -227,7 +237,7 @@ def append_jsonl(path: Path, record: Mapping[str, Any]) -> None:
 
 
 def lock_config(out: Path) -> str:
-    digest = sha256_file(CONFIG_PATH)
+    digest = sha256_text_file(CONFIG_PATH)
     lock = CONFIG_LOCK_PATH
     if not lock.exists():
         raise StudyFailure("committed config.lock.sha256 is missing; do not consume study seeds")

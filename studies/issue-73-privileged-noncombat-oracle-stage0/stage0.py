@@ -31,7 +31,7 @@ def tree_cpu() -> float:
 
 def source_hashes() -> dict[str, str]:
     names = ("runner.py", "policy.py", "public_history_execution.py", "gate_a.py", "stage0.py", "gate-a-target-direction.json", ".gitignore")
-    return {n: runner.sha256_file(STUDY / n) for n in names}
+    return {n: runner.sha256_text_file(STUDY / n) for n in names}
 
 def verify_sources() -> dict[str, str]:
     observed = source_hashes()
@@ -935,12 +935,17 @@ def _run_gate_c_suffixes(plan: Mapping[str, Any], roots: Sequence[Mapping[str, A
 def evidence_manifest() -> dict[str, Any]:
     excluded={"evidence-manifest.json","stage0-report.json"}
     rows=[]
+    text_suffixes={".csv", ".json", ".jsonl", ".log", ".md", ".py", ".sha256", ".txt"}
     for path in sorted(STUDY.rglob("*")):
         if not path.is_file() or path.name in excluded or "__pycache__" in path.parts: continue
-        rows.append({"path":path.relative_to(STUDY).as_posix(),"bytes":path.stat().st_size,"sha256":runner.sha256_file(path)})
+        if path.suffix.lower() in text_suffixes:
+            payload=runner.normalize_text_bytes(path.read_bytes())
+        else:
+            payload=path.read_bytes()
+        rows.append({"path":path.relative_to(STUDY).as_posix(),"bytes":len(payload),"sha256":runner.sha256_bytes(payload)})
     manifest={"schema_id":"issue73-stage0-evidence-manifest-v1","files":rows,"excluded_for_nonrecursive_manifest_reference":sorted(excluded),"total_included_bytes":sum(x["bytes"] for x in rows)}
     runner.atomic_json(OUT / "evidence-manifest.json",manifest)
-    return {"path":(OUT / "evidence-manifest.json").relative_to(STUDY).as_posix(),"sha256":runner.sha256_file(OUT / "evidence-manifest.json"),"bytes":(OUT / "evidence-manifest.json").stat().st_size,"included_file_count":len(rows),"included_bytes":manifest["total_included_bytes"],"excluded":sorted(excluded)}
+    return {"path":(OUT / "evidence-manifest.json").relative_to(STUDY).as_posix(),"sha256":runner.sha256_text_file(OUT / "evidence-manifest.json"),"bytes":len(runner.normalize_text_bytes((OUT / "evidence-manifest.json").read_bytes())),"included_file_count":len(rows),"included_bytes":manifest["total_included_bytes"],"excluded":sorted(excluded)}
 
 
 def execute() -> dict[str, Any]:
