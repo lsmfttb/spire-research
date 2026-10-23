@@ -514,7 +514,9 @@ def gate_c_plan(root_values: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any]], dict[str, Any]]:
+def make_qualification_config(
+    *, source_ledger: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]], dict[str, Any]]:
     all_roots = stage0.load_roots()
     expected_candidate_seeds = set(range(SOURCE_QUAL_SEED, SOURCE_QUAL_SEED + 8))
     observed_candidate_seeds = {int(row["seed"]) for row in all_roots}
@@ -565,7 +567,7 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
         "preseed-source-lock-v3.json", "stage0-report.json", "gate-a-report.json",
         "gate-b-report.json", "gate-c-report.json", "resource-ledger.json",
     ]
-    current_builder_charge, current_native_charge = charged(ledger())
+    current_builder_charge, current_native_charge = charged(source_ledger if source_ledger is not None else ledger())
     source_capture_reserve = 60.0
     prefix_parity_reserve = 80.0
     gate_c_setup_reserve = 20.0
@@ -2303,11 +2305,29 @@ def write_evidence_manifest() -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("reserve-static-v6", "pre-capture-smoke", "prepare-lock", "verify-lock", "capture", "parity", "gate-a", "gate-c", "finalize"))
+    parser.add_argument("--qualification-version", choices=("v6", "v7"), default="v6")
+    parser.add_argument("command", choices=("reserve-static-v6", "reserve-static", "pre-capture-smoke", "prepare-lock", "verify-lock", "capture", "parity", "gate-a", "gate-c", "finalize"))
     parser.add_argument("--preflight-only", action="store_true", help="run the production capture preparation path but stop before debit/adapter/game/seed")
     parser.add_argument("--native-module-path", help="test an explicit native path; it must equal the prospective v6 locked path")
     parser.add_argument("--preflight-report-dir", help="task-local directory for capture --preflight-only diagnostics")
     args = parser.parse_args(argv)
+    if args.qualification_version == "v7":
+        if args.command not in {"reserve-static", "prepare-lock", "verify-lock", "capture"}:
+            parser.error(f"command {args.command!r} is not available for prospective v7")
+        import source_qualification_v7 as v7
+
+        v7_args = [args.command]
+        if args.command == "capture":
+            if not args.preflight_only:
+                parser.error("v7 capture is restricted to --preflight-only until independent review passes")
+            v7_args.append("--preflight-only")
+            if args.native_module_path:
+                v7_args.extend(("--native-module-path", args.native_module_path))
+            if args.preflight_report_dir:
+                v7_args.extend(("--preflight-report-dir", args.preflight_report_dir))
+        return v7.main(v7_args)
+    if args.command == "reserve-static":
+        parser.error("reserve-static requires --qualification-version v7")
     OUT.mkdir(parents=True, exist_ok=True)
     if args.command == "reserve-static-v6":
         print(json.dumps(reserve_static_v6(), sort_keys=True))
