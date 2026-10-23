@@ -53,6 +53,17 @@ def verify_sources() -> dict[str, str]:
                 raise Stage0Failure(f"{env_name}/{name} source hash differs")
     return observed
 
+def latest_preseed_lock() -> dict[str, Any] | None:
+    paths = [OUT / "preseed-source-lock.json", *sorted(OUT.glob("preseed-source-lock-v*.json"))]
+    records = []
+    for path in paths:
+        if path.exists():
+            value = read_json(path)
+            if isinstance(value, dict) and value.get("schema_id") == "issue73-preseed-source-lock-v1":
+                records.append(value)
+    return max(records, key=lambda row: int(row.get("lock_revision", 1))) if records else None
+
+
 def commit_push(message: str) -> str:
     git("add", "--", STUDY_RELATIVE)
     staged = [x for x in git("diff", "--cached", "--name-only").splitlines() if x]
@@ -214,7 +225,7 @@ def finish_attempt(key: str, *, measured_cpu: float, status: str, details: Mappi
     measured = max(0.0, float(measured_cpu))
     exceeded = measured > float(previous["reserved_cpu_seconds"])
     final_status = "FAIL_CPU_RESERVATION_EXCEEDED" if exceeded else status
-    charge = measured if final_status == "COMPLETE" or exceeded else max(float(previous["reserved_cpu_seconds"]), measured)
+    charge = measured if exceeded else max(float(previous["reserved_cpu_seconds"]), measured)
     row = {**previous, **dict(details), "status": final_status, "measured_process_cpu_seconds": measured, "cpu_charged_seconds": charge, "finished_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     write_receipt(path, row, f"Issue 73: finish fixed Stage 0 attempt {key}")
     value = ledger()
@@ -227,7 +238,7 @@ def finish_attempt(key: str, *, measured_cpu: float, status: str, details: Mappi
 def add_setup_cpu(seconds: float, label: str) -> None:
     value = ledger()
     value["setup_process_cpu_seconds"] = float(value.get("setup_process_cpu_seconds", 0.0)) + max(0.0, seconds)
-    value.setdefault("setup_segments", []).append({"label": label, "process_cpu_seconds": max(0.0, seconds)})
+    value.setdefault("setup_segments", []).append({"label": label, "process_cpu_seconds": max(0.0, seconds), "measurement_status": "OBSERVED_PROCESS_TREE_COUNTERS"})
     if charged_cpu(value) > BUILDER_CEILING:
         raise Stage0Failure("Builder CPU hard ceiling reached while accounting setup")
     runner.atomic_json(OUT / "resource-ledger.json", value)
@@ -269,12 +280,34 @@ def prepare() -> str:
     config = json.loads(config_path.read_text(encoding="utf-8"))
     if config.get("stage0", {}).get("stage1_authorized") is not False or config.get("resources", {}).get("stage1_budget", {}).get("formal_execution_authorized") is not False:
         raise Stage0Failure("preseed config must keep Stage 1 unauthorized")
-    if any((STUDY / "receipts").glob("**/*")) if (STUDY / "receipts").exists() else False:
-        raise Stage0Failure("preseed prepare refuses to overwrite existing receipt history")
-    if git("rev-parse", "HEAD") != str(config["identity"]["base_study_commit"]):
-        raise Stage0Failure("source work must begin at the exact Issue 72 remote base commit")
-    if git("rev-parse", "origin/codex/issue-72-attribution") != str(config["identity"]["base_study_commit"]):
+    previous_lock = latest_preseed_lock()
+    if previous_lock and previous_lock.get("config_sha256") != CONFIG_SHA:
+        raise Stage0Failure("existing preseed lock does not match the currently loaded config; refusing an implicit relock")
+    for relative in ("attempts", "roots", "checkpoints", "runs", "debug-owner-runs"):
+        directory = OUT / relative
+        if directory.exists() and any(path.is_file() for path in directory.rglob("*")):
+            raise Stage0Failure(f"preseed relock refuses existing Stage 0 execution evidence in {relative}")
+    for filename in ("root-collection-status.json", "gate-a-report.json", "gate-b-report.json", "gate-c-report.json", "gate-c-plan.json", "stage0-report.json"):
+        if (OUT / filename).exists():
+            raise Stage0Failure(f"preseed relock refuses existing gate evidence: {filename}")
+    current_head = git("rev-parse", "HEAD")
+    base_commit = str(config["identity"]["base_study_commit"])
+    if git("rev-parse", "origin/codex/issue-72-attribution") != base_commit:
         raise Stage0Failure("Issue 72 remote lineage moved or is unavailable")
+    if previous_lock is None:
+        if current_head != base_commit:
+            raise Stage0Failure("initial source preparation must begin at the exact Issue 72 remote base commit")
+    else:
+        remote = git("ls-remote", "origin", f"refs/heads/{BRANCH}").split()
+        prior_commit = previous_lock.get("preseed_commit")
+        if not remote or remote[0] != current_head:
+            raise Stage0Failure("preseed source relock requires the exact current remote study branch")
+        if not prior_commit:
+            raise Stage0Failure("prior preseed lock has no durable commit to supersede")
+        git("merge-base", "--is-ancestor", str(prior_commit), current_head)
+        ledger_value = ledger()
+        if ledger_value.get("attempts"):
+            raise Stage0Failure("preseed relock refuses any previously started Stage 0 attempt")
     forbidden = [line for line in (git("diff", "--name-only") + "\n" + git("diff", "--cached", "--name-only")).splitlines() if line]
     outside = [line for line in forbidden if line != STUDY_RELATIVE and not line.startswith(STUDY_RELATIVE + "/")]
     if outside:
@@ -285,8 +318,17 @@ def prepare() -> str:
     runner.atomic_bytes(config_path, encoded)
     digest = runner.sha256_bytes(encoded)
     runner.atomic_bytes(STUDY / "config.lock.sha256", (digest + "\n").encode("ascii"))
+    revision = int(previous_lock.get("lock_revision", 1)) + 1 if previous_lock else 1
+    if previous_lock:
+        previous_revision_path = OUT / f"preseed-source-lock-v{revision - 1}.json"
+        if previous_revision_path.exists():
+            if read_json(previous_revision_path) != previous_lock:
+                raise Stage0Failure("preseed lock revision archive already exists with different content")
+        else:
+            runner.atomic_json(previous_revision_path, previous_lock)
     record = {
-        "schema_id": "issue73-preseed-source-lock-v1", "status": "PRESEED_LOCKED_BEFORE_ANY_DEBUG_SEED",
+        "schema_id": "issue73-preseed-source-lock-v1", "lock_revision": revision,
+        "status": "PRESEED_LOCKED_BEFORE_ANY_DEBUG_SEED",
         "study_branch": BRANCH, "base_remote_branch": "codex/issue-72-attribution",
         "base_commit": config["identity"]["base_study_commit"], "config_sha256": digest,
         "study_source_sha256": config["identity"]["study_source_sha256"],
@@ -301,13 +343,19 @@ def prepare() -> str:
         "reviewer_cpu_reserve_seconds": config["resources"]["reviewer_cpu_reserve_seconds"],
         "native_gate_bc_cpu_ceiling_seconds": config["resources"]["native_gate_bc_cpu_ceiling_seconds"],
         "debug_seeds": config["stage0"]["debug_owner_seeds"], "created_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "supersedes_config_sha256": None if previous_lock is None else previous_lock.get("config_sha256"),
+        "supersedes_lock_commit": None if previous_lock is None else previous_lock.get("preseed_commit"),
+        "startup_failure_preserved": (OUT / "execution-failure.json").exists(),
+        "debug_attempt_count_before_lock": len(ledger().get("attempts", [])),
+        "relock_reason": "initial source-locked startup failed while comparing torch serialization file SHA to tensor-state SHA; fixed verification before any debug owner" if previous_lock else None,
     }
-    runner.atomic_json(OUT / "preseed-source-lock.json", record)
+    lock_path = OUT / "preseed-source-lock.json" if revision == 1 else OUT / f"preseed-source-lock-v{revision}.json"
+    runner.atomic_json(lock_path, record)
     commit = commit_push("Issue 73: freeze Stage 0 source and config before debug seeds")
     record["preseed_commit"] = commit
-    runner.atomic_json(OUT / "preseed-source-lock.json", record)
+    runner.atomic_json(lock_path, record)
     commit = commit_push("Issue 73: bind preseed lock to exact source commit")
-    return f"PRESEED_LOCKED config_sha256={digest} commit={commit}"
+    return f"PRESEED_LOCKED revision={revision} config_sha256={digest} commit={commit}"
 
 
 def setup_environment() -> tuple[dict[str, Any], Any, Any, dict[str, Any], Any, str]:
@@ -317,17 +365,29 @@ def setup_environment() -> tuple[dict[str, Any], Any, Any, dict[str, Any], Any, 
     if identity.get("native_module_sha256") != CONFIG["identity"]["native_binary_sha256"]:
         raise Stage0Failure("loaded native binary differs from the committed source lock")
     init_path = OUT / "policies" / "pi_init.pt"
-    model, digest = runner._load_policy(init_path, initial=True)
-    saved_digest = runner._save_policy(model, init_path)
-    if saved_digest != digest or runner._model_digest(model) != digest:
-        raise Stage0Failure("deterministic initial policy did not roundtrip under the committed runtime")
+    expected_initial_model, expected_initial_digest = runner._load_policy(init_path, initial=True)
+    if init_path.exists():
+        model, digest = runner._load_policy(init_path, initial=False)
+        if digest != expected_initial_digest:
+            raise Stage0Failure("existing initial policy artifact differs from deterministic initialization; preserving it without overwrite")
+    else:
+        model, digest = expected_initial_model, expected_initial_digest
+        saved_file_sha = runner._save_policy(model, init_path)
+        reloaded, reloaded_digest = runner._load_policy(init_path, initial=False)
+        if saved_file_sha != runner.sha256_file(init_path) or reloaded_digest != digest or runner._model_digest(reloaded) != digest:
+            raise Stage0Failure("deterministic initial policy tensor state did not roundtrip through the committed torch serialization")
+    if runner._model_digest(model) != digest:
+        raise Stage0Failure("initial policy tensor digest changed after load")
     return env, module, encoder, runtime, model, digest
 
 
 def budget_summary() -> dict[str, Any]:
     value = ledger()
     native = sum(float(row.get("cpu_charged_seconds", row.get("reserved_cpu_seconds", 0.0))) for row in value["attempts"] if row.get("native"))
-    return {"charged_builder_process_cpu_seconds": charged_cpu(value), "builder_ceiling_seconds": BUILDER_CEILING, "reviewer_reserved_seconds": float(CONFIG["resources"]["reviewer_cpu_reserve_seconds"]), "all_in_ceiling_seconds": float(CONFIG["resources"]["all_in_ceiling_seconds"]), "charged_native_root_gate_bc_cpu_seconds": native, "native_gate_bc_ceiling_seconds": GATE_CEILING, "remaining_builder_cpu_seconds": max(0.0, BUILDER_CEILING - charged_cpu(value)), "remaining_native_gate_bc_cpu_seconds": max(0.0, GATE_CEILING - native)}
+    observed_setup = sum(float(row.get("process_cpu_seconds", 0.0)) for row in value.get("setup_segments", []) if row.get("measurement_status") == "OBSERVED_PROCESS_TREE_COUNTERS")
+    conservative_setup = sum(float(row.get("process_cpu_seconds", 0.0)) for row in value.get("setup_segments", []) if row.get("measurement_status") != "OBSERVED_PROCESS_TREE_COUNTERS")
+    measured_attempts = sum(max(0.0, float(row.get("measured_process_cpu_seconds", 0.0))) for row in value.get("attempts", []))
+    return {"charged_builder_cpu_budget_seconds": charged_cpu(value), "measured_attempt_process_cpu_seconds": measured_attempts, "observed_setup_process_cpu_seconds": observed_setup, "conservative_setup_debit_seconds": conservative_setup, "builder_ceiling_seconds": BUILDER_CEILING, "reviewer_cpu_reserve_seconds": float(CONFIG["resources"]["reviewer_cpu_reserve_seconds"]), "all_in_ceiling_seconds": float(CONFIG["resources"]["all_in_ceiling_seconds"]), "charged_native_root_gate_bc_budget_seconds": native, "native_gate_bc_ceiling_seconds": GATE_CEILING, "remaining_builder_cpu_budget_seconds": max(0.0, BUILDER_CEILING - charged_cpu(value)), "remaining_native_gate_bc_budget_seconds": max(0.0, GATE_CEILING - native)}
 
 def root_has_hidden_semantic(root: Mapping[str, Any]) -> bool:
     if str(root.get("screen", "")).upper() != "MAP_SCREEN": return False
@@ -855,7 +915,7 @@ def evidence_manifest() -> dict[str, Any]:
 
 def execute() -> dict[str, Any]:
     ensure_layout()
-    locked=read_json(OUT / "preseed-source-lock.json")
+    locked=latest_preseed_lock()
     if not locked or locked.get("status") != "PRESEED_LOCKED_BEFORE_ANY_DEBUG_SEED" or locked.get("config_sha256") != CONFIG_SHA:
         raise Stage0Failure("exact committed Stage 0 preseed lock is missing or mismatched")
     if locked.get("base_commit") != CONFIG["identity"]["base_study_commit"] or locked.get("stage1_authorized") is not False:
@@ -880,7 +940,15 @@ def execute() -> dict[str, Any]:
     all_passed=all(x.get("status")=="PASS" for x in (gate_a_report,gate_b_report,gate_c_report))
     terminal="PRESEED_READY_FOR_PLANNER_ACTIVATION_DECISION" if all_passed else "PRESEED_BLOCKED"
     manifest=evidence_manifest()
-    report={"schema_id":"issue73-stage0-integrated-gates-v1","terminal_status":terminal,"registered_scope":"Stage 0 debug-only Gates A/B/C; no formal owners, training, evaluation, or Stage 1 execution", "source_status":"SOURCE_PINNED_AND_VERIFIED", "config_sha256":CONFIG_SHA,"preseed_source_lock":locked,"root_collection":root_status,"gates":{"A":gate_a_report,"B":gate_b_report,"C":gate_c_report},"gate_statuses":{"A":gate_a_report.get("status"),"B":gate_b_report.get("status"),"C":gate_c_report.get("status")},"formal_training_seed_consumed":False,"formal_evaluation_seed_consumed":False,"stage1_authorized":False,"stage1_launched":False,"native_rng_resampling_for_gate_c":False,"source_claim_limitations":["Gate A is synthetic optimization responsiveness only, not return quality or policy generalization.","Gate B hidden projection and one chest opening are native-surrogate semantics, not CommunicationMod/live fidelity or a conditional return distribution.","Gate C, if reached, estimates only full-state checkpoint conditional returns under independent stochastic policy sampling; native hidden/game future RNG is not independently resampled and Q(I_public,a) is not identified."],"resource_accounting":budget_summary(),"evidence_manifest":manifest,"finished_at_utc":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())}
+    first_failure=read_json(OUT / "execution-failure.json")
+    failure_events=[]
+    events_path=OUT / "execution-failure-events.jsonl"
+    if events_path.exists():
+        for line in events_path.read_text(encoding="utf-8").splitlines():
+            try: failure_events.append(json.loads(line))
+            except Exception: pass
+    failure_summary={"first_failure_receipt_sha256":runner.sha256_file(OUT / "execution-failure.json") if (OUT / "execution-failure.json").exists() else None,"failure_event_count":len(failure_events),"superseded_preseed_config_sha256":first_failure.get("config_sha256") if first_failure and first_failure.get("config_sha256") != CONFIG_SHA else None,"all_events_preseed_debug_attempt":all(row.get("formal_training_or_evaluation_seeds_consumed") is False for row in failure_events)}
+    report={"schema_id":"issue73-stage0-integrated-gates-v1","terminal_status":terminal,"registered_scope":"Stage 0 debug-only Gates A/B/C; no formal owners, training, evaluation, or Stage 1 execution", "source_status":"SOURCE_PINNED_AND_VERIFIED", "config_sha256":CONFIG_SHA,"preseed_source_lock":locked,"root_collection":root_status,"gates":{"A":gate_a_report,"B":gate_b_report,"C":gate_c_report},"gate_statuses":{"A":gate_a_report.get("status"),"B":gate_b_report.get("status"),"C":gate_c_report.get("status")},"preserved_preseed_startup_failures":failure_summary,"formal_training_seed_consumed":False,"formal_evaluation_seed_consumed":False,"stage1_authorized":False,"stage1_launched":False,"native_rng_resampling_for_gate_c":False,"source_claim_limitations":["Gate A is synthetic optimization responsiveness only, not return quality or policy generalization.","Gate B hidden projection and one chest opening are native-surrogate semantics, not CommunicationMod/live fidelity or a conditional return distribution.","Gate C, if reached, estimates only full-state checkpoint conditional returns under independent stochastic policy sampling; native hidden/game future RNG is not independently resampled and Q(I_public,a) is not identified."],"resource_accounting":budget_summary(),"evidence_manifest":manifest,"finished_at_utc":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())}
     runner.atomic_json(OUT / "stage0-report.json",report)
     commit_push("Issue 73: preserve integrated Stage 0 terminal report and evidence manifest")
     return report
@@ -897,7 +965,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.prepare: print(prepare()); return 0
         if args.status:
             report=read_json(OUT / "stage0-report.json")
-            print(json.dumps(report or {"status":"PRESEED_LOCKED_NOT_EXECUTED","resource_accounting":budget_summary()},indent=2,sort_keys=True)); return 0
+            print(json.dumps(report or {"status":"PRESEED_LOCKED_NOT_EXECUTED","preseed_source_lock":latest_preseed_lock(),"resource_accounting":budget_summary()},indent=2,sort_keys=True)); return 0
         report=execute()
         print(json.dumps({"terminal_status":report["terminal_status"],"gate_statuses":report["gate_statuses"],"resource_accounting":report["resource_accounting"],"evidence_manifest":report["evidence_manifest"]},indent=2,sort_keys=True))
         return 0 if report["terminal_status"] == "PRESEED_READY_FOR_PLANNER_ACTIVATION_DECISION" else 2
