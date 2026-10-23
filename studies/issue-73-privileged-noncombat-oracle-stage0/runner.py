@@ -18,6 +18,7 @@ import math
 import os
 import random
 import resource
+import shutil
 import signal
 import sys
 import threading
@@ -256,10 +257,64 @@ def lock_config(out: Path) -> str:
     return digest
 
 
+def git_invocation(path: str | Path) -> tuple[list[str], dict[str, str]]:
+    """Return checkout-bound Git command/env, using Git for Windows for WSL worktrees."""
+    root = Path(path).resolve()
+    marker = root / ".git"
+    raw_git_dir: str | None = None
+    if marker.is_dir():
+        git_dir = marker.resolve()
+    else:
+        try:
+            line = marker.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise StudyFailure(f"Git worktree metadata is unavailable for {root}: {exc}") from exc
+        prefix, separator, value = line.partition(":")
+        if prefix.lower() != "gitdir" or not separator or not value.strip():
+            raise StudyFailure(f"invalid Git worktree pointer for {root}")
+        value = value.strip().replace("\\", "/")
+        if len(value) >= 3 and value[1] == ":" and value[2] == "/":
+            raw_git_dir = value
+            if os.name != "nt":
+                git_dir = Path(f"/mnt/{value[0].lower()}/{value[3:]}")
+            else:
+                git_dir = Path(value)
+        else:
+            git_dir = Path(value)
+        if not git_dir.is_absolute():
+            git_dir = (root / git_dir).resolve()
+    env = os.environ.copy()
+    if os.name != "nt" and raw_git_dir is not None:
+        exe = env.get("ISSUE73_WINDOWS_GIT_EXE") or shutil.which("git.exe")
+        if not exe:
+            for candidate in ("/mnt/c/Program Files/Git/cmd/git.exe", "/mnt/d/Git/cmd/git.exe"):
+                if Path(candidate).is_file():
+                    exe = candidate
+                    break
+        if not exe or not Path(exe).is_file():
+            raise StudyFailure("Windows Git is required to operate on this WSL-mounted Windows worktree; set ISSUE73_WINDOWS_GIT_EXE")
+        root_text = str(root).replace("\\", "/")
+        if len(root_text) < 7 or not root_text.startswith("/mnt/") or root_text[6] != "/":
+            raise StudyFailure(f"WSL worktree path cannot be converted to a Windows Git path: {root_text}")
+        windows_root = f"{root_text[5].upper()}:/{root_text[7:]}"
+        env["GIT_DIR"] = raw_git_dir
+        env["GIT_WORK_TREE"] = windows_root
+        return [exe, "-C", windows_root], env
+    env["GIT_DIR"] = str(git_dir)
+    env["GIT_WORK_TREE"] = str(root)
+    return ["git", "-C", str(root)], env
+
+
+def git_environment(path: str | Path) -> dict[str, str]:
+    """Backward-compatible checkout-bound environment for Git subprocesses."""
+    return git_invocation(path)[1]
+
+
 def _git_identity(path: str) -> tuple[str, str]:
     import subprocess
-    commit = subprocess.check_output(["git", "-C", path, "rev-parse", "HEAD"], text=True).strip()
-    dirty = subprocess.check_output(["git", "-C", path, "status", "--porcelain"], text=True).strip()
+    command, env = git_invocation(path)
+    commit = subprocess.check_output([*command, "rev-parse", "HEAD"], text=True, env=env).strip()
+    dirty = subprocess.check_output([*command, "status", "--porcelain"], text=True, env=env).strip()
     return commit, dirty
 
 

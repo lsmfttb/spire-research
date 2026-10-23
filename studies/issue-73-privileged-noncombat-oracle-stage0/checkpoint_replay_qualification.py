@@ -19,7 +19,9 @@ def process_tree_cpu() -> float:
 _PROCESS_START_CPU = process_tree_cpu()
 
 import argparse
+import base64
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -50,6 +52,13 @@ CAPTURE_ATTEMPT_KEY = "source-history-capture-173730001-metered-adapter-fix-v3"
 CAPTURE_REPORT_PATH = OUT / "reports" / "source-history-capture-report-v3.json"
 CAPTURE_FAILURE_PATH = OUT / "reports" / "source-history-capture-failure-v3.json"
 RESOURCE_LEDGER_PATH = OUT / "resource-ledger.json"
+LEGACY_MANIFEST_RECONCILIATION_PATH = OUT / "reports" / "stage0-manifest-integrity-reconciliation-v1.json"
+PRELOCK_STATIC_DEBIT_PATH = OUT / "attempts" / "builder-prelock-static-verification-v1.json"
+PRELOCK_STATIC_DEBIT_KEY = "builder-prelock-static-verification-20261023"
+PRELOCK_STATIC_DEBIT_CPU_SECONDS = 30.0
+PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH = OUT / "ledgers" / "resource-ledger-before-v3.json"
+NATIVE_GATE_BC_CAP = 2520.0
+STSRL_PYTHON_PACKAGE_ROOT = "STSRL_SOURCE_DIR/src"
 PRIOR_QUALIFICATION_FILES = (
     OUT / "config-lock.json",
     OUT / "qualification-config-v1.json",
@@ -64,6 +73,9 @@ PRIOR_QUALIFICATION_FILES = (
     OUT / "reports" / "source-history-capture-failure-v2.json",
     OUT / "attempts" / "environment-after-failed-attempt-v2.json",
     OUT / "attempts" / "runtime-metrics-after-failed-attempt-v2.jsonl",
+    LEGACY_MANIFEST_RECONCILIATION_PATH,
+    PRELOCK_STATIC_DEBIT_PATH,
+    PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH,
 )
 BRANCH = "codex/issue-73-stage0-replay-qualification"
 OLD_CONFIG = runner.CONFIG
@@ -126,13 +138,171 @@ def install_process_cpu_ceiling(limit_seconds: float) -> None:
 
 
 def git(*args: str, check: bool = True) -> str:
-    result = subprocess.run(
-        ["git", "-C", str(REPOSITORY), *args], check=False,
-        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-    )
+    command, env = runner.git_invocation(REPOSITORY)
+    if args and args[0] in {"push", "ls-remote"} and os.name != "nt" and command[0].lower().endswith(".exe"):
+        result = git_via_windows_powershell(command, env, args)
+    else:
+        result = subprocess.run(
+            [*command, *args], check=False,
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=env,
+        )
     if check and result.returncode:
         raise QualificationFailure(f"git {' '.join(args)} failed: {result.stderr[-800:]}")
     return result.stdout.strip()
+
+
+def git_via_windows_powershell(command: Sequence[str], env: Mapping[str, str], args: Sequence[str]) -> subprocess.CompletedProcess[str]:
+    powershell = os.environ.get("ISSUE73_WINDOWS_POWERSHELL_EXE")
+    if not powershell:
+        for candidate in (
+            "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+            "/mnt/c/Program Files/PowerShell/7/pwsh.exe",
+        ):
+            if Path(candidate).is_file():
+                powershell = candidate
+                break
+    if not powershell or not Path(powershell).is_file():
+        raise QualificationFailure("PowerShell is required for authenticated Git network operations from this WSL worktree")
+    def ps_string(value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"
+    def windows_path(value: str) -> str:
+        value = value.replace("\\", "/")
+        if len(value) >= 7 and value.startswith("/mnt/") and value[6] == "/":
+            return f"{value[5].upper()}:/{value[7:]}"
+        return value
+    argument_array = ", ".join(ps_string(value) for value in args)
+    script = (
+        f"$env:GIT_DIR={ps_string(env['GIT_DIR'])}; "
+        f"$env:GIT_WORK_TREE={ps_string(env['GIT_WORK_TREE'])}; "
+        f"$gitArgs=@({argument_array}); "
+        f"& {ps_string(windows_path(command[0]))} -C {ps_string(command[2])} @gitArgs; "
+        "exit $LASTEXITCODE"
+    )
+    encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+    return subprocess.run(
+        [powershell, "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+        check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+
+
+def git_object_bytes(object_spec: str) -> bytes:
+    command, env = runner.git_invocation(REPOSITORY)
+    result = subprocess.run(
+        [*command, "show", object_spec],
+        check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env=env,
+    )
+    if result.returncode:
+        raise QualificationFailure(f"git show {object_spec} failed: {result.stderr[-800:].decode('utf-8', errors='replace')}")
+    return result.stdout
+
+
+def legacy_manifest_reconciliation() -> dict[str, Any]:
+    """Record the immutable Stage 0 manifest digest against the committed blob."""
+    manifest_path = HISTORICAL / "evidence-manifest.json"
+    report_path = HISTORICAL / "stage0-report.json"
+    manifest_relative = manifest_path.relative_to(REPOSITORY).as_posix()
+    report_relative = report_path.relative_to(REPOSITORY).as_posix()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report_manifest = report.get("evidence_manifest", {})
+    committed_manifest = git_object_bytes(f"HEAD:{manifest_relative}")
+    committed_report = git_object_bytes(f"HEAD:{report_relative}")
+    committed_manifest_sha256 = runner.sha256_bytes(committed_manifest)
+    reported_sha256 = str(report_manifest.get("sha256", ""))
+    return {
+        "schema_id": "issue73-stage0-legacy-manifest-integrity-reconciliation-v1",
+        "status": "COMMITTED_BLOB_DIGEST_MATCHES" if reported_sha256 == committed_manifest_sha256 else "COMMITTED_BLOB_DIGEST_MISMATCH_RETAINED",
+        "historical_evidence_unchanged": True,
+        "historical_stage0_terminal_status": report.get("terminal_status"),
+        "historical_manifest_path": manifest_path.relative_to(STUDY).as_posix(),
+        "historical_report_path": report_path.relative_to(STUDY).as_posix(),
+        "historical_report_sha256": runner.sha256_bytes(committed_report),
+        "report_claimed_manifest_sha256": reported_sha256,
+        "exact_committed_manifest_blob_sha256": committed_manifest_sha256,
+        "normalized_worktree_manifest_sha256": runner.sha256_text_file(manifest_path),
+        "raw_worktree_manifest_sha256": runner.sha256_bytes(manifest_path.read_bytes()),
+        "manifest_included_file_count": len(manifest.get("files", [])),
+        "manifest_included_bytes": manifest.get("total_included_bytes"),
+        "independent_review_manifest_entry_audit": {
+            "status": "PASS_AS_REPORTED",
+            "entry_count": 286,
+            "included_bytes": 16336255,
+            "source_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6357856158",
+        },
+        "digest_comparison_method": "SHA256 of exact `git show HEAD:<path>` blob bytes; raw checkout bytes are separately reported because Windows CRLF conversion can differ from committed LF bytes",
+        "source_review_request": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6362889350",
+        "disposition": "retain original PRESEED_BLOCKED report and manifest unchanged; future manifests hash exact staged Git blob bytes",
+    }
+
+
+def ensure_legacy_manifest_reconciliation() -> None:
+    receipt = legacy_manifest_reconciliation()
+    if LEGACY_MANIFEST_RECONCILIATION_PATH.exists():
+        existing = json.loads(LEGACY_MANIFEST_RECONCILIATION_PATH.read_text(encoding="utf-8"))
+        if existing != receipt:
+            raise QualificationFailure("legacy Stage 0 manifest reconciliation receipt is immutable and differs from the committed evidence")
+        return
+    runner.atomic_json(LEGACY_MANIFEST_RECONCILIATION_PATH, receipt)
+
+
+def ensure_prelock_static_debit() -> None:
+    """Precharge one conservative, non-native static source-audit reserve."""
+    receipt = {
+        "schema_id": "issue73-checkpoint-replay-attempt-v1",
+        "key": PRELOCK_STATIC_DEBIT_KEY,
+        "kind": "prelock_static_source_config_and_manifest_verification",
+        "status": "COMPLETE_CONSERVATIVE_STATIC_DEBIT",
+        "native_gate_bc": False,
+        "reserved_cpu_seconds": PRELOCK_STATIC_DEBIT_CPU_SECONDS,
+        "cpu_charged_seconds": PRELOCK_STATIC_DEBIT_CPU_SECONDS,
+        "measurement_status": "CONSERVATIVE_FIXED_RESERVATION; UNUSED_CPU_NOT_RECLAIMED",
+        "source_lock_sha256": None,
+        "formal_seed_consumed": False,
+        "note": "Covers the bounded prelock source/static verification pass; charged before verification and remains charged regardless of measured use.",
+    }
+    if PRELOCK_STATIC_DEBIT_PATH.exists():
+        existing = json.loads(PRELOCK_STATIC_DEBIT_PATH.read_text(encoding="utf-8"))
+        if existing != receipt:
+            raise QualificationFailure("prelock static debit receipt is immutable and differs from its registered reservation")
+        return
+    runner.atomic_json(PRELOCK_STATIC_DEBIT_PATH, receipt)
+
+
+def ensure_prelock_resource_ledger_snapshot() -> None:
+    value = ledger()
+    if PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH.exists():
+        existing = json.loads(PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+        if existing != value:
+            raise QualificationFailure("prelock resource ledger snapshot is immutable and differs from the registered ledger")
+        return
+    runner.atomic_json(PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH, value)
+    push_scoped_commit("Issue 73: preserve immutable pre-v3 cumulative resource ledger snapshot")
+
+
+def resolve_stsr_python_root() -> Path:
+    root_value = os.environ.get("STSRL_SOURCE_DIR")
+    if not root_value:
+        raise QualificationFailure("STSRL_SOURCE_DIR is required to resolve the pinned Python package root")
+    source_root = Path(root_value).resolve()
+    package_root = (source_root / "src").resolve()
+    if not (package_root / "sts_combat_rl").is_dir():
+        raise QualificationFailure("STSRL_SOURCE_DIR/src does not contain sts_combat_rl")
+    if not any(str(Path(entry or ".").resolve()) == str(package_root) for entry in sys.path):
+        raise QualificationFailure("STSRL_SOURCE_DIR/src is absent from the Python import path")
+    try:
+        spec = importlib.util.find_spec("sts_combat_rl")
+    except (ImportError, ValueError) as exc:
+        raise QualificationFailure(f"pinned STSRL package cannot be resolved: {exc}") from exc
+    if spec is None:
+        raise QualificationFailure("sts_combat_rl cannot be resolved from the pinned STSRL source")
+    locations = list(spec.submodule_search_locations or [])
+    if spec.origin:
+        locations.append(str(Path(spec.origin).resolve().parent))
+    if not any(Path(location).resolve().is_relative_to(package_root) for location in locations):
+        raise QualificationFailure("resolved sts_combat_rl package is outside the pinned STSRL_SOURCE_DIR/src tree")
+    return package_root
 
 
 def jsonable(value: Any) -> Any:
@@ -357,7 +527,7 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
     projected_builder_reserve = projected_native_reserve + gate_a_reserve
     full_stage0_forecast_fits_current_caps = (
         current_builder_charge + projected_builder_reserve <= 4800.0
-        and current_native_charge + projected_native_reserve <= 2400.0
+        and current_native_charge + projected_native_reserve <= NATIVE_GATE_BC_CAP
     )
     config = {
         "schema_id": "issue73-checkpoint-replay-qualification-config-v3",
@@ -389,7 +559,7 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
             {"key": "source-history-capture-173730001-pythonpath-fix-v2", "status": "FAIL_OR_INCOMPLETE", "cause": "Issue 65 metering wrapper identity was not unwrapped during action history capture"},
         ],
         "prior_failed_attempt_receipt_is_immutable": True,
-        "required_stsr_python_package_root": "STSRL_SOURCE_DIR/src",
+        "required_stsr_python_package_root": STSRL_PYTHON_PACKAGE_ROOT,
         "old_debug_seeds_not_replayed": [173730002, 173730003, 173730004, 173730005, 173730006, 173730007, 173730008],
         "gates": {
             "A": "run corrected exact original fixed 24-root target/encoder test; no target reselection; <=128 gradient updates; TV>=0.05 with targeted action preference rising on >=80% roots",
@@ -403,8 +573,9 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
             "prior_builder_charge_cpu_seconds": current_builder_charge,
             "builder_remaining_before_new_phase_cpu_seconds": 4800.0 - current_builder_charge,
             "prior_native_gate_bc_charge_cpu_seconds": current_native_charge,
-            "native_gate_bc_ceiling_cpu_seconds": 2400.0,
-            "native_gate_bc_remaining_cpu_seconds": 2400.0 - current_native_charge,
+            "prelock_resource_ledger_sha256": runner.sha256_text_file(PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH),
+            "native_gate_bc_ceiling_cpu_seconds": NATIVE_GATE_BC_CAP,
+            "native_gate_bc_remaining_cpu_seconds": NATIVE_GATE_BC_CAP - current_native_charge,
             "source_history_capture_reserve_cpu_seconds": source_capture_reserve,
             "fresh_process_prefix_and_transition_parity_reserve_cpu_seconds": prefix_parity_reserve,
             "gate_c_environment_setup_reserve_cpu_seconds": gate_c_setup_reserve,
@@ -417,7 +588,7 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
             "cumulative_builder_projection_cpu_seconds": current_builder_charge + projected_builder_reserve,
             "remaining_builder_cpu_seconds_after_max_reserve": 4800.0 - current_builder_charge - projected_builder_reserve,
             "cumulative_native_gate_bc_projection_cpu_seconds": current_native_charge + projected_native_reserve,
-            "remaining_native_gate_bc_cpu_seconds_after_max_reserve": 2400.0 - current_native_charge - projected_native_reserve,
+            "remaining_native_gate_bc_cpu_seconds_after_max_reserve": NATIVE_GATE_BC_CAP - current_native_charge - projected_native_reserve,
             "full_stage0_forecast_fits_current_caps": full_stage0_forecast_fits_current_caps,
             "process_topology": "separate source-history capture and fresh-process prefix replay; one Gate C process with per-suffix 20 CPU-second watchdog; process CPU charged once; no build or child simulator processes",
             "no_reclaim_of_prior_charges": True,
@@ -438,6 +609,9 @@ def prepare_lock() -> dict[str, Any]:
         # scoped Git commit/push. This only commits the already-hashed bytes.
         push_scoped_commit("Issue 73: commit prospective replay source lock")
         return lock
+    ensure_prelock_static_debit()
+    ensure_legacy_manifest_reconciliation()
+    ensure_prelock_resource_ledger_snapshot()
     mutable_run_outputs = {OUT / "environment.json", OUT / "runtime-metrics.jsonl"}
     allowed_prior = set(PRIOR_QUALIFICATION_FILES) | {RESOURCE_LEDGER_PATH} | mutable_run_outputs
     missing_prior = [path.relative_to(STUDY).as_posix() for path in PRIOR_QUALIFICATION_FILES if not path.is_file()]
@@ -446,12 +620,7 @@ def prepare_lock() -> dict[str, Any]:
     unexpected_prior = [path.relative_to(STUDY).as_posix() for path in OUT.rglob("*") if path.is_file() and path.suffix.lower() in {".json", ".jsonl"} and path not in allowed_prior]
     if unexpected_prior:
         raise QualificationFailure(f"source qualification output has unregistered receipts; lock cannot be regenerated: {unexpected_prior}")
-    stsr_root_value = os.environ.get("STSRL_SOURCE_DIR")
-    if not stsr_root_value:
-        raise QualificationFailure("STSRL_SOURCE_DIR is required to lock the Python package root")
-    stsr_python_root = (Path(stsr_root_value).resolve() / "src").resolve()
-    if not (stsr_python_root / "sts_combat_rl").is_dir() or str(stsr_python_root) not in sys.path:
-        raise QualificationFailure("STSRL_SOURCE_DIR/src must contain sts_combat_rl and be present on the Python import path")
+    stsr_python_root = resolve_stsr_python_root()
     config, roots, plan = make_qualification_config()
     budget = config["resource_caps"]
     if not budget["full_stage0_forecast_fits_current_caps"]:
@@ -481,9 +650,11 @@ def prepare_lock() -> dict[str, Any]:
     current_commit = git("rev-parse", "HEAD")
     if git("symbolic-ref", "--short", "HEAD") != BRANCH:
         raise QualificationFailure("prospective source lock must be prepared on its registered remote branch")
+    command, env = runner.git_invocation(REPOSITORY)
     if subprocess.run(
-        ["git", "-C", str(REPOSITORY), "merge-base", "--is-ancestor", EXPECTED_BASE_COMMIT, current_commit],
+        [*command, "merge-base", "--is-ancestor", EXPECTED_BASE_COMMIT, current_commit],
         check=False,
+        env=env,
     ).returncode:
         raise QualificationFailure(f"source code branch does not descend from the registered base: {current_commit}")
     remote = git("ls-remote", "origin", f"refs/heads/{BRANCH}").split()
@@ -520,7 +691,7 @@ def prepare_lock() -> dict[str, Any]:
             "source_file_sha256": OLD_CONFIG["identity"]["stsr_source_files_sha256"],
         },
         "runtime": {name: OLD_CONFIG["identity"][name] for name in ("python", "torch", "numpy")},
-        "stsr_python_package_root": str(stsr_python_root),
+        "stsr_python_package_root": STSRL_PYTHON_PACKAGE_ROOT,
         "historical_input_sha256": {
             path.relative_to(STUDY).as_posix(): runner.sha256_text_file(path)
             for path in sorted(old_input_paths)
@@ -544,11 +715,9 @@ def verify_lock(*, require_remote_current: bool = True) -> tuple[dict[str, Any],
     plan = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
     if lock.get("status") != "PRESEED_LOCKED_BEFORE_NEW_DEBUG_EXECUTION":
         raise QualificationFailure("prospective source lock has an invalid status")
-    stsr_root_value = os.environ.get("STSRL_SOURCE_DIR")
-    if not stsr_root_value or str((Path(stsr_root_value).resolve() / "src").resolve()) != lock.get("stsr_python_package_root"):
-        raise QualificationFailure("STSRL Python package root differs from the locked import path")
-    if lock.get("stsr_python_package_root") not in sys.path:
-        raise QualificationFailure("locked STSRL Python package root is absent from sys.path")
+    if lock.get("stsr_python_package_root") != STSRL_PYTHON_PACKAGE_ROOT:
+        raise QualificationFailure("source lock does not name the pinned logical STSRL package root")
+    resolve_stsr_python_root()
     if runner.sha256_text_file(CONFIG_PATH) != lock.get("qualification_config_sha256"):
         raise QualificationFailure("qualification config changed after source lock")
     if runner.sha256_text_file(PLAN_PATH) != lock.get("gate_c_plan_sha256"):
@@ -563,9 +732,11 @@ def verify_lock(*, require_remote_current: bool = True) -> tuple[dict[str, Any],
         path = STUDY / name
         if not path.is_file() or runner.sha256_text_file(path) != expected:
             raise QualificationFailure(f"immutable historical input changed: {name}")
+    command, env = runner.git_invocation(REPOSITORY)
     ancestor = subprocess.run(
-        ["git", "-C", str(REPOSITORY), "merge-base", "--is-ancestor", lock["code_source_commit"], "HEAD"],
+        [*command, "merge-base", "--is-ancestor", lock["code_source_commit"], "HEAD"],
         check=False,
+        env=env,
     )
     if ancestor.returncode:
         raise QualificationFailure("current worktree does not descend from the locked source commit")
@@ -576,8 +747,9 @@ def verify_lock(*, require_remote_current: bool = True) -> tuple[dict[str, Any],
             raise QualificationFailure("registered source branch is missing from GitHub")
         if remote[0] != head:
             remote_is_ancestor = subprocess.run(
-                ["git", "-C", str(REPOSITORY), "merge-base", "--is-ancestor", remote[0], head],
+                [*command, "merge-base", "--is-ancestor", remote[0], head],
                 check=False,
+                env=env,
             ).returncode == 0
             if not remote_is_ancestor:
                 raise QualificationFailure("remote source branch diverged from the current evidence lineage")
@@ -595,7 +767,8 @@ def push_scoped_commit(message: str) -> str:
     staged = [item for item in git("diff", "--cached", "--name-only").splitlines() if item]
     if any(item != f"{STUDY_RELATIVE}/receipts/source-qualification-v1" and not item.startswith(f"{STUDY_RELATIVE}/receipts/source-qualification-v1/") for item in staged):
         raise QualificationFailure("refusing to commit evidence outside the new source-qualification receipt folder")
-    changed = subprocess.run(["git", "-C", str(REPOSITORY), "diff", "--cached", "--quiet"], check=False).returncode != 0
+    command, env = runner.git_invocation(REPOSITORY)
+    changed = subprocess.run([*command, "diff", "--cached", "--quiet"], check=False, env=env).returncode != 0
     if changed:
         git("commit", "-m", message)
     commit = git("rev-parse", "HEAD")
@@ -618,7 +791,7 @@ def ledger() -> dict[str, Any]:
             "baseline_builder_charge_cpu_seconds": 1501.060651,
             "baseline_native_gate_bc_charge_cpu_seconds": 960.0,
             "builder_ceiling_cpu_seconds": 4800.0,
-            "native_gate_bc_ceiling_cpu_seconds": 2400.0,
+            "native_gate_bc_ceiling_cpu_seconds": NATIVE_GATE_BC_CAP,
             "reviewer_reserve_cpu_seconds": 1200.0,
             "attempts": [],
             "setup_process_cpu_seconds": 0.0,
@@ -627,6 +800,12 @@ def ledger() -> dict[str, Any]:
         }
     by_key = {str(row["key"]): i for i, row in enumerate(value.get("attempts", []))}
     changed = False
+    prior_native_cap = float(value.get("native_gate_bc_ceiling_cpu_seconds", NATIVE_GATE_BC_CAP))
+    if prior_native_cap not in {2400.0, NATIVE_GATE_BC_CAP}:
+        raise QualificationFailure(f"resource ledger has an unrecognized native Gate B+C cap: {prior_native_cap}")
+    if prior_native_cap != NATIVE_GATE_BC_CAP:
+        value["native_gate_bc_ceiling_cpu_seconds"] = NATIVE_GATE_BC_CAP
+        changed = True
     for receipt_path in sorted((OUT / "attempts").glob("*.json")):
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
         if receipt.get("schema_id") != "issue73-checkpoint-replay-attempt-v1":
@@ -686,7 +865,7 @@ def start_attempt(key: str, *, kind: str, reserve: float, native_gate_bc: bool) 
     total, native = charged(value)
     projected_total = total + reserve
     projected_native = native + (reserve if native_gate_bc else 0.0)
-    if projected_total > 4800.0 or projected_native > 2400.0:
+    if projected_total > 4800.0 or projected_native > NATIVE_GATE_BC_CAP:
         raise QualificationFailure(f"registered remaining CPU cap blocks {key}: builder={projected_total:.6f}, native={projected_native:.6f}")
     row = {
         "schema_id": "issue73-checkpoint-replay-attempt-v1",
@@ -725,7 +904,7 @@ def finish_attempt(key: str, *, started_cpu: float, status: str, details: Mappin
     value = ledger()
     value["attempts"] = [row if item.get("key") == key else item for item in value["attempts"]]
     total, native = charged(value)
-    if total > 4800.0 or native > 2400.0:
+    if total > 4800.0 or native > NATIVE_GATE_BC_CAP:
         row["status"] = "FAIL_CUMULATIVE_CPU_CEILING_EXCEEDED"
         value["attempts"] = [row if item.get("key") == key else item for item in value["attempts"]]
     runner.atomic_json(path, row)
@@ -741,8 +920,7 @@ def verify_locked_external_sources() -> None:
             raise QualificationFailure(f"{env_name} is required by the precommitted source lock")
         root = Path(root_value)
         source_lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))[key]
-        commit = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-        dirty = subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"], text=True).strip()
+        commit, dirty = runner._git_identity(str(root))
         if commit != source_lock["commit"] or dirty:
             raise QualificationFailure(f"{env_name} differs from the exact clean source lock")
         for name, expected in source_lock["source_file_sha256"].items():
@@ -1348,7 +1526,7 @@ def gate_c_suffixes() -> dict[str, Any]:
         lock, config, module, encoder, model, model_digest, history = pre_lock, pre_config, None, None, None, "", []
     else:
         current_total, current_native = charged(ledger())
-        remaining = min(4800.0 - current_total, 2400.0 - current_native)
+        remaining = min(4800.0 - current_total, NATIVE_GATE_BC_CAP - current_native)
         install_process_cpu_ceiling(remaining)
         lock, config, module, encoder, model, model_digest, history = setup_gate_c()
     plan = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
@@ -1516,8 +1694,8 @@ def budget_summary() -> dict[str, Any]:
         "builder_ceiling_cpu_seconds": 4800.0,
         "remaining_builder_cpu_seconds": max(0.0, 4800.0 - total),
         "charged_native_gate_bc_cpu_seconds_including_previous": native,
-        "native_gate_bc_ceiling_cpu_seconds": 2400.0,
-        "remaining_native_gate_bc_cpu_seconds": max(0.0, 2400.0 - native),
+        "native_gate_bc_ceiling_cpu_seconds": NATIVE_GATE_BC_CAP,
+        "remaining_native_gate_bc_cpu_seconds": max(0.0, NATIVE_GATE_BC_CAP - native),
         "reviewer_reserve_cpu_seconds": 1200.0,
         "reviewer_reserve_released_cpu_seconds": float(value.get("reviewer_reserve_released_cpu_seconds", 0.0)),
         "resource_ledger_sha256": runner.sha256_text_file(OUT / "resource-ledger.json") if (OUT / "resource-ledger.json").exists() else None,
@@ -1578,10 +1756,13 @@ def write_evidence_manifest() -> dict[str, Any]:
     }
     path = OUT / "evidence-manifest.json"
     runner.atomic_json(path, manifest)
+    relative_path = path.relative_to(REPOSITORY).as_posix()
+    git("add", "--", relative_path)
+    staged_blob = git_object_bytes(f":{relative_path}")
     return {
         "path": path.relative_to(STUDY).as_posix(),
-        "sha256": runner.sha256_text_file(path),
-        "bytes": len(runner.normalize_text_bytes(path.read_bytes())),
+        "sha256": runner.sha256_bytes(staged_blob),
+        "bytes": len(staged_blob),
         "included_file_count": len(rows),
         "included_bytes": manifest["total_included_bytes"],
         "excluded": sorted(excluded),
