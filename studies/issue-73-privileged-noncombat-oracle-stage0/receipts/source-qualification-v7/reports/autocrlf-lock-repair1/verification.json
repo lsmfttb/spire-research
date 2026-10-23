@@ -1,0 +1,59 @@
+{
+  "schema_id": "issue73-autocrlf-lock-repair-verification-v1",
+  "issue": 73,
+  "review_finding": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6373693207",
+  "source": {
+    "branch": "codex/issue-73-stage0-replay-qualification",
+    "code_source_commit": "e872ce78b73f99678e500a1e79bd4bf091fa26fd",
+    "prospective_lock_commit": "a636fa4f12f3545b246261a888ab723e9f788ba8",
+    "lock_sha256": "376ef5944db1e4e49852488c3a03969c738b1c8faca7c66c6f2344e18523d0b6"
+  },
+  "fresh_checkout": {
+    "commit": "a636fa4f12f3545b246261a888ab723e9f788ba8",
+    "core_autocrlf": true,
+    "config_plan_manifest_have_crlf_checkout_conversion": true,
+    "verify_lock_positive": "PASS",
+    "verify_lock_negative_config_plan_manifest_content_mutations": "PASS; each mutated field rejected by its digest check and original bytes restored"
+  },
+  "production_capture_preflight": {
+    "status": "PASS",
+    "report": "receipts/source-qualification-v7/reports/capture-preflight-autocrlf-lock-repair1/production-positive/capture-launch-preflight-v7.json",
+    "source_lock_sha256": "376ef5944db1e4e49852488c3a03969c738b1c8faca7c66c6f2344e18523d0b6",
+    "measured_process_tree_cpu_seconds": 6.013588,
+    "start_attempt_invoked": false,
+    "native_adapter_instantiated": false,
+    "native_game_step_started": false,
+    "debug_owner_started": false,
+    "formal_seed_consumed": false,
+    "native_debit_created": false,
+    "external_git_sources": "PASS at the pinned commits recorded in the report"
+  },
+  "focused_tests": {
+    "test_file": "studies/issue-73-privileged-noncombat-oracle-stage0/test_autocrlf_lock_v7.py",
+    "command_result": "2 passed in 56.45s",
+    "measured_process_cpu_seconds": 30.05,
+    "coverage": "LF/CRLF-equivalent checkout text digest; real content differences remain distinct; production verify-lock positive and config/plan/manifest mutation negatives"
+  },
+  "resource_accounting": {
+    "prepare_lock_measured_process_cpu_seconds": 9.97,
+    "production_preflight_measured_process_tree_cpu_seconds": 6.013588,
+    "focused_test_measured_process_cpu_seconds": 30.05,
+    "digest_only_test_invocations_wall_time_upper_bound_seconds": 8.06,
+    "repair_process_cpu_upper_bound_seconds_for_named_runs": 54.093588,
+    "prior_builder_charge_cpu_seconds": 2197.891659,
+    "builder_charge_including_named_repair_upper_bound_cpu_seconds": 2251.985247,
+    "prior_native_gate_b_c_charge_cpu_seconds": 1260,
+    "new_native_capture_cpu_seconds": 0,
+    "reviewer_reserve_cpu_seconds": 1200,
+    "overall_builder_native_reviewer_caps_cpu_seconds": [4800, 2760, 1200, 6000],
+    "static_reservation_note": "The existing 60 CPU-s static reservation remains fully charged; no new reserve or ledger reclassification was made. Minor git and receipt-writing overhead was not individually timed."
+  },
+  "limits": {
+    "code_disposition": "STUDY_ONLY pending independent review",
+    "native_capture_or_parity_replay": false,
+    "gate_a_b_or_c_execution": false,
+    "formal_seed_or_stage1": false,
+    "scientific_conclusion": false
+  },
+  "runner_note": "The first hash-only pytest invocation encountered pytest fd capture on a DrvFS temporary file; the same focused checks passed on rerun with -s. Existing receipts were preserved."
+}
