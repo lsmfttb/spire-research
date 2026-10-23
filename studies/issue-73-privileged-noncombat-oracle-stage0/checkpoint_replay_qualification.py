@@ -45,22 +45,30 @@ REPOSITORY = STUDY.parents[1]
 STUDY_RELATIVE = STUDY.relative_to(REPOSITORY).as_posix()
 HISTORICAL = STUDY / "receipts" / "stage0"
 PRIOR_OUT = STUDY / "receipts" / "source-qualification-v1"
-OUT = STUDY / "receipts" / "source-qualification-v4"
-CONFIG_PATH = OUT / "qualification-config-v4.json"
-LOCK_PATH = OUT / "preseed-source-lock-v4.json"
-PLAN_PATH = OUT / "plans" / "gate-c-replay-plan-v4.json"
-HISTORY_PATH = OUT / "histories" / "actual-action-step-history-v4.json"
-CAPTURE_ATTEMPT_KEY = "source-history-capture-173730001-prospective-v4"
-CAPTURE_REPORT_PATH = OUT / "reports" / "source-history-capture-report-v4.json"
-CAPTURE_FAILURE_PATH = OUT / "reports" / "source-history-capture-failure-v4.json"
+V4_OUT = STUDY / "receipts" / "source-qualification-v4"
+OUT = STUDY / "receipts" / "source-qualification-v5"
+CONFIG_PATH = OUT / "qualification-config-v5.json"
+LOCK_PATH = OUT / "preseed-source-lock-v5.json"
+PLAN_PATH = OUT / "plans" / "gate-c-replay-plan-v5.json"
+HISTORY_PATH = OUT / "histories" / "actual-action-step-history-v5.json"
+CAPTURE_ATTEMPT_KEY = "source-history-capture-173730001-prospective-v5"
+CAPTURE_REPORT_PATH = OUT / "reports" / "source-history-capture-report-v5.json"
+CAPTURE_FAILURE_PATH = OUT / "reports" / "source-history-capture-failure-v5.json"
 RESOURCE_LEDGER_PATH = OUT / "resource-ledger.json"
 LEGACY_MANIFEST_RECONCILIATION_PATH = OUT / "reports" / "stage0-manifest-integrity-reconciliation-v1.json"
-PRELOCK_STATIC_DEBIT_PATH = OUT / "attempts" / "builder-prelock-static-verification-v4.json"
-PRELOCK_STATIC_DEBIT_KEY = "builder-prelock-static-verification-v4"
+PRELOCK_STATIC_DEBIT_PATH = OUT / "attempts" / "builder-prelock-static-verification-v5.json"
+PRELOCK_STATIC_DEBIT_KEY = "builder-prelock-static-verification-v5"
 PRELOCK_STATIC_DEBIT_CPU_SECONDS = 120.0
-PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH = OUT / "ledgers" / "resource-ledger-before-v4.json"
-V4_STATIC_PREFLIGHT_PRIOR_REPORT_PATH = OUT / "reports" / "source-lock-cross-platform-preflight-v4.json"
-V4_STATIC_PREFLIGHT_REPORT_PATH = OUT / "reports" / "source-lock-cross-platform-preflight-v4-pass-2.json"
+PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH = OUT / "ledgers" / "resource-ledger-before-v5.json"
+V4_STATIC_PREFLIGHT_PRIOR_REPORT_PATH = V4_OUT / "reports" / "source-lock-cross-platform-preflight-v4.json"
+V4_STATIC_PREFLIGHT_REPORT_PATH = V4_OUT / "reports" / "source-lock-cross-platform-preflight-v4-pass-2.json"
+V5_STATIC_PREFLIGHT_REPORT_PATH = OUT / "reports" / "pre-capture-smoke-v5.json"
+PRE_CAPTURE_SMOKE_REPORT_PATH = V5_STATIC_PREFLIGHT_REPORT_PATH
+PRE_CAPTURE_SMOKE_FAILURE_PATH = OUT / "reports" / "pre-capture-smoke-v5-failure.json"
+PRE_CAPTURE_SMOKE_OUT = OUT / "smoke-runtime"
+V5_PRIOR_BLOCKED_REPORT_PATH = OUT / "reports" / "pre-capture-runtime-readiness-v5-blocked.json"
+V5_RUNTIME_CORRECTION_REPORT_PATH = OUT / "reports" / "runtime-inventory-correction-v5.json"
+
 NATIVE_GATE_BC_CAP = 2760.0
 STSRL_PYTHON_PACKAGE_ROOT = "STSRL_SOURCE_DIR/src"
 PRIOR_QUALIFICATION_FILES = tuple(sorted(
@@ -98,6 +106,7 @@ SOURCE_HASH_PATHS = (
     "public_history_execution.py",
     "runner.py",
     "source_lock_integrity.py",
+    "test_pre_capture_smoke_v5.py",
     "test_source_lock_portability_v4.py",
     "stage0.py",
 )
@@ -252,7 +261,7 @@ def ensure_prelock_static_debit() -> None:
         "measurement_status": "CONSERVATIVE_FIXED_RESERVATION; UNUSED_CPU_NOT_RECLAIMED",
         "source_lock_sha256": None,
         "formal_seed_consumed": False,
-        "note": "Covers the bounded v4 prelock source/static verification pass; charged before verification and remains charged regardless of measured use.",
+        "note": "Covers the one-time bounded v5 source audit, full pre-capture smoke and prospective lock; charged once and remains charged regardless of measured use.",
     }
     if PRELOCK_STATIC_DEBIT_PATH.exists():
         existing = json.loads(PRELOCK_STATIC_DEBIT_PATH.read_text(encoding="utf-8"))
@@ -270,7 +279,7 @@ def ensure_prelock_resource_ledger_snapshot() -> None:
             raise QualificationFailure("prelock resource ledger snapshot is immutable and differs from the registered ledger")
         return
     runner.atomic_json(PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH, value)
-    push_scoped_commit("Issue 73: preserve immutable v4 preflight resource ledger snapshot")
+    push_scoped_commit("Issue 73: preserve immutable v5 preflight resource ledger snapshot")
 
 
 def resolve_stsr_python_root() -> Path:
@@ -439,7 +448,7 @@ def gate_c_plan(root_values: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     if len({row["screen"] for row in roots}) < 2 or not any(row["policy_decision_index"] >= 2 for row in roots):
         raise QualificationFailure("fixed Gate C roots miss screen-family or post-two coverage")
     return {
-        "schema_id": "issue73-checkpoint-replay-gate-c-plan-v4",
+        "schema_id": "issue73-checkpoint-replay-gate-c-plan-v5",
         "status": "PRECOMMITTED_BEFORE_ANY_NEW_SUFFIX_RESULT",
         "selection_rule": "original Stage 0 rule over every immutable pre-existing debug-owner root receipt, in fixed seed/decision order; reserve earliest two distinct families; include the earliest policy decision index >=2; fill to four; selected roots are fixed before new replay and never replaced after parity failure",
         "candidate_root_ids": candidate_root_ids,
@@ -516,7 +525,7 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
     projected_native_reserve = (
         source_capture_reserve + prefix_parity_reserve + gate_c_setup_reserve + gate_c_suffix_reserve
     )
-    native_engineering_contingency = 180.0
+    native_engineering_contingency = 120.0
     projected_native_reserve += native_engineering_contingency
     projected_builder_reserve = projected_native_reserve + gate_a_reserve
     full_stage0_forecast_fits_current_caps = (
@@ -524,7 +533,7 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
         and current_native_charge + projected_native_reserve <= NATIVE_GATE_BC_CAP
     )
     config = {
-        "schema_id": "issue73-checkpoint-replay-qualification-config-v4",
+        "schema_id": "issue73-checkpoint-replay-qualification-config-v5",
         "study_id": runner.STUDY_ID,
         "source_qualification_only": True,
         "formal_training_seed_consumed": False,
@@ -551,6 +560,7 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
         "prior_failed_attempts": [
             {"key": "source-history-capture-173730001", "status": "FAIL_OR_INCOMPLETE", "cause": "ModuleNotFoundError: sts_combat_rl import search path omitted STSRL src/"},
             {"key": "source-history-capture-173730001-pythonpath-fix-v2", "status": "FAIL_OR_INCOMPLETE", "cause": "Issue 65 metering wrapper identity was not unwrapped during action history capture"},
+            {"key": "source-history-capture-173730001-prospective-v4", "status": "FAIL_OR_INCOMPLETE", "cause": "optimizer raw checkout SHA256 6a5ec8a9f9f266b5d6aacf311bbbedb5348971a244ca5052faf85fa9cc4ae906 differed from the normalized text/Git-blob SHA256 d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913; v4 attempt charged 60 CPU-s and is immutable"},
         ],
         "prior_failed_attempt_receipt_is_immutable": True,
         "required_stsr_python_package_root": STSRL_PYTHON_PACKAGE_ROOT,
@@ -605,23 +615,23 @@ def prepare_lock() -> dict[str, Any]:
         # scoped Git commit/push. This only commits the already-hashed bytes.
         push_scoped_commit("Issue 73: commit prospective replay source lock")
         return lock
-    if not V4_STATIC_PREFLIGHT_REPORT_PATH.is_file():
-        raise QualificationFailure("v4 static source-lock preflight report is missing; no lock or execution may be created")
-    static_report = json.loads(V4_STATIC_PREFLIGHT_REPORT_PATH.read_text(encoding="utf-8"))
+    if not V5_STATIC_PREFLIGHT_REPORT_PATH.is_file():
+        raise QualificationFailure("v5 pre-capture smoke report is missing; no lock or capture may be created")
+    static_report = json.loads(V5_STATIC_PREFLIGHT_REPORT_PATH.read_text(encoding="utf-8"))
     current_commit_before_receipts = git("rev-parse", "HEAD")
-    if static_report.get("status") != "PASS" or static_report.get("schema_id") != "issue73-source-lock-cross-platform-preflight-v4":
-        raise QualificationFailure("v4 cross-platform source-lock preflight did not record a targeted PASS")
+    if static_report.get("status") != "PASS" or static_report.get("schema_id") != "issue73-pre-capture-smoke-v5":
+        raise QualificationFailure("v5 actual entry-path pre-capture smoke did not record a PASS")
     if static_report.get("tested_study_source_commit") != current_commit_before_receipts:
         raise QualificationFailure("static source-lock report was not produced from the exact current study source commit")
-    if static_report.get("native_loaded_module_sha256") != OLD_CONFIG["identity"]["native_binary_sha256"]:
-        raise QualificationFailure("static source-lock report loaded native binary digest differs from the frozen config")
+    if static_report.get("native_module", {}).get("sha256") != OLD_CONFIG["identity"]["native_binary_sha256"]:
+        raise QualificationFailure("pre-capture smoke loaded native binary digest differs from the frozen config")
     fresh_source_report = verify_locked_external_sources()
     if static_report.get("external_git_sources") != fresh_source_report:
-        raise QualificationFailure("external source checkouts changed after the static source-lock report")
+        raise QualificationFailure("external source checkouts changed after the v5 pre-capture smoke")
     ensure_prelock_static_debit()
     ensure_legacy_manifest_reconciliation()
     ensure_prelock_resource_ledger_snapshot()
-    mutable_run_outputs = {OUT / "environment.json", OUT / "runtime-metrics.jsonl"}
+    mutable_run_outputs = {PRE_CAPTURE_SMOKE_OUT / "environment.json", PRE_CAPTURE_SMOKE_OUT / "runtime-metrics.jsonl"}
     allowed_prior = set(PRIOR_QUALIFICATION_FILES) | {
         RESOURCE_LEDGER_PATH,
         PRELOCK_STATIC_DEBIT_PATH,
@@ -629,10 +639,13 @@ def prepare_lock() -> dict[str, Any]:
         LEGACY_MANIFEST_RECONCILIATION_PATH,
         V4_STATIC_PREFLIGHT_PRIOR_REPORT_PATH,
         V4_STATIC_PREFLIGHT_REPORT_PATH,
+        V5_STATIC_PREFLIGHT_REPORT_PATH,
+        V5_PRIOR_BLOCKED_REPORT_PATH,
+        V5_RUNTIME_CORRECTION_REPORT_PATH,
     } | mutable_run_outputs
     missing_prior = [path.relative_to(STUDY).as_posix() for path in PRIOR_QUALIFICATION_FILES if not path.is_file()]
     if missing_prior:
-        raise QualificationFailure(f"prior qualification evidence is incomplete; cannot create revision 4: {missing_prior}")
+        raise QualificationFailure(f"prior qualification evidence is incomplete; cannot create revision 5: {missing_prior}")
     unexpected_prior = [path.relative_to(STUDY).as_posix() for path in OUT.rglob("*") if path.is_file() and path.suffix.lower() in {".json", ".jsonl"} and path not in allowed_prior]
     if unexpected_prior:
         raise QualificationFailure(f"source qualification output has unregistered receipts; lock cannot be regenerated: {unexpected_prior}")
@@ -657,9 +670,13 @@ def prepare_lock() -> dict[str, Any]:
         HISTORICAL / "attempts" / f"debug-owner-{SOURCE_QUAL_SEED}.json",
         V4_STATIC_PREFLIGHT_PRIOR_REPORT_PATH,
         V4_STATIC_PREFLIGHT_REPORT_PATH,
+        V5_STATIC_PREFLIGHT_REPORT_PATH,
+        V5_PRIOR_BLOCKED_REPORT_PATH,
+        V5_RUNTIME_CORRECTION_REPORT_PATH,
         PRELOCK_STATIC_DEBIT_PATH,
         PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH,
         LEGACY_MANIFEST_RECONCILIATION_PATH,
+        *(path for path in V4_OUT.rglob("*") if path.is_file()),
         *(root_path(rid) for rid in roots),
         *(HISTORICAL / name for name in (
             "preseed-source-lock-v3.json", "stage0-report.json", "gate-a-report.json",
@@ -667,7 +684,7 @@ def prepare_lock() -> dict[str, Any]:
         )),
         *PRIOR_QUALIFICATION_FILES,
     }
-    code_hashes = {name: runner.sha256_text_file(STUDY / name) for name in SOURCE_HASH_PATHS}
+    code_hashes = {name: runner.sha256_bytes(external_git_blob(REPOSITORY, current_commit, f"{STUDY_RELATIVE}/{name}")) for name in SOURCE_HASH_PATHS}
     current_commit = git("rev-parse", "HEAD")
     if git("symbolic-ref", "--short", "HEAD") != BRANCH:
         raise QualificationFailure("prospective source lock must be prepared on its registered remote branch")
@@ -682,8 +699,8 @@ def prepare_lock() -> dict[str, Any]:
     if not remote or remote[0] != current_commit:
         raise QualificationFailure("prospective source code commit must be pushed before creating the source/config lock")
     lock = {
-        "schema_id": "issue73-checkpoint-replay-preseed-source-lock-v4",
-        "lock_revision": 4,
+        "schema_id": "issue73-checkpoint-replay-preseed-source-lock-v5",
+        "lock_revision": 5,
         "status": "PRESEED_LOCKED_BEFORE_NEW_DEBUG_EXECUTION",
         "study_only": True,
         "formal_training_seed_consumed": False,
@@ -713,8 +730,8 @@ def prepare_lock() -> dict[str, Any]:
         },
         "runtime": {name: OLD_CONFIG["identity"][name] for name in ("python", "torch", "numpy")},
         "stsr_python_package_root": STSRL_PYTHON_PACKAGE_ROOT,
-        "static_preflight_report": V4_STATIC_PREFLIGHT_REPORT_PATH.relative_to(STUDY).as_posix(),
-        "static_preflight_report_sha256": runner.sha256_text_file(V4_STATIC_PREFLIGHT_REPORT_PATH),
+        "static_preflight_report": V5_STATIC_PREFLIGHT_REPORT_PATH.relative_to(STUDY).as_posix(),
+        "static_preflight_report_sha256": runner.sha256_text_file(V5_STATIC_PREFLIGHT_REPORT_PATH),
         "historical_input_sha256": {
             path.relative_to(STUDY).as_posix(): runner.sha256_text_file(path)
             for path in sorted(old_input_paths)
@@ -736,8 +753,8 @@ def verify_lock(*, require_remote_current: bool = True) -> tuple[dict[str, Any],
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     plan = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
-    if lock.get("schema_id") != "issue73-checkpoint-replay-preseed-source-lock-v4" or lock.get("lock_revision") != 4:
-        raise QualificationFailure("only the prospective v4 source lock is valid for this execution path")
+    if lock.get("schema_id") != "issue73-checkpoint-replay-preseed-source-lock-v5" or lock.get("lock_revision") != 5:
+        raise QualificationFailure("only the prospective v5 source lock is valid for this execution path")
     if lock.get("status") != "PRESEED_LOCKED_BEFORE_NEW_DEBUG_EXECUTION":
         raise QualificationFailure("prospective source lock has an invalid status")
     if lock.get("stsr_python_package_root") != STSRL_PYTHON_PACKAGE_ROOT:
@@ -745,7 +762,7 @@ def verify_lock(*, require_remote_current: bool = True) -> tuple[dict[str, Any],
     configure_stsr_python_root()
     static_report_path = STUDY / str(lock.get("static_preflight_report", ""))
     if not static_report_path.is_file() or runner.sha256_text_file(static_report_path) != lock.get("static_preflight_report_sha256"):
-        raise QualificationFailure("static source-lock preflight report differs from its prospective v4 lock")
+        raise QualificationFailure("end-to-end pre-capture smoke report differs from its prospective v5 lock")
     if runner.sha256_text_file(CONFIG_PATH) != lock.get("qualification_config_sha256"):
         raise QualificationFailure("qualification config changed after source lock")
     if runner.sha256_text_file(PLAN_PATH) != lock.get("gate_c_plan_sha256"):
@@ -754,8 +771,13 @@ def verify_lock(*, require_remote_current: bool = True) -> tuple[dict[str, Any],
         raise QualificationFailure("Gate C plan is for a different qualification config")
     for name, expected in lock.get("study_source_sha256", {}).items():
         path = STUDY / name
-        if not path.is_file() or runner.sha256_text_file(path) != expected:
-            raise QualificationFailure(f"source-locked study file changed: {name}")
+        if not path.is_file():
+            raise QualificationFailure(f"source-locked study file is missing: {name}")
+        blob = external_git_blob(REPOSITORY, lock["code_source_commit"], f"{STUDY_RELATIVE}/{name}")
+        verify_locked_source_payload(
+            label=f"study/{name}", expected_sha256=str(expected),
+            committed_blob=blob, checkout_bytes=path.read_bytes(),
+        )
     for name, expected in lock.get("historical_input_sha256", {}).items():
         path = STUDY / name
         if not path.is_file() or runner.sha256_text_file(path) != expected:
@@ -792,11 +814,11 @@ def verify_lock(*, require_remote_current: bool = True) -> tuple[dict[str, Any],
 
 
 def push_scoped_commit(message: str) -> str:
-    v4_receipt_directory = f"{STUDY_RELATIVE}/receipts/source-qualification-v4"
-    git("add", "--", v4_receipt_directory)
+    v5_receipt_directory = f"{STUDY_RELATIVE}/receipts/source-qualification-v5"
+    git("add", "--", v5_receipt_directory)
     staged = [item for item in git("diff", "--cached", "--name-only").splitlines() if item]
-    if any(item != v4_receipt_directory and not item.startswith(f"{v4_receipt_directory}/") for item in staged):
-        raise QualificationFailure("refusing to commit evidence outside the prospective v4 source-qualification folder")
+    if any(item != v5_receipt_directory and not item.startswith(f"{v5_receipt_directory}/") for item in staged):
+        raise QualificationFailure("refusing to commit evidence outside the prospective v5 source-qualification folder")
     command, env = runner.git_invocation(REPOSITORY)
     changed = subprocess.run([*command, "diff", "--cached", "--quiet"], check=False, env=env).returncode != 0
     if changed:
@@ -816,7 +838,9 @@ def ledger() -> dict[str, Any]:
         if value.get("schema_id") != "issue73-checkpoint-replay-resource-ledger-v1":
             raise QualificationFailure("new source qualification ledger schema changed")
     else:
-        prior_path = PRIOR_OUT / "resource-ledger.json"
+        prior_path = V4_OUT / "resource-ledger.json"
+        if not prior_path.is_file():
+            prior_path = PRIOR_OUT / "resource-ledger.json"
         if not prior_path.is_file():
             raise QualificationFailure("immutable v1-v3 cumulative resource ledger is missing")
         value = json.loads(prior_path.read_text(encoding="utf-8"))
@@ -868,6 +892,31 @@ def charged(value: Mapping[str, Any]) -> tuple[float, float]:
     return total, native
 
 
+def projected_attempt_budget(*, reserve: float, native_gate_bc: bool, include_static_reservation: bool = False) -> dict[str, float]:
+    """Return a read-only CPU projection using the same cap arithmetic as start_attempt."""
+    value = ledger()
+    total, native = charged(value)
+    if include_static_reservation:
+        total += PRELOCK_STATIC_DEBIT_CPU_SECONDS
+    projected_total = total + reserve
+    projected_native = native + (reserve if native_gate_bc else 0.0)
+    if projected_total > 4800.0 or projected_native > NATIVE_GATE_BC_CAP:
+        raise QualificationFailure(
+            f"registered remaining CPU cap blocks capture: builder={projected_total:.6f}, "
+            f"native={projected_native:.6f}"
+        )
+    return {
+        "builder_charged_before_attempt_cpu_seconds": total,
+        "builder_projected_after_attempt_cpu_seconds": projected_total,
+        "builder_remaining_after_attempt_cpu_seconds": 4800.0 - projected_total,
+        "native_charged_before_attempt_cpu_seconds": native,
+        "native_projected_after_attempt_cpu_seconds": projected_native,
+        "native_remaining_after_attempt_cpu_seconds": NATIVE_GATE_BC_CAP - projected_native,
+        "attempt_reserve_cpu_seconds": reserve,
+    }
+
+
+
 def start_attempt(key: str, *, kind: str, reserve: float, native_gate_bc: bool) -> dict[str, Any]:
     attempt_path = OUT / "attempts" / f"{key}.json"
     if attempt_path.exists():
@@ -886,11 +935,7 @@ def start_attempt(key: str, *, kind: str, reserve: float, native_gate_bc: bool) 
             raise QualificationFailure(f"attempt {key} was interrupted; no retry permitted")
         raise QualificationFailure(f"fixed attempt {key} already has a terminal receipt: {old.get('status')}")
     value = ledger()
-    total, native = charged(value)
-    projected_total = total + reserve
-    projected_native = native + (reserve if native_gate_bc else 0.0)
-    if projected_total > 4800.0 or projected_native > NATIVE_GATE_BC_CAP:
-        raise QualificationFailure(f"registered remaining CPU cap blocks {key}: builder={projected_total:.6f}, native={projected_native:.6f}")
+    projected_attempt_budget(reserve=reserve, native_gate_bc=native_gate_bc)
     row = {
         "schema_id": "issue73-checkpoint-replay-attempt-v1",
         "key": key,
@@ -1273,6 +1318,143 @@ def replay_forced_transition(adapter: Any, history: Sequence[Mapping[str, Any]],
     }
 
 
+def verify_current_candidate_sources() -> dict[str, Any]:
+    """Bind the current study files to exact Git blobs with EOL-only checkout conversion."""
+    commit = git("rev-parse", "HEAD").strip()
+    remote = git("ls-remote", "origin", f"refs/heads/{BRANCH}").split()
+    if not remote or remote[0] != commit:
+        raise QualificationFailure("pre-capture source candidate is not the exact pushed branch head")
+    sources: dict[str, Any] = {}
+    for name in SOURCE_HASH_PATHS:
+        blob = external_git_blob(REPOSITORY, commit, f"{STUDY_RELATIVE}/{name}")
+        expected = runner.sha256_bytes(blob)
+        sources[name] = verify_locked_source_payload(
+            label=f"study/{name}", expected_sha256=expected,
+            committed_blob=blob, checkout_bytes=(STUDY / name).read_bytes(),
+        )
+    return {"commit": commit, "remote_branch": BRANCH, "files": sources}
+
+
+def prepare_capture_prerequisites(*, out: Path, source_lock: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Run the exact shared pre-adapter path used by source-history capture."""
+    external_sources = verify_locked_external_sources(source_lock)
+    env, module, encoder, runtime = runner._setup(out)
+    model_path = HISTORICAL / "policies" / "pi_init.pt"
+    model, model_digest = runner._load_policy(model_path, initial=False)
+    return {
+        "external_sources": external_sources,
+        "environment": env,
+        "module": module,
+        "encoder": encoder,
+        "runtime": runtime,
+        "model": model,
+        "model_digest": model_digest,
+        "model_path": model_path,
+    }
+
+
+def pre_capture_smoke_v5() -> dict[str, Any]:
+    """Exercise capture setup through the native-adapter boundary, without a seed or game step."""
+    if PRE_CAPTURE_SMOKE_FAILURE_PATH.exists():
+        raise QualificationFailure("an immutable v5 pre-capture smoke failure already exists; no retry is permitted")
+    if PRE_CAPTURE_SMOKE_REPORT_PATH.exists() and not LOCK_PATH.exists():
+        raise QualificationFailure("a v5 smoke receipt exists without its lock; do not reconstruct or overwrite it")
+    started_cpu = process_tree_cpu()
+    started_wall = time.monotonic()
+    report_exists = PRE_CAPTURE_SMOKE_REPORT_PATH.exists()
+    try:
+        if LOCK_PATH.exists():
+            lock, _config = verify_lock()
+            source_report = None
+        else:
+            lock = None
+            source_report = verify_current_candidate_sources()
+        attempt_path = OUT / "attempts" / f"{CAPTURE_ATTEMPT_KEY}.json"
+        if attempt_path.exists():
+            raise QualificationFailure("the fixed v5 capture attempt key already has a receipt; no retry is permitted")
+        capacity = projected_attempt_budget(
+            reserve=60.0, native_gate_bc=True, include_static_reservation=lock is None,
+        )
+        prepared = prepare_capture_prerequisites(out=PRE_CAPTURE_SMOKE_OUT, source_lock=lock)
+        module = prepared["module"]
+        native_path = Path(module.__file__).resolve()
+        native_hash = runner.validate_native_module_identity(
+            native_path,
+            expected_name=OLD_CONFIG["identity"]["native_module"],
+            expected_sha256=OLD_CONFIG["identity"]["native_binary_sha256"],
+        )
+        adapter_class = importlib.import_module("sts_combat_rl.sim.lightspeed").LightSpeedAdapter
+        runner.validate_light_speed_adapter_class(adapter_class)
+        optimizer_path = STUDY / "public_history_execution.py"
+        optimizer_hash = runner.validate_locked_optimizer_source(optimizer_path)
+        report = {
+            "schema_id": "issue73-pre-capture-smoke-v5",
+            "status": "PASS",
+            "tested_study_source_commit": (source_report or {}).get("commit") or lock["code_source_commit"],
+            "remote_branch": BRANCH,
+            "study_source_git_blob_eol_checks": source_report["files"] if source_report else "PASS_FROM_PROSPECTIVE_V5_LOCK",
+            "optimizer_source": {
+                "path": "public_history_execution.py",
+                "normalized_sha256": optimizer_hash,
+                "expected_locked_sha256": OLD_CONFIG["runtime_optimizer"]["sha256"],
+                "raw_checkout_sha256": runner.sha256_bytes(optimizer_path.read_bytes()),
+                "crlf_count": optimizer_path.read_bytes().count(bytes((13, 10))),
+            },
+            "runtime": {
+                "python_executable": sys.executable,
+                "python": sys.version.split()[0],
+                "torch": runner.torch.__version__,
+                "numpy": np.__version__,
+            },
+            "native_module": {"path": str(native_path), "name": native_path.name, "sha256": native_hash},
+            "adapter": {"module": adapter_class.__module__, "qualname": adapter_class.__qualname__},
+            "runtime_installation": prepared["runtime"],
+            "loaded_policy": {
+                "path": str(prepared["model_path"].relative_to(STUDY)),
+                "sha256": prepared["model_digest"],
+            },
+            "external_git_sources": prepared["external_sources"],
+            "capture_attempt_cpu_projection": capacity,
+            "capture_entry_path": {
+                "shared_function": "prepare_capture_prerequisites",
+                "source_history_capture_uses_same_function": True,
+                "reached_boundary": "immediately_before_runner.native_adapter(module, SOURCE_QUAL_SEED)",
+                "native_adapter_instantiated": False,
+                "native_game_step_started": False,
+                "debug_owner_started": False,
+                "formal_seed_consumed": False,
+            },
+            "resource_accounting": {
+                "fixed_static_reservation_cpu_seconds": PRELOCK_STATIC_DEBIT_CPU_SECONDS,
+                "additional_reservation_cpu_seconds": 0.0,
+                "measured_process_tree_cpu_seconds": max(0.0, process_tree_cpu() - started_cpu),
+                "measured_wall_seconds": max(0.0, time.monotonic() - started_wall),
+                "rss_kib_at_boundary": runner.current_rss_kib(),
+            },
+        }
+        if not report_exists:
+            runner.atomic_json(PRE_CAPTURE_SMOKE_REPORT_PATH, report)
+        elif json.loads(PRE_CAPTURE_SMOKE_REPORT_PATH.read_text(encoding="utf-8")).get("status") != "PASS":
+            raise QualificationFailure("existing v5 pre-capture smoke receipt is not PASS")
+        return report
+    except BaseException as exc:
+        if not PRE_CAPTURE_SMOKE_FAILURE_PATH.exists():
+            runner.atomic_json(PRE_CAPTURE_SMOKE_FAILURE_PATH, {
+                "schema_id": "issue73-pre-capture-smoke-v5-failure",
+                "status": "FAIL_OR_INCOMPLETE",
+                "failure_type": type(exc).__name__,
+                "failure": str(exc)[:1600],
+                "fixed_static_reservation_cpu_seconds": PRELOCK_STATIC_DEBIT_CPU_SECONDS,
+                "additional_reservation_cpu_seconds": 0.0,
+                "measured_process_tree_cpu_seconds": max(0.0, process_tree_cpu() - started_cpu),
+                "measured_wall_seconds": max(0.0, time.monotonic() - started_wall),
+                "formal_seed_consumed": False,
+                "no_retry": True,
+            })
+        raise
+
+
+
 def capture_source_history() -> dict[str, Any]:
     lock, config = verify_lock()
     attempt_key = CAPTURE_ATTEMPT_KEY
@@ -1288,10 +1470,13 @@ def capture_source_history() -> dict[str, Any]:
     install_process_cpu_ceiling(60.0)
     phase_start = _PROCESS_START_CPU
     try:
-        verify_locked_external_sources()
-        env, module, encoder, runtime = runner._setup(OUT)
-        model_path = HISTORICAL / "policies" / "pi_init.pt"
-        model, model_digest = runner._load_policy(model_path, initial=False)
+        prepared = prepare_capture_prerequisites(out=OUT, source_lock=lock)
+        env = prepared["environment"]
+        module = prepared["module"]
+        encoder = prepared["encoder"]
+        runtime = prepared["runtime"]
+        model = prepared["model"]
+        model_digest = prepared["model_digest"]
         adapter = runner.native_adapter(module, SOURCE_QUAL_SEED)
         try:
             result = runner._run_one(
@@ -1582,10 +1767,13 @@ def setup_gate_c() -> tuple[dict[str, Any], dict[str, Any], Any, Any, Any, str, 
     setup_report_path = OUT / "reports" / f"{setup_key}.json"
     setup_failure_path = OUT / "reports" / f"{setup_key}-failure.json"
     try:
-        verify_locked_external_sources()
-        env, module, encoder, runtime = runner._setup(OUT)
-        model_path = HISTORICAL / "policies" / "pi_init.pt"
-        model, model_digest = runner._load_policy(model_path, initial=False)
+        prepared = prepare_capture_prerequisites(out=OUT, source_lock=lock)
+        env = prepared["environment"]
+        module = prepared["module"]
+        encoder = prepared["encoder"]
+        runtime = prepared["runtime"]
+        model = prepared["model"]
+        model_digest = prepared["model_digest"]
         history = load_history()
         setup_report = {
             "schema_id": "issue73-gate-c-replay-setup-v1",
@@ -1889,10 +2077,12 @@ def write_evidence_manifest() -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("prepare-lock", "verify-lock", "capture", "parity", "gate-a", "gate-c", "finalize"))
+    parser.add_argument("command", choices=("pre-capture-smoke", "prepare-lock", "verify-lock", "capture", "parity", "gate-a", "gate-c", "finalize"))
     args = parser.parse_args(argv)
     OUT.mkdir(parents=True, exist_ok=True)
-    if args.command == "prepare-lock":
+    if args.command == "pre-capture-smoke":
+        print(json.dumps(pre_capture_smoke_v5(), sort_keys=True))
+    elif args.command == "prepare-lock":
         lock = prepare_lock()
         print(json.dumps({"status": lock["status"], "config_sha256": lock["qualification_config_sha256"], "gate_c_plan_sha256": lock["gate_c_plan_sha256"], "source_commit": lock["code_source_commit"], "stream_count": 64}, sort_keys=True))
     elif args.command == "verify-lock":

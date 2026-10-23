@@ -182,6 +182,39 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+
+def validate_native_module_identity(path: str | Path, *, expected_name: str, expected_sha256: str) -> str:
+    """Validate the exact loaded native binary without text normalization."""
+    module_path = Path(path)
+    digest = sha256_file(module_path)
+    if module_path.name != expected_name or digest != expected_sha256:
+        raise StudyFailure(f"loaded native module identity mismatch: {module_path} {digest}")
+    return digest
+
+
+def validate_locked_optimizer_source(path: str | Path, *, expected_sha256: str | None = None) -> str:
+    """Hash locked UTF-8 source after accepting only CRLF/LF checkout conversion."""
+    source_path = Path(path)
+    try:
+        canonical_source = source_lock_integrity.normalize_locked_source_eol(
+            source_path.read_bytes(), label=str(source_path),
+        )
+    except source_lock_integrity.SourceLockValidationError as exc:
+        raise StudyFailure(str(exc)) from exc
+    digest = sha256_bytes(canonical_source)
+    expected = expected_sha256 or CONFIG["runtime_optimizer"]["sha256"]
+    if digest != expected:
+        raise StudyFailure("Issue 65 study-local optimizer is missing or changed")
+    return digest
+
+
+def validate_light_speed_adapter_class(adapter_class: type) -> None:
+    """Fail closed unless the adapter is the pinned STSRL LightSpeedAdapter."""
+    if (getattr(adapter_class, "__module__", None), getattr(adapter_class, "__qualname__", None)) != (
+        "sts_combat_rl.sim.lightspeed", "LightSpeedAdapter",
+    ):
+        raise StudyFailure("loaded LightSpeed adapter identity differs from the pinned STSRL adapter")
+
 def fsync_directory(path: Path) -> None:
     """Persist directory entries after atomic rename/first creation."""
     if os.name != "posix":
@@ -342,9 +375,11 @@ def validate_environment(out: Path) -> dict[str, Any]:
         raise StudyFailure("STSRL source checkout does not match the clean frozen commit")
     module = importlib.import_module("slaythespire")
     module_path = Path(module.__file__).resolve()
-    binary_hash = sha256_file(module_path)
-    if module_path.name != CONFIG["identity"]["native_module"] or binary_hash != CONFIG["identity"]["native_binary_sha256"]:
-        raise StudyFailure(f"loaded native module identity mismatch: {module_path} {binary_hash}")
+    binary_hash = validate_native_module_identity(
+        module_path,
+        expected_name=CONFIG["identity"]["native_module"],
+        expected_sha256=CONFIG["identity"]["native_binary_sha256"],
+    )
     if not hasattr(module, "PrivilegedNoncombatProjectionAccess"):
         raise StudyFailure("pinned native module lacks PrivilegedNoncombatProjectionAccess")
     if not hasattr(module.StepSimulator, "battle_search_v2"):
@@ -1297,8 +1332,10 @@ def _install_runtime(out: Path) -> dict[str, Any]:
     from sts_combat_rl.sim.non_combat_policy import ExpertNonCombatDriver
 
     optimizer_path = ROOT / "public_history_execution.py"
-    if not optimizer_path.exists() or sha256_file(optimizer_path) != CONFIG["runtime_optimizer"]["sha256"]:
+    if not optimizer_path.is_file():
         raise StudyFailure("Issue 65 study-local optimizer is missing or changed")
+    validate_locked_optimizer_source(optimizer_path)
+    validate_light_speed_adapter_class(LightSpeedAdapter)
     sys.path.insert(0, str(ROOT))
     optimizer = importlib.import_module("public_history_execution")
     execution = optimizer.install(
