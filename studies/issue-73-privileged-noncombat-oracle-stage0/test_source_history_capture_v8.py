@@ -111,6 +111,59 @@ class SourceHistoryCaptureV8Tests(unittest.TestCase):
         self.assertTrue(report["required_roots_match"])
         self.assertTrue(all(x["all_fields_match"] for x in report["roots"].values()))
 
+    def test_runtime_volatile_roots_without_root_id_match_by_seed_and_decision(self):
+        # runner.Controller's live root dictionaries have seed and
+        # decision_index, but only persisted historical receipts add root_id.
+        roots = copy.deepcopy(self.live_roots)
+        for root in roots:
+            root.pop("root_id")
+            root.pop("source_tag_mapping")
+            root.pop("feature_matrix_sha256")
+            root.update({
+                "checkpoint": object(),
+                "adapter": object(),
+                "native_checkpoint_id": None,
+                "checkpoint_adapter_id": None,
+                "native_checkpoint_metadata": {},
+                "probabilities": None,
+                "audit": {},
+            })
+
+        self.assertTrue(all("root_id" not in root for root in roots))
+        report = self.compare(roots=roots)
+
+        self.assertEqual(report["status"], "PASS")
+        self.assertTrue(report["root_membership"]["exact_membership"])
+        self.assertEqual(report["captured_root_count"], len(self.owner_root_ids))
+        self.assertEqual(report["historical_root_match_count"], len(self.owner_root_ids))
+        self.assertTrue(all(row["status"] == "MATCH" for row in report["roots"].values()))
+
+    def test_durable_root_snapshots_retain_comparison_inputs_without_live_handles(self):
+        roots = copy.deepcopy(self.live_roots)
+        for root in roots:
+            root.pop("root_id")
+            root.pop("source_tag_mapping")
+            root.pop("feature_matrix_sha256")
+            root["checkpoint"] = object()
+            root["adapter"] = object()
+
+        record = v8.capture_root_snapshots_record_v8(roots)
+
+        self.assertEqual(record["schema_id"], "issue73-volatile-root-snapshots-v8-v1")
+        self.assertEqual(record["root_count"], len(self.owner_root_ids))
+        by_id = {row["root_id"]: row for row in record["roots"]}
+        self.assertEqual(set(by_id), set(self.owner_root_ids))
+        for root in roots:
+            root_id = stage0.root_id(root)
+            snapshot = by_id[root_id]
+            self.assertNotIn("checkpoint", snapshot)
+            self.assertNotIn("adapter", snapshot)
+            self.assertEqual(snapshot["seed"], root["seed"])
+            self.assertEqual(snapshot["decision_index"], root["decision_index"])
+            self.assertEqual(snapshot["projection"], root["projection"])
+            self.assertEqual(snapshot["public_projection"], root["public_projection"])
+            self.assertEqual(snapshot["legal_action_identities"], root["legal_action_identities"])
+
     def test_first_action_trace_difference_is_durable_and_indexed(self):
         result = self.make_result()
         result["decisions"][14]["chosen_index"] = 0

@@ -54,6 +54,7 @@ STATIC_REPORT_PATH = OUT / "reports" / "static-qualification-report-v8.json"
 STATIC_FAILURE_PATH = OUT / "reports" / "static-qualification-failure-v8.json"
 CAPTURE_OUT = OUT / "capture-runtime-v8"
 CAPTURE_HISTORY_PATH = OUT / "histories" / "actual-action-step-history-v8.json"
+CAPTURE_ROOTS_PATH = OUT / "histories" / "captured-root-snapshots-v8.json"
 CAPTURE_REPORT_PATH = OUT / "reports" / "source-history-capture-report-v8.json"
 CAPTURE_FAILURE_PATH = OUT / "reports" / "source-history-capture-failure-v8.json"
 REQUIRED_ROOTS = tuple(q.REQUIRED_REPLAY_ROOTS)
@@ -312,7 +313,9 @@ def compare_capture_run_v8(
         "attempt_transition_count": int(owner_attempt.get("completed_transitions", -1)) == int(owner.get("completed_transitions", -2)),
     }
     expected_roots = set(str(x) for x in owner_attempt.get("root_ids", []))
-    observed_by_id = {str(root.get("root_id", "")): root for root in roots}
+    # Volatile roots captured by runner use (seed, decision_index) as their
+    # identity and do not carry the persisted receipt's root_id field.
+    observed_by_id = {stage0.root_id(root): root for root in roots}
     historical = dict(historical_roots or {})
     root_checks: dict[str, Any] = {}
     for root_id in sorted(expected_roots | set(observed_by_id)):
@@ -375,6 +378,28 @@ def compare_capture_run_v8(
     if not report["required_roots_match"]:
         report["status"] = "FAIL_REQUIRED_REPLAY_ROOT_MISMATCH"
     return report
+
+
+def capture_root_snapshots_record_v8(roots: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Keep JSON-safe live roots so a later comparator failure is diagnosable."""
+    snapshots: list[dict[str, Any]] = []
+    for index, root in enumerate(roots):
+        # Checkpoints and adapters are live native handles, not comparator
+        # inputs. Preserve the volatile root's remaining fields verbatim.
+        snapshot = {key: value for key, value in root.items() if key not in {"checkpoint", "adapter"}}
+        try:
+            snapshot["root_id"] = stage0.root_id(root)
+        except (KeyError, TypeError, ValueError) as exc:
+            snapshot["root_id"] = None
+            snapshot["root_identity_error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
+        snapshot["capture_root_index"] = index
+        snapshots.append(q.jsonable(snapshot))
+    return {
+        "schema_id": "issue73-volatile-root-snapshots-v8-v1",
+        "identity": "root_id derived from seed and decision_index; live checkpoint/adapter handles omitted",
+        "root_count": len(snapshots),
+        "roots": snapshots,
+    }
 
 
 def _source_hashes(source_commit: str) -> dict[str, str]:
@@ -920,12 +945,13 @@ def capture_source_history_v8(*, reviewed_source_sha: str, reviewer_pass_referen
     _runtime_lock, prepared, _module_path, _module_hash = _prepared_capture_runtime_v8()
     if prepared["model_digest"] != provenance["model_digest"]:
         raise QualificationV8Failure("live loaded policy digest differs from the original owner")
-    if CAPTURE_REPORT_PATH.exists() or CAPTURE_FAILURE_PATH.exists() or CAPTURE_HISTORY_PATH.exists():
+    if CAPTURE_REPORT_PATH.exists() or CAPTURE_FAILURE_PATH.exists() or CAPTURE_HISTORY_PATH.exists() or CAPTURE_ROOTS_PATH.exists():
         raise QualificationV8Failure("v8 capture output already exists without the unique attempt receipt; no retry")
     q.install_process_cpu_ceiling(int(CAPTURE_RESERVE))
     _start_capture_attempt_v8(lock, current_source_sha, reviewer_pass_reference)
     started_cpu = q.process_tree_cpu()
     adapter = None
+    root_snapshots_sha256 = None
     try:
         module = prepared["module"]
         adapter = runner.native_adapter(module, SEED)
@@ -950,6 +976,8 @@ def capture_source_history_v8(*, reviewed_source_sha: str, reviewer_pass_referen
         )
         roots = list(result.get("_volatile_roots", []))
         history = list(result.get("_actual_action_history", []))
+        runner.atomic_json(CAPTURE_ROOTS_PATH, capture_root_snapshots_record_v8(roots))
+        root_snapshots_sha256 = sha256_file(CAPTURE_ROOTS_PATH)
         report = compare_capture_run_v8(
             result, roots, history, owner=owner, owner_attempt=owner_attempt,
             historical_roots=root_preflight["roots"],
@@ -964,6 +992,8 @@ def capture_source_history_v8(*, reviewed_source_sha: str, reviewer_pass_referen
             "measured_process_tree_cpu_seconds": max(0.0, q.process_tree_cpu() - started_cpu),
             "history_sha256": None,
             "history_event_count": len(history),
+            "root_snapshots_path": CAPTURE_ROOTS_PATH.relative_to(STUDY).as_posix(),
+            "root_snapshots_sha256": root_snapshots_sha256,
             "formal_seed_consumed": False,
         })
         runner.atomic_json(CAPTURE_HISTORY_PATH, {
@@ -995,6 +1025,7 @@ def capture_source_history_v8(*, reviewed_source_sha: str, reviewer_pass_referen
             "cpu_charged_seconds": CAPTURE_RESERVE,
             "report_status": report["status"],
             "history_event_count": len(history),
+            "root_snapshots_sha256": root_snapshots_sha256,
             "finished_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         })
         ledger = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
@@ -1017,6 +1048,8 @@ def capture_source_history_v8(*, reviewed_source_sha: str, reviewer_pass_referen
             "failure": str(exc)[:1800],
             "reviewed_source_sha": current_source_sha,
             "reviewer_pass_reference": reviewer_pass_reference,
+            "root_snapshots_path": CAPTURE_ROOTS_PATH.relative_to(STUDY).as_posix() if root_snapshots_sha256 else None,
+            "root_snapshots_sha256": root_snapshots_sha256,
             "formal_seed_consumed": False,
             "no_retry_or_overwrite": True,
         }
