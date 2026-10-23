@@ -40,6 +40,7 @@ from policy import (
     derived_seed,
     validate_live_native_candidate_bindings,
 )
+import source_lock_integrity
 
 
 ROOT = Path(__file__).resolve().parent
@@ -1007,7 +1008,7 @@ class ActionHistoryController:
 
         # Issue 65's process-time metering wrapper is transparent and passes
         # this exact history adapter through its _adapter field.
-        if adapter is not self._adapter and getattr(adapter, "_adapter", None) is not self._adapter:
+        if not source_lock_integrity.adapter_matches_history_target(adapter, self._adapter):
             raise StudyFailure("controlled runner replaced the adapter during action-history capture")
         state_fingerprint = adapter.checkpoint_fingerprint(snapshot)
         decision_trace_index = len(self._controller.trace)
