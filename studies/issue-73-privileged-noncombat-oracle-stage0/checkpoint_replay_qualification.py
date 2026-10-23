@@ -233,7 +233,7 @@ def gate_c_plan(root_values: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
             "decision_index": root["decision_index"],
             "policy_decision_index": root["policy_decision_index"],
             "screen": root["screen"],
-            "historical_root_receipt_sha256": runner.sha256_file(root_path(root_id_value)),
+            "historical_root_receipt_sha256": runner.sha256_text_file(root_path(root_id_value)),
             "action_indices": action_indices,
             "action_identities": [root["legal_action_identities"][i] for i in action_indices],
         })
@@ -453,7 +453,7 @@ def prepare_lock() -> dict[str, Any]:
         },
         "runtime": {name: OLD_CONFIG["identity"][name] for name in ("python", "torch", "numpy")},
         "historical_input_sha256": {
-            path.relative_to(STUDY).as_posix(): runner.sha256_file(path)
+            path.relative_to(STUDY).as_posix(): runner.sha256_text_file(path)
             for path in sorted(old_input_paths)
         },
         "durability_method": "reset same native owner seed and replay the complete actual legal action/step history in a fresh process; validate every recorded legal occurrence order, selected occurrence, full pinned adapter state fingerprint, sanitized public projection, exact native privileged root projection, deck/resource/map/choice fields and repeated forced-action transitions; native RNG bytes/counters remain opaque, so RNG equivalence is qualified by exact transition/post-step parity including the treasureRng-dependent chest reveal",
@@ -487,7 +487,7 @@ def verify_lock(*, require_remote_current: bool = True) -> tuple[dict[str, Any],
             raise QualificationFailure(f"source-locked study file changed: {name}")
     for name, expected in lock.get("historical_input_sha256", {}).items():
         path = STUDY / name
-        if not path.is_file() or runner.sha256_file(path) != expected:
+        if not path.is_file() or runner.sha256_text_file(path) != expected:
             raise QualificationFailure(f"immutable historical input changed: {name}")
     ancestor = subprocess.run(
         ["git", "-C", str(REPOSITORY), "merge-base", "--is-ancestor", lock["code_source_commit"], "HEAD"],
@@ -621,7 +621,7 @@ def start_attempt(key: str, *, kind: str, reserve: float, native_gate_bc: bool) 
         "status": "STARTED",
         "native_gate_bc": bool(native_gate_bc),
         "reserved_cpu_seconds": float(reserve),
-        "source_lock_sha256": runner.sha256_file(LOCK_PATH),
+        "source_lock_sha256": runner.sha256_text_file(LOCK_PATH),
         "started_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     value["attempts"].append(row)
@@ -941,7 +941,7 @@ def capture_source_history() -> dict[str, Any]:
             history_path = OUT / "histories" / "actual-action-step-history.json"
             runner.atomic_json(history_path, {
                 "schema_id": "issue73-actual-action-step-history-v1",
-                "source_lock_sha256": runner.sha256_file(LOCK_PATH),
+                "source_lock_sha256": runner.sha256_text_file(LOCK_PATH),
                 "owner_seed": SOURCE_QUAL_SEED,
                 "role": "historical debug owner provenance/prefix replay only; not a new owner",
                 "source_identity": env["identity"],
@@ -998,7 +998,7 @@ def capture_source_history() -> dict[str, Any]:
             report["gate_b"] = gate_b
             report["source_identity"] = env["identity"]
             report["runtime_identity"] = runtime
-            report["history_sha256"] = runner.sha256_file(history_path)
+            report["history_sha256"] = runner.sha256_text_file(history_path)
             report["history_bytes"] = history_path.stat().st_size
             report["all_locked_transition_witnesses_repeated_equal"] = all(row.get("status") == "PASS" for row in transition_receipts.values())
             report["status"] = "PASS" if report["status"] == "PASS" and report["all_locked_transition_witnesses_repeated_equal"] and all(gate_b[name]["status"] == "PASS" for name in GATE_B_ROOTS) else "FAIL_SOURCE_HISTORY_OR_GATE_B_CAPTURE"
@@ -1087,7 +1087,7 @@ def fresh_process_prefix_parity() -> dict[str, Any]:
                 "fresh_process": True,
                 "source_identity": env["identity"],
                 "runtime_identity": runtime,
-                "history_sha256": runner.sha256_file(OUT / "histories" / "actual-action-step-history.json"),
+                "history_sha256": runner.sha256_text_file(OUT / "histories" / "actual-action-step-history.json"),
                 "replayed_transition_count": len(results),
                 "witnesses": results,
                 "gate_b_source_capture": gate_b,
@@ -1147,7 +1147,7 @@ def run_gate_a_locked() -> dict[str, Any]:
         expected_min = math.ceil(len(config["gate_a_root_ids"]) * 0.8)
         report["precommitted_root_ids"] = config["gate_a_root_ids"]
         report["required_joint_target_rise_and_tv_count"] = expected_min
-        report["source_qualification_lock_sha256"] = runner.sha256_file(LOCK_PATH)
+        report["source_qualification_lock_sha256"] = runner.sha256_text_file(LOCK_PATH)
         report["status"] = report.get("status", "FAIL_MISSING_STATUS")
         if report.get("root_count") != 24 or report.get("screen_family_count", 0) < 4 or report.get("fixed_encoder", {}).get("joint_target_rise_and_tv_at_least_005_count", 0) < expected_min:
             report["status"] = "FAIL_FIXED_POLICY_RESPONSE_THRESHOLD"
@@ -1224,8 +1224,8 @@ def setup_gate_c() -> tuple[dict[str, Any], dict[str, Any], Any, Any, Any, str, 
             "runtime_identity": runtime,
             "policy_artifact_sha256": runner.sha256_file(model_path),
             "policy_tensor_digest": model_digest,
-            "source_history_sha256": runner.sha256_file(OUT / "histories" / "actual-action-step-history.json"),
-            "gate_c_plan_sha256": runner.sha256_file(PLAN_PATH),
+            "source_history_sha256": runner.sha256_text_file(OUT / "histories" / "actual-action-step-history.json"),
+            "gate_c_plan_sha256": runner.sha256_text_file(PLAN_PATH),
             "suffix_policy": config["suffixed_policy"],
             "native_rng_resampling": "none",
             "formal_seed_consumed": False,
@@ -1446,7 +1446,7 @@ def budget_summary() -> dict[str, Any]:
         "remaining_native_gate_bc_cpu_seconds": max(0.0, 2400.0 - native),
         "reviewer_reserve_cpu_seconds": 1200.0,
         "reviewer_reserve_released_cpu_seconds": float(value.get("reviewer_reserve_released_cpu_seconds", 0.0)),
-        "resource_ledger_sha256": runner.sha256_file(OUT / "resource-ledger.json") if (OUT / "resource-ledger.json").exists() else None,
+        "resource_ledger_sha256": runner.sha256_text_file(OUT / "resource-ledger.json") if (OUT / "resource-ledger.json").exists() else None,
     }
 
 
@@ -1466,9 +1466,9 @@ def finalize_report() -> dict[str, Any]:
         "gate_a_status": gate_a_report.get("status"),
         "gate_b_statuses": {name: gate_b.get(name, {}).get("status") for name in GATE_B_ROOTS},
         "gate_c_status": gate_c_report.get("status"),
-        "source_lock_sha256": runner.sha256_file(LOCK_PATH),
+        "source_lock_sha256": runner.sha256_text_file(LOCK_PATH),
         "qualification_config_sha256": runner.sha256_text_file(CONFIG_PATH),
-        "gate_c_plan_sha256": runner.sha256_file(PLAN_PATH),
+        "gate_c_plan_sha256": runner.sha256_text_file(PLAN_PATH),
         "resource_accounting": budget_summary(),
         "formal_training_seed_consumed": False,
         "formal_evaluation_seed_consumed": False,
@@ -1492,7 +1492,10 @@ def write_evidence_manifest() -> dict[str, Any]:
         relative = path.relative_to(OUT).as_posix()
         if relative in excluded:
             continue
-        rows.append({"path": relative, "bytes": path.stat().st_size, "sha256": runner.sha256_file(path)})
+        payload = path.read_bytes()
+        if path.suffix.lower() in {".json", ".jsonl"}:
+            payload = runner.normalize_text_bytes(payload)
+        rows.append({"path": relative, "bytes": len(payload), "sha256": runner.sha256_bytes(payload)})
     manifest = {
         "schema_id": "issue73-checkpoint-replay-evidence-manifest-v1",
         "files": rows,
@@ -1503,8 +1506,8 @@ def write_evidence_manifest() -> dict[str, Any]:
     runner.atomic_json(path, manifest)
     return {
         "path": path.relative_to(STUDY).as_posix(),
-        "sha256": runner.sha256_file(path),
-        "bytes": path.stat().st_size,
+        "sha256": runner.sha256_text_file(path),
+        "bytes": len(runner.normalize_text_bytes(path.read_bytes())),
         "included_file_count": len(rows),
         "included_bytes": manifest["total_included_bytes"],
         "excluded": sorted(excluded),
