@@ -18,6 +18,7 @@ REPOSITORY = q.REPOSITORY
 STUDY_RELATIVE = q.STUDY_RELATIVE
 V7_OUT = STUDY / "receipts" / "source-qualification-v7"
 V7_RELATIVE = V7_OUT.relative_to(REPOSITORY).as_posix()
+BUILDER_RUNTIME_ROOT = REPOSITORY / ".issue73-builder-runtime-v7"
 # Keep the reviewed v7 lock and receipts immutable.  The repaired checker gets a
 # distinct prospective lock lineage after its source code is pushed.
 V7_LOCK_OUT = V7_OUT / "autocrlf-lock-repair1"
@@ -25,12 +26,29 @@ CONFIG_PATH = V7_LOCK_OUT / "qualification-config-v7.json"
 PLAN_PATH = V7_LOCK_OUT / "plans" / "gate-c-replay-plan-v7.json"
 LOCK_PATH = V7_LOCK_OUT / "preseed-source-lock-v7.json"
 INPUT_MANIFEST_PATH = V7_LOCK_OUT / "input-manifest-v7.json"
+V7_CAPTURE_LOCK_OUT = V7_OUT / "native-capture-repair1"
+V7_CAPTURE_PREFLIGHT_ROOT = V7_OUT / "reports" / "native-capture-preflight-repair1"
+V7_CAPTURE_PREFLIGHT_REPORT_PATH = V7_CAPTURE_PREFLIGHT_ROOT / "capture-launch-preflight-v7.json"
+V7_CAPTURE_PREFLIGHT_FAILURE_PATH = V7_CAPTURE_PREFLIGHT_ROOT / "capture-launch-preflight-v7-failure.json"
+V7_CAPTURE_NATIVE_PREFLIGHT_FAILURE_PATH = V7_OUT / "reports" / "source-history-capture-preflight-failure-v7.json"
+V7_CAPTURE_RUNTIME_OUT = V7_OUT / "capture-runtime-v7"
+V7_CAPTURE_HISTORY_PATH = V7_OUT / "histories" / "actual-action-step-history-v7.json"
+V7_CAPTURE_STAGING_PATH = V7_OUT / "reports" / "source-history-capture-staging-v7.json"
+V7_CAPTURE_REPORT_PATH = V7_OUT / "reports" / "source-history-capture-report-v7.json"
+V7_CAPTURE_FAILURE_PATH = V7_OUT / "reports" / "source-history-capture-failure-v7.json"
 RESOURCE_LEDGER_PATH = V7_OUT / "resource-ledger.json"
 RESOURCE_SNAPSHOT_PATH = V7_OUT / "ledgers" / "resource-ledger-before-v7.json"
 STATIC_RESERVATION_PATH = V7_OUT / "attempts" / "builder-prelock-static-verification-v7.json"
 STATIC_RESERVATION_KEY = "builder-prelock-static-verification-v7"
 STATIC_RESERVATION_CPU_SECONDS = 60.0
 CAPTURE_ATTEMPT_KEY = "source-history-capture-173730001-prospective-v7"
+V7_CAPTURE_ATTEMPT_PATH = V7_OUT / "attempts" / f"{CAPTURE_ATTEMPT_KEY}.json"
+V7_STATIC_CHARGE_PATHS = {
+    "native-capture-implementation-repair1": V7_OUT / "reports" / "native-capture-implementation-cpu-charge-v7.json",
+    "native-capture-lock-preparation-repair1": V7_OUT / "reports" / "native-capture-lock-preparation-cpu-charge-v7.json",
+    "native-capture-preflight-repair1": V7_CAPTURE_PREFLIGHT_ROOT / "capture-preflight-cpu-charge-v7.json",
+    "native-capture-inline-preflight-repair1": V7_OUT / "reports" / "native-capture-inline-preflight-cpu-charge-v7.json",
+}
 
 HISTORICAL_INPUT_BASE_COMMIT = "80729ed02e3af698a71d33538169f7aa31209457"
 HISTORICAL_PREFIXES = tuple(
@@ -72,6 +90,7 @@ SOURCE_HASH_PATHS_V7 = (
     "source_qualification_v7.py",
     "stage0.py",
     "test_autocrlf_lock_v7.py",
+    "test_native_capture_v7.py",
     "test_pre_capture_smoke_v7.py",
     "test_source_manifest_v7.py",
 )
@@ -341,7 +360,8 @@ def reserve_static_v7() -> dict[str, Any]:
     if projected_builder > 4800.0 or projected_native > 2760.0:
         raise QualificationV7Failure("v7 authorization no longer fits the registered CPU ceilings")
     receipt = {
-        "schema_id": "issue73-checkpoint-replay-attempt-v1",        "key": STATIC_RESERVATION_KEY,
+        "schema_id": "issue73-checkpoint-replay-attempt-v1",
+        "key": STATIC_RESERVATION_KEY,
         "kind": "v7_bounded_static_input_manifest_lock_and_preflight_qualification",
         "status": "RESERVED_CONSERVATIVE_STATIC_DEBIT",
         "native_gate_bc": False,
@@ -384,12 +404,147 @@ def ensure_static_precharge_v7() -> tuple[dict[str, Any], dict[str, Any]]:
         raise QualificationV7Failure("v7 reservation, cumulative ledger, or immutable prior snapshot is inconsistent")
     expected_ledger = json.loads(json.dumps(snapshot))
     expected_ledger.setdefault("attempts", []).append(reservation)
-    if ledger != expected_ledger:
-        raise QualificationV7Failure("v7 cumulative ledger differs from the exact immutable baseline plus one fixed reservation")
+    expected_attempts = expected_ledger["attempts"]
+    observed_attempts = ledger.get("attempts", [])
+    if observed_attempts[:len(expected_attempts)] != expected_attempts:
+        raise QualificationV7Failure("v7 cumulative ledger no longer preserves the exact immutable baseline and static reservation")
+    extra_attempts = observed_attempts[len(expected_attempts):]
+    seen_extra_keys: set[str] = set()
+    for expected_attempt in extra_attempts:
+        key = str(expected_attempt.get("key", ""))
+        if key in seen_extra_keys:
+            raise QualificationV7Failure(f"v7 cumulative ledger repeats an attempt key: {key}")
+        seen_extra_keys.add(key)
+        if key in V7_STATIC_CHARGE_PATHS:
+            receipt_path = V7_STATIC_CHARGE_PATHS[key]
+            if (
+                expected_attempt.get("schema_id") != "issue73-checkpoint-replay-attempt-v1"
+                or expected_attempt.get("native_gate_bc") is not False
+                or expected_attempt.get("status") not in {"COMPLETE", "FAIL_OR_INCOMPLETE"}
+                or float(expected_attempt.get("cpu_charged_seconds", -1.0)) < 0.0
+                or not receipt_path.is_file()
+                or read_json(receipt_path) != expected_attempt
+            ):
+                raise QualificationV7Failure(f"v7 static CPU charge has no matching immutable receipt: {key}")
+        elif key == CAPTURE_ATTEMPT_KEY:
+            if (
+                expected_attempt.get("kind") != "v7_historical_debug_owner_source_history_capture"
+                or expected_attempt.get("native_gate_bc") is not True
+                or expected_attempt.get("reserved_cpu_seconds") != 60.0
+                or expected_attempt.get("formal_seed_consumed") is not False
+                or expected_attempt.get("status") not in {"STARTED", "COMPLETE", "FAIL_OR_INCOMPLETE", "INTERRUPTED_NO_RERUN", "FAIL_CPU_RESERVATION_EXCEEDED", "FAIL_CUMULATIVE_CPU_CEILING_EXCEEDED"}
+                or not V7_CAPTURE_ATTEMPT_PATH.is_file()
+                or read_json(V7_CAPTURE_ATTEMPT_PATH) != expected_attempt
+            ):
+                raise QualificationV7Failure("v7 ledger contains an invalid or unreceipted native capture attempt")
+        else:
+            raise QualificationV7Failure(f"v7 ledger contains an unregistered additional attempt: {key}")
+    if {key: value for key, value in ledger.items() if key != "attempts"} != {
+        key: value for key, value in expected_ledger.items() if key != "attempts"
+    }:
+        raise QualificationV7Failure("v7 cumulative ledger changed fields outside its append-only attempts")
     baseline_builder, baseline_native = q.charged(snapshot)
     if abs(baseline_builder - 2137.891659) > 1e-6 or abs(baseline_native - 1260.0) > 1e-6:
         raise QualificationV7Failure("immutable v7 precharge snapshot does not match the authorized resource baseline")
+    builder_total, native_total = _v7_charged(ledger)
+    if builder_total > 4800.0 or native_total > 2760.0:
+        raise QualificationV7Failure("v7 cumulative resource ledger exceeds the registered Builder or native ceiling")
     return reservation, ledger
+
+
+def record_builder_cpu_charge_v7(
+    *, key: str, cpu_seconds: float, status: str = "COMPLETE", details: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    receipt_path = V7_STATIC_CHARGE_PATHS.get(key)
+    if receipt_path is None:
+        raise QualificationV7Failure(f"unregistered v7 static CPU charge key: {key}")
+    if receipt_path.exists():
+        raise QualificationV7Failure(f"v7 static CPU charge receipt already exists; no overwrite: {key}")
+    if status not in {"COMPLETE", "FAIL_OR_INCOMPLETE"}:
+        raise QualificationV7Failure("v7 static CPU charge status must describe a completed or failed bounded run")
+    amount = float(cpu_seconds)
+    if amount < 0.0:
+        raise QualificationV7Failure("v7 static CPU charge cannot be negative")
+    _reservation, ledger = ensure_static_precharge_v7()
+    builder_before, native_before = _v7_charged(ledger)
+    if builder_before + amount > 4800.0 or native_before > 2760.0:
+        raise QualificationV7Failure("v7 static CPU charge would exceed registered resource ceilings")
+    row = {
+        "schema_id": "issue73-checkpoint-replay-attempt-v1",
+        "key": key,
+        "kind": "v7_bounded_non_native_builder_cpu_charge",
+        "status": status,
+        "native_gate_bc": False,
+        "cpu_charged_seconds": amount,
+        "formal_seed_consumed": False,
+        "measurement_status": "MEASURED_PROCESS_TREE_CPU_WITH_CONSERVATIVE_ORCHESTRATION_BOUND",
+        **dict(details or {}),
+    }
+    ledger["attempts"].append(row)
+    runner.atomic_json(receipt_path, row)
+    runner.atomic_json(RESOURCE_LEDGER_PATH, ledger)
+    push_v7(f"Issue 73: preserve v7 bounded Builder CPU charge {key}")
+    return row
+
+
+def verify_native_capture_implementation_v7() -> dict[str, Any]:
+    key = "native-capture-implementation-repair1"
+    if V7_STATIC_CHARGE_PATHS[key].exists():
+        raise QualificationV7Failure("native-capture implementation verification already has an immutable charge receipt; no rerun")
+    started_cpu = q.process_tree_cpu()
+    started_wall = time.monotonic()
+    output = ""
+    return_code: int | None = None
+    failure: str | None = None
+    try:
+        temp_root = BUILDER_RUNTIME_ROOT / "tmp" / key
+        cache_root = BUILDER_RUNTIME_ROOT / "cache" / key
+        temp_root.mkdir(parents=True, exist_ok=True)
+        cache_root.mkdir(parents=True, exist_ok=True)
+        env = os.environ.copy()
+        env.update({
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONPYCACHEPREFIX": str(BUILDER_RUNTIME_ROOT / "pycache" / key),
+            "TMPDIR": str(temp_root),
+            "TMP": str(temp_root),
+            "TEMP": str(temp_root),
+            "XDG_CACHE_HOME": str(cache_root),
+            "TORCH_HOME": str(cache_root / "torch"),
+            "HF_HOME": str(cache_root / "huggingface"),
+        })
+        command = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "test_native_capture_v7.py"]
+        completed = subprocess.run(command, cwd=STUDY, env=env, check=False, capture_output=True, text=True, timeout=45.0)
+        return_code = int(completed.returncode)
+        output = (completed.stdout + completed.stderr)[-6000:]
+        if return_code:
+            failure = f"focused pytest returned {return_code}"
+    except BaseException as exc:
+        failure = f"{type(exc).__name__}: {str(exc)[:1000]}"
+    measured = max(0.0, q.process_tree_cpu() - started_cpu)
+    # Include bounded CLI/receipt/push orchestration not measured inside pytest.
+    prior_autocrlf_repair_bound = 54.093588
+    charged = prior_autocrlf_repair_bound + measured + 2.0
+    status = "COMPLETE" if failure is None else "FAIL_OR_INCOMPLETE"
+    row = record_builder_cpu_charge_v7(
+        key=key,
+        cpu_seconds=charged,
+        status=status,
+        details={
+            "measured_test_process_tree_cpu_seconds": measured,
+            "conservative_orchestration_bound_seconds": 2.0,
+            "prior_autocrlf_lock_repair_cpu_bound_seconds": prior_autocrlf_repair_bound,
+            "prior_autocrlf_repair_evidence": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6374192622",
+            "measured_wall_seconds": max(0.0, time.monotonic() - started_wall),
+            "command_return_code": return_code,
+            "command": [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "test_native_capture_v7.py"],
+            "test_output_tail": output,
+            "failure": failure,
+            "no_native_attempt_or_seed": True,
+        },
+    )
+    if failure is not None:
+        raise QualificationV7Failure(f"native-capture implementation verification failed: {failure}")
+    return {"status": row["status"], "cpu_charged_seconds": row["cpu_charged_seconds"], "test_output_tail": output}
 
 
 def _stage0_resource_projection(ledger: Mapping[str, Any]) -> dict[str, Any]:
@@ -412,7 +567,8 @@ def _stage0_resource_projection(ledger: Mapping[str, Any]) -> dict[str, Any]:
         "source_history_capture_reserve_cpu_seconds": 60.0,
         "fresh_process_prefix_and_transition_parity_reserve_cpu_seconds": 80.0,
         "gate_c_environment_setup_reserve_cpu_seconds": 20.0,
-        "gate_c_suffix_attempt_count": 64,        "gate_c_per_suffix_process_cpu_cap_seconds": 20.0,
+        "gate_c_suffix_attempt_count": 64,
+        "gate_c_per_suffix_process_cpu_cap_seconds": 20.0,
         "gate_c_suffix_total_reserve_cpu_seconds": 64.0 * 20.0,
         "native_engineering_contingency_cpu_seconds": 60.0,
         "projected_new_native_cpu_reserve_seconds": native_reserve,
@@ -434,17 +590,40 @@ def _manifest_digest(manifest: Mapping[str, Any]) -> str:
     return sha256_bytes(payload)
 
 
-def prepare_lock_v7() -> dict[str, Any]:
-    lock_paths = (LOCK_PATH, CONFIG_PATH, PLAN_PATH, INPUT_MANIFEST_PATH)
+def _lock_paths(lock_out: Path) -> tuple[Path, Path, Path, Path]:
+    try:
+        lock_out.resolve().relative_to(V7_OUT.resolve())
+    except ValueError as exc:
+        raise QualificationV7Failure("v7 lock outputs must remain inside the v7 receipt directory") from exc
+    return (
+        lock_out / "preseed-source-lock-v7.json",
+        lock_out / "qualification-config-v7.json",
+        lock_out / "plans" / "gate-c-replay-plan-v7.json",
+        lock_out / "input-manifest-v7.json",
+    )
+
+
+def prepare_lock_v7(*, lock_out: Path = V7_LOCK_OUT, lock_revision: int = 7) -> dict[str, Any]:
+    if (lock_out, lock_revision) not in {(V7_LOCK_OUT, 7), (V7_CAPTURE_LOCK_OUT, 8)}:
+        raise QualificationV7Failure("only the reviewed v7 lock and the uniquely named native-capture repair lock are supported")
+    lock_path, config_path, plan_path, input_manifest_path = _lock_paths(lock_out)
+    lock_paths = (lock_path, config_path, plan_path, input_manifest_path)
     existing = [path.exists() for path in lock_paths]
     if any(existing):
         if not all(existing):
             raise QualificationV7Failure("partial v7 source/config/plan/manifest exists; it may not be reconstructed")
-        lock, _config = verify_lock_v7(require_remote_current=False)
+        lock, _config = verify_lock_v7(
+            require_remote_current=False, lock_out=lock_out, lock_revision=lock_revision,
+        )
         push_v7("Issue 73: preserve existing prospective v7 source lock")
         return lock
 
     ensure_static_precharge_v7()
+    if lock_revision == 8:
+        implementation_charge_path = V7_STATIC_CHARGE_PATHS["native-capture-implementation-repair1"]
+        implementation_charge = read_json(implementation_charge_path) if implementation_charge_path.is_file() else None
+        if not isinstance(implementation_charge, Mapping) or implementation_charge.get("status") != "COMPLETE":
+            raise QualificationV7Failure("native-capture repair lock requires a passing immutable implementation verification charge")
     source_commit = _verify_source_commit_and_remote()
     baseline_paths = git_tree_paths(HISTORICAL_INPUT_BASE_COMMIT)
     current_paths = git_tree_paths(source_commit)
@@ -460,11 +639,11 @@ def prepare_lock_v7() -> dict[str, Any]:
     config, _roots, plan = q.make_qualification_config(source_ledger=_v7_resource_ledger())
     config = json.loads(json.dumps(config))
     config["schema_id"] = "issue73-checkpoint-replay-qualification-config-v7"
-    config["gate_c_plan_file"] = PLAN_PATH.relative_to(STUDY).as_posix()
+    config["gate_c_plan_file"] = plan_path.relative_to(STUDY).as_posix()
     config["source_history_attempt_key"] = CAPTURE_ATTEMPT_KEY
     config["source_qualification_version"] = "v7"
     config["input_manifest"] = {
-        "path": INPUT_MANIFEST_PATH.relative_to(STUDY).as_posix(),
+        "path": input_manifest_path.relative_to(STUDY).as_posix(),
         "sha256": _manifest_digest(manifest),
         "included_file_count": manifest["included_file_count"],
         "included_bytes": manifest["included_bytes"],
@@ -482,7 +661,7 @@ def prepare_lock_v7() -> dict[str, Any]:
         raise QualificationV7Failure("the complete fixed Stage-0 budget no longer fits current caps")
     plan = json.loads(json.dumps(plan))
     plan["schema_id"] = "issue73-checkpoint-replay-gate-c-plan-v7"
-    plan["qualification_config_file"] = CONFIG_PATH.relative_to(STUDY).as_posix()
+    plan["qualification_config_file"] = config_path.relative_to(STUDY).as_posix()
     plan["source_qualification_version"] = "v7"
     root_paths = [q.root_path(str(root["root_id"])).relative_to(REPOSITORY).as_posix() for root in plan.get("roots", [])]
     root_blobs = external_git_blobs(source_commit, root_paths)
@@ -497,14 +676,14 @@ def prepare_lock_v7() -> dict[str, Any]:
     ):
         raise QualificationV7Failure("v7 plan differs from the fixed four-root, eight-per-action Gate C contract")
     config["historical_input_manifest_sha256"] = _manifest_digest(manifest)
-    runner.atomic_json(INPUT_MANIFEST_PATH, manifest)
-    runner.atomic_json(CONFIG_PATH, config)
-    plan["qualification_config_sha256"] = sha256_checkout_text_file(CONFIG_PATH)
-    runner.atomic_json(PLAN_PATH, plan)
+    runner.atomic_json(input_manifest_path, manifest)
+    runner.atomic_json(config_path, config)
+    plan["qualification_config_sha256"] = sha256_checkout_text_file(config_path)
+    runner.atomic_json(plan_path, plan)
 
     lock = {
         "schema_id": "issue73-checkpoint-replay-preseed-source-lock-v7",
-        "lock_revision": 7,
+        "lock_revision": lock_revision,
         "status": "PRESEED_LOCKED_BEFORE_ANY_NEW_NATIVE_EXECUTION",
         "study_only": True,
         "formal_training_seed_consumed": False,
@@ -515,16 +694,16 @@ def prepare_lock_v7() -> dict[str, Any]:
         "remote_must_equal_current_evidence_head_before_any_run": True,
         "historical_input_base_commit": HISTORICAL_INPUT_BASE_COMMIT,
         "historical_input_prefixes": list(HISTORICAL_PREFIXES),
-        "historical_input_manifest": INPUT_MANIFEST_PATH.relative_to(STUDY).as_posix(),
+        "historical_input_manifest": input_manifest_path.relative_to(STUDY).as_posix(),
         "historical_input_manifest_sha256": _manifest_digest(manifest),
         "historical_input_sha256": {
             row["path"]: row["git_blob_sha256"] for row in manifest["included"]
         },
         "optional_runtime_output_exclusions": manifest["excluded"],
-        "qualification_config": CONFIG_PATH.relative_to(STUDY).as_posix(),
-        "qualification_config_sha256": sha256_checkout_text_file(CONFIG_PATH),
-        "gate_c_plan": PLAN_PATH.relative_to(STUDY).as_posix(),
-        "gate_c_plan_sha256": sha256_checkout_text_file(PLAN_PATH),
+        "qualification_config": config_path.relative_to(STUDY).as_posix(),
+        "qualification_config_sha256": sha256_checkout_text_file(config_path),
+        "gate_c_plan": plan_path.relative_to(STUDY).as_posix(),
+        "gate_c_plan_sha256": sha256_checkout_text_file(plan_path),
         "study_source_sha256": code_hashes,
         "native": {
             "repository": q.OLD_CONFIG["identity"]["native_repository"],
@@ -553,7 +732,8 @@ def prepare_lock_v7() -> dict[str, Any]:
             "prior_ledger_snapshot": RESOURCE_SNAPSHOT_PATH.relative_to(STUDY).as_posix(),
             "prior_ledger_snapshot_sha256": sha256_checkout_text_file(RESOURCE_SNAPSHOT_PATH),
         },
-        "resource_caps": resource_projection,        "fixed_gate_contract": {
+        "resource_caps": resource_projection,
+        "fixed_gate_contract": {
             "gate_a_root_count": 24,
             "gate_b_witness_count": 3,
             "gate_c_root_count": 4,
@@ -566,30 +746,63 @@ def prepare_lock_v7() -> dict[str, Any]:
         "lock_preparation_process_cpu_seconds": max(0.0, q.process_tree_cpu() - q._PROCESS_START_CPU),
         "source_lock_created_before_any_new_debug_execution": True,
     }
-    runner.atomic_json(LOCK_PATH, lock)
+    runner.atomic_json(lock_path, lock)
     push_v7("Issue 73: commit prospective v7 replay source lock")
     return lock
 
 
-def verify_lock_v7(*, require_remote_current: bool = True) -> tuple[dict[str, Any], dict[str, Any]]:
-    if not all(path.is_file() for path in (LOCK_PATH, CONFIG_PATH, PLAN_PATH, INPUT_MANIFEST_PATH)):
+def prepare_native_capture_lock_v7() -> dict[str, Any]:
+    key = "native-capture-lock-preparation-repair1"
+    if V7_STATIC_CHARGE_PATHS[key].exists():
+        raise QualificationV7Failure("native-capture lock preparation already has an immutable CPU receipt; no rerun")
+    started_cpu = q.process_tree_cpu()
+    started_wall = time.monotonic()
+    lock = prepare_lock_v7(lock_out=V7_CAPTURE_LOCK_OUT, lock_revision=8)
+    measured = max(0.0, q.process_tree_cpu() - started_cpu)
+    row = record_builder_cpu_charge_v7(
+        key=key,
+        cpu_seconds=measured + 2.0,
+        details={
+            "measured_process_tree_cpu_seconds": measured,
+            "conservative_orchestration_bound_seconds": 2.0,
+            "measured_wall_seconds": max(0.0, time.monotonic() - started_wall),
+            "source_lock_sha256": sha256_checkout_text_file(_lock_paths(V7_CAPTURE_LOCK_OUT)[0]),
+            "lock_revision": 8,
+            "no_native_attempt_or_seed": True,
+        },
+    )
+    return {"status": lock["status"], "lock_revision": lock["lock_revision"], "cpu_charged_seconds": row["cpu_charged_seconds"], "historical_input_count": len(lock["historical_input_sha256"])}
+
+
+def verify_lock_v7(
+    *, require_remote_current: bool = True, lock_out: Path = V7_LOCK_OUT, lock_revision: int = 7,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if (lock_out, lock_revision) not in {(V7_LOCK_OUT, 7), (V7_CAPTURE_LOCK_OUT, 8)}:
+        raise QualificationV7Failure("only the reviewed v7 lock and the uniquely named native-capture repair lock are supported")
+    lock_path, config_path, plan_path, input_manifest_path = _lock_paths(lock_out)
+    if not all(path.is_file() for path in (lock_path, config_path, plan_path, input_manifest_path)):
         raise QualificationV7Failure("prospective v7 source/config/plan/input manifest is missing")
     ensure_static_precharge_v7()
-    lock = read_json(LOCK_PATH)
-    config = read_json(CONFIG_PATH)
-    plan = read_json(PLAN_PATH)
-    manifest = read_json(INPUT_MANIFEST_PATH)
-    if lock.get("schema_id") != "issue73-checkpoint-replay-preseed-source-lock-v7" or lock.get("lock_revision") != 7:
+    lock = read_json(lock_path)
+    config = read_json(config_path)
+    plan = read_json(plan_path)
+    manifest = read_json(input_manifest_path)
+    if lock.get("schema_id") != "issue73-checkpoint-replay-preseed-source-lock-v7" or lock.get("lock_revision") != lock_revision:
         raise QualificationV7Failure("only the prospective v7 source lock is valid on this path")
     if lock.get("status") != "PRESEED_LOCKED_BEFORE_ANY_NEW_NATIVE_EXECUTION":
         raise QualificationV7Failure("prospective v7 source lock has an invalid status")
+    if lock_revision == 8:
+        implementation_charge_path = V7_STATIC_CHARGE_PATHS["native-capture-implementation-repair1"]
+        implementation_charge = read_json(implementation_charge_path) if implementation_charge_path.is_file() else None
+        if not isinstance(implementation_charge, Mapping) or implementation_charge.get("status") != "COMPLETE":
+            raise QualificationV7Failure("native-capture repair lock has no passing bounded implementation verification receipt")
     if lock.get("code_source_commit") != manifest.get("code_source_commit"):
         raise QualificationV7Failure("v7 lock and input manifest name different source commits")
-    if sha256_checkout_text_file(CONFIG_PATH) != lock.get("qualification_config_sha256"):
+    if sha256_checkout_text_file(config_path) != lock.get("qualification_config_sha256"):
         raise QualificationV7Failure("v7 qualification config changed after source lock")
-    if sha256_checkout_text_file(PLAN_PATH) != lock.get("gate_c_plan_sha256"):
+    if sha256_checkout_text_file(plan_path) != lock.get("gate_c_plan_sha256"):
         raise QualificationV7Failure("v7 Gate C roots/actions/streams plan changed after source lock")
-    if sha256_checkout_text_file(INPUT_MANIFEST_PATH) != lock.get("historical_input_manifest_sha256"):
+    if sha256_checkout_text_file(input_manifest_path) != lock.get("historical_input_manifest_sha256"):
         raise QualificationV7Failure("v7 bounded historical input manifest changed after source lock")
     if config.get("historical_input_manifest_sha256") != lock.get("historical_input_manifest_sha256"):
         raise QualificationV7Failure("v7 config and source lock disagree on historical input manifest")
@@ -662,6 +875,8 @@ def capture_preflight_v7(
     *,
     preflight_report_dir: Path,
     native_module_path_override: str | None = None,
+    lock_out: Path = V7_LOCK_OUT,
+    lock_revision: int = 7,
 ) -> dict[str, Any]:
     try:
         out = preflight_report_dir.resolve()
@@ -672,34 +887,21 @@ def capture_preflight_v7(
     failure_path = out / "capture-launch-preflight-v7-failure.json"
     if report_path.exists() or failure_path.exists():
         raise QualificationV7Failure("this immutable v7 preflight case already has a receipt; no rerun or overwrite")
+    if lock_revision == 8 and V7_STATIC_CHARGE_PATHS["native-capture-preflight-repair1"].exists():
+        raise QualificationV7Failure("native-capture preflight already has an immutable CPU charge; no rerun")
     reservation, _ledger = ensure_static_precharge_v7()
     q.install_process_cpu_ceiling(STATIC_RESERVATION_CPU_SECONDS)
     started_cpu = q.process_tree_cpu()
     started_wall = time.monotonic()
     try:
-        locked_module = read_json(LOCK_PATH)["native"]["module_path"]
-        if native_module_path_override is not None:
-            try:
-                override_path = Path(native_module_path_override).expanduser().resolve(strict=True)
-                locked_path = Path(locked_module).expanduser().resolve(strict=True)
-            except OSError as exc:
-                raise QualificationV7Failure(f"native module path override is unavailable: {exc}") from exc
-            if override_path != locked_path:
-                raise QualificationV7Failure("native module path override differs from the exact prospective v7 lock")
-        lock, _config = verify_lock_v7()
-        prepared = q.prepare_capture_prerequisites(
+        lock_path, _config_path, _plan_path, _manifest_path = _lock_paths(lock_out)
+        lock, _config, prepared, module_path_value, native_hash = _prepare_v7_capture_runtime(
+            lock_out=lock_out,
+            lock_revision=lock_revision,
             out=out,
-            source_lock=lock,
             native_module_path_override=native_module_path_override,
         )
-        module_path = Path(prepared["module"].__file__).resolve(strict=True)
-        native_hash = runner.validate_native_module_identity(
-            module_path,
-            expected_name=q.OLD_CONFIG["identity"]["native_module"],
-            expected_sha256=q.OLD_CONFIG["identity"]["native_binary_sha256"],
-        )
-        if str(module_path) != lock["native"]["module_path"] or native_hash != lock["native"]["loaded_module_sha256"]:
-            raise QualificationV7Failure("production entry path did not load the exact v7 locked native module")
+        module_path = Path(module_path_value)
     except BaseException as exc:
         failure = {
             "schema_id": "issue73-capture-launch-preflight-v7-failure-v1",
@@ -721,13 +923,28 @@ def capture_preflight_v7(
             "no_retry_or_overwrite": True,
         }
         runner.atomic_json(failure_path, failure)
+        if lock_revision == 8:
+            record_builder_cpu_charge_v7(
+                key="native-capture-preflight-repair1",
+                cpu_seconds=max(0.0, q.process_tree_cpu() - q._PROCESS_START_CPU) + 2.0,
+                status="FAIL_OR_INCOMPLETE",
+                details={
+                    "measured_process_tree_cpu_seconds": max(0.0, q.process_tree_cpu() - q._PROCESS_START_CPU),
+                    "conservative_orchestration_bound_seconds": 2.0,
+                    "failure_receipt": failure_path.relative_to(STUDY).as_posix(),
+                    "no_native_attempt_or_seed": True,
+                },
+            )
+        else:
+            push_v7("Issue 73: preserve v7 capture preflight failure")
         raise
 
     result = {
         "schema_id": "issue73-capture-launch-preflight-v7-v1",
         "status": "PASS",
-        "source_lock_sha256": sha256_checkout_text_file(LOCK_PATH),
+        "source_lock_sha256": sha256_checkout_text_file(lock_path),
         "code_source_commit": lock["code_source_commit"],
+        "lock_revision": lock_revision,
         "remote_branch": lock["remote_branch"],
         "command_argv": list(sys.argv),
         "python_executable": sys.executable,
@@ -762,7 +979,416 @@ def capture_preflight_v7(
         },
     }
     runner.atomic_json(report_path, result)
+    if lock_revision == 8:
+        record_builder_cpu_charge_v7(
+            key="native-capture-preflight-repair1",
+            cpu_seconds=max(0.0, q.process_tree_cpu() - q._PROCESS_START_CPU) + 2.0,
+            details={
+                "measured_process_tree_cpu_seconds": max(0.0, q.process_tree_cpu() - q._PROCESS_START_CPU),
+                "conservative_orchestration_bound_seconds": 2.0,
+                "preflight_report": report_path.relative_to(STUDY).as_posix(),
+                "source_lock_sha256": result["source_lock_sha256"],
+                "no_native_attempt_or_seed": True,
+            },
+        )
+    else:
+        push_v7("Issue 73: preserve v7 production capture preflight")
     return result
+
+
+def _require_reviewed_source_sha(reviewed_source_sha: str | None) -> str:
+    if not reviewed_source_sha or len(reviewed_source_sha) != 40:
+        raise QualificationV7Failure("native v7 capture requires the exact independently reviewed 40-character source SHA")
+    current = q.git("rev-parse", "HEAD")
+    if reviewed_source_sha.lower() != current:
+        raise QualificationV7Failure("reviewed source SHA does not equal the current local evidence head")
+    remote = q.git("ls-remote", "origin", f"refs/heads/{q.BRANCH}").split()
+    if not remote or remote[0] != current:
+        raise QualificationV7Failure("native v7 capture requires the exact reviewed source SHA at the remote issue-branch head")
+    return current
+
+
+def _start_capture_attempt_v7(lock_path: Path) -> dict[str, Any]:
+    ensure_static_precharge_v7()
+    if V7_CAPTURE_ATTEMPT_PATH.exists():
+        old = read_json(V7_CAPTURE_ATTEMPT_PATH)
+        if old.get("status") == "STARTED":
+            old.update({
+                "status": "INTERRUPTED_NO_RERUN",
+                "cpu_charged_seconds": float(old["reserved_cpu_seconds"]),
+                "failure": "started v7 native capture has no terminal evidence; the fixed attempt may not be rerun",
+            })
+            ledger = _v7_resource_ledger()
+            ledger["attempts"] = [old if row.get("key") == CAPTURE_ATTEMPT_KEY else row for row in ledger["attempts"]]
+            runner.atomic_json(V7_CAPTURE_ATTEMPT_PATH, old)
+            runner.atomic_json(RESOURCE_LEDGER_PATH, ledger)
+            push_v7("Issue 73: preserve interrupted v7 source-history capture")
+            raise QualificationV7Failure("the fixed v7 native capture attempt was interrupted; no retry is permitted")
+        raise QualificationV7Failure(f"the fixed v7 native capture attempt already has terminal receipt {old.get('status')}; no retry is permitted")
+
+    ledger = _v7_resource_ledger()
+    builder_before, native_before = _v7_charged(ledger)
+    if builder_before + 60.0 > 4800.0 or native_before + 60.0 > 2760.0:
+        raise QualificationV7Failure(
+            f"the registered 60 CPU-s capture does not fit remaining caps: "
+            f"builder={builder_before + 60.0:.6f}, native={native_before + 60.0:.6f}"
+        )
+    if V7_CAPTURE_REPORT_PATH.exists() or V7_CAPTURE_STAGING_PATH.exists() or V7_CAPTURE_FAILURE_PATH.exists() or V7_CAPTURE_HISTORY_PATH.exists():
+        raise QualificationV7Failure("a v7 source-history output already exists without its fixed attempt receipt; no retry")
+    row = {
+        "schema_id": "issue73-checkpoint-replay-attempt-v1",
+        "key": CAPTURE_ATTEMPT_KEY,
+        "kind": "v7_historical_debug_owner_source_history_capture",
+        "status": "STARTED",
+        "native_gate_bc": True,
+        "reserved_cpu_seconds": 60.0,
+        "source_lock_sha256": sha256_checkout_text_file(lock_path),
+        "formal_seed_consumed": False,
+        "started_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    ledger["attempts"].append(row)
+    runner.atomic_json(V7_CAPTURE_ATTEMPT_PATH, row)
+    runner.atomic_json(RESOURCE_LEDGER_PATH, ledger)
+    push_v7(f"Issue 73: start uniquely authorized v7 source-history capture {CAPTURE_ATTEMPT_KEY}")
+    return row
+
+
+def _finish_capture_attempt_v7(*, started_cpu: float, status: str, details: Mapping[str, Any]) -> dict[str, Any]:
+    if not V7_CAPTURE_ATTEMPT_PATH.is_file():
+        raise QualificationV7Failure("v7 capture attempt receipt disappeared before terminal accounting")
+    previous = read_json(V7_CAPTURE_ATTEMPT_PATH)
+    if previous.get("status") != "STARTED":
+        raise QualificationV7Failure("v7 capture attempt is not in its immutable STARTED state")
+    measured = max(0.0, q.process_tree_cpu() - started_cpu)
+    reserve = float(previous["reserved_cpu_seconds"])
+    exceeded = measured > reserve
+    success = status in {"COMPLETE", "PASS", "READY"}
+    row = {
+        **previous,
+        **dict(details),
+        "status": "FAIL_CPU_RESERVATION_EXCEEDED" if exceeded else status,
+        "measured_process_cpu_seconds": measured,
+        "cpu_charged_seconds": measured if success and not exceeded else max(reserve, measured),
+        "finished_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    ledger = _v7_resource_ledger()
+    ledger["attempts"] = [row if item.get("key") == CAPTURE_ATTEMPT_KEY else item for item in ledger["attempts"]]
+    total, native = _v7_charged(ledger)
+    if total > 4800.0 or native > 2760.0:
+        row["status"] = "FAIL_CUMULATIVE_CPU_CEILING_EXCEEDED"
+        ledger["attempts"] = [row if item.get("key") == CAPTURE_ATTEMPT_KEY else item for item in ledger["attempts"]]
+    runner.atomic_json(V7_CAPTURE_ATTEMPT_PATH, row)
+    runner.atomic_json(RESOURCE_LEDGER_PATH, ledger)
+    push_v7(f"Issue 73: finish uniquely authorized v7 source-history capture {CAPTURE_ATTEMPT_KEY}")
+    return row
+
+
+def _prepare_v7_capture_runtime(
+    *, lock_out: Path, lock_revision: int, out: Path, native_module_path_override: str | None,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str, str]:
+    lock_path, _config_path, _plan_path, _manifest_path = _lock_paths(lock_out)
+    lock, config = verify_lock_v7(lock_out=lock_out, lock_revision=lock_revision)
+    prepared = q.prepare_capture_prerequisites(
+        out=out,
+        source_lock=lock,
+        native_module_path_override=native_module_path_override,
+    )
+    module_path = Path(prepared["module"].__file__).resolve(strict=True)
+    native_hash = runner.validate_native_module_identity(
+        module_path,
+        expected_name=q.OLD_CONFIG["identity"]["native_module"],
+        expected_sha256=q.OLD_CONFIG["identity"]["native_binary_sha256"],
+    )
+    if str(module_path) != lock["native"]["module_path"] or native_hash != lock["native"]["loaded_module_sha256"]:
+        raise QualificationV7Failure("production v7 capture did not load the exact locked native module")
+    return lock, config, prepared, str(module_path), native_hash
+
+
+def capture_source_history_v7(
+    *, reviewed_source_sha: str,
+    native_module_path_override: str | None = None,
+) -> dict[str, Any]:
+    if V7_CAPTURE_ATTEMPT_PATH.exists():
+        previous = read_json(V7_CAPTURE_ATTEMPT_PATH)
+        if previous.get("status") == "COMPLETE" and V7_CAPTURE_REPORT_PATH.is_file():
+            return read_json(V7_CAPTURE_REPORT_PATH)
+        if previous.get("status") == "COMPLETE" and V7_CAPTURE_STAGING_PATH.is_file():
+            staged = read_json(V7_CAPTURE_STAGING_PATH)
+            if (
+                staged.get("schema_id") != "issue73-source-history-capture-staging-v7-v1"
+                or staged.get("source_lock_sha256") != previous.get("source_lock_sha256")
+                or not isinstance(staged.get("report"), Mapping)
+            ):
+                raise QualificationV7Failure("completed v7 attempt has an invalid staged report; preserve evidence for audit")
+            report = dict(staged["report"])
+            report["attempt_receipt"] = previous
+            if previous.get("status") != "COMPLETE":
+                report["status"] = str(previous.get("status"))
+            runner.atomic_json(V7_CAPTURE_REPORT_PATH, report)
+            push_v7("Issue 73: recover final v7 source-history report from durable staged result")
+            return report
+        if previous.get("status") == "STARTED":
+            _start_capture_attempt_v7(V7_CAPTURE_LOCK_OUT)
+        raise QualificationV7Failure(f"the fixed v7 source-history attempt is already receipted as {previous.get('status')}; no retry")
+    if V7_CAPTURE_NATIVE_PREFLIGHT_FAILURE_PATH.exists():
+        raise QualificationV7Failure("v7 native capture has an immutable pre-attempt failure receipt; no retry or overwrite")
+    if V7_STATIC_CHARGE_PATHS["native-capture-inline-preflight-repair1"].exists():
+        raise QualificationV7Failure("v7 native capture inline preflight already has an immutable CPU charge; no retry")
+    if V7_CAPTURE_REPORT_PATH.exists() or V7_CAPTURE_STAGING_PATH.exists() or V7_CAPTURE_FAILURE_PATH.exists() or V7_CAPTURE_HISTORY_PATH.exists():
+        raise QualificationV7Failure("v7 native capture has immutable output without an attempt receipt; no retry")
+    current_source_sha = _require_reviewed_source_sha(reviewed_source_sha)
+
+    try:
+        lock, config, prepared, module_path, native_hash = _prepare_v7_capture_runtime(
+            lock_out=V7_CAPTURE_LOCK_OUT,
+            lock_revision=8,
+            out=V7_CAPTURE_PREFLIGHT_ROOT / "capture-runtime",
+            native_module_path_override=native_module_path_override,
+        )
+    except BaseException as exc:
+        failure = {
+            "schema_id": "issue73-source-history-capture-preflight-v7-failure-v1",
+            "status": "FAIL_OR_INCOMPLETE",
+            "failure_type": type(exc).__name__,
+            "failure": str(exc)[:1600],
+            "command_argv": list(sys.argv),
+            "python_executable": sys.executable,
+            "cwd": os.getcwd(),
+            "measured_process_tree_cpu_seconds": max(0.0, q.process_tree_cpu() - q._PROCESS_START_CPU),
+            "start_attempt_invoked": False,
+            "native_adapter_instantiated": False,
+            "native_game_step_started": False,
+            "debug_owner_started": False,
+            "formal_seed_consumed": False,
+            "native_debit_created": False,
+            "no_retry_or_overwrite": True,
+        }
+        if not V7_CAPTURE_NATIVE_PREFLIGHT_FAILURE_PATH.exists():
+            runner.atomic_json(V7_CAPTURE_NATIVE_PREFLIGHT_FAILURE_PATH, failure)
+            measured = max(0.0, q.process_tree_cpu() - q._PROCESS_START_CPU)
+            record_builder_cpu_charge_v7(
+                key="native-capture-inline-preflight-repair1",
+                cpu_seconds=measured + 2.0,
+                status="FAIL_OR_INCOMPLETE",
+                details={
+                    "measured_process_tree_cpu_seconds": measured,
+                    "conservative_orchestration_bound_seconds": 2.0,
+                    "failure_receipt": V7_CAPTURE_NATIVE_PREFLIGHT_FAILURE_PATH.relative_to(STUDY).as_posix(),
+                    "start_attempt_invoked": False,
+                    "native_adapter_instantiated": False,
+                    "native_game_step_started": False,
+                    "no_native_debit_or_seed": True,
+                },
+            )
+        raise
+
+    reviewed_preflight = read_json(V7_CAPTURE_PREFLIGHT_REPORT_PATH) if V7_CAPTURE_PREFLIGHT_REPORT_PATH.is_file() else None
+    lock_path, _config_path, _plan_path, _manifest_path = _lock_paths(V7_CAPTURE_LOCK_OUT)
+    if (
+        not isinstance(reviewed_preflight, Mapping)
+        or reviewed_preflight.get("status") != "PASS"
+        or reviewed_preflight.get("lock_revision") != 8
+        or reviewed_preflight.get("source_lock_sha256") != sha256_checkout_text_file(lock_path)
+        or reviewed_preflight.get("code_source_commit") != lock.get("code_source_commit")
+    ):
+        if V7_CAPTURE_NATIVE_PREFLIGHT_FAILURE_PATH.exists():
+            raise QualificationV7Failure("v7 capture preflight mismatch already has an immutable pre-attempt failure receipt")
+        runner.atomic_json(V7_CAPTURE_NATIVE_PREFLIGHT_FAILURE_PATH, {
+            "schema_id": "issue73-source-history-capture-preflight-v7-failure-v1",
+            "status": "FAIL_OR_INCOMPLETE",
+            "failure": "the new v7 lock has no matching production capture-preflight PASS receipt",
+            "source_lock_sha256": sha256_checkout_text_file(lock_path),
+            "formal_seed_consumed": False,
+            "start_attempt_invoked": False,
+            "native_adapter_instantiated": False,
+            "native_game_step_started": False,
+            "native_debit_created": False,
+            "no_retry_or_overwrite": True,
+        })
+        measured = max(0.0, q.process_tree_cpu() - q._PROCESS_START_CPU)
+        record_builder_cpu_charge_v7(
+            key="native-capture-inline-preflight-repair1",
+            cpu_seconds=measured + 2.0,
+            status="FAIL_OR_INCOMPLETE",
+            details={
+                "measured_process_tree_cpu_seconds": measured,
+                "conservative_orchestration_bound_seconds": 2.0,
+                "failure_receipt": V7_CAPTURE_NATIVE_PREFLIGHT_FAILURE_PATH.relative_to(STUDY).as_posix(),
+                "start_attempt_invoked": False,
+                "native_adapter_instantiated": False,
+                "native_game_step_started": False,
+                "no_native_debit_or_seed": True,
+            },
+        )
+        raise QualificationV7Failure("the new v7 lock has no matching production capture-preflight PASS receipt")
+
+    attempt = _start_capture_attempt_v7(lock_path)
+    del attempt
+    q.install_process_cpu_ceiling(60.0)
+    phase_start = q._PROCESS_START_CPU
+    adapter = None
+
+    def enforce_capture_cpu_budget() -> float:
+        used = max(0.0, q.process_tree_cpu() - phase_start)
+        if used >= 60.0:
+            raise QualificationV7Failure("v7 capture reached its fixed 60 process-tree CPU-s reservation")
+        return 60.0 - used
+
+    try:
+        env = prepared["environment"]
+        module = prepared["module"]
+        encoder = prepared["encoder"]
+        runtime = prepared["runtime"]
+        model = prepared["model"]
+        model_digest = prepared["model_digest"]
+        adapter = runner.native_adapter(module, q.SOURCE_QUAL_SEED)
+        remaining_cpu = enforce_capture_cpu_budget()
+        result = runner._run_one(
+            out=V7_CAPTURE_RUNTIME_OUT,
+            module=module,
+            model=model,
+            model_digest=model_digest,
+            seed=q.SOURCE_QUAL_SEED,
+            arm="P0",
+            encoder=encoder,
+            capture_checkpoints=True,
+            capture_all_roots=True,
+            purpose="issue73-source-qualification-exact-debug-owner-replay-v7",
+            resource_label=f"SOURCE_QUAL_V7_{q.SOURCE_QUAL_SEED}",
+            adapter_override=adapter,
+            durable=False,
+            capture_trace=False,
+            capture_action_history=True,
+            cpu_cap_seconds=remaining_cpu,
+        )
+        enforce_capture_cpu_budget()
+        roots = list(result.get("_volatile_roots", []))
+        history = list(result.get("_actual_action_history", []))
+        if len(history) != int(result.get("completed_transitions", -1)):
+            raise QualificationV7Failure("v7 history lacks one actual legal action/step receipt per native transition")
+        report = q.compare_capture_run(result, roots, history)
+        runner.atomic_json(V7_CAPTURE_HISTORY_PATH, {
+            "schema_id": "issue73-actual-action-step-history-v7-v1",
+            "source_lock_sha256": sha256_checkout_text_file(lock_path),
+            "code_source_commit": lock["code_source_commit"],
+            "owner_seed": q.SOURCE_QUAL_SEED,
+            "role": "historical debug owner provenance/prefix replay only; not a new owner",
+            "source_identity": env["identity"],
+            "runtime_identity": runtime,
+            "event_count": len(history),
+            "events": history,
+        })
+        root_by_id = {q.stage0.root_id(root): root for root in roots}
+        transition_receipts: dict[str, Any] = {}
+        for row in config["gate_c_transition_pairs"]:
+            enforce_capture_cpu_budget()
+            root_id_value, index = row["root_id"], int(row["candidate_index"])
+            root = root_by_id.get(root_id_value)
+            if root is None:
+                raise QualificationV7Failure(f"locked live root was absent from v7 owner replay: {root_id_value}")
+            transition_receipts[f"{root_id_value}-a{index}"] = q.capture_transition_witness(adapter, module, root, index)
+        enforce_capture_cpu_budget()
+
+        map_root = root_by_id[q.GATE_B_ROOTS["hidden_semantic"]]
+        chest_root = root_by_id[q.GATE_B_ROOTS["native_rng_consequence"]]
+        post_root = root_by_id[q.GATE_B_ROOTS["post_two_third_family"]]
+        hidden_negative = q.stage0.hidden_public_negative(module, map_root)
+        chest_source = q.stage0.native_chest_rng_source_evidence()
+        gate_b = {
+            "schema_id": "issue73-replay-qualified-gate-b-v1",
+            "witness_root_ids": dict(q.GATE_B_ROOTS),
+            "distinct_screen_families": sorted({str(map_root["screen"]), str(chest_root["screen"]), str(post_root["screen"])}),
+            "hidden_semantic": {
+                "status": "PASS" if q.stage0.root_has_hidden_semantic(q.compact_root(q.root_receipt(q.GATE_B_ROOTS["hidden_semantic"]))) and hidden_negative.get("status") == "PASS" else "FAIL",
+                "source_tags": q.root_receipt(q.GATE_B_ROOTS["hidden_semantic"])["source_tag_mapping"],
+                "public_negative_test": hidden_negative,
+                "transition_witnesses": {key: value for key, value in transition_receipts.items() if key.startswith(q.GATE_B_ROOTS["hidden_semantic"])},
+            },
+            "native_rng_consequence": {
+                "status": "PASS" if q.stage0.root_has_rng_consequence(q.compact_root(q.root_receipt(q.GATE_B_ROOTS["native_rng_consequence"]))) and chest_source.get("status") == "PASS" else "FAIL",
+                "source_evidence": chest_source,
+                "unavailable_loot_tags": q.root_receipt(q.GATE_B_ROOTS["native_rng_consequence"])["source_tag_mapping"],
+                "forced_action_index": int(config["gate_b_witness_candidate_indices"]["native_rng_consequence"]),
+                "transition_witnesses": {key: value for key, value in transition_receipts.items() if key.startswith(q.GATE_B_ROOTS["native_rng_consequence"])},
+                "revealed_selected_consequence": {
+                    "transition_info": transition_receipts[f"{q.GATE_B_ROOTS['native_rng_consequence']}-a{config['gate_b_witness_candidate_indices']['native_rng_consequence']}"]["transition"]["transition_info"],
+                    "post_public_projection": transition_receipts[f"{q.GATE_B_ROOTS['native_rng_consequence']}-a{config['gate_b_witness_candidate_indices']['native_rng_consequence']}"]["transition"]["post_public_projection"],
+                    "post_legal_action_occurrences": transition_receipts[f"{q.GATE_B_ROOTS['native_rng_consequence']}-a{config['gate_b_witness_candidate_indices']['native_rng_consequence']}"]["transition"]["post_legal_action_occurrences"],
+                },
+                "claim_limit": "one exact treasureRng consequence replayed across processes; no distribution or conditional-return claim",
+            },
+            "post_two_third_family": {
+                "status": "PASS" if q.stage0.root_after_two_third_family(q.compact_root(q.root_receipt(q.GATE_B_ROOTS["post_two_third_family"]))) else "FAIL",
+                "transition_witnesses": {key: value for key, value in transition_receipts.items() if key.startswith(q.GATE_B_ROOTS["post_two_third_family"])},
+            },
+            "native_rng_byte_state_exposed": False,
+            "native_rng_parity_method": "exact reset+prefix replay plus identical forced transition and post-step observation/public output; includes pinned treasureRng chest generation",
+            "normal_public_api_receives_oracle_only_values": hidden_negative.get("status") == "PASS",
+            "formal_seed_consumed": False,
+        }
+        report["transition_witnesses"] = transition_receipts
+        report["gate_b"] = gate_b
+        report["source_identity"] = env["identity"]
+        report["runtime_identity"] = runtime
+        report["native_module_path"] = module_path
+        report["native_module_sha256"] = native_hash
+        report["source_lock_sha256"] = sha256_checkout_text_file(lock_path)
+        report["reviewed_source_sha"] = current_source_sha
+        report["history_sha256"] = sha256_checkout_text_file(V7_CAPTURE_HISTORY_PATH)
+        report["history_bytes"] = V7_CAPTURE_HISTORY_PATH.stat().st_size
+        report["all_locked_transition_witnesses_repeated_equal"] = all(row.get("status") == "PASS" for row in transition_receipts.values())
+        report["status"] = "PASS" if report["status"] == "PASS" and report["all_locked_transition_witnesses_repeated_equal"] and all(gate_b[name]["status"] == "PASS" for name in q.GATE_B_ROOTS) else "FAIL_SOURCE_HISTORY_OR_GATE_B_CAPTURE"
+        enforce_capture_cpu_budget()
+        if adapter is not None:
+            closing_adapter = adapter
+            adapter = None
+            closing_adapter.close()
+        runner.atomic_json(V7_CAPTURE_STAGING_PATH, {
+            "schema_id": "issue73-source-history-capture-staging-v7-v1",
+            "source_lock_sha256": sha256_checkout_text_file(lock_path),
+            "reviewed_source_sha": current_source_sha,
+            "report": report,
+        })
+        push_v7("Issue 73: checkpoint v7 source-history results before final attempt accounting")
+    except BaseException as exc:
+        failure = {
+            "schema_id": "issue73-source-history-capture-failure-v7-v1",
+            "status": "FAIL_OR_INCOMPLETE",
+            "failure_type": type(exc).__name__,
+            "failure": str(exc)[:1600],
+            "reviewed_source_sha": current_source_sha,
+            "formal_seed_consumed": False,
+            "no_retry_or_overwrite": True,
+        }
+        if adapter is not None:
+            try:
+                adapter.close()
+            except BaseException as close_exc:
+                failure["adapter_close_failure"] = f"{type(close_exc).__name__}: {str(close_exc)[:400]}"
+        runner.atomic_json(V7_CAPTURE_FAILURE_PATH, failure)
+        _finish_capture_attempt_v7(
+            started_cpu=phase_start,
+            status="FAIL_OR_INCOMPLETE",
+            details={"formal_seed_consumed": False, "failure_type": failure["failure_type"]},
+        )
+        raise
+
+    attempt_receipt = _finish_capture_attempt_v7(
+        started_cpu=phase_start,
+        status="COMPLETE" if report["status"] == "PASS" else "FAIL_OR_INCOMPLETE",
+        details={
+            "formal_seed_consumed": False,
+            "report_status": report["status"],
+            "history_event_count": len(history),
+            "source_lock_sha256": sha256_checkout_text_file(lock_path),
+        },
+    )
+    if attempt_receipt.get("status") != "COMPLETE":
+        report["status"] = attempt_receipt["status"]
+    report["attempt_receipt"] = attempt_receipt
+    runner.atomic_json(V7_CAPTURE_REPORT_PATH, report)
+    push_v7("Issue 73: preserve uniquely authorized v7 source-history capture evidence")
+    return report
 
 
 def push_v7(message: str) -> str:
@@ -778,7 +1404,8 @@ def push_v7(message: str) -> str:
         check=False,
         env=env,
     ).returncode != 0
-    if changed:        q.git("commit", "-m", message)
+    if changed:
+        q.git("commit", "-m", message)
     commit = q.git("rev-parse", "HEAD")
     q.git("push", "origin", f"HEAD:refs/heads/{q.BRANCH}")
     remote = q.git("ls-remote", "origin", f"refs/heads/{q.BRANCH}").split()
@@ -791,10 +1418,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("reserve-static", "prepare-lock", "verify-lock", "capture"))
+    parser.add_argument("command", choices=("reserve-static", "prepare-lock", "verify-lock", "verify-capture-implementation", "prepare-capture-lock", "verify-capture-lock", "capture"))
     parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--native-module-path")
     parser.add_argument("--preflight-report-dir")
+    parser.add_argument("--capture-profile", choices=("reviewed-v7", "native-capture-repair1"), default="native-capture-repair1")
+    parser.add_argument("--reviewed-source-sha")
     args = parser.parse_args(argv)
     if args.command == "reserve-static":
         result = reserve_static_v7()
@@ -818,13 +1447,42 @@ def main(argv: Sequence[str] | None = None) -> int:
             "historical_input_manifest_sha256": lock["historical_input_manifest_sha256"],
             "measured_process_tree_cpu_seconds": max(0.0, q.process_tree_cpu() - q._PROCESS_START_CPU),
         }
+    elif args.command == "verify-capture-implementation":
+        result = verify_native_capture_implementation_v7()
+    elif args.command == "prepare-capture-lock":
+        result = prepare_native_capture_lock_v7()
+    elif args.command == "verify-capture-lock":
+        lock, _config = verify_lock_v7(lock_out=V7_CAPTURE_LOCK_OUT, lock_revision=8)
+        result = {
+            "status": lock["status"],
+            "source_commit": lock["code_source_commit"],
+            "lock_revision": lock["lock_revision"],
+            "historical_input_count": len(lock["historical_input_sha256"]),
+            "historical_input_manifest_sha256": lock["historical_input_manifest_sha256"],
+        }
     else:
-        if not args.preflight_only:
-            parser.error("prospective v7 capture is restricted to --preflight-only until independent review passes")
-        result = capture_preflight_v7(
-            preflight_report_dir=Path(args.preflight_report_dir) if args.preflight_report_dir else PREFLIGHT_TEST_ROOT / "production-default",
-            native_module_path_override=args.native_module_path,
-        )
+        if args.capture_profile == "native-capture-repair1":
+            lock_out, lock_revision = V7_CAPTURE_LOCK_OUT, 8
+            default_report_dir = V7_CAPTURE_PREFLIGHT_ROOT
+        else:
+            lock_out, lock_revision = V7_LOCK_OUT, 7
+            default_report_dir = PREFLIGHT_TEST_ROOT / "production-default"
+        if args.preflight_only:
+            result = capture_preflight_v7(
+                preflight_report_dir=Path(args.preflight_report_dir) if args.preflight_report_dir else default_report_dir,
+                native_module_path_override=args.native_module_path,
+                lock_out=lock_out,
+                lock_revision=lock_revision,
+            )
+        else:
+            if args.capture_profile != "native-capture-repair1":
+                parser.error("native capture requires the uniquely source-locked native-capture-repair1 profile")
+            if not args.reviewed_source_sha:
+                parser.error("native capture requires --reviewed-source-sha from the exact independent Reviewer PASS")
+            result = capture_source_history_v7(
+                reviewed_source_sha=args.reviewed_source_sha,
+                native_module_path_override=args.native_module_path,
+            )
     print(json.dumps(result, sort_keys=True))
     return 0
 
