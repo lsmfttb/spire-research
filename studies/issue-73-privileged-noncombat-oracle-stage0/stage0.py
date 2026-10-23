@@ -283,6 +283,30 @@ def prepare() -> str:
     previous_lock = latest_preseed_lock()
     if previous_lock and previous_lock.get("config_sha256") != CONFIG_SHA:
         raise Stage0Failure("existing preseed lock does not match the currently loaded config; refusing an implicit relock")
+    if previous_lock:
+        output_lock_path = OUT / "config-lock.json"
+        if output_lock_path.exists():
+            output_lock = read_json(output_lock_path)
+            if not isinstance(output_lock, dict) or output_lock.get("study_id") != runner.STUDY_ID or output_lock.get("locked_before_study_seed") is not True:
+                raise Stage0Failure("existing output config lock is malformed or belongs to another study")
+            if output_lock.get("config_sha256") != CONFIG_SHA:
+                lock_paths = [OUT / "preseed-source-lock.json", *sorted(OUT.glob("preseed-source-lock-v*.json"))]
+                source_lock_revisions = []
+                for lock_path in lock_paths:
+                    if lock_path.exists():
+                        candidate_lock = read_json(lock_path)
+                        if isinstance(candidate_lock, dict) and candidate_lock.get("config_sha256") == output_lock.get("config_sha256"):
+                            source_lock_revisions.append(int(candidate_lock.get("lock_revision", 1)))
+                if not source_lock_revisions:
+                    raise Stage0Failure("stale output config lock does not match any preserved preseed lock")
+                config_lock_revision = min(source_lock_revisions)
+                archive_path = OUT / f"config-lock-v{config_lock_revision}.json"
+                if archive_path.exists():
+                    if read_json(archive_path) != output_lock:
+                        raise Stage0Failure("archived output config lock already exists with different content")
+                else:
+                    runner.atomic_json(archive_path, output_lock)
+                output_lock_path.unlink()
     for relative in ("attempts", "roots", "checkpoints", "runs", "debug-owner-runs"):
         directory = OUT / relative
         if directory.exists() and any(path.is_file() for path in directory.rglob("*")):
