@@ -386,6 +386,13 @@ def _stage0_screen_key(value: Any) -> str:
     return screen
 
 
+def process_tree_cpu() -> float:
+    """Return this process and its completed child-process CPU usage."""
+    own = resource.getrusage(resource.RUSAGE_SELF)
+    children = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return float(own.ru_utime + own.ru_stime + children.ru_utime + children.ru_stime)
+
+
 def _snapshot_debug_fingerprints(adapter: Any, snapshot: Any) -> dict[str, str]:
     """Hash native and public state in memory; never persist opaque raw state."""
     fingerprint = adapter.checkpoint_fingerprint(snapshot)
@@ -873,6 +880,100 @@ def _save_decisions_npz(path: Path, trace: Sequence[Mapping[str, Any]]) -> None:
     atomic_npz(path, features=all_features, offsets=np.asarray(offsets, dtype=np.int32), choices=np.asarray(choices, dtype=np.int16))
 
 
+def _public_projection_payload(adapter: Any, snapshot: Any) -> dict[str, Any]:
+    projection = adapter.public_projection(snapshot)
+    payload = getattr(projection, "canonical_payload", None)
+    if isinstance(payload, str):
+        value = json.loads(payload)
+    elif isinstance(projection, Mapping):
+        value = dict(projection)
+    else:
+        raise StudyFailure("native public projection is not persistable JSON")
+    if not isinstance(value, dict):
+        raise StudyFailure("native public projection payload is not an object")
+    return value
+
+
+class ActionHistoryAdapter:
+    """Record the actual action occurrence and transition for each native step."""
+
+    def __init__(self, base: Any) -> None:
+        self.base = base
+        self.events: list[dict[str, Any]] = []
+        self._current_event: dict[str, Any] | None = None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.base, name)
+
+    def bind_event(self, event: dict[str, Any], actions: Sequence[Any], selected_index: int) -> None:
+        if self._current_event is not None:
+            raise StudyFailure("action-history recorder received a second decision before a native step")
+        event["_selected_action_object"] = actions[selected_index]
+        event["_selected_action_index"] = selected_index
+        self._current_event = event
+
+    def step(self, action: Any) -> Any:
+        event = self._current_event
+        if event is None:
+            raise StudyFailure("native step occurred without a recorded live legal-action decision")
+        selected = int(event.pop("_selected_action_index"))
+        expected_action = event.pop("_selected_action_object")
+        if action is not expected_action:
+            raise StudyFailure("controlled runner stepped a different action object than the selected live occurrence")
+        transition = self.base.step(action)
+        post_snapshot = transition.snapshot
+        event["transition"] = {
+            "terminal": bool(transition.terminal),
+            "info": dict(transition.info),
+            "post_state_fingerprints": _snapshot_debug_fingerprints(self.base, post_snapshot),
+            "post_public_projection": _public_projection_payload(self.base, post_snapshot),
+        }
+        event["selected_occurrence"] = selected
+        self.events.append(event)
+        self._current_event = None
+        return transition
+
+
+class ActionHistoryController:
+    """Transparent controller wrapper that records every actual legal-action list."""
+
+    def __init__(self, controller: Any, adapter: ActionHistoryAdapter) -> None:
+        self._controller = controller
+        self._adapter = adapter
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._controller, name)
+
+    def reset_for_run(self, seed: int | None) -> None:
+        self._controller.reset_for_run(seed)
+
+    def select_action(self, adapter: Any, snapshot: Any, actions: Sequence[Any], context: Any, step_index: int) -> Any:
+        from sts_combat_rl.sim.decision_record import action_identity_dicts_for_actions
+
+        if adapter is not self._adapter:
+            raise StudyFailure("controlled runner replaced the adapter during action-history capture")
+        state_fingerprint = adapter.checkpoint_fingerprint(snapshot)
+        decision_trace_index = len(self._controller.trace)
+        identities = action_identity_dicts_for_actions(actions)
+        event: dict[str, Any] = {
+            "event_index": len(self._adapter.events),
+            "step_index": int(step_index),
+            "controller_trace_index": decision_trace_index,
+            "screen_state": str(context.screen_state),
+            "state_fingerprint": state_fingerprint,
+            "state_fingerprints": _snapshot_debug_fingerprints(adapter, snapshot),
+            "public_projection": _public_projection_payload(adapter, snapshot),
+            "legal_action_occurrences": identities,
+        }
+        decision = self._controller.select_action(adapter, snapshot, actions, context, step_index)
+        selected_index = int(getattr(decision, "selected_index", -1))
+        if selected_index < 0 or selected_index >= len(actions):
+            raise StudyFailure("controller did not return an in-range native legal occurrence")
+        event["selected_identity"] = identities[selected_index]
+        self._adapter.bind_event(event, actions, selected_index)
+        return decision
+
+
 def _run_one(
     *, out: Path, module: Any, model: AllNoncombatPolicy, model_digest: str,
     seed: int, arm: str, encoder: SemanticHashEncoder, capture_checkpoints: bool = False,
@@ -883,6 +984,7 @@ def _run_one(
     capture_trace: bool = True, capture_all_roots: bool = False,
     suffix_random_seed: int | None = None, expert_random_seed: int | None = None,
     root_callback: Any | None = None, cpu_cap_seconds: float | None = None,
+    capture_action_history: bool = False,
 ) -> dict[str, Any]:
     from sts_combat_rl.sim import controlled_run
     from sts_combat_rl.sim.action_space import ActionSpaceConfig
@@ -907,8 +1009,12 @@ def _run_one(
     )
     controller.run_id = label
     adapter = adapter_override or LightSpeedAdapter(seed=seed, ascension=20, player_class="IRONCLAD", module=module)
-    run_adapter = CheckpointAdapter(adapter, checkpoint) if checkpoint is not None else adapter
-    started_cpu = time.process_time()
+    history_adapter = ActionHistoryAdapter(adapter) if capture_action_history else None
+    if history_adapter is not None:
+        controller = ActionHistoryController(controller, history_adapter)
+    run_adapter = history_adapter if history_adapter is not None else adapter
+    run_adapter = CheckpointAdapter(run_adapter, checkpoint) if checkpoint is not None else run_adapter
+    started_cpu = process_tree_cpu()
     started_wall = time.monotonic()
     observer_steps = 0
     progress_path = out / "progress" / f"{label}.json"
@@ -921,10 +1027,10 @@ def _run_one(
         })
 
     def after_transition(step: Any) -> None:
-        if cpu_cap_seconds is not None and time.process_time() - started_cpu > cpu_cap_seconds:
+        if cpu_cap_seconds is not None and process_tree_cpu() - started_cpu > cpu_cap_seconds:
             raise CpuBudgetExceeded("run exceeded its predeclared process-CPU ceiling", receipt={
                 "failure_boundary": "per_attempt_cpu_cap", "cpu_cap_seconds": cpu_cap_seconds,
-                "process_cpu_seconds": time.process_time() - started_cpu,
+                "process_cpu_seconds": process_tree_cpu() - started_cpu,
             })
         nonlocal observer_steps
         observer_steps += 1
@@ -933,7 +1039,7 @@ def _run_one(
                 "study_id": STUDY_ID, "run": label, "seed": seed, "arm": arm,
                 "boundary": "controlled_run_transition_batch",
                 "completed_transitions": observer_steps,
-                "parent_process_cpu_seconds": time.process_time() - started_cpu,
+                "process_tree_cpu_seconds": process_tree_cpu() - started_cpu,
                 "wall_seconds": time.monotonic() - started_wall,
                 "screen_counts": dict(controller.screen_counts),
                 "source_commit": EXPECTED_NATIVE,
@@ -967,7 +1073,7 @@ def _run_one(
                 "outcome": str(run.outcome), "problems": list(run.problems),
                 "requested_steps": int(run.requested_steps),
                 "completed_transitions": observer_steps,
-                "cpu_seconds": time.process_time() - started_cpu,
+                "cpu_seconds": process_tree_cpu() - started_cpu,
                 "wall_seconds": time.monotonic() - started_wall,
                 "max_rss_kib_sampled_for_run": run_peak_rss_kib,
                 "native_source_commit": EXPECTED_NATIVE,
@@ -1046,7 +1152,7 @@ def _run_one(
             "exposures": dict(controller.exposures),
             "native_source_commit": EXPECTED_NATIVE,
             "native_module_sha256": CONFIG["identity"]["native_binary_sha256"],
-            "cpu_seconds": time.process_time() - started_cpu,
+            "cpu_seconds": process_tree_cpu() - started_cpu,
             "wall_seconds": time.monotonic() - started_wall,
             "max_rss_kib_sampled_for_run": run_peak_rss_kib,
             "process_peak_rss_kib_cumulative": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss),
@@ -1061,6 +1167,10 @@ def _run_one(
             atomic_json(progress_path, {"study_id": STUDY_ID, "run": label, "boundary": "terminal_committed", "completed_transitions": observer_steps})
         if capture_checkpoints:
             result["_volatile_roots"] = controller.roots
+        if history_adapter is not None:
+            if history_adapter._current_event is not None:
+                raise StudyFailure("action-history run completed with a decision that was never stepped")
+            result["_actual_action_history"] = history_adapter.events
         return result
     except BaseException as exc:
         setattr(exc, "issue73_captured_roots", controller.roots)
@@ -1070,7 +1180,7 @@ def _run_one(
                 "terminal_complete": False, "failure_boundary": "native_or_controller_exception",
                 "error_type": type(exc).__name__, "error": str(exc)[:800],
                 "completed_transitions": observer_steps,
-                "cpu_seconds": max(0.0, time.process_time() - started_cpu),
+                "cpu_seconds": max(0.0, process_tree_cpu() - started_cpu),
                 "wall_seconds": max(0.0, time.monotonic() - started_wall),
                 "native_source_commit": EXPECTED_NATIVE,
                 "exposures": dict(controller.exposures),
