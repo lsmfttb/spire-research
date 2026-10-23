@@ -45,6 +45,7 @@ CAPTURE_ATTEMPT_KEY = "source-history-capture-173730001-prospective-v7"
 V7_CAPTURE_ATTEMPT_PATH = V7_OUT / "attempts" / f"{CAPTURE_ATTEMPT_KEY}.json"
 V7_STATIC_CHARGE_PATHS = {
     "native-capture-implementation-repair1": V7_OUT / "reports" / "native-capture-implementation-cpu-charge-v7.json",
+    "native-capture-implementation-repair2": V7_OUT / "reports" / "native-capture-implementation-repair2-cpu-charge-v7.json",
     "native-capture-lock-preparation-repair1": V7_OUT / "reports" / "native-capture-lock-preparation-cpu-charge-v7.json",
     "native-capture-preflight-repair1": V7_CAPTURE_PREFLIGHT_ROOT / "capture-preflight-cpu-charge-v7.json",
     "native-capture-inline-preflight-repair1": V7_OUT / "reports" / "native-capture-inline-preflight-cpu-charge-v7.json",
@@ -488,7 +489,7 @@ def record_builder_cpu_charge_v7(
 
 
 def verify_native_capture_implementation_v7() -> dict[str, Any]:
-    key = "native-capture-implementation-repair1"
+    key = "native-capture-implementation-repair2"
     if V7_STATIC_CHARGE_PATHS[key].exists():
         raise QualificationV7Failure("native-capture implementation verification already has an immutable charge receipt; no rerun")
     started_cpu = q.process_tree_cpu()
@@ -512,7 +513,7 @@ def verify_native_capture_implementation_v7() -> dict[str, Any]:
             "TORCH_HOME": str(cache_root / "torch"),
             "HF_HOME": str(cache_root / "huggingface"),
         })
-        command = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "test_native_capture_v7.py"]
+        command = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--capture=sys", "test_native_capture_v7.py"]
         completed = subprocess.run(command, cwd=STUDY, env=env, check=False, capture_output=True, text=True, timeout=45.0)
         return_code = int(completed.returncode)
         output = (completed.stdout + completed.stderr)[-6000:]
@@ -522,8 +523,7 @@ def verify_native_capture_implementation_v7() -> dict[str, Any]:
         failure = f"{type(exc).__name__}: {str(exc)[:1000]}"
     measured = max(0.0, q.process_tree_cpu() - started_cpu)
     # Include bounded CLI/receipt/push orchestration not measured inside pytest.
-    prior_autocrlf_repair_bound = 54.093588
-    charged = prior_autocrlf_repair_bound + measured + 2.0
+    charged = measured + 2.0
     status = "COMPLETE" if failure is None else "FAIL_OR_INCOMPLETE"
     row = record_builder_cpu_charge_v7(
         key=key,
@@ -532,11 +532,9 @@ def verify_native_capture_implementation_v7() -> dict[str, Any]:
         details={
             "measured_test_process_tree_cpu_seconds": measured,
             "conservative_orchestration_bound_seconds": 2.0,
-            "prior_autocrlf_lock_repair_cpu_bound_seconds": prior_autocrlf_repair_bound,
-            "prior_autocrlf_repair_evidence": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6374192622",
             "measured_wall_seconds": max(0.0, time.monotonic() - started_wall),
             "command_return_code": return_code,
-            "command": [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "test_native_capture_v7.py"],
+            "command": [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--capture=sys", "test_native_capture_v7.py"],
             "test_output_tail": output,
             "failure": failure,
             "no_native_attempt_or_seed": True,
@@ -620,7 +618,7 @@ def prepare_lock_v7(*, lock_out: Path = V7_LOCK_OUT, lock_revision: int = 7) -> 
 
     ensure_static_precharge_v7()
     if lock_revision == 8:
-        implementation_charge_path = V7_STATIC_CHARGE_PATHS["native-capture-implementation-repair1"]
+        implementation_charge_path = V7_STATIC_CHARGE_PATHS["native-capture-implementation-repair2"]
         implementation_charge = read_json(implementation_charge_path) if implementation_charge_path.is_file() else None
         if not isinstance(implementation_charge, Mapping) or implementation_charge.get("status") != "COMPLETE":
             raise QualificationV7Failure("native-capture repair lock requires a passing immutable implementation verification charge")
@@ -792,7 +790,7 @@ def verify_lock_v7(
     if lock.get("status") != "PRESEED_LOCKED_BEFORE_ANY_NEW_NATIVE_EXECUTION":
         raise QualificationV7Failure("prospective v7 source lock has an invalid status")
     if lock_revision == 8:
-        implementation_charge_path = V7_STATIC_CHARGE_PATHS["native-capture-implementation-repair1"]
+        implementation_charge_path = V7_STATIC_CHARGE_PATHS["native-capture-implementation-repair2"]
         implementation_charge = read_json(implementation_charge_path) if implementation_charge_path.is_file() else None
         if not isinstance(implementation_charge, Mapping) or implementation_charge.get("status") != "COMPLETE":
             raise QualificationV7Failure("native-capture repair lock has no passing bounded implementation verification receipt")
