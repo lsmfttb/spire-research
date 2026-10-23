@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+MODULE_START_OWN_CPU = resource.getrusage(resource.RUSAGE_SELF)
+
 import checkpoint_replay_qualification as q
 import runner
 import source_qualification_v7 as v7
@@ -17,7 +19,17 @@ import source_qualification_v7 as v7
 REPORT_PATH = v7.INPUT_AUDIT_REPORT_PATH
 
 
-def _run_cli(*args: str) -> dict[str, Any]:
+def _preexec_cpu_cap(remaining_seconds: float) -> Any:
+    hard = max(2, min(60, int(remaining_seconds)))
+    soft = max(1, hard - 2)
+
+    def apply() -> None:
+        resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
+
+    return apply
+
+
+def _run_cli(*args: str, remaining_seconds: float) -> dict[str, Any]:
     script = v7.STUDY / "checkpoint_replay_qualification.py"
     result = subprocess.run(
         [sys.executable, str(script), "--qualification-version", "v7", *args],
@@ -27,6 +39,7 @@ def _run_cli(*args: str) -> dict[str, Any]:
         stderr=subprocess.PIPE,
         text=True,
         timeout=45,
+        preexec_fn=_preexec_cpu_cap(remaining_seconds),
     )
     if result.returncode:
         raise AssertionError(
@@ -50,7 +63,6 @@ def run() -> dict[str, Any]:
     if (v7.REPOSITORY / v7.OPTIONAL_RUNTIME_OUTPUT).exists():
         raise AssertionError("the known optional v6 runtime-metrics output is unexpectedly present")
 
-    own_start = resource.getrusage(resource.RUSAGE_SELF)
     missing_input_path = v7.REPOSITORY / v7.REQUIRED_INPUT_ANCHORS[-2]
     original_bytes = missing_input_path.read_bytes()
     child_start = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -71,10 +83,23 @@ def run() -> dict[str, Any]:
         missing_input_path.write_bytes(original_bytes)
     if missing_input_path.read_bytes() != original_bytes:
         raise AssertionError("temporarily removed historical input was not restored byte-for-byte")
-    child_after = resource.getrusage(resource.RUSAGE_CHILDREN)
-
-    prepared = _run_cli("prepare-lock")
-    verified = _run_cli("verify-lock")
+    own_after_missing = resource.getrusage(resource.RUSAGE_SELF)
+    child_after_missing = resource.getrusage(resource.RUSAGE_CHILDREN)
+    prelock_probe_cpu = max(
+        0.0,
+        own_after_missing.ru_utime + own_after_missing.ru_stime
+        - MODULE_START_OWN_CPU.ru_utime - MODULE_START_OWN_CPU.ru_stime,
+    ) + max(
+        0.0,
+        child_after_missing.ru_utime + child_after_missing.ru_stime
+        - child_start.ru_utime - child_start.ru_stime,
+    )
+    prepared = _run_cli("prepare-lock", remaining_seconds=v7.STATIC_RESERVATION_CPU_SECONDS - prelock_probe_cpu - 2.0)
+    prepare_cpu = float(prepared.get("lock_preparation_process_cpu_seconds", 0.0))
+    verified = _run_cli(
+        "verify-lock",
+        remaining_seconds=v7.STATIC_RESERVATION_CPU_SECONDS - prelock_probe_cpu - prepare_cpu - 2.0,
+    )
     lock = v7.read_json(v7.LOCK_PATH)
     manifest = v7.read_json(v7.INPUT_MANIFEST_PATH)
     if not all(path.is_file() for path in (v7.LOCK_PATH, v7.CONFIG_PATH, v7.PLAN_PATH, v7.INPUT_MANIFEST_PATH)):
@@ -100,11 +125,6 @@ def run() -> dict[str, Any]:
     if len(lock.get("historical_input_sha256", {})) != len(included_paths):
         raise AssertionError("v7 source-lock hash map does not cover each included historical input")
 
-    own_after = resource.getrusage(resource.RUSAGE_SELF)
-    child_cpu_missing_probe = (
-        child_after.ru_utime + child_after.ru_stime - child_start.ru_utime - child_start.ru_stime
-    )
-    own_cpu = own_after.ru_utime + own_after.ru_stime - own_start.ru_utime - own_start.ru_stime
     cli_cpu = float(prepared.get("lock_preparation_process_cpu_seconds", 0.0)) + float(
         verified.get("measured_process_tree_cpu_seconds", 0.0)
     )
@@ -135,10 +155,10 @@ def run() -> dict[str, Any]:
         "production_prepare_lock": prepared,
         "production_verify_lock": verified,
         "resource_accounting": {
-            "measured_test_process_cpu_seconds": max(0.0, own_cpu) + max(0.0, child_cpu_missing_probe),
+            "measured_test_process_cpu_seconds": prelock_probe_cpu,
             "prepare_lock_reported_process_tree_cpu_seconds": float(prepared.get("lock_preparation_process_cpu_seconds", 0.0)),
             "verify_lock_reported_process_tree_cpu_seconds": float(verified.get("measured_process_tree_cpu_seconds", 0.0)),
-            "conservative_sum_cpu_seconds": max(0.0, own_cpu) + max(0.0, child_cpu_missing_probe) + cli_cpu,
+            "conservative_sum_cpu_seconds": prelock_probe_cpu + cli_cpu,
             "fixed_reservation_cpu_seconds": v7.STATIC_RESERVATION_CPU_SECONDS,
             "no_refund": True,
         },

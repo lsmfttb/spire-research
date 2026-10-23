@@ -24,6 +24,16 @@ def _cpu_now() -> float:
     return float(usage.ru_utime + usage.ru_stime)
 
 
+def _preexec_cpu_cap(remaining_seconds: float) -> Any:
+    hard = max(2, min(60, int(remaining_seconds)))
+    soft = max(1, hard - 2)
+
+    def apply() -> None:
+        resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
+
+    return apply
+
+
 def _write_json_tamper(path: Path, mutate: Callable[[dict[str, Any]], None]) -> bytes:
     original = path.read_bytes()
     value = json.loads(original.decode("utf-8"))
@@ -41,6 +51,7 @@ def _case(
     mutation: tuple[Path, Callable[[dict[str, Any]], None]] | None = None,
     mutation_bytes: tuple[Path, Callable[[bytes], bytes]] | None = None,
     missing_file: Path | None = None,
+    remaining_cpu_seconds: float,
 ) -> dict[str, Any]:
     case_dir = v7.PREFLIGHT_TEST_ROOT / name
     report_path = case_dir / "capture-launch-preflight-v7.json"
@@ -85,6 +96,7 @@ def _case(
             stderr=subprocess.PIPE,
             text=True,
             timeout=45,
+            preexec_fn=_preexec_cpu_cap(remaining_cpu_seconds),
         )
     finally:
         if original_bytes is not None:
@@ -190,7 +202,7 @@ def _run() -> dict[str, Any]:
         )
         if next_cpu >= v7.STATIC_RESERVATION_CPU_SECONDS - 2.0:
             raise RuntimeError(f"60 CPU-s static reservation is nearly exhausted before {args[0]!r}: {next_cpu:.3f}")
-        cases.append(_case(*args, **kwargs))
+        cases.append(_case(*args, remaining_cpu_seconds=max(2.0, v7.STATIC_RESERVATION_CPU_SECONDS - next_cpu - 2.0), **kwargs))
         measured = prior_cpu + (_cpu_now() - started_cpu) + sum(
             float(row["measured_process_tree_cpu_seconds"]) for row in cases
         )
