@@ -269,6 +269,7 @@ def _v7_charged(value: Mapping[str, Any]) -> tuple[float, float]:
 
 
 def reserve_static_v7() -> dict[str, Any]:
+    q.install_process_cpu_ceiling(STATIC_RESERVATION_CPU_SECONDS)
     if any(path.exists() for path in (STATIC_RESERVATION_PATH, RESOURCE_LEDGER_PATH, RESOURCE_SNAPSHOT_PATH)):
         raise QualificationV7Failure("v7 static reservation or ledger is partial or already exists; no retry is permitted")
     prior = read_json(q.OUT / "resource-ledger.json")
