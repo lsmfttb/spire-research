@@ -352,7 +352,7 @@ def _git_identity(path: str) -> tuple[str, str]:
     return commit, dirty
 
 
-def validate_environment(out: Path) -> dict[str, Any]:
+def validate_environment(out: Path, *, native_module_path: str | Path | None = None) -> dict[str, Any]:
     if sys.version.split()[0] != CONFIG["identity"]["python"]:
         raise StudyFailure(f"Python version mismatch: {sys.version.split()[0]}")
     if torch.__version__ != CONFIG["identity"]["torch"]:
@@ -373,8 +373,49 @@ def validate_environment(out: Path) -> dict[str, Any]:
         raise StudyFailure("native source checkout does not match the clean frozen commit")
     if stsr_commit != EXPECTED_STSRL or stsr_dirty:
         raise StudyFailure("STSRL source checkout does not match the clean frozen commit")
-    module = importlib.import_module("slaythespire")
-    module_path = Path(module.__file__).resolve()
+    # The v6 source-history launcher locks the exact binary path.  Importing
+    # by module name alone is insufficient: a fresh capture process may not
+    # inherit the native build directory in sys.path even though a smoke
+    # process did.  Resolve and hash the configured binary before import, add
+    # only its verified parent to sys.path, then prove Python loaded that exact
+    # file.  Older callers retain their pinned sys.path behavior when no path
+    # is supplied.
+    configured_module_path = native_module_path or os.environ.get("ISSUE73_NATIVE_MODULE_PATH")
+    expected_module_path: Path | None = None
+    original_sys_path = list(sys.path)
+    if configured_module_path:
+        try:
+            expected_module_path = Path(configured_module_path).expanduser().resolve(strict=True)
+        except OSError as exc:
+            raise StudyFailure(f"configured native module path is unavailable: {configured_module_path}: {exc}") from exc
+        if not expected_module_path.is_file():
+            raise StudyFailure(f"configured native module path is not a file: {expected_module_path}")
+        validate_native_module_identity(
+            expected_module_path,
+            expected_name=CONFIG["identity"]["native_module"],
+            expected_sha256=CONFIG["identity"]["native_binary_sha256"],
+        )
+        module_directory = str(expected_module_path.parent)
+        if module_directory not in {str(Path(entry or ".").resolve()) for entry in sys.path}:
+            sys.path.insert(0, module_directory)
+        cached_module = sys.modules.get("slaythespire")
+        if cached_module is not None:
+            cached_path_value = getattr(cached_module, "__file__", None)
+            if not cached_path_value or Path(cached_path_value).resolve() != expected_module_path:
+                raise StudyFailure(
+                    "slaythespire was already imported from a path different from the locked native module"
+                )
+            module = cached_module
+        else:
+            module = importlib.import_module("slaythespire")
+        module_path = Path(module.__file__).resolve(strict=True)
+        if module_path != expected_module_path:
+            raise StudyFailure(
+                f"Python loaded slaythespire from {module_path}, not the locked path {expected_module_path}"
+            )
+    else:
+        module = importlib.import_module("slaythespire")
+        module_path = Path(module.__file__).resolve(strict=True)
     binary_hash = validate_native_module_identity(
         module_path,
         expected_name=CONFIG["identity"]["native_module"],
@@ -394,6 +435,18 @@ def validate_environment(out: Path) -> dict[str, Any]:
         "stsr_native_integration_commit": source_identity.get("integration_commit"),
         "native_module_path": str(module_path),
         "native_module_sha256": binary_hash,
+        "native_module_search": {
+            "configured_exact_path": str(expected_module_path) if expected_module_path else None,
+            "configured_parent_present_before_import": (
+                str(expected_module_path.parent) in {str(Path(entry or ".").resolve()) for entry in original_sys_path}
+                if expected_module_path else None
+            ),
+            "configured_parent_present_after_import": (
+                str(expected_module_path.parent) in {str(Path(entry or ".").resolve()) for entry in sys.path}
+                if expected_module_path else None
+            ),
+            "loaded_path_exact_match": module_path == expected_module_path if expected_module_path else None,
+        },
         "python": sys.version.split()[0],
         "torch": torch.__version__,
         "numpy": np.__version__,
@@ -3162,9 +3215,11 @@ def _native_fixture_record(out: Path) -> dict[str, Any]:
     return evidence
 
 
-def _setup(out: Path) -> tuple[dict[str, Any], Any, SemanticHashEncoder, dict[str, Any]]:
+def _setup(
+    out: Path, *, native_module_path: str | Path | None = None,
+) -> tuple[dict[str, Any], Any, SemanticHashEncoder, dict[str, Any]]:
     lock_config(out)
-    env = validate_environment(out)
+    env = validate_environment(out, native_module_path=native_module_path)
     module = env["module"]
     runtime = _install_runtime(out)
     optimizer_path = ROOT / "public_history_execution.py"
