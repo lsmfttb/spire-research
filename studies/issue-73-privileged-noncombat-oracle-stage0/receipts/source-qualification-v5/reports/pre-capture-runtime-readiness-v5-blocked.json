@@ -1,0 +1,106 @@
+{
+  "schema_id": "issue73-v5-pre-capture-runtime-readiness-attempt-v1",
+  "attempt_key": "builder-pre-capture-runtime-readiness-v5",
+  "observed_at_utc": "2026-10-23T16:06:16.9827173Z",
+  "status": "BLOCKED_PINNED_RUNTIME_UNAVAILABLE",
+  "disposition": "STOP_BEFORE_SOURCE_REPAIR_OR_NATIVE_CAPTURE",
+  "study_only": true,
+  "source": {
+    "remote_branch": "codex/issue-73-stage0-replay-qualification",
+    "exact_remote_sha": "96d3e96d5f23e17f43ae3c1e870d5917a24087c1",
+    "source_worktree_clean": true,
+    "v4_config_lock_sha256": "3393c326e62b3f2ef15883de95ddc6ca9379c4ca7008fd35251fc57292e1e76c",
+    "immutable_v4_lock_sha256": "41fc63eb7197a12689d3a780bdb2dd063306b354f3d518b8bff06ff30f802fae",
+    "immutable_v4_resource_ledger_sha256": "c3a297bbcf4b82c04be35bf0017fcc6352c6488accd157a3757631ed39d1aa44",
+    "immutable_v4_failure_report_sha256": "be32dc1d7e842add64e7f9452e733c9a6aa8a60e7987b0567098aa51b80117e4",
+    "immutable_v4_attempt_receipt_sha256": "dcfee2bc185e9cc90c3782a8d9f7b3182d2b1edea219f4c251f35ffece67bb40"
+  },
+  "source_defect": {
+    "path": "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
+    "function": "_install_runtime",
+    "current_comparison": "sha256_file(public_history_execution.py) raw checkout bytes vs normalized Git-blob text digest",
+    "observed_v4_raw_sha256": "6a5ec8a9f9f266b5d6aacf311bbbedb5348971a244ca5052faf85fa9cc4ae906",
+    "locked_normalized_text_sha256": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+    "correction_not_applied": true
+  },
+  "required_runtime": {
+    "python": "3.13.13",
+    "torch": "2.12.0+cpu",
+    "numpy": "2.4.6",
+    "native_module": "slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad"
+  },
+  "available_runtime_checks": [
+    {
+      "environment": "Windows Miniconda base",
+      "python": "3.13.12",
+      "torch": "2.12.0",
+      "numpy": "2.4.6",
+      "slaythespire_module": "not installed",
+      "sts_combat_rl": "not installed",
+      "compatible": false
+    },
+    {
+      "environment": "WSL Ubuntu default",
+      "python": "3.14.4",
+      "torch": "missing",
+      "numpy": "missing",
+      "slaythespire_module": "not installed",
+      "sts_combat_rl": "not installed",
+      "compatible": false
+    },
+    {
+      "environment": "Python launchers and common candidates",
+      "py_launcher": "only Python 3.12",
+      "miniconda_envs": "none",
+      "wsl_python3_13": "not found",
+      "wsl_uv": "not found",
+      "pinned_native_binary_in_clean_source_worktree": "not found",
+      "compatible": false
+    }
+  ],
+  "source_checkouts": [
+    {
+      "repository": "lsmfttb/sts_lightspeed",
+      "path": "D:\\DeadlycatCoding\\sts_lightspeed-builder-issue73-v5",
+      "commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+      "clean": true
+    },
+    {
+      "repository": "lsmfttb/STSRL",
+      "path": "D:\\DeadlycatCoding\\STSRL-builder-issue73-v5",
+      "commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+      "clean": true
+    }
+  ],
+  "execution_boundary": {
+    "runner_validate_environment_invoked": false,
+    "runner__setup_invoked": false,
+    "source_history_capture_started": false,
+    "native_adapter_created": false,
+    "native_game_step_started": false,
+    "formal_seed_consumed": false,
+    "reason": "Exact locked Python 3.13.13, Torch 2.12.0+cpu and loaded native module are unavailable. Running _setup under a different interpreter would fail its identity check and would not qualify the required entry path."
+  },
+  "resource_accounting": {
+    "prior_builder_charge_cpu_seconds": 1897.891659,
+    "registered_static_reserve_cpu_seconds": 120.0,
+    "conservative_charge_cpu_seconds": 120.0,
+    "cumulative_builder_charge_cpu_seconds": 2017.891659,
+    "builder_ceiling_cpu_seconds": 4800.0,
+    "prior_native_gate_bc_charge_cpu_seconds": 1200.0,
+    "additional_native_cpu_seconds": 0.0,
+    "native_gate_bc_ceiling_cpu_seconds": 2760.0,
+    "reviewer_reserve_cpu_seconds": 1200.0,
+    "measured_process_cpu_seconds": null,
+    "measured_process_cpu_reason": "Inventory used multiple independent short-lived shell/tool processes; no process-tree CPU measurement was registered. Charge the full reserved amount; do not reclaim.",
+    "remaining_native_gate_bc_capacity_cpu_seconds": 1560.0,
+    "stage1_authorized": false
+  },
+  "preexisting_failure_preserved": true,
+  "v5_source_lock_created": false,
+  "capture_attempt_started": false,
+  "stop_condition": "One final non-native 120-second pre-capture readiness reservation is exhausted. Planner binding says stop after another pre-capture failure; no implicit v6 or fresh authorization.",
+  "decision_required": "Planner disposition: stop Stage 0 as PRESEED_BLOCKED under the existing contract, or issue a distinct prospective authorization that supplies the exact locked runtime/native module and explicitly accounts for any further bounded validation. No native execution is requested.",
+  "planner_binding_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6368414087"
+}
