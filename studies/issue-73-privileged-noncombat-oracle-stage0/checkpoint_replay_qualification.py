@@ -59,7 +59,8 @@ PRELOCK_STATIC_DEBIT_PATH = OUT / "attempts" / "builder-prelock-static-verificat
 PRELOCK_STATIC_DEBIT_KEY = "builder-prelock-static-verification-v4"
 PRELOCK_STATIC_DEBIT_CPU_SECONDS = 120.0
 PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH = OUT / "ledgers" / "resource-ledger-before-v4.json"
-V4_STATIC_PREFLIGHT_REPORT_PATH = OUT / "reports" / "source-lock-cross-platform-preflight-v4.json"
+V4_STATIC_PREFLIGHT_PRIOR_REPORT_PATH = OUT / "reports" / "source-lock-cross-platform-preflight-v4.json"
+V4_STATIC_PREFLIGHT_REPORT_PATH = OUT / "reports" / "source-lock-cross-platform-preflight-v4-pass-2.json"
 NATIVE_GATE_BC_CAP = 2760.0
 STSRL_PYTHON_PACKAGE_ROOT = "STSRL_SOURCE_DIR/src"
 PRIOR_QUALIFICATION_FILES = tuple(sorted(
@@ -626,6 +627,7 @@ def prepare_lock() -> dict[str, Any]:
         PRELOCK_STATIC_DEBIT_PATH,
         PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH,
         LEGACY_MANIFEST_RECONCILIATION_PATH,
+        V4_STATIC_PREFLIGHT_PRIOR_REPORT_PATH,
         V4_STATIC_PREFLIGHT_REPORT_PATH,
     } | mutable_run_outputs
     missing_prior = [path.relative_to(STUDY).as_posix() for path in PRIOR_QUALIFICATION_FILES if not path.is_file()]
@@ -653,6 +655,7 @@ def prepare_lock() -> dict[str, Any]:
     old_input_paths = {
         HISTORICAL / "debug-owner-runs" / f"{SOURCE_QUAL_SEED}.json",
         HISTORICAL / "attempts" / f"debug-owner-{SOURCE_QUAL_SEED}.json",
+        V4_STATIC_PREFLIGHT_PRIOR_REPORT_PATH,
         V4_STATIC_PREFLIGHT_REPORT_PATH,
         PRELOCK_STATIC_DEBIT_PATH,
         PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH,

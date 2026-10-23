@@ -22,7 +22,7 @@ import source_lock_integrity as lock_integrity
 
 STUDY = Path(__file__).resolve().parent
 REPOSITORY = STUDY.parents[1]
-V4_REPORT = STUDY / "receipts" / "source-qualification-v4" / "reports" / "source-lock-cross-platform-preflight-v4.json"
+V4_REPORT = STUDY / "receipts" / "source-qualification-v4" / "reports" / "source-lock-cross-platform-preflight-v4-pass-2.json"
 V4_DEBIT = STUDY / "receipts" / "source-qualification-v4" / "attempts" / "builder-prelock-static-verification-v4.json"
 IDENTITY = json.loads((STUDY / "config.json").read_text(encoding="utf-8"))["identity"]
 ENVIRONMENT = json.loads((STUDY / "receipts" / "source-qualification-v1" / "environment.json").read_text(encoding="utf-8"))
