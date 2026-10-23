@@ -1,0 +1,236 @@
+{
+  "adapter_and_metering_wrapper": {
+    "pinned_metering_wrapper_exposes_exact_inner_adapter": true,
+    "runner_action_history_uses_identity_guard": true,
+    "single_wrapper_identity_case": "PASS",
+    "status": "PASS",
+    "unrelated_adapter_rejection": "PASS"
+  },
+  "cross_platform_eol_variants": {
+    "native_lf": {
+      "clean_worktree": true,
+      "commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+      "environment_variable": "STS_LIGHTSPEED_SOURCE_DIR",
+      "files": {
+        "bindings/slaythespire.cpp": {
+          "checkout_bare_cr_count": 0,
+          "checkout_bytes": 487915,
+          "checkout_crlf_count": 0,
+          "checkout_normalized_sha256": "72e1df24c3f1c2663480593e2884db72deedf5d05c026b8f7bdedb967d14a666",
+          "checkout_raw_sha256": "72e1df24c3f1c2663480593e2884db72deedf5d05c026b8f7bdedb967d14a666",
+          "committed_blob_bytes": 487915,
+          "committed_git_blob_sha256": "72e1df24c3f1c2663480593e2884db72deedf5d05c026b8f7bdedb967d14a666",
+          "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+        },
+        "src/game/GameContext.cpp": {
+          "checkout_bare_cr_count": 0,
+          "checkout_bytes": 118438,
+          "checkout_crlf_count": 0,
+          "checkout_normalized_sha256": "d56e84da34c234b4d53d45b1d68ef0627b271c94b9ce334999d8887407dc7712",
+          "checkout_raw_sha256": "d56e84da34c234b4d53d45b1d68ef0627b271c94b9ce334999d8887407dc7712",
+          "committed_blob_bytes": 118438,
+          "committed_git_blob_sha256": "d56e84da34c234b4d53d45b1d68ef0627b271c94b9ce334999d8887407dc7712",
+          "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+        },
+        "src/sim/search/GameAction.cpp": {
+          "checkout_bare_cr_count": 0,
+          "checkout_bytes": 27608,
+          "checkout_crlf_count": 0,
+          "checkout_normalized_sha256": "72c5fac3188b5830cc2d6b6a897da8d0ffbfc2d413059f8d1ad13ba4c1b014dc",
+          "checkout_raw_sha256": "72c5fac3188b5830cc2d6b6a897da8d0ffbfc2d413059f8d1ad13ba4c1b014dc",
+          "committed_blob_bytes": 27608,
+          "committed_git_blob_sha256": "72c5fac3188b5830cc2d6b6a897da8d0ffbfc2d413059f8d1ad13ba4c1b014dc",
+          "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+        }
+      },
+      "origin": "https://github.com/lsmfttb/sts_lightspeed.git",
+      "repository": "https://github.com/lsmfttb/sts_lightspeed",
+      "source_ref": "refs/remotes/origin/stsrl/main"
+    },
+    "stsr_lf": {
+      "clean_worktree": true,
+      "commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+      "environment_variable": "STSRL_SOURCE_DIR",
+      "files": {
+        "src/sts_combat_rl/sim/controller_contract.py": {
+          "checkout_bare_cr_count": 0,
+          "checkout_bytes": 10963,
+          "checkout_crlf_count": 0,
+          "checkout_normalized_sha256": "6fbeb3600b6bee7686f65d3cde0b2716a2b17dfb2b34e0a9251a088e0e5aa042",
+          "checkout_raw_sha256": "6fbeb3600b6bee7686f65d3cde0b2716a2b17dfb2b34e0a9251a088e0e5aa042",
+          "committed_blob_bytes": 10963,
+          "committed_git_blob_sha256": "6fbeb3600b6bee7686f65d3cde0b2716a2b17dfb2b34e0a9251a088e0e5aa042",
+          "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+        },
+        "src/sts_combat_rl/sim/decision_record.py": {
+          "checkout_bare_cr_count": 0,
+          "checkout_bytes": 17989,
+          "checkout_crlf_count": 0,
+          "checkout_normalized_sha256": "bce0b268d1eefc958ca2c3c793377a62058b4f91103e17dcb0c51e8a986325b0",
+          "checkout_raw_sha256": "bce0b268d1eefc958ca2c3c793377a62058b4f91103e17dcb0c51e8a986325b0",
+          "committed_blob_bytes": 17989,
+          "committed_git_blob_sha256": "bce0b268d1eefc958ca2c3c793377a62058b4f91103e17dcb0c51e8a986325b0",
+          "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+        },
+        "src/sts_combat_rl/sim/lightspeed.py": {
+          "checkout_bare_cr_count": 0,
+          "checkout_bytes": 38901,
+          "checkout_crlf_count": 0,
+          "checkout_normalized_sha256": "d2ba18eced21589fdfb853a3f2389828997330f84b9c34fc996d09a9d54e426b",
+          "checkout_raw_sha256": "d2ba18eced21589fdfb853a3f2389828997330f84b9c34fc996d09a9d54e426b",
+          "committed_blob_bytes": 38901,
+          "committed_git_blob_sha256": "d2ba18eced21589fdfb853a3f2389828997330f84b9c34fc996d09a9d54e426b",
+          "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+        },
+        "src/sts_combat_rl/sim/lightspeed_source.py": {
+          "checkout_bare_cr_count": 0,
+          "checkout_bytes": 16494,
+          "checkout_crlf_count": 0,
+          "checkout_normalized_sha256": "ba107b8c5b3081c70a4d645afd772a3e3a5c74386c0b2fef8040a316ab060378",
+          "checkout_raw_sha256": "ba107b8c5b3081c70a4d645afd772a3e3a5c74386c0b2fef8040a316ab060378",
+          "committed_blob_bytes": 16494,
+          "committed_git_blob_sha256": "ba107b8c5b3081c70a4d645afd772a3e3a5c74386c0b2fef8040a316ab060378",
+          "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+        },
+        "src/sts_combat_rl/sim/online_controller.py": {
+          "checkout_bare_cr_count": 0,
+          "checkout_bytes": 12253,
+          "checkout_crlf_count": 0,
+          "checkout_normalized_sha256": "5bbc2499d757a5a5b405d5c9f489bf6b712260c1d44a4615e9d22c6b6981198a",
+          "checkout_raw_sha256": "5bbc2499d757a5a5b405d5c9f489bf6b712260c1d44a4615e9d22c6b6981198a",
+          "committed_blob_bytes": 12253,
+          "committed_git_blob_sha256": "5bbc2499d757a5a5b405d5c9f489bf6b712260c1d44a4615e9d22c6b6981198a",
+          "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+        }
+      },
+      "origin": "https://github.com/lsmfttb/STSRL.git",
+      "repository": "https://github.com/lsmfttb/STSRL",
+      "source_ref": "refs/remotes/origin/main"
+    }
+  },
+  "external_git_sources": {
+    "schema_id": "issue73-external-source-git-blob-check-v4",
+    "sources": [
+      {
+        "clean_worktree": true,
+        "commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+        "environment_variable": "STS_LIGHTSPEED_SOURCE_DIR",
+        "files": {
+          "bindings/slaythespire.cpp": {
+            "checkout_bare_cr_count": 0,
+            "checkout_bytes": 497563,
+            "checkout_crlf_count": 9648,
+            "checkout_normalized_sha256": "72e1df24c3f1c2663480593e2884db72deedf5d05c026b8f7bdedb967d14a666",
+            "checkout_raw_sha256": "b8dc9d8e2620bee5bba4166536736d42c86fb8b699a2309ae7209f2f607ac9d7",
+            "committed_blob_bytes": 487915,
+            "committed_git_blob_sha256": "72e1df24c3f1c2663480593e2884db72deedf5d05c026b8f7bdedb967d14a666",
+            "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+          },
+          "src/game/GameContext.cpp": {
+            "checkout_bare_cr_count": 0,
+            "checkout_bytes": 122356,
+            "checkout_crlf_count": 3918,
+            "checkout_normalized_sha256": "d56e84da34c234b4d53d45b1d68ef0627b271c94b9ce334999d8887407dc7712",
+            "checkout_raw_sha256": "4816112464b6a0fb7b454caeac82617b749f3c98cf47cf246578a5f28aa9d774",
+            "committed_blob_bytes": 118438,
+            "committed_git_blob_sha256": "d56e84da34c234b4d53d45b1d68ef0627b271c94b9ce334999d8887407dc7712",
+            "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+          },
+          "src/sim/search/GameAction.cpp": {
+            "checkout_bare_cr_count": 0,
+            "checkout_bytes": 28557,
+            "checkout_crlf_count": 949,
+            "checkout_normalized_sha256": "72c5fac3188b5830cc2d6b6a897da8d0ffbfc2d413059f8d1ad13ba4c1b014dc",
+            "checkout_raw_sha256": "2b34b1de2daede014e0a4929e6b576531776ac62e5cf099ccd0ef2468c023e54",
+            "committed_blob_bytes": 27608,
+            "committed_git_blob_sha256": "72c5fac3188b5830cc2d6b6a897da8d0ffbfc2d413059f8d1ad13ba4c1b014dc",
+            "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+          }
+        },
+        "origin": "https://github.com/lsmfttb/sts_lightspeed.git",
+        "repository": "https://github.com/lsmfttb/sts_lightspeed",
+        "source_ref": "refs/remotes/origin/stsrl/main"
+      },
+      {
+        "clean_worktree": true,
+        "commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+        "environment_variable": "STSRL_SOURCE_DIR",
+        "files": {
+          "src/sts_combat_rl/sim/controller_contract.py": {
+            "checkout_bare_cr_count": 0,
+            "checkout_bytes": 11250,
+            "checkout_crlf_count": 287,
+            "checkout_normalized_sha256": "6fbeb3600b6bee7686f65d3cde0b2716a2b17dfb2b34e0a9251a088e0e5aa042",
+            "checkout_raw_sha256": "2e6a9d771201a39d882f8226e36497345243fc6006a13e98c43375a7b66dc16f",
+            "committed_blob_bytes": 10963,
+            "committed_git_blob_sha256": "6fbeb3600b6bee7686f65d3cde0b2716a2b17dfb2b34e0a9251a088e0e5aa042",
+            "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+          },
+          "src/sts_combat_rl/sim/decision_record.py": {
+            "checkout_bare_cr_count": 0,
+            "checkout_bytes": 18520,
+            "checkout_crlf_count": 531,
+            "checkout_normalized_sha256": "bce0b268d1eefc958ca2c3c793377a62058b4f91103e17dcb0c51e8a986325b0",
+            "checkout_raw_sha256": "1aa3bb511d756c850f08f9612c2ff5adaa7a3c309451d35e13793a93c4b11126",
+            "committed_blob_bytes": 17989,
+            "committed_git_blob_sha256": "bce0b268d1eefc958ca2c3c793377a62058b4f91103e17dcb0c51e8a986325b0",
+            "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+          },
+          "src/sts_combat_rl/sim/lightspeed.py": {
+            "checkout_bare_cr_count": 0,
+            "checkout_bytes": 39876,
+            "checkout_crlf_count": 975,
+            "checkout_normalized_sha256": "d2ba18eced21589fdfb853a3f2389828997330f84b9c34fc996d09a9d54e426b",
+            "checkout_raw_sha256": "b611748a823c7f2d0e4961dd88e9d392248b67829e62d326358162238cf1f0b0",
+            "committed_blob_bytes": 38901,
+            "committed_git_blob_sha256": "d2ba18eced21589fdfb853a3f2389828997330f84b9c34fc996d09a9d54e426b",
+            "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+          },
+          "src/sts_combat_rl/sim/lightspeed_source.py": {
+            "checkout_bare_cr_count": 0,
+            "checkout_bytes": 16962,
+            "checkout_crlf_count": 468,
+            "checkout_normalized_sha256": "ba107b8c5b3081c70a4d645afd772a3e3a5c74386c0b2fef8040a316ab060378",
+            "checkout_raw_sha256": "b8e4c783d119ed80c1c9ad77307bf935925d53e27030b69012ce1299c90c3671",
+            "committed_blob_bytes": 16494,
+            "committed_git_blob_sha256": "ba107b8c5b3081c70a4d645afd772a3e3a5c74386c0b2fef8040a316ab060378",
+            "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+          },
+          "src/sts_combat_rl/sim/online_controller.py": {
+            "checkout_bare_cr_count": 0,
+            "checkout_bytes": 12561,
+            "checkout_crlf_count": 308,
+            "checkout_normalized_sha256": "5bbc2499d757a5a5b405d5c9f489bf6b712260c1d44a4615e9d22c6b6981198a",
+            "checkout_raw_sha256": "7762b6093a76cbee1c1f805a992bf396760df60c62d9dd43758bb073f0a23b8b",
+            "committed_blob_bytes": 12253,
+            "committed_git_blob_sha256": "5bbc2499d757a5a5b405d5c9f489bf6b712260c1d44a4615e9d22c6b6981198a",
+            "status": "PASS_EXACT_GIT_BLOB_WITH_EOL_ONLY_CHECKOUT_CONVERSION"
+          }
+        },
+        "origin": "https://github.com/lsmfttb/STSRL.git",
+        "repository": "https://github.com/lsmfttb/STSRL",
+        "source_ref": "refs/remotes/origin/main"
+      }
+    ],
+    "status": "PASS"
+  },
+  "formal_seed_consumed": false,
+  "measured_current_python_process_cpu_seconds": 0.46875,
+  "native_loaded_module_path": "/home/lsmft/stsrl-spikes/build-issue71-8ded-py313/slaythespire.cpython-313-x86_64-linux-gnu.so",
+  "native_loaded_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+  "native_module_digest_source": "SHA256 of the exact module path recorded by the earlier successful pinned runtime environment receipt; verified read-only in this static pass",
+  "resource_accounting": "fixed 120 CPU-second non-native preflight reservation; no native Gate B/C debit",
+  "schema_id": "issue73-source-lock-cross-platform-preflight-v4",
+  "simulator_imported_or_stepped": false,
+  "stage0_gate_started": false,
+  "static_preflight_reservation_cpu_seconds": 120.0,
+  "status": "PASS",
+  "stsr_python_import_path": {
+    "logical_root": "STSRL_SOURCE_DIR/src",
+    "missing_sys_path_rejected": true,
+    "resolved_under_pinned_source": true,
+    "status": "PASS"
+  },
+  "tested_at_utc": "2026-10-23T14:05:33.813005+00:00",
+  "tested_study_source_commit": "2935e2bbda51f264b9b6a421ceb82bcb011a9ae2"
+}
