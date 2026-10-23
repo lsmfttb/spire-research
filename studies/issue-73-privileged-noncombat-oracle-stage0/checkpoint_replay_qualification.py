@@ -631,7 +631,11 @@ def prepare_lock() -> dict[str, Any]:
     ensure_prelock_static_debit()
     ensure_legacy_manifest_reconciliation()
     ensure_prelock_resource_ledger_snapshot()
-    mutable_run_outputs = {PRE_CAPTURE_SMOKE_OUT / "environment.json", PRE_CAPTURE_SMOKE_OUT / "runtime-metrics.jsonl"}
+    mutable_run_outputs = {
+        PRE_CAPTURE_SMOKE_OUT / "config-lock.json",
+        PRE_CAPTURE_SMOKE_OUT / "environment.json",
+        PRE_CAPTURE_SMOKE_OUT / "runtime-metrics.jsonl",
+    }
     allowed_prior = set(PRIOR_QUALIFICATION_FILES) | {
         RESOURCE_LEDGER_PATH,
         PRELOCK_STATIC_DEBIT_PATH,
@@ -673,6 +677,7 @@ def prepare_lock() -> dict[str, Any]:
         V5_STATIC_PREFLIGHT_REPORT_PATH,
         V5_PRIOR_BLOCKED_REPORT_PATH,
         V5_RUNTIME_CORRECTION_REPORT_PATH,
+        PRE_CAPTURE_SMOKE_OUT / "config-lock.json",
         PRELOCK_STATIC_DEBIT_PATH,
         PRELOCK_RESOURCE_LEDGER_SNAPSHOT_PATH,
         LEGACY_MANIFEST_RECONCILIATION_PATH,
@@ -684,8 +689,8 @@ def prepare_lock() -> dict[str, Any]:
         )),
         *PRIOR_QUALIFICATION_FILES,
     }
-    code_hashes = {name: runner.sha256_bytes(external_git_blob(REPOSITORY, current_commit, f"{STUDY_RELATIVE}/{name}")) for name in SOURCE_HASH_PATHS}
     current_commit = git("rev-parse", "HEAD")
+    code_hashes = {name: runner.sha256_bytes(external_git_blob(REPOSITORY, current_commit, f"{STUDY_RELATIVE}/{name}")) for name in SOURCE_HASH_PATHS}
     if git("symbolic-ref", "--short", "HEAD") != BRANCH:
         raise QualificationFailure("prospective source lock must be prepared on its registered remote branch")
     command, env = runner.git_invocation(REPOSITORY)
@@ -1414,6 +1419,7 @@ def pre_capture_smoke_v5() -> dict[str, Any]:
                 "sha256": prepared["model_digest"],
             },
             "external_git_sources": prepared["external_sources"],
+            "smoke_runtime_config_lock_sha256": runner.sha256_text_file(PRE_CAPTURE_SMOKE_OUT / "config-lock.json"),
             "capture_attempt_cpu_projection": capacity,
             "capture_entry_path": {
                 "shared_function": "prepare_capture_prerequisites",
