@@ -42,13 +42,13 @@ REPOSITORY = STUDY.parents[1]
 STUDY_RELATIVE = STUDY.relative_to(REPOSITORY).as_posix()
 HISTORICAL = STUDY / "receipts" / "stage0"
 OUT = STUDY / "receipts" / "source-qualification-v1"
-CONFIG_PATH = OUT / "qualification-config-v2.json"
-LOCK_PATH = OUT / "preseed-source-lock-v2.json"
-PLAN_PATH = OUT / "plans" / "gate-c-replay-plan-v2.json"
-HISTORY_PATH = OUT / "histories" / "actual-action-step-history-v2.json"
-CAPTURE_ATTEMPT_KEY = "source-history-capture-173730001-pythonpath-fix-v2"
-CAPTURE_REPORT_PATH = OUT / "reports" / "source-history-capture-report-v2.json"
-CAPTURE_FAILURE_PATH = OUT / "reports" / "source-history-capture-failure-v2.json"
+CONFIG_PATH = OUT / "qualification-config-v3.json"
+LOCK_PATH = OUT / "preseed-source-lock-v3.json"
+PLAN_PATH = OUT / "plans" / "gate-c-replay-plan-v3.json"
+HISTORY_PATH = OUT / "histories" / "actual-action-step-history-v3.json"
+CAPTURE_ATTEMPT_KEY = "source-history-capture-173730001-metered-adapter-fix-v3"
+CAPTURE_REPORT_PATH = OUT / "reports" / "source-history-capture-report-v3.json"
+CAPTURE_FAILURE_PATH = OUT / "reports" / "source-history-capture-failure-v3.json"
 RESOURCE_LEDGER_PATH = OUT / "resource-ledger.json"
 PRIOR_QUALIFICATION_FILES = (
     OUT / "config-lock.json",
@@ -57,6 +57,13 @@ PRIOR_QUALIFICATION_FILES = (
     OUT / "plans" / "gate-c-replay-plan.json",
     OUT / "attempts" / "source-history-capture-173730001.json",
     OUT / "reports" / "source-history-capture-failure.json",
+    OUT / "qualification-config-v2.json",
+    OUT / "preseed-source-lock-v2.json",
+    OUT / "plans" / "gate-c-replay-plan-v2.json",
+    OUT / "attempts" / "source-history-capture-173730001-pythonpath-fix-v2.json",
+    OUT / "reports" / "source-history-capture-failure-v2.json",
+    OUT / "attempts" / "environment-after-failed-attempt-v2.json",
+    OUT / "attempts" / "runtime-metrics-after-failed-attempt-v2.jsonl",
 )
 BRANCH = "codex/issue-73-stage0-replay-qualification"
 OLD_CONFIG = runner.CONFIG
@@ -270,7 +277,7 @@ def gate_c_plan(root_values: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     if len({row["screen"] for row in roots}) < 2 or not any(row["policy_decision_index"] >= 2 for row in roots):
         raise QualificationFailure("fixed Gate C roots miss screen-family or post-two coverage")
     return {
-        "schema_id": "issue73-checkpoint-replay-gate-c-plan-v2",
+        "schema_id": "issue73-checkpoint-replay-gate-c-plan-v3",
         "status": "PRECOMMITTED_BEFORE_ANY_NEW_SUFFIX_RESULT",
         "selection_rule": "original Stage 0 rule over every immutable pre-existing debug-owner root receipt, in fixed seed/decision order; reserve earliest two distinct families; include the earliest policy decision index >=2; fill to four; selected roots are fixed before new replay and never replaced after parity failure",
         "candidate_root_ids": candidate_root_ids,
@@ -338,8 +345,22 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
         "preseed-source-lock-v3.json", "stage0-report.json", "gate-a-report.json",
         "gate-b-report.json", "gate-c-report.json", "resource-ledger.json",
     ]
+    current_builder_charge, current_native_charge = charged(ledger())
+    source_capture_reserve = 60.0
+    prefix_parity_reserve = 80.0
+    gate_c_setup_reserve = 20.0
+    gate_c_suffix_reserve = 64 * 20.0
+    gate_a_reserve = 120.0
+    projected_native_reserve = (
+        source_capture_reserve + prefix_parity_reserve + gate_c_setup_reserve + gate_c_suffix_reserve
+    )
+    projected_builder_reserve = projected_native_reserve + gate_a_reserve
+    full_stage0_forecast_fits_current_caps = (
+        current_builder_charge + projected_builder_reserve <= 4800.0
+        and current_native_charge + projected_native_reserve <= 2400.0
+    )
     config = {
-        "schema_id": "issue73-checkpoint-replay-qualification-config-v2",
+        "schema_id": "issue73-checkpoint-replay-qualification-config-v3",
         "study_id": runner.STUDY_ID,
         "source_qualification_only": True,
         "formal_training_seed_consumed": False,
@@ -363,7 +384,10 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
         "suffixed_policy": "0.80 expert_non_combat_v1 + 0.20 uniform among all currently legal actions at each multichoice; exact frozen existing Stage 0 rule",
         "old_debug_seeds_replay_scope": [SOURCE_QUAL_SEED],
         "source_history_attempt_key": CAPTURE_ATTEMPT_KEY,
-        "prior_failed_attempt": {"key": "source-history-capture-173730001", "status": "FAIL_OR_INCOMPLETE", "cause": "ModuleNotFoundError: sts_combat_rl import search path omitted STSRL src/"},
+        "prior_failed_attempts": [
+            {"key": "source-history-capture-173730001", "status": "FAIL_OR_INCOMPLETE", "cause": "ModuleNotFoundError: sts_combat_rl import search path omitted STSRL src/"},
+            {"key": "source-history-capture-173730001-pythonpath-fix-v2", "status": "FAIL_OR_INCOMPLETE", "cause": "Issue 65 metering wrapper identity was not unwrapped during action history capture"},
+        ],
         "prior_failed_attempt_receipt_is_immutable": True,
         "required_stsr_python_package_root": "STSRL_SOURCE_DIR/src",
         "old_debug_seeds_not_replayed": [173730002, 173730003, 173730004, 173730005, 173730006, 173730007, 173730008],
@@ -376,22 +400,25 @@ def make_qualification_config() -> tuple[dict[str, Any], dict[str, dict[str, Any
             "aggregate_stage0_cpu_seconds": 6000.0,
             "builder_ceiling_cpu_seconds": 4800.0,
             "reviewer_reserve_cpu_seconds": 1200.0,
-            "prior_builder_charge_cpu_seconds": 1501.060651,
-            "builder_remaining_before_new_phase_cpu_seconds": 3298.939349,
-            "prior_native_gate_bc_charge_cpu_seconds": 960.0,
+            "prior_builder_charge_cpu_seconds": current_builder_charge,
+            "builder_remaining_before_new_phase_cpu_seconds": 4800.0 - current_builder_charge,
+            "prior_native_gate_bc_charge_cpu_seconds": current_native_charge,
             "native_gate_bc_ceiling_cpu_seconds": 2400.0,
-            "native_gate_bc_remaining_cpu_seconds": 1440.0,
-            "source_history_capture_reserve_cpu_seconds": 60.0,
-            "fresh_process_prefix_and_transition_parity_reserve_cpu_seconds": 80.0,
-            "gate_c_environment_setup_reserve_cpu_seconds": 20.0,
+            "native_gate_bc_remaining_cpu_seconds": 2400.0 - current_native_charge,
+            "source_history_capture_reserve_cpu_seconds": source_capture_reserve,
+            "fresh_process_prefix_and_transition_parity_reserve_cpu_seconds": prefix_parity_reserve,
+            "gate_c_environment_setup_reserve_cpu_seconds": gate_c_setup_reserve,
             "gate_c_suffix_attempt_count": 64,
             "gate_c_per_suffix_process_cpu_cap_seconds": 20.0,
-            "gate_c_suffix_total_reserve_cpu_seconds": 1280.0,
-            "gate_a_nonnative_process_cpu_cap_seconds": 120.0,
-            "projected_new_native_cpu_reserve_seconds": 1440.0,
-            "projected_new_builder_cpu_reserve_seconds": 1560.0,
-            "cumulative_builder_projection_cpu_seconds": 3061.060651,
-            "remaining_builder_cpu_seconds_after_max_reserve": 1738.939349,
+            "gate_c_suffix_total_reserve_cpu_seconds": gate_c_suffix_reserve,
+            "gate_a_nonnative_process_cpu_cap_seconds": gate_a_reserve,
+            "projected_new_native_cpu_reserve_seconds": projected_native_reserve,
+            "projected_new_builder_cpu_reserve_seconds": projected_builder_reserve,
+            "cumulative_builder_projection_cpu_seconds": current_builder_charge + projected_builder_reserve,
+            "remaining_builder_cpu_seconds_after_max_reserve": 4800.0 - current_builder_charge - projected_builder_reserve,
+            "cumulative_native_gate_bc_projection_cpu_seconds": current_native_charge + projected_native_reserve,
+            "remaining_native_gate_bc_cpu_seconds_after_max_reserve": 2400.0 - current_native_charge - projected_native_reserve,
+            "full_stage0_forecast_fits_current_caps": full_stage0_forecast_fits_current_caps,
             "process_topology": "separate source-history capture and fresh-process prefix replay; one Gate C process with per-suffix 20 CPU-second watchdog; process CPU charged once; no build or child simulator processes",
             "no_reclaim_of_prior_charges": True,
             "failure_or_interruption": "charge at least the precommitted attempt reserve, preserve immutable receipt, stop without retry or replacement",
@@ -411,10 +438,11 @@ def prepare_lock() -> dict[str, Any]:
         # scoped Git commit/push. This only commits the already-hashed bytes.
         push_scoped_commit("Issue 73: commit prospective replay source lock")
         return lock
-    allowed_prior = set(PRIOR_QUALIFICATION_FILES) | {RESOURCE_LEDGER_PATH}
+    mutable_run_outputs = {OUT / "environment.json", OUT / "runtime-metrics.jsonl"}
+    allowed_prior = set(PRIOR_QUALIFICATION_FILES) | {RESOURCE_LEDGER_PATH} | mutable_run_outputs
     missing_prior = [path.relative_to(STUDY).as_posix() for path in PRIOR_QUALIFICATION_FILES if not path.is_file()]
     if missing_prior:
-        raise QualificationFailure(f"prior qualification evidence is incomplete; cannot create revision 2: {missing_prior}")
+        raise QualificationFailure(f"prior qualification evidence is incomplete; cannot create revision 3: {missing_prior}")
     unexpected_prior = [path.relative_to(STUDY).as_posix() for path in OUT.rglob("*") if path.is_file() and path.suffix.lower() in {".json", ".jsonl"} and path not in allowed_prior]
     if unexpected_prior:
         raise QualificationFailure(f"source qualification output has unregistered receipts; lock cannot be regenerated: {unexpected_prior}")
@@ -425,6 +453,17 @@ def prepare_lock() -> dict[str, Any]:
     if not (stsr_python_root / "sts_combat_rl").is_dir() or str(stsr_python_root) not in sys.path:
         raise QualificationFailure("STSRL_SOURCE_DIR/src must contain sts_combat_rl and be present on the Python import path")
     config, roots, plan = make_qualification_config()
+    budget = config["resource_caps"]
+    if not budget["full_stage0_forecast_fits_current_caps"]:
+        raise QualificationFailure(
+            "complete bounded Stage 0 reservation exceeds current authorization; "
+            f"native={budget['prior_native_gate_bc_charge_cpu_seconds']:.6f}+"
+            f"{budget['projected_new_native_cpu_reserve_seconds']:.6f}>"
+            f"{budget['native_gate_bc_ceiling_cpu_seconds']:.6f}, "
+            f"builder={budget['prior_builder_charge_cpu_seconds']:.6f}+"
+            f"{budget['projected_new_builder_cpu_reserve_seconds']:.6f}>"
+            f"{budget['builder_ceiling_cpu_seconds']:.6f}; no source lock or run was created"
+        )
     runner.atomic_json(CONFIG_PATH, config)
     plan = {**plan, "qualification_config_sha256": runner.sha256_text_file(CONFIG_PATH)}
     runner.atomic_json(PLAN_PATH, plan)
@@ -451,8 +490,8 @@ def prepare_lock() -> dict[str, Any]:
     if not remote or remote[0] != current_commit:
         raise QualificationFailure("prospective source code commit must be pushed before creating the source/config lock")
     lock = {
-        "schema_id": "issue73-checkpoint-replay-preseed-source-lock-v2",
-        "lock_revision": 2,
+        "schema_id": "issue73-checkpoint-replay-preseed-source-lock-v3",
+        "lock_revision": 3,
         "status": "PRESEED_LOCKED_BEFORE_NEW_DEBUG_EXECUTION",
         "study_only": True,
         "formal_training_seed_consumed": False,
@@ -753,7 +792,7 @@ def compare_capture_run(result: Mapping[str, Any], roots: Sequence[Mapping[str, 
         root_checks[root_id_value] = fields
     target_roots = all(root_checks.get(rid) and all(root_checks[rid].values()) for rid in REQUIRED_REPLAY_ROOTS)
     report = {
-        "schema_id": "issue73-source-history-capture-v2",
+        "schema_id": "issue73-source-history-capture-v3",
         "status": "PASS" if all(checks.values()) and target_roots else "FAIL_SOURCE_HISTORY_CAPTURE_PARITY",
         "replayed_seed": SOURCE_QUAL_SEED,
         "historical_owner_treatment": "exact provenance/parity replay only; not a new owner",
@@ -813,7 +852,7 @@ def capture_transition_witness(base: Any, module: Any, root: Mapping[str, Any], 
 def load_history() -> list[dict[str, Any]]:
     path = HISTORY_PATH
     value = json.loads(path.read_text(encoding="utf-8"))
-    if value.get("schema_id") != "issue73-actual-action-step-history-v2":
+    if value.get("schema_id") != "issue73-actual-action-step-history-v3":
         raise QualificationFailure("complete action/step history schema mismatch")
     events = value.get("events")
     if not isinstance(events, list) or not events:
@@ -975,7 +1014,7 @@ def capture_source_history() -> dict[str, Any]:
             report = compare_capture_run(result, roots, history)
             history_path = HISTORY_PATH
             runner.atomic_json(history_path, {
-                "schema_id": "issue73-actual-action-step-history-v2",
+                "schema_id": "issue73-actual-action-step-history-v3",
                 "source_lock_sha256": runner.sha256_text_file(LOCK_PATH),
                 "owner_seed": SOURCE_QUAL_SEED,
                 "role": "historical debug owner provenance/prefix replay only; not a new owner",
@@ -1042,7 +1081,7 @@ def capture_source_history() -> dict[str, Any]:
             adapter.close()
     except BaseException as exc:
         failure = {
-            "schema_id": "issue73-source-history-capture-failure-v2",
+            "schema_id": "issue73-source-history-capture-failure-v3",
             "status": "FAIL_OR_INCOMPLETE",
             "failure_type": type(exc).__name__,
             "failure": str(exc)[:1200],

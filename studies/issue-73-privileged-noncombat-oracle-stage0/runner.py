@@ -950,7 +950,9 @@ class ActionHistoryController:
     def select_action(self, adapter: Any, snapshot: Any, actions: Sequence[Any], context: Any, step_index: int) -> Any:
         from sts_combat_rl.sim.decision_record import action_identity_dicts_for_actions
 
-        if adapter is not self._adapter:
+        # Issue 65's process-time metering wrapper is transparent and passes
+        # this exact history adapter through its _adapter field.
+        if adapter is not self._adapter and getattr(adapter, "_adapter", None) is not self._adapter:
             raise StudyFailure("controlled runner replaced the adapter during action-history capture")
         state_fingerprint = adapter.checkpoint_fingerprint(snapshot)
         decision_trace_index = len(self._controller.trace)
