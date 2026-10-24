@@ -13,6 +13,7 @@ import torch
 from torch import nn
 
 import runner
+import source_lock_integrity
 from policy import AllNoncombatPolicy, PROJECTION_ORDER, SemanticHashEncoder
 
 
@@ -68,14 +69,29 @@ def check_sign_parity_corpus(dimension: int) -> dict[str, Any]:
     }
 
 
+def _canonical_target_payload(raw: bytes, *, label: str) -> bytes:
+    """Accept one uniform checkout EOL style without weakening target identity."""
+    try:
+        canonical = source_lock_integrity.normalize_locked_source_eol(raw, label=label)
+    except source_lock_integrity.SourceLockValidationError as exc:
+        raise RuntimeError(f"fixed synthetic target direction has invalid line endings: {label}") from exc
+    if b"\r\n" in raw and b"\n" in raw.replace(b"\r\n", b""):
+        raise RuntimeError(f"fixed synthetic target direction has mixed line endings: {label}")
+    return canonical
+
+
 def _target_direction() -> tuple[np.ndarray, str]:
     path = runner.ROOT / runner.CONFIG["stage0"]["synthetic_target"]["direction_file"]
     raw = path.read_bytes()
-    digest = _sha_bytes(raw)
+    canonical = _canonical_target_payload(raw, label=str(path))
+    digest = _sha_bytes(canonical)
     expected = runner.CONFIG["stage0"]["synthetic_target"]["direction_sha256"]
     if digest != expected:
-        raise RuntimeError("fixed synthetic target direction hash differs from the committed configuration")
-    values = np.asarray(json.loads(raw.decode("utf-8"))["direction"], dtype=np.float32)
+        raise RuntimeError(
+            "fixed synthetic target direction canonical SHA-256 differs from the committed configuration: "
+            f"{digest} != {expected}"
+        )
+    values = np.asarray(json.loads(canonical.decode("utf-8"))["direction"], dtype=np.float32)
     if values.shape != (int(runner.CONFIG["model"]["hash_dimension"]),) or not np.all(np.isfinite(values)):
         raise RuntimeError("synthetic target direction has invalid shape or values")
     norm = float(np.linalg.norm(values))

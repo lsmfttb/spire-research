@@ -1,0 +1,42 @@
+{
+  "schema_id": "issue73-gate-a-target-preflight-resource-ledger-v1",
+  "parent_resource_ledger": {
+    "path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v2/resource-ledger-final.json",
+    "git_blob_sha1": "7b7fe5e2e5daafe0b4cf7a23e7f95c4359c62ce2"
+  },
+  "planner_budget_policy": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6383443034",
+  "builder_charge_before_attempt_cpu_seconds": 3331.610134,
+  "native_gate_bc_charge_before_attempt_cpu_seconds": 1580,
+  "builder_ceiling_cpu_seconds": 10000,
+  "aggregate_ceiling_cpu_seconds": 12000,
+  "native_gate_bc_ceiling_cpu_seconds": 6000,
+  "independent_reviewer_protected_reserve_cpu_seconds": 2000,
+  "attempt": {
+    "key": "builder-gate-a-target-preflight-v3",
+    "kind": "non-native-target-source-positive-negative-preflight",
+    "status": "STARTED",
+    "started_at_utc": "2026-10-24 11:41:34 UTC",
+    "source_lock_path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v3-preflight/source-lock-v3.json",
+    "fixed_reservation_cpu_seconds": 60,
+    "cpu_charged_seconds": 60,
+    "measurement_status": "FIXED RESERVATION PRECHARGED; NO REFUND; TERMINAL RECEIPT FOLLOWS",
+    "native_gate_bc": false,
+    "native_adapter_instantiated": false,
+    "native_game_step_started": false,
+    "formal_seed_consumed": false,
+    "optimizer_updates_allowed": false
+  },
+  "projection": {
+    "cumulative_builder_charge_after_attempt_cpu_seconds": 3391.610134,
+    "remaining_gate_a_reservation_cpu_seconds": 120,
+    "remaining_fixed_native_gate_c_work_cpu_seconds": 1300,
+    "remaining_native_contingency_cpu_seconds": 100,
+    "projected_builder_total_cpu_seconds": 4911.610134,
+    "projected_native_gate_bc_total_cpu_seconds": 2980,
+    "reviewer_reserve_cpu_seconds": 2000,
+    "projected_all_in_cpu_seconds": 6911.610134,
+    "within_all_registered_ceilings": true
+  },
+  "stage1_authorized": false,
+  "formal_seeds_consumed": false
+}

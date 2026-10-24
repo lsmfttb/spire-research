@@ -131,15 +131,15 @@
     "stage1_registered": false
   },
   "resources": {
-    "all_in_ceiling_seconds": 6000,
+    "all_in_ceiling_seconds": 12000,
     "branch_cpu_upper_bound_seconds": 2400,
     "branch_limits_enforced_in_forked_linux_children": false,
-    "builder_cpu_hard_cap_seconds": 4800,
-    "compile_configure_charge_note": "No build or formal seed; setup and all failed or incomplete Stage0 processes debit the 4800 Builder ceiling",
+    "builder_cpu_hard_cap_seconds": 10000,
+    "compile_configure_charge_note": "No build or formal seed; setup and all failed or incomplete Stage0 processes debit the 10000 Builder ceiling",
     "compile_configure_cpu_seconds_already_used": 0,
     "cpu_margin_seconds": 0,
     "max_steps_per_natural_run": 4096,
-    "native_gate_bc_cpu_ceiling_seconds": 2400,
+    "native_gate_bc_cpu_ceiling_seconds": 6000,
     "native_process_topology": "single pinned Linux Python process; no branch subprocesses; worker RLIMIT_CPU hard ceiling and per-attempt process CPU checks",
     "native_worker_cpu_rlimit_hard_seconds": 2400,
     "native_worker_cpu_rlimit_soft_seconds": 2399,
@@ -151,7 +151,7 @@
       "run_cpu_inflation_factor": 0,
       "stage1_authorized": false
     },
-    "reviewer_cpu_reserve_seconds": 1200,
+    "reviewer_cpu_reserve_seconds": 2000,
     "root_attempt_cpu_cap_seconds": 120,
     "stage1_budget": {
       "cpu_ceiling_seconds": null,
