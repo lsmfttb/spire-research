@@ -339,7 +339,7 @@ def _required_environment() -> None:
     q.verify_locked_external_sources(read_json(e5.LOCK_PATH))
     native = read_json(e5.LOCK_PATH)["native"]
     module_path = Path(str(native["module_path"]))
-    if not module_path.is_file() or sha256_file(module_path) != native.get("loaded_module_sha256"):
+    if not module_path.is_file() or sha256_bytes(module_path.read_bytes()) != native.get("loaded_module_sha256"):
         raise GateBCV10Failure("pinned native module path/hash differs from the reviewed v9 lock")
 
 

@@ -20,6 +20,11 @@ class GateBCV10StaticTests(unittest.TestCase):
         current_config = v10.sha256_bytes((v10.STUDY / "config.json").read_bytes())
         self.assertNotEqual(current_config, committed["config.json"])
 
+    def test_pinned_native_module_digest_uses_raw_binary_bytes(self) -> None:
+        native = v10.read_json(v10.e5.LOCK_PATH)["native"]
+        module_path = v10.Path(native["module_path"])
+        self.assertEqual(v10.sha256_bytes(module_path.read_bytes()), native["loaded_module_sha256"])
+
     def test_fixed_population_and_resource_projection(self) -> None:
         self.assertEqual(v10.GATE_B_ROOTS["hidden_semantic"], "root-173730001-0003")
         self.assertEqual(v10.GATE_C_ROOTS, tuple(f"root-173730001-{i:04d}" for i in range(4)))
