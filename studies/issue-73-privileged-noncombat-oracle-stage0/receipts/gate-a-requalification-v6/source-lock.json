@@ -1,8 +1,8 @@
 {
   "schema_id": "issue73-gate-a-requalification-source-lock-v1",
   "lock_key": "gate-a-requalification-after-v9-parity-v6",
-  "status": "LOCKED_PENDING_V9_PREFLIGHT_AND_INDEPENDENT_REVIEW",
-  "locked_at_utc": "2026-10-24T14:48:17Z",
+  "status": "READY_FOR_INDEPENDENT_REVIEW",
+  "locked_at_utc": "2026-10-24T14:53:11Z",
   "execution_branch": "codex/issue-73-root-config-provenance-v1",
   "remote_parent_branch": "codex/issue-73-root-config-provenance-v1",
   "remote_parent_sha": "38734761c44fa367e745ad79ac6566a3e7ec7915",
@@ -415,12 +415,12 @@
   "attempt_key": "gate-a-requalification-after-v9-parity-v6",
   "attempt_path": "receipts/gate-a-requalification-v6/attempts/gate-a-requalification-after-v9-parity-v6.json",
   "parent_resource_ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v9.json",
-  "parent_resource_ledger_sha256": "PENDING_PREFLIGHT",
-  "reviewer_requirement": "Independent Reviewer PASS on this exact source, v6 launcher and pinned v9 preflight before Builder precharges the unique 120 CPU-s Gate A attempt; no execution before the fixed reservation.",
+  "parent_resource_ledger_sha256": "68cb99fcd66483d7742b8f57f8d3ed94910430425bab57a18d96eba2ed84286b",
+  "reviewer_requirement": "Independent Reviewer must verify this exact v6 source/launcher and pinned-runtime v9 positive/negative prelaunch gate; only after PASS may Builder create the fixed 120 CPU-s Gate A v6 precharge. No Gate A execution or formal seed is authorized by this preflight.",
   "resource_reservation": {
     "kind": "fixed non-native Gate A requalification",
     "fixed_cpu_seconds": 120,
-    "status": "AUTHORIZED_NOT_STARTED",
+    "status": "AUTHORIZED_NOT_STARTED_AWAITING_INDEPENDENT_REVIEW",
     "native": false,
     "formal_seed_consumed": false
   },
@@ -429,5 +429,7 @@
   "preflight_source_lock_v9_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v9.json",
   "preflight_source_lock_v9_sha256": "e8907e9ce1c49b3f103a1457c4b8e48ab8c98158af13983796a3039d980e958a",
   "preflight_report_v9_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v9.json",
-  "preflight_report_v9_sha256": "PENDING_PREFLIGHT"
+  "preflight_report_v9_sha256": "2b56dc3e1f4cff5c8c13d8ae708178aefa6543c499e3115f2ba11621ea591cb1",
+  "preflight_status": "PASS_PINNED_RUNTIME_SOURCE_ROOT_AND_NEGATIVE_PREFLIGHT",
+  "preflight_attempt_key": "builder-gate-a-root-config-provenance-preflight-v9"
 }
