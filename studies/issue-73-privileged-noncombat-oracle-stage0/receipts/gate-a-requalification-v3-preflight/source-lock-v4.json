@@ -1,0 +1,73 @@
+{
+  "schema_id": "issue73-gate-a-target-preflight-source-lock-v1",
+  "lock_key": "gate-a-target-preflight-v4",
+  "source_branch": "codex/issue-73-crlf-target-hash",
+  "remote_parent_branch": "codex/issue-73-crlf-target-hash",
+  "remote_parent_sha": "baf2fdc04071ca854ab7995f4bcf7424aa794bd3",
+  "files": [
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.json",
+      "git_blob_sha1": "f453a3fc15a015b0569a7e20bc4e2d2074d7edc5"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.lock.sha256",
+      "git_blob_sha1": "c9eab759d4985ccc682823695059e7955cb40165"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate_a.py",
+      "git_blob_sha1": "9aff1cd73b9d10299ba4a299af4458f8fbf7cfac"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/test_gate_a_target_direction.py",
+      "git_blob_sha1": "f22fe4238cb137908dda893b50826292dfa9336e"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/source_lock_integrity.py",
+      "git_blob_sha1": "5aeeab8d4746edf0c5d0c76eb14ccb72a92a436d"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
+      "git_blob_sha1": "398dd982bd6610a134dde57ada7d75dd0f9f24ec"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
+      "git_blob_sha1": "eebdb40a206dbfc48f4fb171c03670634593fe01"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate-a-target-direction.json",
+      "git_blob_sha1": "f4589a942207760866f0bab4d04a46dfcc70431e"
+    }
+  ],
+  "root_input_tree": {
+    "git_tree_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
+    "path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/stage0/roots",
+    "file_count": 225
+  },
+  "previous_gate_a_v2_ledger": {
+    "path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v2/resource-ledger-final.json",
+    "git_blob_sha1": "7b7fe5e2e5daafe0b4cf7a23e7f95c4359c62ce2"
+  },
+  "previous_preflight_attempt": {
+    "key": "builder-gate-a-target-preflight-v3",
+    "status": "FAIL_LAUNCHER_IMPORT_PATH",
+    "cpu_charged_seconds": 60,
+    "receipt_path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v3-preflight/attempt-v3-terminal-failure.json"
+  },
+  "target_identity": {
+    "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate-a-target-direction.json",
+    "canonical_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "allow_uniform_lf_or_crlf": true,
+    "reject_substantive_changes": true
+  },
+  "required_runtime": {
+    "python_executable": "/home/lsmft/stsrl-spikes/py313-torch/bin/python3.13",
+    "python_version": "3.13.13",
+    "native_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+    "native_module_import_required": false,
+    "native_game_step_allowed": false
+  },
+  "attempt_key": "builder-gate-a-target-preflight-v4",
+  "created_at_utc": "2026-10-24 11:44:06 UTC",
+  "stage1_authorized": false,
+  "formal_seed_consumed": false
+}
