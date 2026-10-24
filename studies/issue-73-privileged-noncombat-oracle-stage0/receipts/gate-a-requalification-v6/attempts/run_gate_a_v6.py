@@ -106,15 +106,18 @@ try:
         if not path.is_file() or sha256_lf(path) != expected_sha256:
             raise RuntimeError(f"locked source file differs from source lock: {relative_path}")
     preflight_root = STUDY / "receipts" / "gate-a-requalification-v3-preflight"
-    preflight_lock_path = preflight_root / "source-lock-v9.json"
-    preflight_report_path = preflight_root / "preflight-report-v9.json"
-    parent_ledger_path = preflight_root / "resource-ledger-final-v9.json"
-    if sha256_lf(preflight_lock_path) != source_lock.get("preflight_source_lock_v9_sha256"):
-        raise RuntimeError("independently reviewed preflight source lock v9 changed")
+    preflight_version = int(source_lock.get("preflight_version", 0))
+    if preflight_version <= 0:
+        raise RuntimeError("source lock lacks a valid preflight version")
+    preflight_lock_path = preflight_root / f"source-lock-v{preflight_version}.json"
+    preflight_report_path = preflight_root / f"preflight-report-v{preflight_version}.json"
+    parent_ledger_path = STUDY / str(source_lock.get("parent_resource_ledger_path", ""))
+    if not preflight_lock_path.is_file() or sha256_lf(preflight_lock_path) != source_lock.get("preflight_source_lock_sha256"):
+        raise RuntimeError("independently reviewed preflight source lock changed")
     if not PREFLIGHT_ONLY:
-        if sha256_lf(preflight_report_path) != source_lock.get("preflight_report_v9_sha256"):
-            raise RuntimeError("preflight report v9 changed after review")
-        if sha256_lf(parent_ledger_path) != source_lock.get("parent_resource_ledger_sha256"):
+        if not preflight_report_path.is_file() or sha256_lf(preflight_report_path) != source_lock.get("preflight_report_sha256"):
+            raise RuntimeError("preflight report changed after review")
+        if not parent_ledger_path.is_file() or sha256_lf(parent_ledger_path) != source_lock.get("parent_resource_ledger_sha256"):
             raise RuntimeError("parent resource ledger changed after precharge")
     root_source = source_lock.get("root_source", {})
     producer_config_sha256 = root_source.get("producer_config_sha256")
