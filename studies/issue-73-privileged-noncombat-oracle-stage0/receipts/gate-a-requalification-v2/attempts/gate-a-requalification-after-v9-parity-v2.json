@@ -1,0 +1,20 @@
+{
+  "schema_id": "issue73-stage0-attempt-v1",
+  "key": "gate-a-requalification-after-v9-parity-v2",
+  "kind": "synthetic_policy_response_requalification",
+  "status": "STARTED",
+  "native": false,
+  "reserved_cpu_seconds": 120.0,
+  "cpu_charged_seconds": 120.0,
+  "measurement_status": "FIXED_RESERVATION_PRECHARGED; NO REFUND",
+  "source_lock_sha256": "908c7088f4fbe1bca47431dd0a5f9526f19de8f4a47648b6ab9937c0d9d3cd0e",
+  "source_code_commit": "cc470033ae8332412c4d710fa7be0542db09935b",
+  "remote_parent_sha": "3561969b668067cb35493241b7a0fe5e3f3704a1",
+  "started_at_utc": "2026-10-24T10:46:30Z",
+  "config_sha256": "3393c326e62b3f2ef15883de95ddc6ca9379c4ca7008fd35251fc57292e1e76c",
+  "native_gate_bc": false,
+  "formal_seed_consumed": false,
+  "native_adapter_instantiated": false,
+  "native_game_step_started": false,
+  "requalification_parent_attempt_sha256": "fce348ef3b1273428c94bcaeb86487187c4af3939cb20bfc67280cee3279ec8c"
+}

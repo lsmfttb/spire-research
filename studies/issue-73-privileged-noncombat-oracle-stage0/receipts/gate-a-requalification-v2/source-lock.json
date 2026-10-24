@@ -1,0 +1,141 @@
+{
+  "schema_id": "issue73-gate-a-requalification-source-lock-v1",
+  "lock_revision": 2,
+  "status": "LOCKED_BEFORE_GATE_A_REQUALIFICATION_V2",
+  "locked_at_utc": "2026-10-24T10:46:30Z",
+  "remote_branch": "codex/issue-73-v9-pre-capture",
+  "remote_parent_sha": "3561969b668067cb35493241b7a0fe5e3f3704a1",
+  "locked_code_source_commit": "cc470033ae8332412c4d710fa7be0542db09935b",
+  "config_sha256": "3393c326e62b3f2ef15883de95ddc6ca9379c4ca7008fd35251fc57292e1e76c",
+  "source_hashes_lf": {
+    "config.json": "3393c326e62b3f2ef15883de95ddc6ca9379c4ca7008fd35251fc57292e1e76c",
+    "config.lock.sha256": "d6f7f792bca06942ce3a6fcb9640600ba4acd3f9db8e0f9435ed34df91e5169b",
+    "gate-a-target-direction.json": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "gate_a.py": "1a03a5c0aee06ef0c8672730e405ce858abf30238dcab7c9f8b6c843aa5c697e",
+    "policy.py": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
+    "public_history_execution.py": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+    "runner.py": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497",
+    "stage0.py": "77e76ab4fee57002225d507650335bff9de3ead40620fc081e882b48701921af"
+  },
+  "root_source": {
+    "stage0_evidence_manifest_sha256": "7e73685c72307bc5a36cb02f3a56884bc75680accd7da7b37709a395da09a13b",
+    "stage0_report_sha256": "1dd5c0458a881328e48ec332d7baf7b9209037ffda7703ab27e3a51df7d9ca24",
+    "root_count": 225,
+    "preflight_process_cpu_seconds": 0.932906633,
+    "selected_root_ids": [
+      "root-173730001-0000",
+      "root-173730001-0001",
+      "root-173730001-0003",
+      "root-173730001-0004",
+      "root-173730001-0002",
+      "root-173730001-0005",
+      "root-173730001-0006",
+      "root-173730001-0007",
+      "root-173730001-0008",
+      "root-173730001-0009",
+      "root-173730001-0010",
+      "root-173730001-0011",
+      "root-173730001-0014",
+      "root-173730001-0015",
+      "root-173730001-0016",
+      "root-173730001-0018",
+      "root-173730001-0019",
+      "root-173730001-0020",
+      "root-173730001-0021",
+      "root-173730001-0022",
+      "root-173730001-0025",
+      "root-173730001-0026",
+      "root-173730001-0027",
+      "root-173730001-0028"
+    ],
+    "selected_count": 24,
+    "selected_screen_families": [
+      "CARD_SELECT",
+      "EVENT_SCREEN",
+      "MAP_SCREEN",
+      "REST_ROOM",
+      "REWARDS",
+      "TREASURE_ROOM"
+    ],
+    "selection_rule": "gate_a.select_corpus: sorted by owner seed and decision index; first occurrence of each of the first four screen families, then first 24 unique root IDs; fixed synthetic target only",
+    "all_selected_live_binding_validation_passed": true
+  },
+  "target": {
+    "direction_file": "gate-a-target-direction.json",
+    "direction_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "target_reselected": false,
+    "formula": "argmax_c (fixed_semantic_hash_features[c] dot precommitted unit direction)"
+  },
+  "gate_contract": {
+    "required_root_count": 24,
+    "minimum_screen_family_count": 4,
+    "updates_per_encoding": 64,
+    "total_gradient_updates_max": 128,
+    "minimum_tv_fraction": 0.8,
+    "cpu_reserve_seconds": 120,
+    "native_execution": false,
+    "formal_seed_consumed": false,
+    "stage1_authorized": false
+  },
+  "runtime": {
+    "python": "3.13.13",
+    "numpy": "2.4.6",
+    "torch": "2.12.0+cpu",
+    "platform": "WSL Ubuntu; Gate A uses no native module or game transitions",
+    "execution_user": "root (WSL)",
+    "write_location": "task worktree only; TMPDIR/XDG/TORCH/Python cache directories are under this task worktree"
+  },
+  "parent_resource_ledger": {
+    "path": "receipts/source-qualification-v9-engineering-6/resource-ledger-v9-engineering-6.json",
+    "sha256": "be616e45a665ec1244534b0749537a463ead51b2c1b8ef49ece1833cb88fc362",
+    "builder_charge_cpu_seconds": 3091.610134,
+    "builder_projection_cpu_seconds": 4611.610134,
+    "native_charge_cpu_seconds": 1580,
+    "native_projection_cpu_seconds": 2980,
+    "native_contingency_remaining_cpu_seconds": 100,
+    "fixed_native_work_remaining_cpu_seconds": 1300,
+    "reviewer_reserve_cpu_seconds": 1200,
+    "all_in_projection_cpu_seconds": 5811.610134,
+    "independent_review_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6382993876"
+  },
+  "attempt_key": "gate-a-requalification-after-v9-parity-v2",
+  "attempt_path": "receipts/gate-a-requalification-v2/attempts/gate-a-requalification-after-v9-parity-v2.json",
+  "output_path": "receipts/gate-a-requalification-v2/outputs",
+  "execution_entrypoint": "gate_a.run_gate_a(stage0.load_roots(), output_path), after locked root selection matches exact root IDs",
+  "limits": [
+    "Do not re-run or replace any completed/failed seed; this gate uses only the immutable 225-root receipt set.",
+    "Do not write to receipts/stage0 or replace the historical Gate A FAIL receipt/report.",
+    "No native adapter, game step, formal owner seed, Stage 1, training, or code promotion.",
+    "A started or terminal attempt is never rerun; reserve/charge is fixed at 120 CPU-s unless measured process CPU exceeds it, which is a terminal cap failure.",
+    "The v1 pre-execution permission failure remains terminal and charged; it is never rerun or overwritten.",
+    "V2 is a new unique attempt under a separate source lock, charged from existing Builder headroom; cumulative caps are unchanged and projected Builder/all-in usage remain 4731.610134/4800 and 5931.610134/6000.",
+    "Run the pinned Python 3.13.13 interpreter as WSL root only because WSL user lsmft cannot write to the task worktree mount; all generated/temp/cache/output paths remain inside the task worktree.",
+    "The attempt is terminal after any STARTED state and is never rerun."
+  ],
+  "requalification_parent_attempt": {
+    "key": "gate-a-requalification-after-v9-parity-v1",
+    "path": "receipts/gate-a-requalification-v1/attempts/gate-a-requalification-after-v9-parity-v1.json",
+    "sha256": "fce348ef3b1273428c94bcaeb86487187c4af3939cb20bfc67280cee3279ec8c",
+    "status": "FAIL_OR_INCOMPLETE",
+    "gate_status": "FAIL_PREEXECUTION_ENV_PERMISSION",
+    "cpu_charged_seconds": 120.0,
+    "formal_seed_consumed": false,
+    "gate_a_function_invoked": false
+  },
+  "parent_gate_a_resource_ledger": {
+    "path": "receipts/gate-a-requalification-v1/resource-ledger-final.json",
+    "sha256": "acae1385246c84a4322a077caaea9697abd7500817d2edb6d2882f395c21f66e",
+    "projected_builder_cpu_seconds": 4611.610134,
+    "projected_native_cpu_seconds": 2980.0,
+    "projected_all_in_cpu_seconds": 5811.610134
+  },
+  "additional_reservation": {
+    "cpu_seconds": 120.0,
+    "basis": "Ordinary WSL task-worktree write-permission launcher repair; second unique Gate A qualification attempt",
+    "builder_projection_after_reservation_cpu_seconds": 4731.610134,
+    "native_projection_cpu_seconds": 2980.0,
+    "all_in_projection_cpu_seconds": 5931.610134,
+    "remaining_builder_headroom_cpu_seconds": 68.389866,
+    "original_and_global_ceilings_unchanged": true
+  }
+}
