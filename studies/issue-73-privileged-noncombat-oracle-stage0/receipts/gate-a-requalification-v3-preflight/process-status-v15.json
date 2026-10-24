@@ -1,0 +1,13 @@
+{
+  "focused_test_exit_code": 1,
+  "pinned_preflight_exit_code": 0,
+  "test_count": 2,
+  "tests_passed": false,
+  "test_suite_elapsed_seconds": 0.39,
+  "focused_test_process_cpu_seconds": 0.27,
+  "pinned_preflight_process_cpu_seconds": 5.84,
+  "pinned_preflight_elapsed_seconds": 8.45,
+  "pinned_python_invoked": true,
+  "process_tree_cpu_captured": false,
+  "test_harness_error": "Focused unittest was invoked from the receipts directory rather than the study root; Python reported both modules not found. Pinned Gate A --preflight-only did run and returned PRELAUNCH_PASS."
+}

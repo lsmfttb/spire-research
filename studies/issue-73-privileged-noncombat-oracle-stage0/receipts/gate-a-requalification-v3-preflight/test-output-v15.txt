@@ -1,0 +1,29 @@
+=== FOCUSED TESTS v15 ===
+EE
+======================================================================
+ERROR: test_gate_a_target_direction (unittest.loader._FailedTest.test_gate_a_target_direction)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_gate_a_target_direction
+Traceback (most recent call last):
+  File "/home/lsmft/stsrl-spikes/py313-torch/lib/python3.13/unittest/loader.py", line 137, in loadTestsFromName
+    module = __import__(module_name)
+ModuleNotFoundError: No module named 'test_gate_a_target_direction'
+
+
+======================================================================
+ERROR: test_stage0_root_config_provenance (unittest.loader._FailedTest.test_stage0_root_config_provenance)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_stage0_root_config_provenance
+Traceback (most recent call last):
+  File "/home/lsmft/stsrl-spikes/py313-torch/lib/python3.13/unittest/loader.py", line 137, in loadTestsFromName
+    module = __import__(module_name)
+ModuleNotFoundError: No module named 'test_stage0_root_config_provenance'
+
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+FAILED (errors=2)
+
+=== PINNED PREFLIGHT v15 ===
+{"config_sha256": "87dcc49507eb23b1a9430f520836226a5a5db3eaa5d4231a470fb06ac220d2c4", "formal_seed_consumed": false, "native_game_step_started": false, "native_module_imported": false, "root_count": 225, "root_producer_config_sha256": "3393c326e62b3f2ef15883de95ddc6ca9379c4ca7008fd35251fc57292e1e76c", "selected_root_count": 24, "stage1_authorized": false, "status": "PRELAUNCH_PASS"}
