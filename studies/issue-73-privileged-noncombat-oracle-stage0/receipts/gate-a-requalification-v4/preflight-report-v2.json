@@ -1,0 +1,25 @@
+{
+  "attempt_key": "builder-gate-a-requalification-v4-startup-preflight-v2",
+  "failure": {
+    "error": "Command '['git', '-C', '/mnt/d/bld73d', 'rev-parse', 'HEAD']' returned non-zero exit status 128.",
+    "error_type": "CalledProcessError",
+    "traceback": "Traceback (most recent call last):\n  File \"/mnt/d/bld73d/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v4/attempts/run_gate_a_v4.py\", line 223, in run_preflight\n    lock, lock_sha, head = verify_source_lock()\n                           ~~~~~~~~~~~~~~~~~~^^\n  File \"/mnt/d/bld73d/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v4/attempts/run_gate_a_v4.py\", line 103, in verify_source_lock\n    head = git_text(\"rev-parse\", \"HEAD\")\n  File \"/mnt/d/bld73d/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v4/attempts/run_gate_a_v4.py\", line 65, in git_text\n    result = subprocess.run(\n        [\"git\", \"-C\", str(REPOSITORY), *args],\n        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,\n    )\n  File \"/home/lsmft/stsrl-spikes/py313-torch/lib/python3.13/subprocess.py\", line 577, in run\n    raise CalledProcessError(retcode, process.args,\n                             output=stdout, stderr=stderr)\nsubprocess.CalledProcessError: Command '['git', '-C', '/mnt/d/bld73d', 'rev-parse', 'HEAD']' returned non-zero exit status 128.\n"
+  },
+  "finished_at_utc": "2026-10-24T13:27:51Z",
+  "formal_seed_consumed": false,
+  "gate_a_invoked": false,
+  "measured_cpu": {
+    "children_system_seconds": 0.003944,
+    "children_user_seconds": 0.001972,
+    "process_tree_cpu_seconds": 0.016237999999999995,
+    "self_system_seconds": 0.006838999999999998,
+    "self_user_seconds": 0.003483
+  },
+  "measured_wall_seconds": 0.06807065010070801,
+  "native_game_step_started": false,
+  "native_module_imported": false,
+  "optimizer_updated": false,
+  "schema_id": "issue73-gate-a-v4-startup-preflight-v2",
+  "stage1_authorized": false,
+  "status": "FAIL_EXCEPTION"
+}

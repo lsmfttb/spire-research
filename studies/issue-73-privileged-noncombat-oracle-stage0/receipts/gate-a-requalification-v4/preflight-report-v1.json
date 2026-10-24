@@ -1,0 +1,25 @@
+{
+  "attempt_key": "builder-gate-a-requalification-v4-startup-preflight",
+  "failure": {
+    "error": "unexpected Gate A v4 attempt key",
+    "error_type": "RuntimeError",
+    "traceback": "Traceback (most recent call last):\n  File \"/mnt/d/bld73d/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v4/attempts/run_gate_a_v4.py\", line 216, in run_preflight\n    lock, lock_sha, head = verify_source_lock()\n                           ~~~~~~~~~~~~~~~~~~^^\n  File \"/mnt/d/bld73d/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v4/attempts/run_gate_a_v4.py\", line 102, in verify_source_lock\n    raise RuntimeError(\"unexpected Gate A v4 attempt key\")\nRuntimeError: unexpected Gate A v4 attempt key\n"
+  },
+  "finished_at_utc": "2026-10-24T13:24:44Z",
+  "formal_seed_consumed": false,
+  "gate_a_invoked": false,
+  "measured_cpu": {
+    "children_system_seconds": 0.0,
+    "children_user_seconds": 0.0,
+    "process_tree_cpu_seconds": 0.006860999999999978,
+    "self_system_seconds": 5.7999999999988616e-05,
+    "self_user_seconds": 0.00680299999999999
+  },
+  "measured_wall_seconds": 0.03505516052246094,
+  "native_game_step_started": false,
+  "native_module_imported": false,
+  "optimizer_updated": false,
+  "schema_id": "issue73-gate-a-v4-startup-preflight-v1",
+  "stage1_authorized": false,
+  "status": "FAIL_EXCEPTION"
+}
