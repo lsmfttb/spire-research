@@ -166,6 +166,24 @@ def _source_hashes(source_commit: str) -> dict[str, str]:
     return result
 
 
+def _verify_committed_source_hashes(
+    source_commit: str, expected_hashes: Mapping[str, Any], *, label: str,
+) -> dict[str, str]:
+    """Verify historical locks against their Git tree, not today's evolved checkout."""
+    if not isinstance(expected_hashes, Mapping) or not expected_hashes:
+        raise GateBCV10Failure(f"{label} source lock has no committed source-hash map")
+    actual: dict[str, str] = {}
+    for name, expected in expected_hashes.items():
+        relative = Path(str(name))
+        if relative.is_absolute() or ".." in relative.parts:
+            raise GateBCV10Failure(f"{label} source lock contains an unsafe path: {name}")
+        blob = q.git_object_bytes(f"{source_commit}:{STUDY_RELATIVE}/{relative.as_posix()}")
+        actual[str(name)] = sha256_bytes(blob)
+        if actual[str(name)] != str(expected):
+            raise GateBCV10Failure(f"{label} historical Git blob differs from its source lock: {name}")
+    return actual
+
+
 def _parent_input_hashes() -> dict[str, str]:
     result: dict[str, str] = {}
     for name, path in PARENT_PATHS.items():
@@ -184,7 +202,11 @@ def _validate_parent_evidence() -> tuple[dict[str, Any], dict[str, Any], dict[st
         or e5_lock.get("code_source_commit") != "b9ecb23883aa3b10c933cfc26535670d71e5355e"
     ):
         raise GateBCV10Failure("v9 engineering-5 parent source lock is not the reviewed capture lineage")
-    e5._source_hashes(str(e5_lock["code_source_commit"]))
+    _verify_committed_source_hashes(
+        str(e5_lock["code_source_commit"]),
+        e5_lock.get("study_source_sha256", {}),
+        label="v9 engineering-5",
+    )
     _parent_lock, capture_report, capture_attempt, history_record, roots_record = e6.validate_parent_capture_v9()
     e6_lock = read_json(e6.LOCK_PATH)
     e6_source_commit = str(e6_lock.get("code_source_commit", ""))

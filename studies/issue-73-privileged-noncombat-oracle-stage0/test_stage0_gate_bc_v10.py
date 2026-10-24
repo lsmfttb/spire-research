@@ -9,6 +9,17 @@ import stage0_gate_bc_v10 as v10
 
 
 class GateBCV10StaticTests(unittest.TestCase):
+    def test_historical_parent_lock_uses_its_committed_blobs(self) -> None:
+        parent_lock = v10.read_json(v10.e5.LOCK_PATH)
+        committed = v10._verify_committed_source_hashes(
+            parent_lock["code_source_commit"],
+            parent_lock["study_source_sha256"],
+            label="v9 engineering-5 test fixture",
+        )
+        self.assertEqual(committed, parent_lock["study_source_sha256"])
+        current_config = v10.sha256_bytes((v10.STUDY / "config.json").read_bytes())
+        self.assertNotEqual(current_config, committed["config.json"])
+
     def test_fixed_population_and_resource_projection(self) -> None:
         self.assertEqual(v10.GATE_B_ROOTS["hidden_semantic"], "root-173730001-0003")
         self.assertEqual(v10.GATE_C_ROOTS, tuple(f"root-173730001-{i:04d}" for i in range(4)))
@@ -84,7 +95,7 @@ class GateBCV10StaticTests(unittest.TestCase):
         leaked = v10.audit_sanitized_projection(raw, {"oracle_map_secret_marker": "private-sentinel-90173"})
         self.assertFalse(leaked["all_private_names_and_values_absent"])
 
-    def test_scope_stays_study_only_and_no_native_attempt_is_precharged_yet(self) -> None:
+    def test_scope_stays_study_only(self) -> None:
         self.assertEqual(v10.BUILDER_CAP, 10000.0)
         self.assertEqual(v10.AGGREGATE_CAP, 12000.0)
         self.assertEqual(v10.NATIVE_CAP, 6000.0)
