@@ -1,0 +1,133 @@
+{
+  "schema_id": "issue73-gate-a-source-map-preflight-source-lock-v1",
+  "lock_key": "builder-gate-a-source-map-preflight-v5",
+  "status": "LOCKED_BEFORE_SOURCE_MAP_PREFLIGHT_V5",
+  "created_at_utc": "2026-10-24T12:53:21Z",
+  "execution_branch": "codex/issue-73-source-map-relock-v1",
+  "remote_parent_branch": "codex/issue-73-gatea-requalification-v3",
+  "remote_parent_sha": "6a7d09c04cdf3685af0d9238c1c2160571917c3e",
+  "source_code_commit": "393b7b32497df1dbb20496dbbda8cfd6304ba886",
+  "source_files_git_blob_ids": [
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/.gitignore",
+      "git_blob_sha1": "420529e779c50c0a16bf1f3a8268a15d14d43f00",
+      "normalized_text_sha256": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234",
+      "config_source_map_sha256": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.json",
+      "git_blob_sha1": "fd5b2eec070c0904dfcebbdd45b3ccee3ba8ef3e",
+      "normalized_text_sha256": "c73a9dbaed70b7295693b44576bf96dcee2d172049283e0689aabc3f424440c0"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.lock.sha256",
+      "git_blob_sha1": "e0bef7b2ae8e19d10f54d9461931d2a3cdbc341c",
+      "normalized_text_sha256": "d2337b96a07c55a4ef99d2da30f74c0189b3ef9fb4b2da2e0d88258204e25c80"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate-a-target-direction.json",
+      "git_blob_sha1": "f4589a942207760866f0bab4d04a46dfcc70431e",
+      "normalized_text_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+      "config_source_map_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate_a.py",
+      "git_blob_sha1": "9aff1cd73b9d10299ba4a299af4458f8fbf7cfac",
+      "normalized_text_sha256": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283",
+      "config_source_map_sha256": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
+      "git_blob_sha1": "eebdb40a206dbfc48f4fb171c03670634593fe01",
+      "normalized_text_sha256": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
+      "config_source_map_sha256": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/public_history_execution.py",
+      "git_blob_sha1": "c80074a8b5b45773d1e4b5bd54fdd8c1ccaedab8",
+      "normalized_text_sha256": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+      "config_source_map_sha256": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
+      "git_blob_sha1": "398dd982bd6610a134dde57ada7d75dd0f9f24ec",
+      "normalized_text_sha256": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497",
+      "config_source_map_sha256": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/source_lock_integrity.py",
+      "git_blob_sha1": "5aeeab8d4746edf0c5d0c76eb14ccb72a92a436d",
+      "normalized_text_sha256": "ddea1b01c915799d9e5c81cdf5097ae413a610868cf5c89f9e8cad09098c2cc0"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/stage0.py",
+      "git_blob_sha1": "2c650ba989efe1c90204d355740cfe311921838a",
+      "normalized_text_sha256": "77e76ab4fee57002225d507650335bff9de3ead40620fc081e882b48701921af",
+      "config_source_map_sha256": "77e76ab4fee57002225d507650335bff9de3ead40620fc081e882b48701921af"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/test_gate_a_target_direction.py",
+      "git_blob_sha1": "8a7361afa03cea5999f03dc5ab003e111fc2ffba",
+      "normalized_text_sha256": "c33ec423e1a367e3e2c78a81a34c07b74c7dacdc0f80d40233fbfc018a09a059"
+    }
+  ],
+  "config_sha256": "c73a9dbaed70b7295693b44576bf96dcee2d172049283e0689aabc3f424440c0",
+  "study_source_sha256": {
+    ".gitignore": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234",
+    "gate-a-target-direction.json": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "gate_a.py": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283",
+    "policy.py": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
+    "public_history_execution.py": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+    "runner.py": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497",
+    "stage0.py": "77e76ab4fee57002225d507650335bff9de3ead40620fc081e882b48701921af"
+  },
+  "config_lock_verification": {
+    "normalized_config_sha256": "c73a9dbaed70b7295693b44576bf96dcee2d172049283e0689aabc3f424440c0",
+    "committed_config_lock_value": "c73a9dbaed70b7295693b44576bf96dcee2d172049283e0689aabc3f424440c0",
+    "equal": true
+  },
+  "root_input_tree": {
+    "git_tree_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
+    "path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/stage0/roots",
+    "file_count": 225
+  },
+  "previous_terminal_attempt": {
+    "attempt_key": "gate-a-requalification-after-v9-parity-v3",
+    "execution_commit": "6a7d09c04cdf3685af0d9238c1c2160571917c3e",
+    "source_lock_sha256": "4e371114813c71331d8109c88d94f8e15a6c94c66a6ec69e9eb7e5551014a988",
+    "terminal_ledger_sha256": "5b7e1f271000a70c294fcfecf000c2baad635e29170e6d1e8096a14f647ddcf5",
+    "reserved_cpu_seconds_charged": 120.0,
+    "immutable": true
+  },
+  "preflight": {
+    "attempt_key": "builder-gate-a-source-map-preflight-v5",
+    "command": "python3.13 -m unittest -v test_gate_a_target_direction",
+    "python_executable": "/home/lsmft/stsrl-spikes/py313-torch/bin/python3.13",
+    "python_version": "3.13.13",
+    "required_check": "stage0.source_hashes() == runner.CONFIG[\"identity\"][\"study_source_sha256\"]",
+    "native_module_import_allowed": false,
+    "native_game_step_allowed": false,
+    "paid_gate_a_execution_allowed": false,
+    "formal_seed_consumed": false
+  },
+  "resource_reservation": {
+    "kind": "non-native source-map lock and pinned-runtime preflight",
+    "fixed_cpu_seconds": 60.0,
+    "no_refund": true,
+    "parent_builder_charge_cpu_seconds": 3571.610134,
+    "builder_charge_after_reservation_cpu_seconds": 3631.610134,
+    "parent_native_gate_bc_charge_cpu_seconds": 1580.0,
+    "remaining_fixed_native_work_cpu_seconds": 1300.0,
+    "remaining_native_contingency_cpu_seconds": 100.0,
+    "builder_hard_ceiling_cpu_seconds": 10000.0,
+    "native_gate_bc_hard_ceiling_cpu_seconds": 6000.0,
+    "aggregate_hard_ceiling_cpu_seconds": 12000.0,
+    "protected_reviewer_reserve_cpu_seconds": 2000.0,
+    "measured_prelock_source_hash_diagnostic_cpu_seconds": 2.192554337,
+    "remaining_future_gate_a_cpu_seconds": 0.0,
+    "stage1_authorized": false
+  },
+  "disposition": "STUDY_ONLY",
+  "stage1_authorized": false,
+  "formal_seed_consumed": false
+}
