@@ -1,0 +1,29 @@
+{
+  "schema_id": "issue73-gate-a-root-config-provenance-preflight-report-v1",
+  "status": "FAIL_LAUNCHER_ENVIRONMENT_ASSIGNMENT",
+  "attempt_key": "builder-gate-a-root-config-provenance-preflight-v7",
+  "source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v7.json",
+  "source_lock_sha256": "42c20fdfdd00f9981b4716b9472a2344bd39abdbf8df2ee590ee729065e11fca",
+  "source_code_commit": "358d3b3b0e5a4f38b06b33183d7a6f0a0dccf343",
+  "parent_source_lock_sha256": "42c20fdfdd00f9981b4716b9472a2344bd39abdbf8df2ee590ee729065e11fca",
+  "result": "Pinned Python did not run; no unit test or root load occurred.",
+  "evidence": {
+    "command_output_path": "receipts/gate-a-requalification-v3-preflight/test-output-v7.txt",
+    "command_output_sha256": "c2b305cda1784aaebd283dc3dacc371687ce8754968f6f0c8c86367d132dc487",
+    "exit_code": 127
+  },
+  "cpu_accounting": {
+    "reserved_cpu_seconds": 60.0,
+    "charged_cpu_seconds": 60.0,
+    "measured_process_tree_cpu_seconds": null,
+    "builder_charge_before_cpu_seconds": 3691.610134,
+    "builder_charge_after_cpu_seconds": 3751.610134
+  },
+  "native_module_imported": false,
+  "native_game_step_started": false,
+  "gate_a_invoked": false,
+  "formal_seed_consumed": false,
+  "stage1_authorized": false,
+  "disposition": "STUDY_ONLY",
+  "finished_at_utc": "2026-10-24T14:28:17Z"
+}
