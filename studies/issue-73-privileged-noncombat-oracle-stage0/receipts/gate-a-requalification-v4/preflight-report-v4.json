@@ -1,0 +1,25 @@
+{
+  "attempt_key": "builder-gate-a-requalification-v4-startup-preflight-v4",
+  "failure": {
+    "error": "WSL execution UID differs from the reviewed environment",
+    "error_type": "RuntimeError",
+    "traceback": "Traceback (most recent call last):\n  File \"/mnt/d/bld73d/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v4/attempts/run_gate_a_v4.py\", line 219, in run_preflight\n    inputs = verify_gate_a_inputs(lock)\n  File \"/mnt/d/bld73d/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v4/attempts/run_gate_a_v4.py\", line 148, in verify_gate_a_inputs\n    raise RuntimeError(\"WSL execution UID differs from the reviewed environment\")\nRuntimeError: WSL execution UID differs from the reviewed environment\n"
+  },
+  "finished_at_utc": "2026-10-24T13:44:25Z",
+  "formal_seed_consumed": false,
+  "gate_a_invoked": false,
+  "measured_cpu": {
+    "children_system_seconds": 0.0,
+    "children_user_seconds": 0.0,
+    "process_tree_cpu_seconds": 4.230079,
+    "self_system_seconds": 0.634904,
+    "self_user_seconds": 3.5951750000000002
+  },
+  "measured_wall_seconds": 5.852493762969971,
+  "native_game_step_started": false,
+  "native_module_imported": false,
+  "optimizer_updated": false,
+  "schema_id": "issue73-gate-a-v4-startup-preflight-v4",
+  "stage1_authorized": false,
+  "status": "FAIL_EXCEPTION"
+}
