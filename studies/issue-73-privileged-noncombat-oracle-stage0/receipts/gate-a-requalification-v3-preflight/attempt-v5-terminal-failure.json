@@ -1,0 +1,33 @@
+{
+  "schema_id": "issue73-source-map-preflight-attempt-terminal-v1",
+  "attempt_key": "builder-gate-a-source-map-preflight-v5",
+  "status": "FAIL_LAUNCHER_ENVIRONMENT_ASSIGNMENT",
+  "disposition": "STUDY_ONLY",
+  "execution_branch": "codex/issue-73-source-map-relock-v1",
+  "execution_commit": "64afe9ae04ebd66753836e96980fbd126e6fd8d8",
+  "source_code_commit": "393b7b32497df1dbb20496dbbda8cfd6304ba886",
+  "source_lock_commit": "37d34f35adecf759ef46a8adf99f0facc0f8fdf6",
+  "source_lock_sha256": "2697e84dff5456bd95eea388ae72892b9398958380cdb7463644d7e34f90384e",
+  "started_at_utc": "2026-10-24T12:54:34Z",
+  "finished_at_utc": "2026-10-24T12:56:33Z",
+  "reserved_cpu_seconds": 60.0,
+  "cpu_charged_seconds": 60.0,
+  "measurement_status": "FIXED_RESERVATION_NO_REFUND",
+  "measured_test_process_cpu_seconds": 0.0,
+  "failure": {
+    "class": "launcher_environment_assignment",
+    "message": "Pinned Python was not invoked. PowerShell expanded the inherited Windows PATH into the WSL command before bash parsed the export assignment; spaces split it into invalid export operands such as Files/dotnet and Files/Zero Install.",
+    "observed_stderr": [
+      "bash: line 1: export: 'Files/dotnet:...': not a valid identifier",
+      "bash: line 1: export: 'Files/Zero': not a valid identifier"
+    ],
+    "test_runner_started": false
+  },
+  "pinned_python_invoked": false,
+  "unittest_tests_run": 0,
+  "native_module_imported": false,
+  "native_game_step_started": false,
+  "paid_gate_a_execution_started": false,
+  "formal_seed_consumed": false,
+  "stage1_authorized": false
+}
