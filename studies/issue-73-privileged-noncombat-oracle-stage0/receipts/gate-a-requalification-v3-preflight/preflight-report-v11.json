@@ -1,0 +1,86 @@
+{
+  "schema_id": "issue73-gate-a-root-config-provenance-preflight-report-v1",
+  "status": "FAIL_LAUNCHER_VARIABLE_PATHS_BEFORE_PINNED_PYTHON",
+  "attempt_key": "builder-gate-a-root-config-provenance-preflight-v11",
+  "source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v11.json",
+  "source_lock_sha256": "47f46f711bca73b0233194af91b546d1b875edb812c2fb6052cadbc75e26e0df",
+  "source_lock_git_blob_sha1": "c12abc69bbeb129d598221bd1173b6c506a685d1",
+  "source_lock_commit": "07304c8d933a477180f41ec1236093d7750ca287",
+  "source_code_commit": "2526b37b0ea3f32d51fb1876bda8e1e613a7e9a1",
+  "execution_commit": "d3c4c978fdabea42c4fe9df3a2d4ce7c6499ce96",
+  "attempt_terminal_receipt_path": "receipts/gate-a-requalification-v3-preflight/attempt-v11-terminal-failure.json",
+  "attempt_terminal_receipt_sha256": "9e56841ac3dc672d48c67d5a71d3e0e2fb37d95a3e82225b141dbf8b3edd700e",
+  "command_output": {
+    "path": "receipts/gate-a-requalification-v3-preflight/launcher-output-v11.txt",
+    "sha256": "7cec4ea2000a3abdb9280ddb756dfdaaa542be4aca9d1aa9eb7942a5ffd7e3cc",
+    "exit_code": 2
+  },
+  "preflight_output": {
+    "status": "NOT_RUN",
+    "test_count": 0,
+    "tests_passed": 0,
+    "pinned_python_invoked": false,
+    "native_module_imported": false,
+    "native_game_step_started": false,
+    "formal_seed_consumed": false,
+    "stage1_authorized": false
+  },
+  "gate_a_source_lock_input": {
+    "path": "receipts/gate-a-requalification-v6/source-lock.json",
+    "sha256": "9ee1b1d9d937cb4f36147b0c385be57d238f2c154f45fc739cb6160ab6dfa544",
+    "git_blob_sha1": "dc83d64fcab43361a92e3f7b5d4f47f025cef419",
+    "source_lock_commit": "07304c8d933a477180f41ec1236093d7750ca287"
+  },
+  "source_lock_validation": {
+    "git_blob_ids_matched": 13,
+    "normalized_text_hashes_matched": 13,
+    "source_code_commit": "2526b37b0ea3f32d51fb1876bda8e1e613a7e9a1"
+  },
+  "failure_boundary": "Bash launcher failed while resolving worktree-based shell variables before Python invocation; no test or preflight started.",
+  "cpu_accounting": {
+    "reserved_cpu_seconds": 60.0,
+    "charged_cpu_seconds": 60.0,
+    "measured_process_tree_cpu_seconds": null,
+    "measurement_note": "Pinned Python never started; full fixed reservation remains charged without refund.",
+    "builder_charge_before_cpu_seconds": 4231.610134,
+    "builder_charge_after_cpu_seconds": 4291.610134,
+    "native_gate_bc_charge_cpu_seconds": 1580.0,
+    "projected_builder_total_cpu_seconds": 5811.610134,
+    "projected_native_gate_bc_cpu_seconds": 2980.0,
+    "protected_reviewer_reserve_cpu_seconds": 2000.0,
+    "projected_aggregate_cpu_seconds": 7811.610134,
+    "builder_hard_ceiling_cpu_seconds": 10000.0,
+    "native_gate_bc_hard_ceiling_cpu_seconds": 6000.0,
+    "aggregate_hard_ceiling_cpu_seconds": 12000.0,
+    "within_registered_ceilings": true
+  },
+  "previous_attempt_v10": {
+    "key": "builder-gate-a-root-config-provenance-preflight-v10",
+    "status": "INVALID_SOURCE_LOCK_NORMALIZED_TEXT_HASH",
+    "charged_cpu_seconds": 60.0,
+    "terminal_report_sha256": "2bcc124dca42849efae2d439326bceb987fe0e48cb6075a2eff8fcb1e7cdae31",
+    "resource_ledger_sha256": "18323863dead4de9a584dee0891925501824d98c39330646e1a53e65caec7ad6"
+  },
+  "previous_attempt_v9": {
+    "key": "builder-gate-a-root-config-provenance-preflight-v9",
+    "status": "PASS_PINNED_RUNTIME_SOURCE_ROOT_AND_NEGATIVE_PREFLIGHT",
+    "charged_cpu_seconds": 60.0,
+    "terminal_report_sha256": "2b56dc3e1f4cff5c8c13d8ae708178aefa6543c499e3115f2ba11621ea591cb1",
+    "resource_ledger_sha256": "68cb99fcd66483d7742b8f57f8d3ed94910430425bab57a18d96eba2ed84286b"
+  },
+  "cumulative_resource_reconciliation": {
+    "path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-reconciliation-v1.json",
+    "sha256": "34bd6baedf9b3b99e807213a39e300b5a6bdce7cfce83591addde386f04bc479"
+  },
+  "gate_a_followup": {
+    "attempt_key": "gate-a-requalification-after-v9-parity-v6",
+    "status": "NOT_STARTED_AWAITING_CORRECTED_V12_PREFLIGHT_AND_INDEPENDENT_REVIEW",
+    "fixed_reservation_cpu_seconds": 120,
+    "precharge_created": false,
+    "gate_a_invoked": false,
+    "formal_seed_consumed": false,
+    "stage1_authorized": false
+  },
+  "finished_at_utc": "2026-10-24T15:50:10Z",
+  "disposition": "STUDY_ONLY"
+}
