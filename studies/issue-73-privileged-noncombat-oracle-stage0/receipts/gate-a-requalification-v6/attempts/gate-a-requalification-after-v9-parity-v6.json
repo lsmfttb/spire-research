@@ -1,0 +1,32 @@
+{
+  "schema_id": "issue73-stage0-attempt-v1",
+  "key": "gate-a-requalification-after-v9-parity-v6",
+  "kind": "synthetic_policy_response_requalification",
+  "status": "STARTED",
+  "native": false,
+  "reserved_cpu_seconds": 120.0,
+  "cpu_charged_seconds": 120.0,
+  "measurement_status": "FIXED_120_CPU_SECOND_PRECHARGE_NO_REFUND",
+  "source_lock_path": "receipts/gate-a-requalification-v6/source-lock.json",
+  "source_lock_sha256": "b58d38ac01d06efd529064c39281bfc934a25ee65e8c261a0cbbb8219744df30",
+  "source_code_commit": "a19cfd58b9f6905dd1bd33cf3544069ec51b1323",
+  "remote_parent_sha": "0247017dc6241a3fe6f6e11dfd1ddaaee3d9632f",
+  "execution_branch": "codex/issue-73-root-config-provenance-v2",
+  "started_at_utc": "2026-10-24T17:39:52Z",
+  "config_sha256": "87dcc49507eb23b1a9430f520836226a5a5db3eaa5d4231a470fb06ac220d2c4",
+  "native_gate_bc": false,
+  "formal_seed_consumed": false,
+  "native_adapter_instantiated": false,
+  "native_module_imported": false,
+  "native_game_step_started": false,
+  "stage1_authorized": false,
+  "reviewer_precharge_clearance": {
+    "decision": "PASS",
+    "scope": "precharge prerequisite for this locked 120 CPU-s Gate A v6 attempt only",
+    "reviewer_comment_url": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6387350896",
+    "reviewer_comment_id": 6387350896,
+    "reviewed_source_sha": "0247017dc6241a3fe6f6e11dfd1ddaaee3d9632f",
+    "reviewer_measured_pinned_python_cpu_seconds": 9.38,
+    "reviewer_static_audit_cpu_included": false
+  }
+}
