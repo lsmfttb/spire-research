@@ -2,11 +2,11 @@
   "schema_id": "issue73-stage0-attempt-v1",
   "key": "gate-a-requalification-after-v9-parity-v1",
   "kind": "synthetic_policy_response_requalification",
-  "status": "STARTED",
+  "status": "FAIL_OR_INCOMPLETE",
   "native": false,
   "reserved_cpu_seconds": 120.0,
   "cpu_charged_seconds": 120.0,
-  "measurement_status": "FIXED_RESERVATION_PRECHARGED; NO REFUND",
+  "measurement_status": "UNOBSERVED_PREEXECUTION_LAUNCH_FAILURE; FIXED_RESERVATION_PRECHARGED_NO_REFUND",
   "source_lock_sha256": "a9584158c14387b2ee4d608ffe913463d06476d7f78b86d506ff43c85efad6a1",
   "source_code_commit": "cc470033ae8332412c4d710fa7be0542db09935b",
   "remote_parent_sha": "1f5fe44bdd7a963df5525dc8c07691349ba8d0b9",
@@ -17,5 +17,12 @@
   "native_adapter_instantiated": false,
   "native_game_step_started": false,
   "reconstructed_from_resource_ledger": "receipts/gate-a-requalification-v1/resource-ledger-started.json",
-  "reconstructed_at_utc": "2026-10-24T10:38:31Z"
+  "reconstructed_at_utc": "2026-10-24T10:38:31Z",
+  "gate_status": "FAIL_PREEXECUTION_ENV_PERMISSION",
+  "failure_type": "WSLWorktreeWritePermissionError",
+  "failure": "The first locked launcher could not create TMPDIR/XDG/Torch cache directories in the task worktree as WSL user lsmft (mkdir: Permission denied); the pinned Python process was never launched, Gate A was never invoked, and the fresh output directory remained empty.",
+  "execution_process_started": false,
+  "gate_a_function_invoked": false,
+  "measured_process_cpu_seconds": null,
+  "finished_at_utc": "2026-10-24T10:45:04Z"
 }
