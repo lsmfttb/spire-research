@@ -10,6 +10,7 @@ from unittest import mock
 
 import gate_a
 import runner
+import stage0
 import source_lock_integrity
 
 
@@ -44,6 +45,12 @@ class GateATargetDirectionPreflightTests(unittest.TestCase):
         temp_parent = ROOT / ".tmp"
         temp_parent.mkdir(exist_ok=True)
         return tempfile.TemporaryDirectory(prefix="gate-a-target-preflight-", dir=temp_parent)
+
+    def test_committed_source_map_matches_normalized_study_files(self):
+        self.assertEqual(
+            stage0.source_hashes(),
+            runner.CONFIG["identity"]["study_source_sha256"],
+        )
 
     def test_canonical_target_hash_accepts_lf_and_uniform_crlf(self):
         committed = (ROOT / TARGET_FILE).read_bytes()
