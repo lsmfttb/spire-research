@@ -1,0 +1,196 @@
+{
+  "schema_id": "issue73-gate-a-v4-execution-source-lock-v1",
+  "lock_key": "gate-a-requalification-after-v9-parity-v4",
+  "status": "PREPARED_FOR_INDEPENDENT_RUNTIME_READINESS_REVIEW",
+  "locked_at_utc": "2026-10-24T13:23:58Z",
+  "execution_branch": "codex/issue-73-gatea-v4-readiness",
+  "remote_parent_branch": "codex/issue-73-source-map-relock-v1",
+  "remote_parent_sha": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+  "study_source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+  "launcher_source_commit": "62211b289f8902bfaad97d02cdaf01f396d9d5c6",
+  "locked_source_files": [
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/.gitignore",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "420529e779c50c0a16bf1f3a8268a15d14d43f00",
+      "committed_blob_sha256": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.json",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "fd5b2eec070c0904dfcebbdd45b3ccee3ba8ef3e",
+      "committed_blob_sha256": "c73a9dbaed70b7295693b44576bf96dcee2d172049283e0689aabc3f424440c0"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.lock.sha256",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "e0bef7b2ae8e19d10f54d9461931d2a3cdbc341c",
+      "committed_blob_sha256": "d2337b96a07c55a4ef99d2da30f74c0189b3ef9fb4b2da2e0d88258204e25c80"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate-a-target-direction.json",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "f4589a942207760866f0bab4d04a46dfcc70431e",
+      "committed_blob_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate_a.py",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "9aff1cd73b9d10299ba4a299af4458f8fbf7cfac",
+      "committed_blob_sha256": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "eebdb40a206dbfc48f4fb171c03670634593fe01",
+      "committed_blob_sha256": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/public_history_execution.py",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "c80074a8b5b45773d1e4b5bd54fdd8c1ccaedab8",
+      "committed_blob_sha256": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "398dd982bd6610a134dde57ada7d75dd0f9f24ec",
+      "committed_blob_sha256": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/source_lock_integrity.py",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "5aeeab8d4746edf0c5d0c76eb14ccb72a92a436d",
+      "committed_blob_sha256": "ddea1b01c915799d9e5c81cdf5097ae413a610868cf5c89f9e8cad09098c2cc0"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/stage0.py",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "2c650ba989efe1c90204d355740cfe311921838a",
+      "committed_blob_sha256": "77e76ab4fee57002225d507650335bff9de3ead40620fc081e882b48701921af"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/test_gate_a_target_direction.py",
+      "source_commit": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "git_blob_sha1": "8a7361afa03cea5999f03dc5ab003e111fc2ffba",
+      "committed_blob_sha256": "c33ec423e1a367e3e2c78a81a34c07b74c7dacdc0f80d40233fbfc018a09a059"
+    }
+  ],
+  "locked_launcher_files": [
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v4/attempts/run_gate_a_v4.py",
+      "source_commit": "62211b289f8902bfaad97d02cdaf01f396d9d5c6",
+      "git_blob_sha1": "f37c685f6ca12f417b530d4c89a2026a6e6c8413",
+      "committed_blob_sha256": "446ed9204fd71e04df751a8296584c3cfe808e7a10ed985c67be8b20884a2746"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/test_gate_a_v4_prelaunch.py",
+      "source_commit": "62211b289f8902bfaad97d02cdaf01f396d9d5c6",
+      "git_blob_sha1": "0194b55ad68ce5fe0f6aa99e6421a9a709ab8397",
+      "committed_blob_sha256": "7eda6340272e34cb5b8a404cae1321836b7e3a9c710864bd4227ed21c62ddaab"
+    }
+  ],
+  "config_sha256": "c73a9dbaed70b7295693b44576bf96dcee2d172049283e0689aabc3f424440c0",
+  "study_source_sha256": {
+    ".gitignore": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234",
+    "gate-a-target-direction.json": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "gate_a.py": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283",
+    "policy.py": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
+    "public_history_execution.py": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+    "runner.py": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497",
+    "stage0.py": "77e76ab4fee57002225d507650335bff9de3ead40620fc081e882b48701921af"
+  },
+  "root_input_tree": {
+    "git_tree_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
+    "path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/stage0/roots",
+    "file_count": 225
+  },
+  "root_selection": null,
+  "target": {
+    "path": "gate-a-target-direction.json",
+    "canonical_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "target_reselected": false,
+    "uniform_lf_or_crlf_only": true,
+    "substantive_change_rejected_before_optimizer_or_output": true
+  },
+  "gate_contract": {
+    "required_root_count": 24,
+    "minimum_screen_family_count": 4,
+    "updates_per_encoding": 64,
+    "total_gradient_updates_max": 128,
+    "minimum_tv_fraction": 0.8,
+    "native_execution": false,
+    "formal_seed_consumed": false,
+    "stage1_authorized": false,
+    "valid_negative_result_rerunnable": false
+  },
+  "preflight": {
+    "attempt_key": "builder-gate-a-requalification-v4-startup-preflight",
+    "fixed_reservation_cpu_seconds": 60.0,
+    "no_refund": true,
+    "command": "/home/lsmft/stsrl-spikes/py313-torch/bin/python3.13 -B receipts/gate-a-requalification-v4/attempts/run_gate_a_v4.py --preflight-only --record-preflight",
+    "negative_test_command": "Invoked inside the same pinned process by the locked launcher: test_gate_a_target_direction and test_gate_a_v4_prelaunch",
+    "reviewer_runtime_pass_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6384616582",
+    "review_requirement": "Independent Reviewer must run this locked launcher and negative target tests in pinned Python 3.13.13 before the Gate A execution receipt can be precharged."
+  },
+  "next_gate_a_execution": {
+    "attempt_key": "gate-a-requalification-after-v9-parity-v4",
+    "fixed_reservation_cpu_seconds": 120.0,
+    "charge_status": "NOT_STARTED_NOT_CHARGED",
+    "start_receipt": "receipts/gate-a-requalification-v4/execution-started-v1.json",
+    "requires_independent_review_of_this_lock": true,
+    "requires_pinned_preflight_pass": true,
+    "source_lock_sha256": null
+  },
+  "parent_evidence": {
+    "v6_source_lock": {
+      "path": "receipts/gate-a-requalification-v3-preflight/source-lock-v6.json",
+      "sha256": "b6f0baff7c872c30c996ff15bfbace0121532ef86c03daa5e3f9ae4e941549bd",
+      "git_blob_sha1": "81e9e6a854f81313739caf4afdbabc188d72e6ba"
+    },
+    "v6_terminal_report": {
+      "path": "receipts/gate-a-requalification-v3-preflight/attempt-v6-terminal-pass.json",
+      "sha256": "7a3f25b3cf3d9918e758eae60f8a58c6c1bcd39916f89bdbdfb813db33776df6"
+    },
+    "v6_resource_ledger": {
+      "path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v6.json",
+      "sha256": "bdcd0e5504a6fee2d0ba77f798974a3ec56821d5c1328a35a27a8090e5a45aa2"
+    },
+    "v3_terminal_attempt": {
+      "path": "receipts/gate-a-requalification-v3/attempts/gate-a-requalification-after-v9-parity-v3.json",
+      "sha256": "90dbea3a4e8e758c044410f89995ec113349ccc7e78a9496a912637ec38484ac"
+    },
+    "v3_source_lock": {
+      "path": "receipts/gate-a-requalification-v3/source-lock.json",
+      "sha256": "4e371114813c71331d8109c88d94f8e15a6c94c66a6ec69e9eb7e5551014a988"
+    }
+  },
+  "resource_projection": {
+    "parent_builder_charge_cpu_seconds": 3691.610134,
+    "preflight_reservation_cpu_seconds": 60.0,
+    "builder_charge_after_preflight_cpu_seconds": 3751.610134,
+    "next_gate_a_reserved_cpu_seconds": 120.0,
+    "next_gate_a_is_not_yet_charged": true,
+    "parent_native_gate_bc_charge_cpu_seconds": 1580.0,
+    "remaining_fixed_native_work_cpu_seconds": 1300.0,
+    "remaining_native_contingency_cpu_seconds": 100.0,
+    "projected_builder_total_cpu_seconds": 5271.6101340000005,
+    "protected_reviewer_reserve_cpu_seconds": 2000.0,
+    "projected_all_in_including_reviewer_reserve_cpu_seconds": 7271.6101340000005,
+    "projected_native_gate_bc_cpu_seconds": 2980.0,
+    "builder_hard_ceiling_cpu_seconds": 10000.0,
+    "native_gate_bc_hard_ceiling_cpu_seconds": 6000.0,
+    "aggregate_hard_ceiling_cpu_seconds": 12000.0,
+    "within_registered_ceilings": true
+  },
+  "scope": {
+    "disposition": "STUDY_ONLY",
+    "stage1_authorized": false,
+    "student_rl_authorized": false,
+    "native_import_or_game_step_authorized": false,
+    "formal_seed_consumed": false
+  },
+  "parent_planner_budget_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6383403713",
+  "current_resource_policy_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6383443034",
+  "reviewed_preflight_parent_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6384616582"
+}
