@@ -32,16 +32,31 @@ import policy
 STUDY = q.STUDY
 REPOSITORY = q.REPOSITORY
 STUDY_RELATIVE = q.STUDY_RELATIVE
-OUT = STUDY / "receipts" / "source-qualification-v9"
+V9_PRIOR_OUT = STUDY / "receipts" / "source-qualification-v9"
+V9_PRIOR_LOCK_PATH = V9_PRIOR_OUT / "preseed-source-lock-v9.json"
+V9_PRIOR_CONFIG_PATH = V9_PRIOR_OUT / "qualification-config-v9.json"
+V9_PRIOR_PLAN_PATH = V9_PRIOR_OUT / "plans" / "gate-c-replay-plan-v9.json"
+V9_PRIOR_MANIFEST_PATH = V9_PRIOR_OUT / "input-manifest-v9.json"
+V9_PRIOR_LEDGER_PATH = V9_PRIOR_OUT / "resource-ledger-v9.json"
+V9_PRIOR_LEDGER_SNAPSHOT_PATH = V9_PRIOR_OUT / "ledgers" / "resource-ledger-before-v9.json"
+V9_PRIOR_STATIC_PATH = V9_PRIOR_OUT / "attempts" / "builder-prelock-static-verification-v9.json"
+V9_PRIOR_STATIC_REPORT_PATH = V9_PRIOR_OUT / "reports" / "static-qualification-report-v9.json"
+V9_PRIOR_STATIC_FAILURE_PATH = V9_PRIOR_OUT / "reports" / "static-qualification-failure-v9.json"
+V9_PRIOR_CAPTURE_ATTEMPT_PATH = V9_PRIOR_OUT / "attempts" / "source-history-capture-173730001-prospective-v9.json"
+V9_PRIOR_CAPTURE_REPORT_PATH = V9_PRIOR_OUT / "reports" / "source-history-capture-report-v9.json"
+V9_PRIOR_CAPTURE_FAILURE_PATH = V9_PRIOR_OUT / "reports" / "source-history-capture-failure-v9.json"
+V9_PRIOR_CAPTURE_HISTORY_PATH = V9_PRIOR_OUT / "histories" / "actual-action-step-history-v9.json"
+V9_PRIOR_CAPTURE_ROOTS_PATH = V9_PRIOR_OUT / "histories" / "captured-root-snapshots-v9.json"
+OUT = STUDY / "receipts" / "source-qualification-v9-engineering-1"
 OUT_RELATIVE = OUT.relative_to(REPOSITORY).as_posix()
 BRANCH = "codex/issue-73-v9-pre-capture"
 SOURCE_BASE_COMMIT = "1cd3d886a6d59fffd700567425df2ec471f2253f"
 SEED = 173730001
 ARM = "P0"
 SAMPLING_PURPOSE = "issue73-stage0-debug-owner"
-ATTEMPT_KEY = "source-history-capture-173730001-prospective-v9"
+ATTEMPT_KEY = "source-history-capture-173730001-prospective-v9-engineering-1"
 ATTEMPT_PATH = OUT / "attempts" / f"{ATTEMPT_KEY}.json"
-STATIC_KEY = "builder-prelock-static-verification-v9"
+STATIC_KEY = "builder-prelock-static-verification-v9-engineering-1"
 STATIC_PATH = OUT / "attempts" / f"{STATIC_KEY}.json"
 STATIC_RESERVE = 60.0
 CAPTURE_RESERVE = 60.0
@@ -575,11 +590,91 @@ def _base_v8_ledger() -> dict[str, Any]:
     return ledger
 
 
+def _base_prior_v9_ledger() -> dict[str, Any]:
+    """Verify the immutable failed first v9 static attempt before a unique retry."""
+    _base_v8_ledger()
+    required = (
+        V9_PRIOR_LOCK_PATH, V9_PRIOR_CONFIG_PATH, V9_PRIOR_PLAN_PATH,
+        V9_PRIOR_MANIFEST_PATH, V9_PRIOR_LEDGER_PATH,
+        V9_PRIOR_LEDGER_SNAPSHOT_PATH, V9_PRIOR_STATIC_PATH,
+        V9_PRIOR_STATIC_FAILURE_PATH,
+    )
+    if not all(path.is_file() for path in required):
+        raise QualificationV9Failure("immutable failed first v9 lock, ledger, report, or attempt receipt is missing")
+    if any(path.exists() for path in (
+        V9_PRIOR_CAPTURE_ATTEMPT_PATH, V9_PRIOR_CAPTURE_REPORT_PATH,
+        V9_PRIOR_CAPTURE_FAILURE_PATH, V9_PRIOR_CAPTURE_HISTORY_PATH,
+        V9_PRIOR_CAPTURE_ROOTS_PATH,
+    )):
+        raise QualificationV9Failure("the prior v9 branch contains a capture artifact; do not reclassify or retry it")
+    lock = json.loads(V9_PRIOR_LOCK_PATH.read_text(encoding="utf-8"))
+    config = json.loads(V9_PRIOR_CONFIG_PATH.read_text(encoding="utf-8"))
+    plan = json.loads(V9_PRIOR_PLAN_PATH.read_text(encoding="utf-8"))
+    manifest = json.loads(V9_PRIOR_MANIFEST_PATH.read_text(encoding="utf-8"))
+    ledger = json.loads(V9_PRIOR_LEDGER_PATH.read_text(encoding="utf-8"))
+    static = json.loads(V9_PRIOR_STATIC_PATH.read_text(encoding="utf-8"))
+    report = json.loads(V9_PRIOR_STATIC_FAILURE_PATH.read_text(encoding="utf-8"))
+    if (
+        lock.get("schema_id") != "issue73-checkpoint-replay-preseed-source-lock-v9"
+        or lock.get("lock_revision") != 10
+        or lock.get("status") != "PRESEED_LOCKED_BEFORE_ANY_NEW_NATIVE_EXECUTION"
+        or lock.get("stage1_authorized") is not False
+        or lock.get("code_source_commit") != "b2cf813aad454eb1c7efabb97ff14685b52223d2"
+        or lock.get("remote_branch") != BRANCH
+        or lock.get("authorized_source_base_commit") != SOURCE_BASE_COMMIT
+        or lock.get("v9_resource_ledger_sha256") != sha256_text_file(V9_PRIOR_LEDGER_PATH)
+        or lock.get("static_reservation_receipt_sha256") != sha256_text_file(V9_PRIOR_STATIC_PATH)
+        or lock.get("qualification_config_sha256") != sha256_text_file(V9_PRIOR_CONFIG_PATH)
+        or lock.get("gate_c_plan_sha256") != sha256_text_file(V9_PRIOR_PLAN_PATH)
+        or lock.get("historical_input_manifest_sha256") != sha256_text_file(V9_PRIOR_MANIFEST_PATH)
+        or config.get("historical_input_manifest_sha256") != lock.get("historical_input_manifest_canonical_sha256")
+        or plan.get("qualification_config_sha256") != lock.get("qualification_config_sha256")
+        or manifest.get("included_file_count") != 345
+        or manifest != json.loads(v8.MANIFEST_PATH.read_text(encoding="utf-8"))
+    ):
+        raise QualificationV9Failure("prior v9 source/lock/manifest receipt is inconsistent or has been changed")
+    source_commit = str(lock["code_source_commit"])
+    locked_sources = lock.get("study_source_sha256", {})
+    source_paths = [f"{STUDY_RELATIVE}/{name}" for name in sorted(locked_sources)]
+    source_blobs = v7.external_git_blobs(source_commit, source_paths)
+    for name in sorted(locked_sources):
+        if sha256_bytes(source_blobs[f"{STUDY_RELATIVE}/{name}"]) != locked_sources[name]:
+            raise QualificationV9Failure(f"prior v9 code source hash changed for {name}")
+    if V9_PRIOR_STATIC_REPORT_PATH.exists():
+        raise QualificationV9Failure("the failed v9 pre-capture static attempt must not acquire a passing report")
+    if (
+        report.get("status") != "FAIL_OR_INCOMPLETE"
+        or report.get("fixed_static_reservation_cpu_seconds") != 60.0
+        or report.get("formal_seed_consumed") is not False
+        or report.get("native_adapter_instantiated") is not False
+        or report.get("native_game_step_started") is not False
+        or report.get("no_retry_or_overwrite") is not True
+        or report.get("failure_type") != "QualificationV9Failure"
+        or static.get("key") != "builder-prelock-static-verification-v9"
+        or static.get("source_commit") != source_commit
+        or static.get("status") != "RESERVED_CONSERVATIVE_STATIC_DEBIT"
+        or static.get("reserved_cpu_seconds") != 60.0
+        or static.get("cpu_charged_seconds") != 60.0
+        or static.get("native_gate_bc") is not False
+    ):
+        raise QualificationV9Failure("prior v9 failed static attempt or its fixed charge is not immutable and complete")
+    previous_rows = ledger.get("attempts", [])
+    if (
+        ledger.get("schema_id") != "issue73-v9-resource-ledger-v1"
+        or ledger.get("baseline_ledger_sha256") != sha256_text_file(v8.LEDGER_PATH)
+        or len(previous_rows) != 1 or previous_rows[0] != static
+        or abs(q.charged(ledger)[0] - 2531.610134) > 1e-6
+        or abs(q.charged(ledger)[1] - 1380.0) > 1e-6
+    ):
+        raise QualificationV9Failure("prior v9 ledger must retain its original 60 CPU-s debit and v8 baseline")
+    return ledger
+
+
 def _ledger_template(base: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        "schema_id": "issue73-v9-resource-ledger-v1",
-        "baseline_ledger_path": v8.LEDGER_PATH.relative_to(STUDY).as_posix(),
-        "baseline_ledger_sha256": sha256_text_file(v8.LEDGER_PATH),
+        "schema_id": "issue73-v9-engineering-1-resource-ledger-v1",
+        "baseline_ledger_path": V9_PRIOR_LEDGER_PATH.relative_to(STUDY).as_posix(),
+        "baseline_ledger_sha256": sha256_text_file(V9_PRIOR_LEDGER_PATH),
         "baseline_builder_charge_cpu_seconds": q.charged(base)[0],
         "baseline_native_gate_bc_charge_cpu_seconds": q.charged(base)[1],
         "builder_ceiling_cpu_seconds": 4800.0,
@@ -592,7 +687,7 @@ def _ledger_template(base: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 def _ensure_static_reservation(*, allow_started: bool = False) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    base = _base_v8_ledger()
+    base = _base_prior_v9_ledger()
     if not all(path.is_file() for path in (STATIC_PATH, LEDGER_PATH, LEDGER_SNAPSHOT_PATH)):
         raise QualificationV9Failure("v9 fixed 60 CPU-s static reservation is not durably present")
     receipt = json.loads(STATIC_PATH.read_text(encoding="utf-8"))
@@ -602,8 +697,8 @@ def _ensure_static_reservation(*, allow_started: bool = False) -> tuple[dict[str
     rows = [row for row in ledger.get("attempts", []) if row.get("key") == STATIC_KEY]
     if (
         snapshot != expected_snapshot
-        or ledger.get("schema_id") != "issue73-v9-resource-ledger-v1"
-        or ledger.get("baseline_ledger_sha256") != sha256_text_file(v8.LEDGER_PATH)
+        or ledger.get("schema_id") != "issue73-v9-engineering-1-resource-ledger-v1"
+        or ledger.get("baseline_ledger_sha256") != sha256_text_file(V9_PRIOR_LEDGER_PATH)
         or receipt.get("key") != STATIC_KEY
         or receipt.get("reserved_cpu_seconds") != STATIC_RESERVE
         or receipt.get("cpu_charged_seconds") != STATIC_RESERVE
@@ -628,19 +723,20 @@ def _reserve_static() -> dict[str, Any]:
                 return receipt
         raise QualificationV9Failure("v9 static reservation already exists or is partial; no second reservation/replay")
     head = require_current_v9_branch()
-    base = _base_v8_ledger()
+    base = _base_prior_v9_ledger()
     snapshot = _ledger_template(base)
     projection_ledger = json.loads(json.dumps(snapshot))
-    projection_ledger["attempts"] = [{"key": STATIC_KEY, "cpu_charged_seconds": STATIC_RESERVE, "native_gate_bc": False}]
+    projection_ledger["attempts"] = [{"key": STATIC_KEY, "cpu_charged_seconds": STATIC_RESERVE, "native_gate_bc": False, "contingency_pool": "nonnative"}]
     projection = _resource_projection(base, projection_ledger)
     if not projection["forecast_fits_registered_caps"]:
         raise QualificationV9Failure(f"v9 fixed 60 CPU-s debit plus registered continuation does not fit: {projection}")
     row = {
         "schema_id": "issue73-checkpoint-replay-attempt-v1",
         "key": STATIC_KEY,
-        "kind": "v9_bounded_static_provenance_lock_and_runtime_verification",
+        "kind": "v9_engineering_1_bounded_static_provenance_lock_and_runtime_verification",
         "status": "RESERVED_CONSERVATIVE_STATIC_DEBIT",
         "native_gate_bc": False,
+        "contingency_pool": "nonnative",
         "reserved_cpu_seconds": STATIC_RESERVE,
         "cpu_charged_seconds": STATIC_RESERVE,
         "measurement_status": "FIXED_RESERVATION_PRECHARGED; NO REFUND",
@@ -668,7 +764,7 @@ def _locked_root_hashes(manifest: Mapping[str, Any]) -> dict[str, str]:
 
 
 def prepare_lock_v9(*, code_source_commit: str | None = None) -> dict[str, Any]:
-    _base_v8_ledger()
+    _base_prior_v9_ledger()
     _reservation, ledger, projection = _ensure_static_reservation(allow_started=True)
     source_commit = code_source_commit or require_current_v9_branch()
     if git("rev-parse", source_commit) != source_commit:
@@ -719,8 +815,8 @@ def prepare_lock_v9(*, code_source_commit: str | None = None) -> dict[str, Any]:
 
     config = json.loads(v8.CONFIG_PATH.read_text(encoding="utf-8"))
     plan = json.loads(v8.PLAN_PATH.read_text(encoding="utf-8"))
-    config["schema_id"] = "issue73-checkpoint-replay-qualification-config-v9"
-    config["source_qualification_version"] = "v9"
+    config["schema_id"] = "issue73-checkpoint-replay-qualification-config-v9-engineering-1"
+    config["source_qualification_version"] = "v9-engineering-1"
     config["source_history_attempt_key"] = ATTEMPT_KEY
     config["parent_v8_source_lock_sha256"] = sha256_text_file(v8.LOCK_PATH)
     config["input_manifest"] = {
@@ -741,12 +837,15 @@ def prepare_lock_v9(*, code_source_commit: str | None = None) -> dict[str, Any]:
         **projection,
         "parent_v8_lock_sha256": sha256_text_file(v8.LOCK_PATH),
         "parent_v8_resource_ledger_sha256": sha256_text_file(v8.LEDGER_PATH),
+        "parent_v9_failed_static_lock_sha256": sha256_text_file(V9_PRIOR_LOCK_PATH),
+        "parent_v9_failed_static_failure_sha256": sha256_text_file(V9_PRIOR_STATIC_FAILURE_PATH),
+        "parent_v9_failed_static_ledger_sha256": sha256_text_file(V9_PRIOR_LEDGER_PATH),
         "v9_resource_ledger_sha256": sha256_text_file(LEDGER_PATH),
         "v9_static_debit_cpu_seconds": STATIC_RESERVE,
         "no_prior_charge_reclaimed": True,
     }
-    plan["schema_id"] = "issue73-checkpoint-replay-gate-c-plan-v9"
-    plan["source_qualification_version"] = "v9"
+    plan["schema_id"] = "issue73-checkpoint-replay-gate-c-plan-v9-engineering-1"
+    plan["source_qualification_version"] = "v9-engineering-1"
     plan["qualification_config_file"] = CONFIG_PATH.relative_to(STUDY).as_posix()
     plan["qualification_config_sha256"] = None
     plan["parent_v8_source_lock_sha256"] = sha256_text_file(v8.LOCK_PATH)
@@ -761,7 +860,7 @@ def prepare_lock_v9(*, code_source_commit: str | None = None) -> dict[str, Any]:
     source_hashes = _source_hashes(source_commit)
     lock = {
         "schema_id": "issue73-checkpoint-replay-preseed-source-lock-v9",
-        "lock_revision": 10,
+        "lock_revision": 11,
         "status": "PRESEED_LOCKED_BEFORE_ANY_NEW_NATIVE_EXECUTION",
         "study_only": True,
         "formal_training_seed_consumed": False,
@@ -778,6 +877,11 @@ def prepare_lock_v9(*, code_source_commit: str | None = None) -> dict[str, Any]:
         "parent_v8_static_report_sha256": sha256_text_file(v8.STATIC_REPORT_PATH),
         "parent_v8_capture_attempt_sha256": sha256_text_file(v8.ATTEMPT_PATH),
         "parent_v8_capture_report_sha256": sha256_text_file(v8.CAPTURE_REPORT_PATH),
+        "parent_v9_source_lock_sha256": sha256_text_file(V9_PRIOR_LOCK_PATH),
+        "parent_v9_code_source_commit": json.loads(V9_PRIOR_LOCK_PATH.read_text(encoding="utf-8"))["code_source_commit"],
+        "parent_v9_static_attempt_sha256": sha256_text_file(V9_PRIOR_STATIC_PATH),
+        "parent_v9_static_failure_sha256": sha256_text_file(V9_PRIOR_STATIC_FAILURE_PATH),
+        "parent_v9_resource_ledger_sha256": sha256_text_file(V9_PRIOR_LEDGER_PATH),
         "parent_v7_lock_sha256": parent_lock["v7_source_lock_sha256"],
         "parent_v7_code_source_commit": parent_lock["parent_v7_code_source_commit"],
         "historical_input_base_commit": v7.HISTORICAL_INPUT_BASE_COMMIT,
@@ -807,6 +911,7 @@ def prepare_lock_v9(*, code_source_commit: str | None = None) -> dict[str, Any]:
         "v7_source_lock_sha256": parent_lock["v7_source_lock_sha256"],
         "v7_resource_ledger_sha256": parent_lock["v7_resource_ledger_sha256"],
         "v9_resource_ledger_sha256": sha256_text_file(LEDGER_PATH),
+        "v9_retry_resource_baseline_sha256": sha256_text_file(V9_PRIOR_LEDGER_PATH),
         "static_reservation_receipt_sha256": sha256_text_file(STATIC_PATH),
         "resource_projection": projection,
         "fixed_gate_contract": parent_lock["fixed_gate_contract"],
@@ -824,8 +929,8 @@ def verify_lock_v9(*, require_remote_current: bool = True) -> tuple[dict[str, An
     config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     plan = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    if lock.get("schema_id") != "issue73-checkpoint-replay-preseed-source-lock-v9" or lock.get("lock_revision") != 10:
-        raise QualificationV9Failure("only the prospective v9 lock revision 10 is accepted")
+    if lock.get("schema_id") != "issue73-checkpoint-replay-preseed-source-lock-v9" or lock.get("lock_revision") != 11:
+        raise QualificationV9Failure("only the prospective v9 engineering-1 lock revision 11 is accepted")
     if lock.get("status") != "PRESEED_LOCKED_BEFORE_ANY_NEW_NATIVE_EXECUTION" or lock.get("stage1_authorized") is not False:
         raise QualificationV9Failure("v9 lock status or Stage 1 prohibition changed")
     if lock.get("remote_branch") != BRANCH or lock.get("authorized_source_base_commit") != SOURCE_BASE_COMMIT:
@@ -867,7 +972,7 @@ def verify_lock_v9(*, require_remote_current: bool = True) -> tuple[dict[str, An
         raise QualificationV9Failure("v9 branch no longer descends from its locked code source")
     if lock.get("study_source_sha256") != _source_hashes(source_commit):
         raise QualificationV9Failure("v9 study source hashes differ from exact committed source blobs")
-    base = _base_v8_ledger()
+    base = _base_prior_v9_ledger()
     parent_lock = json.loads(v8.LOCK_PATH.read_text(encoding="utf-8"))
     if (
         lock.get("parent_v8_source_lock_sha256") != sha256_text_file(v8.LOCK_PATH)
@@ -877,6 +982,11 @@ def verify_lock_v9(*, require_remote_current: bool = True) -> tuple[dict[str, An
         or lock.get("parent_v8_static_report_sha256") != sha256_text_file(v8.STATIC_REPORT_PATH)
         or lock.get("parent_v8_capture_attempt_sha256") != sha256_text_file(v8.ATTEMPT_PATH)
         or lock.get("parent_v8_capture_report_sha256") != sha256_text_file(v8.CAPTURE_REPORT_PATH)
+        or lock.get("parent_v9_source_lock_sha256") != sha256_text_file(V9_PRIOR_LOCK_PATH)
+        or lock.get("parent_v9_code_source_commit") != json.loads(V9_PRIOR_LOCK_PATH.read_text(encoding="utf-8")).get("code_source_commit")
+        or lock.get("parent_v9_static_attempt_sha256") != sha256_text_file(V9_PRIOR_STATIC_PATH)
+        or lock.get("parent_v9_static_failure_sha256") != sha256_text_file(V9_PRIOR_STATIC_FAILURE_PATH)
+        or lock.get("parent_v9_resource_ledger_sha256") != sha256_text_file(V9_PRIOR_LEDGER_PATH)
         or lock.get("v7_source_lock_sha256") != parent_lock.get("v7_source_lock_sha256")
         or lock.get("v7_resource_ledger_sha256") != parent_lock.get("v7_resource_ledger_sha256")
     ):
@@ -1062,7 +1172,7 @@ def _start_capture_attempt_v9(lock: Mapping[str, Any], reviewed_source_sha: str,
     static, _ledger, projection = _ensure_static_reservation()
     if static.get("status") != "RESERVED_CONSERVATIVE_STATIC_DEBIT" or not STATIC_REPORT_PATH.is_file() or json.loads(STATIC_REPORT_PATH.read_text(encoding="utf-8")).get("status") != "PASS":
         raise QualificationV9Failure("v9 capture requires the committed static PASS receipt")
-    builder, native = q.charged(_base_v8_ledger())
+    builder, native = q.charged(_base_prior_v9_ledger())
     builder += sum(float(x.get("cpu_charged_seconds", 0)) for x in ledger.get("attempts", []))
     native += sum(float(x.get("cpu_charged_seconds", 0)) for x in ledger.get("attempts", []) if x.get("native_gate_bc") is True)
     if builder + CAPTURE_RESERVE > 4800.0 or native + CAPTURE_RESERVE > 3060.0:
@@ -1070,7 +1180,7 @@ def _start_capture_attempt_v9(lock: Mapping[str, Any], reviewed_source_sha: str,
     row = {
         "schema_id": "issue73-checkpoint-replay-attempt-v1",
         "key": ATTEMPT_KEY,
-        "kind": "v9_historical_debug_owner_full_action_history_capture",
+        "kind": "v9_engineering_1_historical_debug_owner_full_action_history_capture",
         "status": "STARTED",
         "native_gate_bc": True,
         "reserved_cpu_seconds": CAPTURE_RESERVE,

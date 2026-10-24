@@ -73,21 +73,22 @@ class SourceHistoryCaptureV9Tests(unittest.TestCase):
         )
 
     def test_resource_projection_preserves_suffixes_contingencies_and_caps(self):
-        base = v9._base_v8_ledger()
+        base = v9._base_prior_v9_ledger()
         ledger = v9._ledger_template(base)
         ledger["attempts"] = [{
             "key": v9.STATIC_KEY,
             "cpu_charged_seconds": 60.0,
             "native_gate_bc": False,
+            "contingency_pool": "nonnative",
         }]
         projection = v9._resource_projection(base, ledger)
         self.assertTrue(projection["forecast_fits_registered_caps"])
-        self.assertEqual(projection["builder_charge_including_v9_cpu_seconds"], 2531.610134)
-        self.assertEqual(projection["cumulative_builder_projection_cpu_seconds"], 4511.610134)
+        self.assertAlmostEqual(projection["builder_charge_including_v9_cpu_seconds"], 2591.610134)
+        self.assertAlmostEqual(projection["cumulative_builder_projection_cpu_seconds"], 4511.610134)
         self.assertEqual(projection["cumulative_native_gate_bc_projection_cpu_seconds"], 3060.0)
         self.assertEqual(projection["gate_c_suffix_attempt_count"], 64)
         self.assertEqual(projection["gate_c_suffix_total_reserve_cpu_seconds"], 1280.0)
-        self.assertEqual(projection["nonnative_contingency_remaining_cpu_seconds"], 180.0)
+        self.assertEqual(projection["nonnative_contingency_remaining_cpu_seconds"], 120.0)
         self.assertEqual(projection["native_contingency_remaining_cpu_seconds"], 240.0)
     def test_original_owner_provenance_reconstructs_exact_policy_stream(self):
         identity = v9.original_replay_identity(self.owner)
@@ -178,7 +179,7 @@ class SourceHistoryCaptureV9Tests(unittest.TestCase):
                 self.assertTrue(snapshot_path.is_file())
                 self.assertEqual(v9.sha256_file(snapshot_path), snapshot_sha256)
                 persisted = json.loads(snapshot_path.read_text(encoding="utf-8"))
-        self.assertEqual(report["status"], "FAIL_SOURCE_HISTORY_CAPTURE_PARITY")
+        self.assertEqual(report["status"], "FAIL_REQUIRED_REPLAY_ROOT_MISMATCH")
         self.assertIn("v9_test_corruption", json.dumps(persisted))
         self.assertEqual(persisted["root_count"], 39)
         self.assertTrue(all("checkpoint" not in root and "adapter" not in root for root in persisted["roots"]))
