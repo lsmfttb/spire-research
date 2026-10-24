@@ -10,6 +10,8 @@ import checkpoint_replay_qualification as q
 import source_qualification_v9 as v9_engineering_1
 import source_qualification_v9_engineering_2 as v9
 
+RUNTIME_TEMP_ROOT = v9.REPOSITORY / ".builder-runtime" / "tmp"
+
 
 class SourceHistoryCaptureV9Engineering2Tests(unittest.TestCase):
     @classmethod
@@ -100,8 +102,8 @@ class SourceHistoryCaptureV9Engineering2Tests(unittest.TestCase):
 
 
     def test_autocrlf_checkout_matches_committed_text_hash(self):
-        v9.RUNTIME_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="issue73-eng4-autocrlf-", dir=v9.RUNTIME_TEMP_ROOT) as temp:
+        RUNTIME_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="issue73-eng4-autocrlf-", dir=RUNTIME_TEMP_ROOT) as temp:
             repo = Path(temp)
             sample = repo / "receipt.json"
             sample.write_bytes(b'{"value":1}\n')
@@ -123,8 +125,8 @@ class SourceHistoryCaptureV9Engineering2Tests(unittest.TestCase):
             self.assertNotEqual(v9.sha256_file(sample), v9.sha256_bytes(committed))
 
     def test_text_hash_rejects_mixed_line_endings(self):
-        v9.RUNTIME_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="issue73-eng4-mixed-eol-", dir=v9.RUNTIME_TEMP_ROOT) as temp:
+        RUNTIME_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="issue73-eng4-mixed-eol-", dir=RUNTIME_TEMP_ROOT) as temp:
             path = Path(temp) / "receipt.json"
             path.write_bytes(b'{"value":1}\r\n{"value":2}\n')
             with self.assertRaisesRegex(ValueError, "mixed line endings"):
