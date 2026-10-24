@@ -1,0 +1,63 @@
+{
+  "schema_id": "issue73-gate-a-postmortem-source-hash-diagnostic-v1",
+  "created_at_utc": "2026-10-24T12:35:00Z",
+  "attempt_key": "gate-a-requalification-after-v9-parity-v3",
+  "attempt_execution_commit": "9aa6ebc378cab09739ce97390766171b5b584f15",
+  "source_code_commit": "fe46d2ec79baded9e01bd04cf9d03d6614410c16",
+  "source_lock_sha256": "4e371114813c71331d8109c88d94f8e15a6c94c66a6ec69e9eb7e5551014a988",
+  "diagnosis_timing": "Postmortem reproduction after the terminal attempt; no Gate A rerun",
+  "method": "Pinned WSL Python 3.13.13 imported stage0.source_hashes(), which calls runner.sha256_text_file() and runner.normalize_text_bytes() over the execution worktree.",
+  "execution_result": "Four committed config identity.study_source_sha256 entries do not match the normalized source bytes in the committed execution source; comparison failed before roots were loaded or gate_a.run_gate_a was invoked.",
+  "mismatches": [
+    {
+      "expected": "f020e1078fae512ca68fcb3a78a3db1cee7c1ded84a0ee507117ea6217ad5042",
+      "path": ".gitignore",
+      "observed": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234"
+    },
+    {
+      "expected": "f85baf3499022c75637e7d7f35e9e824a0741ec3b087d067de7353badaa2dfa6",
+      "path": "gate_a.py",
+      "observed": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283"
+    },
+    {
+      "expected": "a363d68b99092e8d9ab371c05cbb839ac48cb28b398505fcc8691f8458a1ff9b",
+      "path": "runner.py",
+      "observed": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497"
+    },
+    {
+      "expected": "ba6a390325e50fdc808cf066124662f1f680c382e4ac77b1e58348b4254c0fb3",
+      "path": "stage0.py",
+      "observed": "77e76ab4fee57002225d507650335bff9de3ead40620fc081e882b48701921af"
+    }
+  ],
+  "other_configured_source_hashes": "The remaining three configured source hash entries matched the observed normalized bytes.",
+  "attempt_state": {
+    "roots_loaded": false,
+    "gate_a_invoked": false,
+    "stage1_authorized": false,
+    "native_module_imported": false,
+    "optimizer_update_started": false,
+    "native_game_step_started": false,
+    "formal_seed_consumed": false
+  },
+  "resource_accounting": {
+    "hard_ceilings_aggregate": 12000,
+    "native_b_c_charge_cpu_seconds": 1580.0,
+    "reserved_cpu_seconds": 120.0,
+    "builder_charge_after_attempt_cpu_seconds": 3571.610134,
+    "hard_ceilings_native_b_c": 6000,
+    "charged_no_refund": true,
+    "projected_all_in_cpu_seconds": 6971.610134,
+    "projected_builder_cpu_seconds": 4971.610134,
+    "projected_native_b_c_cpu_seconds": 2980.0,
+    "hard_ceilings_builder": 10000,
+    "measured_process_tree_cpu_seconds": 4.847752272
+  },
+  "immutable_evidence": {
+    "note": "Original terminal attempt, failure report, execution claim, and fixed-charge ledger are preserved; no historical receipt, code, config, source lock, population, or budget was overwritten.",
+    "attempt_receipt_path": "attempts/gate-a-requalification-after-v9-parity-v3.json",
+    "execution_claim_path": "attempts/execution-claim.json",
+    "resource_ledger_path": "resource-ledger-final.json",
+    "failure_report_path": "outputs/gate-a-report.json"
+  }
+}
