@@ -20,16 +20,16 @@ SCRIPT = pathlib.Path(__file__).resolve()
 ATTEMPT_ROOT = SCRIPT.parents[1]
 STUDY = SCRIPT.parents[3]
 REPOSITORY = STUDY.parents[1]
-LOCK_PATH = ATTEMPT_ROOT / "source-lock-v1.json"
-LOCK_SHA_PATH = ATTEMPT_ROOT / "source-lock-v1.sha256"
-PREFLIGHT_REPORT_PATH = ATTEMPT_ROOT / "preflight-report-v1.json"
-PREFLIGHT_START_PATH = ATTEMPT_ROOT / "preflight-started-v1.json"
-PREFLIGHT_LEDGER_STARTED_PATH = ATTEMPT_ROOT / "preflight-resource-ledger-started-v1.json"
-PREFLIGHT_LEDGER_FINAL_PATH = ATTEMPT_ROOT / "preflight-resource-ledger-final-v1.json"
-EXECUTION_START_PATH = ATTEMPT_ROOT / "execution-started-v1.json"
-EXECUTION_CLAIM_PATH = ATTEMPT_ROOT / "attempts" / "execution-claim-v1.json"
-EXECUTION_TERMINAL_PATH = ATTEMPT_ROOT / "attempts" / "gate-a-terminal-v1.json"
-EXECUTION_LEDGER_FINAL_PATH = ATTEMPT_ROOT / "resource-ledger-final-v1.json"
+LOCK_PATH = ATTEMPT_ROOT / "source-lock-v2.json"
+LOCK_SHA_PATH = ATTEMPT_ROOT / "source-lock-v2.sha256"
+PREFLIGHT_REPORT_PATH = ATTEMPT_ROOT / "preflight-report-v2.json"
+PREFLIGHT_START_PATH = ATTEMPT_ROOT / "preflight-started-v2.json"
+PREFLIGHT_LEDGER_STARTED_PATH = ATTEMPT_ROOT / "preflight-resource-ledger-started-v2.json"
+PREFLIGHT_LEDGER_FINAL_PATH = ATTEMPT_ROOT / "preflight-resource-ledger-final-v2.json"
+EXECUTION_START_PATH = ATTEMPT_ROOT / "execution-started-v2.json"
+EXECUTION_CLAIM_PATH = ATTEMPT_ROOT / "attempts" / "execution-claim-v2.json"
+EXECUTION_TERMINAL_PATH = ATTEMPT_ROOT / "attempts" / "gate-a-terminal-v2.json"
+EXECUTION_LEDGER_FINAL_PATH = ATTEMPT_ROOT / "resource-ledger-final-v2.json"
 OUTPUT = ATTEMPT_ROOT / "outputs"
 RUNTIME = ATTEMPT_ROOT / "runtime"
 TMP = RUNTIME / "tmp"
@@ -96,7 +96,7 @@ def verify_source_lock():
     expected_lock_sha = LOCK_SHA_PATH.read_text(encoding="ascii").strip().lower()
     observed_lock_sha = hashlib.sha256(lock_raw).hexdigest()
     if observed_lock_sha != expected_lock_sha:
-        raise RuntimeError("source-lock-v1.sha256 does not match the canonical lock bytes")
+        raise RuntimeError("source-lock-v2.sha256 does not match the canonical lock bytes")
     lock = json.loads(lock_raw)
     if lock.get("attempt_key") != "gate-a-requalification-after-v9-parity-v4":
         raise RuntimeError("unexpected Gate A v4 attempt key")
@@ -120,14 +120,21 @@ def verify_source_lock():
             committed_blob=committed,
             checkout_bytes=checkout,
         )
+    verify_parent_evidence(lock)
     return lock, observed_lock_sha, head
+
+def verify_parent_evidence(lock) -> None:
+    for item in lock.get("parent_evidence", {}).values():
+        path = STUDY / pathlib.PurePosixPath(item["path"])
+        if not path.is_file() or sha256_lf(path) != item["sha256"]:
+            raise RuntimeError(f"immutable parent evidence changed: {item['path']}")
 
 def verify_preflight_charge(lock, lock_sha: str) -> tuple[dict[str, object], dict[str, object]]:
     started = read_json(PREFLIGHT_START_PATH)
     ledger = read_json(PREFLIGHT_LEDGER_STARTED_PATH)
-    if started.get("status") != "STARTED" or started.get("attempt_key") != lock["preflight_attempt_key"]:
+    if started.get("status") != "STARTED" or started.get("attempt_key") != lock["preflight"]["attempt_key"]:
         raise RuntimeError("Gate A readiness preflight lacks its unique STARTED receipt")
-    if ledger.get("status") != "STARTED" or ledger.get("attempt_key") != lock["preflight_attempt_key"]:
+    if ledger.get("status") != "STARTED" or ledger.get("attempt_key") != lock["preflight"]["attempt_key"]:
         raise RuntimeError("Gate A readiness preflight lacks its precharged ledger")
     if started.get("source_lock_sha256") != lock_sha or ledger.get("source_lock_sha256") != lock_sha:
         raise RuntimeError("preflight start receipt/ledger does not bind the candidate source lock")
@@ -203,8 +210,8 @@ def run_preflight(record_report: bool) -> int:
     started_children = resource.getrusage(resource.RUSAGE_CHILDREN)
     started_wall = time.time()
     report = {
-        "schema_id": "issue73-gate-a-v4-startup-preflight-v1",
-        "attempt_key": "builder-gate-a-requalification-v4-startup-preflight",
+        "schema_id": "issue73-gate-a-v4-startup-preflight-v2",
+        "attempt_key": "builder-gate-a-requalification-v4-startup-preflight-v2",
         "status": "FAIL_EXCEPTION",
         "finished_at_utc": None,
         "formal_seed_consumed": False, "gate_a_invoked": False,
@@ -230,7 +237,7 @@ def run_preflight(record_report: bool) -> int:
             "inputs": inputs,
             "current_head": head,
             "source_lock_sha256": lock_sha,
-            "preflight_reviewer_gate_comment": lock["prior_preflight_reviewer_pass_comment"],
+            "preflight_reviewer_gate_comment": lock["preflight"]["reviewer_runtime_pass_comment"],
         })
     except BaseException as exc:
         report["failure"] = {
