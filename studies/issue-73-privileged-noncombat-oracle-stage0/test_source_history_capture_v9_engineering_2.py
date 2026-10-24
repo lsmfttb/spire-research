@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 
 import checkpoint_replay_qualification as q
 import source_qualification_v9 as v9_engineering_1
@@ -94,6 +97,38 @@ class SourceHistoryCaptureV9Engineering2Tests(unittest.TestCase):
         self.assertEqual(projection["native_gate_bc_charge_including_v9_cpu_seconds"], 1500.0)
         self.assertEqual(projection["native_contingency_remaining_cpu_seconds"], 180.0)
         self.assertEqual(projection["nonnative_contingency_remaining_cpu_seconds"], 60.0)
+
+
+    def test_autocrlf_checkout_matches_committed_text_hash(self):
+        v9.RUNTIME_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="issue73-eng4-autocrlf-", dir=v9.RUNTIME_TEMP_ROOT) as temp:
+            repo = Path(temp)
+            sample = repo / "receipt.json"
+            sample.write_bytes(b'{"value":1}\n')
+            subprocess.run(["git", "init", "--quiet", str(repo)], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "core.autocrlf", "true"], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.name", "Issue 73 test"], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.email", "issue73-test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(repo), "add", "receipt.json"], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "--quiet", "-m", "fixture"], check=True)
+            committed = subprocess.check_output(["git", "-C", str(repo), "show", "HEAD:receipt.json"])
+
+            sample.unlink()
+            subprocess.run(["git", "-C", str(repo), "checkout", "--", "receipt.json"], check=True)
+            checkout = sample.read_bytes()
+
+            self.assertIn(b"\r\n", checkout)
+            self.assertNotIn(b"\n", checkout.replace(b"\r\n", b""))
+            self.assertEqual(v9.sha256_text_file(sample), v9.sha256_bytes(committed))
+            self.assertNotEqual(v9.sha256_file(sample), v9.sha256_bytes(committed))
+
+    def test_text_hash_rejects_mixed_line_endings(self):
+        v9.RUNTIME_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="issue73-eng4-mixed-eol-", dir=v9.RUNTIME_TEMP_ROOT) as temp:
+            path = Path(temp) / "receipt.json"
+            path.write_bytes(b'{"value":1}\r\n{"value":2}\n')
+            with self.assertRaisesRegex(ValueError, "mixed line endings"):
+                v9.sha256_text_file(path)
 
 
 if __name__ == "__main__":

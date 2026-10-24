@@ -111,7 +111,12 @@ def sha256_file(path: Path) -> str:
 
 
 def sha256_text_file(path: Path) -> str:
-    return sha256_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
+    """Hash LF text while accepting only a uniform CRLF checkout conversion."""
+    payload = path.read_bytes()
+    without_crlf = payload.replace(b"\r\n", b"")
+    if b"\r" in without_crlf or (b"\r\n" in payload and b"\n" in without_crlf):
+        raise ValueError(f"text artifact has unsupported or mixed line endings: {path}")
+    return sha256_bytes(payload.replace(b"\r\n", b"\n"))
 
 
 def canonical(value: Any) -> str:
@@ -498,7 +503,7 @@ def compare_capture_with_durable_roots_v9(
     if CAPTURE_ROOTS_PATH.exists():
         raise QualificationV9Failure("v9 volatile-root snapshot path already exists; refuse overwrite")
     runner.atomic_json(CAPTURE_ROOTS_PATH, capture_root_snapshots_record_v9(roots))
-    snapshot_sha256 = sha256_file(CAPTURE_ROOTS_PATH)
+    snapshot_sha256 = sha256_text_file(CAPTURE_ROOTS_PATH)
     report = compare_capture_run_v9(
         result, roots, history, **kwargs,
     )
@@ -508,7 +513,7 @@ def compare_capture_with_durable_roots_v9(
 def capture_root_snapshot_sha256_v9() -> str | None:
     """Return the durable snapshot digest even when comparison raises."""
     try:
-        return sha256_file(CAPTURE_ROOTS_PATH) if CAPTURE_ROOTS_PATH.is_file() else None
+        return sha256_text_file(CAPTURE_ROOTS_PATH) if CAPTURE_ROOTS_PATH.is_file() else None
     except OSError:
         return None
 
@@ -746,8 +751,8 @@ def _base_prior_v9_ledger() -> dict[str, Any]:
         or engineering_1_report.get("status") != "PASS"
         or engineering_1_report.get("history_event_count") != 111
         or engineering_1_report.get("captured_root_count") != 39
-        or engineering_1_report.get("history_sha256") != sha256_file(ENGINEERING_1_CAPTURE_HISTORY_PATH)
-        or engineering_1_report.get("root_snapshots_sha256") != sha256_file(ENGINEERING_1_CAPTURE_ROOTS_PATH)
+        or engineering_1_report.get("history_sha256") != sha256_text_file(ENGINEERING_1_CAPTURE_HISTORY_PATH)
+        or engineering_1_report.get("root_snapshots_sha256") != sha256_text_file(ENGINEERING_1_CAPTURE_ROOTS_PATH)
         or abs(actual_builder - expected_builder - 120.0) > 1e-6
         or abs(actual_native - expected_native - 60.0) > 1e-6
     ):
@@ -1408,7 +1413,7 @@ def capture_source_history_v9(*, reviewed_source_sha: str, reviewer_pass_referen
             "event_count": len(history),
             "events": history,
         })
-        report["history_sha256"] = sha256_file(CAPTURE_HISTORY_PATH)
+        report["history_sha256"] = sha256_text_file(CAPTURE_HISTORY_PATH)
         report["status"] = report["status"] if report.get("status") == "PASS" else "FAIL_SOURCE_HISTORY_CAPTURE_PARITY"
         if adapter is not None:
             adapter.close()
@@ -1534,10 +1539,10 @@ def fresh_process_prefix_parity_v9() -> dict[str, Any]:
         or history_record.get("code_source_commit") != lock.get("code_source_commit")
         or history_record.get("event_count") != len(history_record.get("events", []))
         or len(history_record.get("events", [])) != capture_report.get("history_event_count")
-        or sha256_file(CAPTURE_HISTORY_PATH) != capture_report.get("history_sha256")
+        or sha256_text_file(CAPTURE_HISTORY_PATH) != capture_report.get("history_sha256")
         or capture_report.get("source_lock_sha256") != sha256_text_file(v9_engineering_1.LOCK_PATH)
         or capture_report.get("root_snapshots_path") != ENGINEERING_1_CAPTURE_ROOTS_PATH.relative_to(STUDY).as_posix()
-        or capture_report.get("root_snapshots_sha256") != sha256_file(ENGINEERING_1_CAPTURE_ROOTS_PATH)
+        or capture_report.get("root_snapshots_sha256") != sha256_text_file(ENGINEERING_1_CAPTURE_ROOTS_PATH)
         or capture_attempt.get("status") != "COMPLETE"
         or capture_attempt.get("report_status") != "PASS"
         or capture_attempt.get("source_lock_sha256") != sha256_text_file(v9_engineering_1.LOCK_PATH)
@@ -1611,7 +1616,7 @@ def fresh_process_prefix_parity_v9() -> dict[str, Any]:
             "runtime_identity": prepared["runtime"],
             "native_module_path": str(module_path),
             "native_module_sha256": module_hash,
-            "history_sha256": sha256_file(CAPTURE_HISTORY_PATH),
+            "history_sha256": sha256_text_file(CAPTURE_HISTORY_PATH),
             "replayed_transition_count": len(witnesses),
             "required_transition_count": len(config["gate_c_transition_pairs"]),
             "witnesses": witnesses,
