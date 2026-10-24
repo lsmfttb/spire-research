@@ -512,10 +512,20 @@ def root_collection_ready(roots: Sequence[Mapping[str, Any]], live_ids: set[str]
 
 def load_roots(live_by_id: Mapping[str, Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
     live_by_id = live_by_id or {}
+    accepted_config_hashes = {CONFIG_SHA}
+    historical_hashes = CONFIG.get("identity", {}).get("historical_root_config_sha256s", [])
+    if not isinstance(historical_hashes, list) or any(
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+        for value in historical_hashes
+    ):
+        raise Stage0Failure("historical root config lock list is malformed")
+    accepted_config_hashes.update(historical_hashes)
     rows: list[dict[str, Any]] = []
     for path in sorted((OUT / "roots").glob("root-*.json")):
         v = json.loads(path.read_text(encoding="utf-8"))
-        if v.get("config_sha256") != CONFIG_SHA: raise Stage0Failure(f"{path.name} config lock mismatch")
+        if v.get("config_sha256") not in accepted_config_hashes: raise Stage0Failure(f"{path.name} config lock mismatch")
         cp_record = v.get("native_checkpoint", {})
         cp = None
         if cp_record.get("status") == "SERIALIZED_AND_ROUNDTRIPPED":
