@@ -1,0 +1,27 @@
+{
+  "attempt_key": "builder-gate-a-requalification-v4-startup-preflight-v5",
+  "failure": {
+    "error": "root-173730001-0000.json config lock mismatch",
+    "error_type": "Stage0Failure",
+    "traceback": "Traceback (most recent call last):\n  File \"/mnt/d/bld73d/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v4/attempts/run_gate_a_v5.py\", line 224, in run_preflight\n    inputs = verify_gate_a_inputs(lock)\n  File \"/mnt/d/bld73d/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v4/attempts/run_gate_a_v5.py\", line 174, in verify_gate_a_inputs\n    roots = stage0.load_roots()\n  File \"/mnt/d/bld73d/studies/issue-73-privileged-noncombat-oracle-stage0/stage0.py\", line 518, in load_roots\n    if v.get(\"config_sha256\") != CONFIG_SHA: raise Stage0Failure(f\"{path.name} config lock mismatch\")\n                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nstage0.Stage0Failure: root-173730001-0000.json config lock mismatch\n"
+  },
+  "finished_at_utc": "2026-10-24T13:50:30Z",
+  "formal_seed_consumed": false,
+  "gate_a_invoked": false,
+  "measured_cpu": {
+    "children_system_seconds": 0.0,
+    "children_user_seconds": 0.0,
+    "process_tree_cpu_seconds": 4.626227,
+    "self_system_seconds": 0.800496,
+    "self_user_seconds": 3.825731
+  },
+  "measured_wall_seconds": 6.96745491027832,
+  "native_game_step_started": false,
+  "native_module_imported": false,
+  "optimizer_updated": false,
+  "schema_id": "issue73-gate-a-v4-startup-preflight-v5",
+  "source_lock_sha256": "302a151005da8d8ea821c745e54627d681982fb4854977a248fafab9f268b831",
+  "source_lock_verified": true,
+  "stage1_authorized": false,
+  "status": "FAIL_EXCEPTION"
+}
