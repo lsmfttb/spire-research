@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -71,6 +73,75 @@ class Stage0RootConfigProvenanceTests(unittest.TestCase):
     def test_rejects_unregistered_root_config_digest(self) -> None:
         with self.assertRaisesRegex(stage0.Stage0Failure, "config lock mismatch"):
             self.load_fixture("f" * 64)
+
+    def test_v13_followup_metadata_matches_gate_a_lock_and_wrapper(self) -> None:
+        preflight_lock_path = (
+            STUDY
+            / "receipts"
+            / "gate-a-requalification-v3-preflight"
+            / "source-lock-v13.json"
+        )
+        gate_a_snapshot_path = (
+            STUDY
+            / "receipts"
+            / "gate-a-requalification-v6"
+            / "source-lock-v13.json"
+        )
+        active_gate_a_lock_path = gate_a_snapshot_path.with_name("source-lock.json")
+        preflight_lock = json.loads(preflight_lock_path.read_text(encoding="utf-8"))
+        gate_a_snapshot = json.loads(gate_a_snapshot_path.read_text(encoding="utf-8"))
+        active_gate_a_lock = json.loads(active_gate_a_lock_path.read_text(encoding="utf-8"))
+
+        snapshot_path = "receipts/gate-a-requalification-v6/source-lock-v13.json"
+        self.assertEqual(preflight_lock["preflight_version"], 13)
+        self.assertEqual(preflight_lock["gate_a_source_lock_snapshot_path"], snapshot_path)
+        self.assertEqual(
+            gate_a_snapshot["preflight_source_lock_path"],
+            "receipts/gate-a-requalification-v3-preflight/source-lock-v13.json",
+        )
+        lock_sha256 = hashlib.sha256(
+            preflight_lock_path.read_bytes().replace(b"\r\n", b"\n")
+        ).hexdigest()
+        self.assertEqual(gate_a_snapshot["preflight_source_lock_sha256"], lock_sha256)
+        self.assertEqual(
+            active_gate_a_lock["preflight_source_lock_path"],
+            gate_a_snapshot["preflight_source_lock_path"],
+        )
+        self.assertEqual(active_gate_a_lock["preflight_source_lock_sha256"], lock_sha256)
+        self.assertEqual(active_gate_a_lock["attempt_key"], gate_a_snapshot["attempt_key"])
+        self.assertEqual(active_gate_a_lock["resource_reservation"], gate_a_snapshot["resource_reservation"])
+
+        reservation = gate_a_snapshot["resource_reservation"]
+        expected_followup = {
+            "attempt_key": gate_a_snapshot["attempt_key"],
+            "fixed_cpu_reservation_seconds": reservation["fixed_cpu_seconds"],
+            "status": reservation["status"],
+            "start_allowed_only_after_independent_review_pass": True,
+            "gate_a_native": False,
+            "formal_seed_consumed": False,
+            "stage1_authorized": False,
+        }
+        self.assertEqual(preflight_lock["gate_a_followup"], expected_followup)
+        self.assertEqual(
+            preflight_lock["attempt_key"],
+            gate_a_snapshot["preflight_attempt_key"],
+        )
+
+        wrapper = STUDY / gate_a_snapshot["execution_wrapper_path"]
+        wrapper_text = wrapper.read_text(encoding="utf-8")
+        attempt_path_match = re.search(
+            r'(?m)^attempt_path = ATTEMPT_ROOT / "attempts" / "([^"]+)"$',
+            wrapper_text,
+        )
+        self.assertIsNotNone(attempt_path_match)
+        self.assertEqual(
+            attempt_path_match.group(1),
+            Path(gate_a_snapshot["attempt_path"]).name,
+        )
+        self.assertIn(
+            f'source_lock.get("attempt_key") != "{gate_a_snapshot["attempt_key"]}"',
+            wrapper_text,
+        )
 
 
 if __name__ == "__main__":
