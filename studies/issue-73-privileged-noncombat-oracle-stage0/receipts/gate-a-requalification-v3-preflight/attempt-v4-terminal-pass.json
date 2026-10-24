@@ -1,0 +1,23 @@
+{
+  "schema_id": "issue73-gate-a-target-preflight-attempt-v1",
+  "key": "builder-gate-a-target-preflight-v4",
+  "status": "PASS_NONNATIVE_TARGET_SOURCE_PREFLIGHT",
+  "started_at_utc": "2026-10-24 11:44:06 UTC",
+  "finished_at_utc": "2026-10-24 11:46:54 UTC",
+  "source_branch": "codex/issue-73-crlf-target-hash",
+  "source_commit": "76bb864047da2b4a118dfb9877e0f4ad6062cde7",
+  "source_lock_sha256": "d42be6f8d2455daeb2348bf44b711a77675da3ae6dff3dffb2a59baaad5afbf3",
+  "reserved_cpu_seconds": 60,
+  "cpu_charged_seconds": 60,
+  "measured_process_cpu_seconds": 8.7,
+  "measurement_status": "FIXED RESERVATION CHARGED; NO REFUND",
+  "python_executable": "/home/lsmft/stsrl-spikes/py313-torch/bin/python3.13",
+  "python_version": "3.13.13",
+  "tests_passed": 3,
+  "tests_failed": 0,
+  "native_module_imported": false,
+  "native_game_step_started": false,
+  "optimizer_updates": 0,
+  "formal_seed_consumed": false,
+  "stage1_authorized": false
+}

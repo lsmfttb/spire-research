@@ -1,0 +1,103 @@
+{
+  "schema_id": "issue73-gate-a-target-preflight-report-v1",
+  "status": "PASS_PRELAUNCH_TARGET_IDENTITY_ROOT_MEMBERSHIP_AND_NO_UPDATE_BOUNDARY",
+  "execution_commit_sha": "76bb864047da2b4a118dfb9877e0f4ad6062cde7",
+  "source_lock_sha256": "d42be6f8d2455daeb2348bf44b711a77675da3ae6dff3dffb2a59baaad5afbf3",
+  "runtime": {
+    "python_executable": "/home/lsmft/stsrl-spikes/py313-torch/bin/python3.13",
+    "python_version": "3.13.13",
+    "native_module_pinned_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+    "native_module_imported": false,
+    "native_game_step_started": false
+  },
+  "target": {
+    "path": "gate-a-target-direction.json",
+    "raw_worktree_sha256": "a4e687d40e22e0d095599988db6758cfe26e6bc130d8dc084a6b72f08e0e1ffc",
+    "canonical_lf_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "configured_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "uniform_crlf_pairs": 1,
+    "uniform_crlf_and_lf_are_accepted": true,
+    "substantive_byte_change_rejected": true,
+    "bare_cr_rejected": true,
+    "mixed_line_endings_rejected": true
+  },
+  "root_membership": {
+    "input_root_count": 225,
+    "input_git_tree_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
+    "selected_root_count": 24,
+    "selected_root_ids": [
+      "root-173730001-0000",
+      "root-173730001-0001",
+      "root-173730001-0003",
+      "root-173730001-0004",
+      "root-173730001-0002",
+      "root-173730001-0005",
+      "root-173730001-0006",
+      "root-173730001-0007",
+      "root-173730001-0008",
+      "root-173730001-0009",
+      "root-173730001-0010",
+      "root-173730001-0011",
+      "root-173730001-0014",
+      "root-173730001-0015",
+      "root-173730001-0016",
+      "root-173730001-0018",
+      "root-173730001-0019",
+      "root-173730001-0020",
+      "root-173730001-0021",
+      "root-173730001-0022",
+      "root-173730001-0025",
+      "root-173730001-0026",
+      "root-173730001-0027",
+      "root-173730001-0028"
+    ],
+    "exact_match_to_immutable_v2_gate_a_selection": true
+  },
+  "no_update_boundary": {
+    "negative_mutation_invoked_run_gate_a": true,
+    "expected_hash_failure_precedes_policy_construction": true,
+    "optimizer_spy_calls": 0,
+    "policy_constructor_calls": 0,
+    "output_directory_created": false,
+    "gradient_updates": 0,
+    "formal_seed_consumed": false
+  },
+  "focused_tests": {
+    "command": "python3.13 -m unittest -v test_gate_a_target_direction (from study directory)",
+    "passed": 3,
+    "failed": 0,
+    "wall_reported_by_unittest_seconds": 4.289,
+    "process_user_cpu_seconds": 6.69,
+    "process_system_cpu_seconds": 2.01,
+    "process_cpu_seconds": 8.7,
+    "output_path": "receipts/gate-a-requalification-v3-preflight/test-output-v4.txt"
+  },
+  "historical_failed_v3_attempt": {
+    "key": "builder-gate-a-target-preflight-v3",
+    "charged_cpu_seconds": 60,
+    "failure_receipt_retained": true
+  },
+  "resource_status": {
+    "builder_charge_before_v3_cpu_seconds": 3331.610134,
+    "builder_charge_after_v3_and_v4_cpu_seconds": 3451.610134,
+    "native_gate_bc_charge_cpu_seconds": 1580,
+    "gate_a_reservation_remaining_cpu_seconds": 120,
+    "remaining_fixed_native_gate_c_work_cpu_seconds": 1300,
+    "remaining_native_contingency_cpu_seconds": 100,
+    "projected_builder_total_cpu_seconds": 4971.610134,
+    "projected_native_gate_bc_total_cpu_seconds": 2980,
+    "protected_reviewer_reserve_cpu_seconds": 2000,
+    "projected_all_in_cpu_seconds": 6971.610134,
+    "ceilings_cpu_seconds": {
+      "builder": 10000,
+      "aggregate": 12000,
+      "native_gate_bc": 6000,
+      "reviewer_reserve_minimum": 2000
+    },
+    "within_all_ceilings": true
+  },
+  "gate_a_execution_allowed": false,
+  "independent_reviewer_pass_required_before_new_gate_a_attempt": true,
+  "stage1_authorized": false,
+  "code_disposition": "STUDY_ONLY"
+}
