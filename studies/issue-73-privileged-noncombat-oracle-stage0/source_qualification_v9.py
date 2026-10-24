@@ -67,7 +67,7 @@ SOURCE_HASH_NAMES = tuple(sorted(set(v7.SOURCE_HASH_PATHS_V7) | {
     "test_source_history_capture_v8.py",
     "source_qualification_v9.py",
     "test_source_history_capture_v9.py",
-})))
+}))
 
 
 class QualificationV9Failure(RuntimeError):
