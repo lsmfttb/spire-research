@@ -1,0 +1,160 @@
+{
+  "schema_id": "issue73-gate-a-requalification-source-lock-v1",
+  "lock_revision": 3,
+  "status": "LOCKED_BEFORE_GATE_A_REQUALIFICATION_V3",
+  "locked_at_utc": "2026-10-24T12:16:04Z",
+  "execution_branch": "codex/issue-73-gatea-requalification-v3",
+  "remote_parent_branch": "codex/issue-73-crlf-target-hash",
+  "remote_parent_sha": "fe46d2ec79baded9e01bd04cf9d03d6614410c16",
+  "locked_code_source_commit": "fe46d2ec79baded9e01bd04cf9d03d6614410c16",
+  "source_files_git_blob_ids": [
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.json",
+      "git_blob_sha1": "f453a3fc15a015b0569a7e20bc4e2d2074d7edc5"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.lock.sha256",
+      "git_blob_sha1": "c9eab759d4985ccc682823695059e7955cb40165"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate_a.py",
+      "git_blob_sha1": "9aff1cd73b9d10299ba4a299af4458f8fbf7cfac"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/test_gate_a_target_direction.py",
+      "git_blob_sha1": "f22fe4238cb137908dda893b50826292dfa9336e"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/source_lock_integrity.py",
+      "git_blob_sha1": "5aeeab8d4746edf0c5d0c76eb14ccb72a92a436d"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
+      "git_blob_sha1": "398dd982bd6610a134dde57ada7d75dd0f9f24ec"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
+      "git_blob_sha1": "eebdb40a206dbfc48f4fb171c03670634593fe01"
+    },
+    {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate-a-target-direction.json",
+      "git_blob_sha1": "f4589a942207760866f0bab4d04a46dfcc70431e"
+    }
+  ],
+  "config_sha256": "aabc860fb767dfd5530eda6c55aff0e97607322d79315e8d87bc399643efb358",
+  "study_source_sha256": {
+    ".gitignore": "f020e1078fae512ca68fcb3a78a3db1cee7c1ded84a0ee507117ea6217ad5042",
+    "gate-a-target-direction.json": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "gate_a.py": "f85baf3499022c75637e7d7f35e9e824a0741ec3b087d067de7353badaa2dfa6",
+    "policy.py": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
+    "public_history_execution.py": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+    "runner.py": "a363d68b99092e8d9ab371c05cbb839ac48cb28b398505fcc8691f8458a1ff9b",
+    "stage0.py": "ba6a390325e50fdc808cf066124662f1f680c382e4ac77b1e58348b4254c0fb3"
+  },
+  "preflight_source_lock_v4_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v4.json",
+  "preflight_source_lock_v4_sha256": "d42be6f8d2455daeb2348bf44b711a77675da3ae6dff3dffb2a59baaad5afbf3",
+  "preflight_pass_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6383966245",
+  "root_input_tree": {
+    "git_tree_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
+    "path": "receipts/stage0/roots",
+    "file_count": 225
+  },
+  "root_source": {
+    "stage0_evidence_manifest_sha256": "7e73685c72307bc5a36cb02f3a56884bc75680accd7da7b37709a395da09a13b",
+    "stage0_report_sha256": "1dd5c0458a881328e48ec332d7baf7b9209037ffda7703ab27e3a51df7d9ca24",
+    "selected_root_count": 24
+  },
+  "root_selection": {
+    "selected_root_ids": [
+      "root-173730001-0000",
+      "root-173730001-0001",
+      "root-173730001-0003",
+      "root-173730001-0004",
+      "root-173730001-0002",
+      "root-173730001-0005",
+      "root-173730001-0006",
+      "root-173730001-0007",
+      "root-173730001-0008",
+      "root-173730001-0009",
+      "root-173730001-0010",
+      "root-173730001-0011",
+      "root-173730001-0014",
+      "root-173730001-0015",
+      "root-173730001-0016",
+      "root-173730001-0018",
+      "root-173730001-0019",
+      "root-173730001-0020",
+      "root-173730001-0021",
+      "root-173730001-0022",
+      "root-173730001-0025",
+      "root-173730001-0026",
+      "root-173730001-0027",
+      "root-173730001-0028"
+    ],
+    "selection_rule": "gate_a.select_corpus: sorted by owner seed and decision index; first occurrence of each of the first four screen families, then first 24 unique root IDs; fixed synthetic target only",
+    "selected_screen_families": [
+      "CARD_SELECT",
+      "EVENT_SCREEN",
+      "MAP_SCREEN",
+      "REST_ROOM",
+      "REWARDS",
+      "TREASURE_ROOM"
+    ],
+    "live_binding_validation_passed": true
+  },
+  "target": {
+    "direction_file": "gate-a-target-direction.json",
+    "direction_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "target_reselected": false,
+    "uniform_lf_or_crlf_only": true,
+    "substantive_change_rejected": true
+  },
+  "gate_contract": {
+    "required_root_count": 24,
+    "minimum_screen_family_count": 4,
+    "updates_per_encoding": 64,
+    "total_gradient_updates_max": 128,
+    "minimum_tv_fraction": 0.8,
+    "cpu_reserve_seconds": 120,
+    "native_execution": false,
+    "formal_seed_consumed": false,
+    "stage1_authorized": false
+  },
+  "execution_wrapper_path": "receipts/gate-a-requalification-v3/attempts/run_gate_a_v3.py",
+  "execution_wrapper_sha256": "9421002abf5592117a685ede6b636534587d5508d033fe518f1a5f8f9f3e84ed",
+  "output_directory": "receipts/gate-a-requalification-v3/outputs",
+  "attempt_key": "gate-a-requalification-after-v9-parity-v3",
+  "attempt_path": "receipts/gate-a-requalification-v3/attempts/gate-a-requalification-after-v9-parity-v3.json",
+  "parent_resource_ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v4.json",
+  "parent_resource_ledger_sha256": "5b7e1f271000a70c294fcfecf000c2baad635e29170e6d1e8096a14f647ddcf5",
+  "parent_builder_charge_cpu_seconds": 3451.610134,
+  "parent_native_charge_cpu_seconds": 1580.0,
+  "new_fixed_reservation_cpu_seconds": 120.0,
+  "projected_builder_after_attempt_and_fixed_native_work_cpu_seconds": 4971.610134,
+  "projected_native_gate_bc_cpu_seconds": 2980.0,
+  "projected_all_in_including_reviewer_reserve_cpu_seconds": 6971.610134,
+  "ceilings": {
+    "builder_cpu_seconds": 10000,
+    "native_gate_bc_cpu_seconds": 6000,
+    "aggregate_cpu_seconds": 12000,
+    "protected_reviewer_cpu_seconds": 2000
+  },
+  "planner_authorization_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6383403713",
+  "latest_resource_ceiling_amendment_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6383443034",
+  "formal_seed_consumed": false,
+  "native_module_import_required": false,
+  "native_game_step_allowed": false,
+  "stage1_authorized": false,
+  "execution_runtime": {
+    "python_executable": "/home/lsmft/stsrl-spikes/py313-torch/bin/python3.13",
+    "python": "3.13.13",
+    "numpy": "2.4.6",
+    "torch": "2.12.0+cpu",
+    "execution_user": "WSL root; previous non-root task-worktree permission failure is terminal and preserved",
+    "task_worktree_wsl_path": "/mnt/d/bld73a",
+    "tmp_cache_output_paths": "All within this task worktree",
+    "native_module_sha256": null,
+    "native_module_imported": false,
+    "native_game_step_started": false
+  }
+}
