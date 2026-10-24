@@ -1,0 +1,116 @@
+{
+  "schema_id": "issue73-gate-a-root-config-provenance-preflight-report-v1",
+  "status": "INVALID_SOURCE_LOCK_NORMALIZED_TEXT_HASH",
+  "attempt_key": "builder-gate-a-root-config-provenance-preflight-v10",
+  "source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v10.json",
+  "source_lock_sha256": "47f9e9047f990620f7317be6a755e13cc2de58217714c869702fdd075598d6c4",
+  "source_lock_git_blob_sha1": "d42e4bb4e09b1c6a1fa3ec44bf35629ce077a8d1",
+  "source_code_commit": "2526b37b0ea3f32d51fb1876bda8e1e613a7e9a1",
+  "execution_commit": "68b2e0f01c662ccf28994127ce9f3c6737605e39",
+  "attempt_terminal_receipt_path": "receipts/gate-a-requalification-v3-preflight/attempt-v10-terminal-invalid-lock.json",
+  "attempt_terminal_receipt_sha256": "34c3fca2139ad7f9c8a37e92d08e924dfe08877c46fe9363c398711db53e8f7b",
+  "preflight_output": {
+    "path": "receipts/gate-a-requalification-v3-preflight/test-output-v10.txt",
+    "sha256": "8f68cd5433f4990bb2353e2ef2fdec730ce3d821908feaaf70ee2bf54e3fe136",
+    "exit_code": 0,
+    "test_count": 9,
+    "tests_passed": 9,
+    "test_suite_elapsed_seconds": 1.291,
+    "status": "PRELAUNCH_PASS",
+    "config_sha256": "87dcc49507eb23b1a9430f520836226a5a5db3eaa5d4231a470fb06ac220d2c4",
+    "root_producer_config_sha256": "3393c326e62b3f2ef15883de95ddc6ca9379c4ca7008fd35251fc57292e1e76c",
+    "root_count": 225,
+    "selected_root_count": 24,
+    "native_module_imported": false,
+    "native_game_step_started": false,
+    "formal_seed_consumed": false,
+    "stage1_authorized": false
+  },
+  "gate_a_source_lock_input": {
+    "path": "receipts/gate-a-requalification-v6/source-lock.json",
+    "sha256": "c1281955a7f64abe36d7d95ca8371e4c8a81cbdf89e200895ba3f558cc528e07",
+    "git_blob_sha1": "b05eaee3a540d7eded2a9cae0da37e63ed0834e6",
+    "source_lock_commit": "0225e0a3947d4699607f63258248584aca5b66ee",
+    "root_selection_schema": "ordered JSON array of 24 root IDs"
+  },
+  "runtime": {
+    "python_executable": "/home/lsmft/stsrl-spikes/py313-torch/bin/python3.13",
+    "python_version": "3.13.13",
+    "numpy_version": "2.4.6",
+    "torch_version": "2.12.0+cpu",
+    "user": "root",
+    "runtime_pins_checked_by_wrapper": true
+  },
+  "cpu_accounting": {
+    "reserved_cpu_seconds": 60.0,
+    "charged_cpu_seconds": 60.0,
+    "measured_process_tree_cpu_seconds": null,
+    "measurement_note": "Process-tree CPU was not captured by the one-shot shell; the fixed 60 CPU-s reservation is fully charged without refund.",
+    "builder_charge_before_cpu_seconds": 4171.610134,
+    "builder_charge_after_cpu_seconds": 4231.610134,
+    "native_gate_bc_charge_cpu_seconds": 1580.0,
+    "projected_builder_total_cpu_seconds": 5751.610134,
+    "projected_native_gate_bc_cpu_seconds": 2980.0,
+    "protected_reviewer_reserve_cpu_seconds": 2000.0,
+    "projected_aggregate_cpu_seconds": 7751.610134,
+    "builder_hard_ceiling_cpu_seconds": 10000.0,
+    "native_gate_bc_hard_ceiling_cpu_seconds": 6000.0,
+    "aggregate_hard_ceiling_cpu_seconds": 12000.0,
+    "within_registered_ceilings": true
+  },
+  "previous_attempt": {
+    "key": "builder-gate-a-root-config-provenance-preflight-v8",
+    "status": "FAIL_PRELAUNCH_ROOT_SELECTION_LOCK_SCHEMA",
+    "charged_cpu_seconds": 60.0,
+    "terminal_report_sha256": "bfa85af0bb0a62460e1a9e035f4b5ad353cd6c46554d3f92e722626d760bca08",
+    "resource_ledger_sha256": "2307b78ee10abd87e7234c38f52726c3bf6fdb8489fd193cd0a76c4b447418ef"
+  },
+  "gate_a_followup": {
+    "attempt_key": "gate-a-requalification-after-v9-parity-v6",
+    "status": "NOT_STARTED_AWAITING_CORRECTED_LOCK_AND_INDEPENDENT_REVIEW",
+    "fixed_reservation_cpu_seconds": 120,
+    "precharge_created": false,
+    "gate_a_invoked": false,
+    "formal_seed_consumed": false,
+    "stage1_authorized": false
+  },
+  "disposition": "STUDY_ONLY",
+  "finished_at_utc": "2026-10-24T15:30:59Z",
+  "previous_attempt_v8": {
+    "key": "builder-gate-a-root-config-provenance-preflight-v8",
+    "status": "FAIL_PRELAUNCH_ROOT_SELECTION_LOCK_SCHEMA",
+    "charged_cpu_seconds": 60.0,
+    "terminal_report_sha256": "bfa85af0bb0a62460e1a9e035f4b5ad353cd6c46554d3f92e722626d760bca08",
+    "resource_ledger_sha256": "2307b78ee10abd87e7234c38f52726c3bf6fdb8489fd193cd0a76c4b447418ef"
+  },
+  "previous_attempt_v9": {
+    "key": "builder-gate-a-root-config-provenance-preflight-v9",
+    "status": "PASS_PINNED_RUNTIME_SOURCE_ROOT_AND_NEGATIVE_PREFLIGHT",
+    "charged_cpu_seconds": 60.0,
+    "terminal_report_sha256": "2b56dc3e1f4cff5c8c13d8ae708178aefa6543c499e3115f2ba11621ea591cb1",
+    "resource_ledger_sha256": "68cb99fcd66483d7742b8f57f8d3ed94910430425bab57a18d96eba2ed84286b"
+  },
+  "cumulative_resource_reconciliation": {
+    "path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-reconciliation-v1.json",
+    "sha256": "34bd6baedf9b3b99e807213a39e300b5a6bdce7cfce83591addde386f04bc479",
+    "attempted_cpu_seconds_in_reconciliation": 480.0,
+    "builder_charge_before_v10_cpu_seconds": 4171.610134,
+    "builder_charge_after_v10_cpu_seconds": 4231.610134
+  },
+  "source_lock_validation": {
+    "source_code_commit": "2526b37b0ea3f32d51fb1876bda8e1e613a7e9a1",
+    "git_blob_ids_matched": 13,
+    "locked_file_count": 13,
+    "normalized_text_hashes_matched": 12,
+    "mismatch": {
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py",
+      "locked_normalized_text_sha256": "4d4ba76edde2ea90fa0ada942c1a187630a449f47f2d215c28ecdbbb505494ed",
+      "observed_normalized_text_sha256": "c61c5ee1b64fe2f55dbe078f255585023eaa0db45bf8e25c6b2ff315306656bb"
+    },
+    "valid_for_independent_review": false,
+    "note": "Pinned tests and --preflight-only passed, but post-run lock audit found one stale normalized text hash; preserve output and full 60 CPU-s charge, repair with unique v11 lock."
+  },
+  "preflight_checkout_head": "68b2e0f01c662ccf28994127ce9f3c6737605e39",
+  "precharge_commit": "68b2e0f01c662ccf28994127ce9f3c6737605e39",
+  "started_resource_ledger_execution_commit_as_recorded": "0225e0a3947d4699607f63258248584aca5b66ee"
+}
