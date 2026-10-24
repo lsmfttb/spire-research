@@ -74,30 +74,23 @@ class Stage0RootConfigProvenanceTests(unittest.TestCase):
         with self.assertRaisesRegex(stage0.Stage0Failure, "config lock mismatch"):
             self.load_fixture("f" * 64)
 
-    def test_v13_followup_metadata_matches_gate_a_lock_and_wrapper(self) -> None:
-        preflight_lock_path = (
-            STUDY
-            / "receipts"
-            / "gate-a-requalification-v3-preflight"
-            / "source-lock-v13.json"
-        )
-        gate_a_snapshot_path = (
-            STUDY
-            / "receipts"
-            / "gate-a-requalification-v6"
-            / "source-lock-v13.json"
-        )
-        active_gate_a_lock_path = gate_a_snapshot_path.with_name("source-lock.json")
+    def test_current_followup_metadata_matches_gate_a_lock_and_wrapper(self) -> None:
+        gate_root = STUDY / "receipts" / "gate-a-requalification-v6"
+        preflight_root = STUDY / "receipts" / "gate-a-requalification-v3-preflight"
+        active_gate_a_lock_path = gate_root / "source-lock.json"
+        active_gate_a_lock = json.loads(active_gate_a_lock_path.read_text(encoding="utf-8"))
+        preflight_version = active_gate_a_lock["preflight_version"]
+        preflight_lock_path = preflight_root / f"source-lock-v{preflight_version}.json"
+        gate_a_snapshot_path = gate_root / f"source-lock-v{preflight_version}.json"
         preflight_lock = json.loads(preflight_lock_path.read_text(encoding="utf-8"))
         gate_a_snapshot = json.loads(gate_a_snapshot_path.read_text(encoding="utf-8"))
-        active_gate_a_lock = json.loads(active_gate_a_lock_path.read_text(encoding="utf-8"))
+        snapshot_path = f"receipts/gate-a-requalification-v6/source-lock-v{preflight_version}.json"
 
-        snapshot_path = "receipts/gate-a-requalification-v6/source-lock-v13.json"
-        self.assertEqual(preflight_lock["preflight_version"], 13)
+        self.assertEqual(preflight_lock["preflight_version"], preflight_version)
         self.assertEqual(preflight_lock["gate_a_source_lock_snapshot_path"], snapshot_path)
         self.assertEqual(
             gate_a_snapshot["preflight_source_lock_path"],
-            "receipts/gate-a-requalification-v3-preflight/source-lock-v13.json",
+            f"receipts/gate-a-requalification-v3-preflight/source-lock-v{preflight_version}.json",
         )
         lock_sha256 = hashlib.sha256(
             preflight_lock_path.read_bytes().replace(b"\r\n", b"\n")
@@ -110,6 +103,7 @@ class Stage0RootConfigProvenanceTests(unittest.TestCase):
         self.assertEqual(active_gate_a_lock["preflight_source_lock_sha256"], lock_sha256)
         self.assertEqual(active_gate_a_lock["attempt_key"], gate_a_snapshot["attempt_key"])
         self.assertEqual(active_gate_a_lock["resource_reservation"], gate_a_snapshot["resource_reservation"])
+        self.assertEqual(active_gate_a_lock["source_code_commit"], gate_a_snapshot["source_code_commit"])
 
         reservation = gate_a_snapshot["resource_reservation"]
         expected_followup = {
