@@ -1,89 +1,31 @@
 {
-  "schema_id": "issue73-gate-a-requalification-source-lock-v1",
-  "lock_key": "builder-gate-a-requalification-after-v12-parity-v6-resource-reconciliation-v1",
-  "status": "LOCKED_V12_PREFLIGHT_PASS_AWAITING_INDEPENDENT_REVIEW",
-  "locked_at_utc": "2026-10-24T15:50:10Z",
-  "execution_branch": "codex/issue-73-root-config-provenance-v1",
-  "remote_parent_branch": "codex/issue-73-root-config-provenance-v1",
-  "remote_parent_sha": "2526b37b0ea3f32d51fb1876bda8e1e613a7e9a1",
-  "source_code_commit": "2526b37b0ea3f32d51fb1876bda8e1e613a7e9a1",
+  "attempt_key": "gate-a-requalification-after-v9-parity-v6",
+  "attempt_path": "receipts/gate-a-requalification-v6/attempts/gate-a-requalification-after-v9-parity-v6.json",
+  "builder_charge_after_v10_preflight_cpu_seconds": 4231.610134,
+  "builder_charge_after_v11_preflight_cpu_seconds": 4291.610134,
+  "builder_charge_after_v12_preflight_cpu_seconds": 4351.610134,
+  "builder_charge_after_v13_preflight_cpu_seconds": 4411.610134,
   "config_sha256": "87dcc49507eb23b1a9430f520836226a5a5db3eaa5d4231a470fb06ac220d2c4",
-  "study_source_sha256": {
-    ".gitignore": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234",
-    "gate-a-target-direction.json": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
-    "gate_a.py": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283",
-    "policy.py": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
-    "public_history_execution.py": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
-    "runner.py": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497",
-    "stage0.py": "57fbc5f688aa82cfb8799bb6397a32c5e29641dc04762237e3e73e8ed3769472"
+  "cumulative_builder_charge_cpu_seconds": 4351.610134,
+  "cumulative_resource_reconciliation_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-reconciliation-v1.json",
+  "cumulative_resource_reconciliation_sha256": "34bd6baedf9b3b99e807213a39e300b5a6bdce7cfce83591addde386f04bc479",
+  "disposition": "STUDY_ONLY",
+  "execution_branch": "codex/issue-73-root-config-provenance-v2",
+  "execution_wrapper_path": "receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py",
+  "execution_wrapper_sha256": "c61c5ee1b64fe2f55dbe078f255585023eaa0db45bf8e25c6b2ff315306656bb",
+  "gate_contract": {
+    "cpu_reserve_seconds": 120,
+    "formal_seed_consumed": false,
+    "minimum_screen_family_count": 4,
+    "minimum_tv_fraction": 0.8,
+    "native_execution": false,
+    "required_root_count": 24,
+    "stage1_authorized": false,
+    "total_gradient_updates_max": 128,
+    "updates_per_encoding": 64
   },
-  "source_files_git_blob_ids": [
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/.gitignore",
-      "git_blob_sha1": "420529e779c50c0a16bf1f3a8268a15d14d43f00",
-      "normalized_text_sha256": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.json",
-      "git_blob_sha1": "570783d3e11478bd78a977df3c635f7113355c6d",
-      "normalized_text_sha256": "87dcc49507eb23b1a9430f520836226a5a5db3eaa5d4231a470fb06ac220d2c4"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.lock.sha256",
-      "git_blob_sha1": "c088c6e6f5cf30faec9a07320480ae5f703727d8",
-      "normalized_text_sha256": "27b3712e83e40f54618109882f9c56f2b8700261cc627c43cdbb448e35fa28e9"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate-a-target-direction.json",
-      "git_blob_sha1": "f4589a942207760866f0bab4d04a46dfcc70431e",
-      "normalized_text_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate_a.py",
-      "git_blob_sha1": "9aff1cd73b9d10299ba4a299af4458f8fbf7cfac",
-      "normalized_text_sha256": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
-      "git_blob_sha1": "eebdb40a206dbfc48f4fb171c03670634593fe01",
-      "normalized_text_sha256": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/public_history_execution.py",
-      "git_blob_sha1": "c80074a8b5b45773d1e4b5bd54fdd8c1ccaedab8",
-      "normalized_text_sha256": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
-      "git_blob_sha1": "398dd982bd6610a134dde57ada7d75dd0f9f24ec",
-      "normalized_text_sha256": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/stage0.py",
-      "git_blob_sha1": "a5cdf137021b7b9ff107b68d43c476e69776c39d",
-      "normalized_text_sha256": "57fbc5f688aa82cfb8799bb6397a32c5e29641dc04762237e3e73e8ed3769472"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/source_lock_integrity.py",
-      "git_blob_sha1": "5aeeab8d4746edf0c5d0c76eb14ccb72a92a436d",
-      "normalized_text_sha256": "ddea1b01c915799d9e5c81cdf5097ae413a610868cf5c89f9e8cad09098c2cc0"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/test_gate_a_target_direction.py",
-      "git_blob_sha1": "d6c1f96ed46ca2a9ff0800a33263c3003b736ad1",
-      "normalized_text_sha256": "4bca321be01c326bec16f62f1a7b83cfc6d0199ca73759befe53fa49c52384a6"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/test_stage0_root_config_provenance.py",
-      "git_blob_sha1": "4f8bde45422e28d95a9d66cc95a0d03cecd67b86",
-      "normalized_text_sha256": "eb4a5e7728cb9c2d3a41c3383370ec4560cc27818c885487ebbb518464f327a4"
-    },
-    {
-      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py",
-      "git_blob_sha1": "ff8514b3d3bbebbe963ee9101c633c77ebef78e8",
-      "normalized_text_sha256": "4d4ba76edde2ea90fa0ada942c1a187630a449f47f2d215c28ecdbbb505494ed"
-    }
-  ],
+  "lock_key": "builder-gate-a-requalification-after-v13-parity-v6-resource-reconciliation-v2",
+  "locked_at_utc": "2026-10-24T16:43:28Z",
   "locked_text_files_sha256": {
     ".gitignore": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234",
     "config.json": "87dcc49507eb23b1a9430f520836226a5a5db3eaa5d4231a470fb06ac220d2c4",
@@ -92,24 +34,142 @@
     "gate_a.py": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283",
     "policy.py": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
     "public_history_execution.py": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+    "receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py": "c61c5ee1b64fe2f55dbe078f255585023eaa0db45bf8e25c6b2ff315306656bb",
     "runner.py": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497",
-    "stage0.py": "57fbc5f688aa82cfb8799bb6397a32c5e29641dc04762237e3e73e8ed3769472",
     "source_lock_integrity.py": "ddea1b01c915799d9e5c81cdf5097ae413a610868cf5c89f9e8cad09098c2cc0",
+    "stage0.py": "57fbc5f688aa82cfb8799bb6397a32c5e29641dc04762237e3e73e8ed3769472",
     "test_gate_a_target_direction.py": "4bca321be01c326bec16f62f1a7b83cfc6d0199ca73759befe53fa49c52384a6",
-    "test_stage0_root_config_provenance.py": "eb4a5e7728cb9c2d3a41c3383370ec4560cc27818c885487ebbb518464f327a4",
-    "receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py": "c61c5ee1b64fe2f55dbe078f255585023eaa0db45bf8e25c6b2ff315306656bb"
+    "test_stage0_root_config_provenance.py": "eb4a5e7728cb9c2d3a41c3383370ec4560cc27818c885487ebbb518464f327a4"
   },
-  "execution_wrapper_path": "receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py",
-  "execution_wrapper_sha256": "c61c5ee1b64fe2f55dbe078f255585023eaa0db45bf8e25c6b2ff315306656bb",
+  "parent_resource_ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v12.json",
+  "parent_resource_ledger_sha256": "46f4b1f369d1ee118c503af857ff85b4902f85b038109cc88580d53e0459f4ec",
+  "preflight_attempt_key": "builder-gate-a-root-config-provenance-preflight-v13",
+  "preflight_report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v13.json",
+  "preflight_report_sha256": "PENDING_V13_PREFLIGHT",
+  "preflight_report_v9_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v9.json",
+  "preflight_report_v9_sha256": "2b56dc3e1f4cff5c8c13d8ae708178aefa6543c499e3115f2ba11621ea591cb1",
+  "preflight_source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v13.json",
+  "preflight_source_lock_sha256": "829c805482ad7b4ede0951cdd774dca15902d64559e83b17fbcfdd10950b64b9",
+  "preflight_source_lock_v9_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v9.json",
+  "preflight_source_lock_v9_sha256": "e8907e9ce1c49b3f103a1457c4b8e48ab8c98158af13983796a3039d980e958a",
+  "preflight_status": "LOCKED_PROSPECTIVE_V13_PINNED_RUNTIME_PREFLIGHT",
+  "preflight_version": 13,
+  "previous_gate_a_source_lock_snapshot": {
+    "path": "receipts/gate-a-requalification-v6/source-lock-v12.json",
+    "sha256": "64bf7a318f8023b5c7296bc62100d533b0388f4ef112e9020108cde46b775e9a",
+    "source_code_commit": "2526b37b0ea3f32d51fb1876bda8e1e613a7e9a1"
+  },
+  "previous_preflight_v10": {
+    "attempt_key": "builder-gate-a-root-config-provenance-preflight-v10",
+    "charged_cpu_seconds": 60.0,
+    "report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v10.json",
+    "report_sha256": "2bcc124dca42849efae2d439326bceb987fe0e48cb6075a2eff8fcb1e7cdae31",
+    "resource_ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v10.json",
+    "resource_ledger_sha256": "18323863dead4de9a584dee0891925501824d98c39330646e1a53e65caec7ad6",
+    "source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v10.json",
+    "source_lock_sha256": "47f9e9047f990620f7317be6a755e13cc2de58217714c869702fdd075598d6c4",
+    "source_lock_status": "INVALID_SOURCE_LOCK_NORMALIZED_TEXT_HASH",
+    "terminal_receipt_path": "receipts/gate-a-requalification-v3-preflight/attempt-v10-terminal-invalid-lock.json",
+    "terminal_receipt_sha256": "34c3fca2139ad7f9c8a37e92d08e924dfe08877c46fe9363c398711db53e8f7b"
+  },
+  "previous_preflight_v11": {
+    "attempt_key": "builder-gate-a-root-config-provenance-preflight-v11",
+    "charged_cpu_seconds": 60.0,
+    "report_sha256": "0cff100d036ff52a1d649e64e56f1b724703d22582fc9bbfe688e725b739cedb",
+    "resource_ledger_sha256": "f986b2aecb505a68626f4fa38a1e57eabb2c11fbcc0be7d13108ed8ccc83571b",
+    "status": "FAIL_LAUNCHER_VARIABLE_PATHS_BEFORE_PINNED_PYTHON",
+    "terminal_receipt_path": "receipts/gate-a-requalification-v3-preflight/attempt-v11-terminal-failure.json",
+    "terminal_receipt_sha256": "9e56841ac3dc672d48c67d5a71d3e0e2fb37d95a3e82225b141dbf8b3edd700e"
+  },
+  "previous_preflight_v12": {
+    "attempt_key": "builder-gate-a-root-config-provenance-preflight-v12",
+    "charged_cpu_seconds": 60.0,
+    "report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v12.json",
+    "report_sha256": "31f52da6357cbfa74b2d2767fceddc8727a4950b31ab45a75687ee2d3bc13091",
+    "resource_ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v12.json",
+    "resource_ledger_sha256": "46f4b1f369d1ee118c503af857ff85b4902f85b038109cc88580d53e0459f4ec",
+    "source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v12.json",
+    "source_lock_sha256": "552a30ce12cff69c6188d7cae4ef09c7df7f048b2c377bb9beeeee6eb2c0d943",
+    "terminal_receipt_path": "receipts/gate-a-requalification-v3-preflight/attempt-v12-terminal-pass.json",
+    "terminal_receipt_sha256": "787cac517e088c35c9042b241aac46cee37c266cefcbd7f07f0d529ee4927bd7"
+  },
+  "previous_preflight_v9": {
+    "report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v9.json",
+    "report_sha256": "2b56dc3e1f4cff5c8c13d8ae708178aefa6543c499e3115f2ba11621ea591cb1",
+    "resource_ledger_sha256": "68cb99fcd66483d7742b8f57f8d3ed94910430425bab57a18d96eba2ed84286b",
+    "source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v9.json",
+    "source_lock_sha256": "e8907e9ce1c49b3f103a1457c4b8e48ab8c98158af13983796a3039d980e958a"
+  },
+  "prior_gate_a_lock_path": "receipts/gate-a-requalification-v6/source-lock-v6-before-resource-reconciliation.json",
+  "prior_gate_a_lock_sha256": "55d7b14ab9b614a3deeedca484fb8873704ff8b11626be301d1c0f9a6c9c6d69",
+  "projected_aggregate_cpu_seconds": 7931.610134,
+  "projected_builder_total_cpu_seconds": 5931.610134,
+  "projected_native_gate_bc_cpu_seconds": 2980.0,
+  "remote_parent_branch": "codex/issue-73-root-config-provenance-v1",
+  "remote_parent_sha": "6ce101f4de6e46b15758dc1c1173c845f3a575ac",
+  "resource_reservation": {
+    "fixed_cpu_seconds": 120,
+    "formal_seed_consumed": false,
+    "kind": "fixed non-native Gate A requalification",
+    "native": false,
+    "status": "AUTHORIZED_NOT_STARTED_AWAITING_INDEPENDENT_REVIEW"
+  },
+  "reviewer_requirement": "Independently verify v13 lock-consistency test, exact v13 preflight lock/report and Gate A snapshot, pinned preflight, and cumulative v10-v13 receipts before any 120 CPU-s Gate A precharge. v10/v11 failures and v12 pass remain immutable and charged. Gate A remains unstarted/unprecharged; no native step, optimizer update, formal seed, or Stage 1.",
+  "root_input_tree": {
+    "file_count": 225,
+    "git_tree_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
+    "path": "receipts/stage0/roots"
+  },
+  "root_selection": [
+    "root-173730001-0000",
+    "root-173730001-0001",
+    "root-173730001-0003",
+    "root-173730001-0004",
+    "root-173730001-0002",
+    "root-173730001-0005",
+    "root-173730001-0006",
+    "root-173730001-0007",
+    "root-173730001-0008",
+    "root-173730001-0009",
+    "root-173730001-0010",
+    "root-173730001-0011",
+    "root-173730001-0014",
+    "root-173730001-0015",
+    "root-173730001-0016",
+    "root-173730001-0018",
+    "root-173730001-0019",
+    "root-173730001-0020",
+    "root-173730001-0021",
+    "root-173730001-0022",
+    "root-173730001-0025",
+    "root-173730001-0026",
+    "root-173730001-0027",
+    "root-173730001-0028"
+  ],
   "root_source": {
-    "producer_commit": "162027bd60d09c34bbfc75d1453427b101a6a8ae",
-    "producer_config_path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.json",
-    "producer_config_git_blob_sha1": "97ea1c5b2ee68b13019b19cc51850d5bd53e8786",
-    "producer_config_lock_path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.lock.sha256",
-    "producer_config_lock_git_blob_sha1": "1573423d715069e6f582acd62dc79a0c788f2568",
-    "producer_config_sha256": "3393c326e62b3f2ef15883de95ddc6ca9379c4ca7008fd35251fc57292e1e76c",
-    "root_tree_git_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
-    "root_path": "receipts/stage0/roots",
+    "added_provenance_field": "identity.historical_root_config_sha256s",
+    "changed_resource_fields": {
+      "all_in_ceiling_seconds": {
+        "after": 12000,
+        "before": 6000
+      },
+      "builder_cpu_hard_cap_seconds": {
+        "after": 10000,
+        "before": 4800
+      },
+      "compile_configure_charge_note": {
+        "after": "No build or formal seed; setup and all failed or incomplete Stage0 processes debit the 10000 Builder ceiling",
+        "before": "No build or formal seed; setup and all failed or incomplete Stage0 processes debit the 4800 Builder ceiling"
+      },
+      "native_gate_bc_cpu_ceiling_seconds": {
+        "after": 6000,
+        "before": 2400
+      },
+      "reviewer_cpu_reserve_seconds": {
+        "after": 2000,
+        "before": 1200
+      }
+    },
     "file_count": 225,
     "files_sha256": {
       "root-173730001-0000.json": "d8e8faeaa3a032d63066adfe3d22c76c8d8374b069929a09a721153ab1ddfb37",
@@ -339,142 +399,100 @@
       "root-173730008-0035.json": "c45ec9fbea0d992603fb75143124290d4a446a44f63485b4d49d2a87c45af121"
     },
     "nonresource_nonprovenance_config_equal": true,
-    "changed_resource_fields": {
-      "all_in_ceiling_seconds": {
-        "before": 6000,
-        "after": 12000
-      },
-      "builder_cpu_hard_cap_seconds": {
-        "before": 4800,
-        "after": 10000
-      },
-      "compile_configure_charge_note": {
-        "before": "No build or formal seed; setup and all failed or incomplete Stage0 processes debit the 4800 Builder ceiling",
-        "after": "No build or formal seed; setup and all failed or incomplete Stage0 processes debit the 10000 Builder ceiling"
-      },
-      "native_gate_bc_cpu_ceiling_seconds": {
-        "before": 2400,
-        "after": 6000
-      },
-      "reviewer_cpu_reserve_seconds": {
-        "before": 1200,
-        "after": 2000
-      }
-    },
-    "added_provenance_field": "identity.historical_root_config_sha256s",
-    "updated_source_map_field": "identity.study_source_sha256.stage0.py",
-    "registered_population_action_rng_endpoint_changes": false
+    "producer_commit": "162027bd60d09c34bbfc75d1453427b101a6a8ae",
+    "producer_config_git_blob_sha1": "97ea1c5b2ee68b13019b19cc51850d5bd53e8786",
+    "producer_config_lock_git_blob_sha1": "1573423d715069e6f582acd62dc79a0c788f2568",
+    "producer_config_lock_path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.lock.sha256",
+    "producer_config_path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.json",
+    "producer_config_sha256": "3393c326e62b3f2ef15883de95ddc6ca9379c4ca7008fd35251fc57292e1e76c",
+    "registered_population_action_rng_endpoint_changes": false,
+    "root_path": "receipts/stage0/roots",
+    "root_tree_git_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
+    "updated_source_map_field": "identity.study_source_sha256.stage0.py"
   },
-  "root_selection": [
-    "root-173730001-0000",
-    "root-173730001-0001",
-    "root-173730001-0003",
-    "root-173730001-0004",
-    "root-173730001-0002",
-    "root-173730001-0005",
-    "root-173730001-0006",
-    "root-173730001-0007",
-    "root-173730001-0008",
-    "root-173730001-0009",
-    "root-173730001-0010",
-    "root-173730001-0011",
-    "root-173730001-0014",
-    "root-173730001-0015",
-    "root-173730001-0016",
-    "root-173730001-0018",
-    "root-173730001-0019",
-    "root-173730001-0020",
-    "root-173730001-0021",
-    "root-173730001-0022",
-    "root-173730001-0025",
-    "root-173730001-0026",
-    "root-173730001-0027",
-    "root-173730001-0028"
+  "schema_id": "issue73-gate-a-requalification-source-lock-v1",
+  "source_code_commit": "2526b37b0ea3f32d51fb1876bda8e1e613a7e9a1",
+  "source_files_git_blob_ids": [
+    {
+      "git_blob_sha1": "420529e779c50c0a16bf1f3a8268a15d14d43f00",
+      "normalized_text_sha256": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/.gitignore"
+    },
+    {
+      "git_blob_sha1": "570783d3e11478bd78a977df3c635f7113355c6d",
+      "normalized_text_sha256": "87dcc49507eb23b1a9430f520836226a5a5db3eaa5d4231a470fb06ac220d2c4",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.json"
+    },
+    {
+      "git_blob_sha1": "c088c6e6f5cf30faec9a07320480ae5f703727d8",
+      "normalized_text_sha256": "27b3712e83e40f54618109882f9c56f2b8700261cc627c43cdbb448e35fa28e9",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.lock.sha256"
+    },
+    {
+      "git_blob_sha1": "f4589a942207760866f0bab4d04a46dfcc70431e",
+      "normalized_text_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate-a-target-direction.json"
+    },
+    {
+      "git_blob_sha1": "9aff1cd73b9d10299ba4a299af4458f8fbf7cfac",
+      "normalized_text_sha256": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/gate_a.py"
+    },
+    {
+      "git_blob_sha1": "eebdb40a206dbfc48f4fb171c03670634593fe01",
+      "normalized_text_sha256": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py"
+    },
+    {
+      "git_blob_sha1": "c80074a8b5b45773d1e4b5bd54fdd8c1ccaedab8",
+      "normalized_text_sha256": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/public_history_execution.py"
+    },
+    {
+      "git_blob_sha1": "398dd982bd6610a134dde57ada7d75dd0f9f24ec",
+      "normalized_text_sha256": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py"
+    },
+    {
+      "git_blob_sha1": "a5cdf137021b7b9ff107b68d43c476e69776c39d",
+      "normalized_text_sha256": "57fbc5f688aa82cfb8799bb6397a32c5e29641dc04762237e3e73e8ed3769472",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/stage0.py"
+    },
+    {
+      "git_blob_sha1": "5aeeab8d4746edf0c5d0c76eb14ccb72a92a436d",
+      "normalized_text_sha256": "ddea1b01c915799d9e5c81cdf5097ae413a610868cf5c89f9e8cad09098c2cc0",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/source_lock_integrity.py"
+    },
+    {
+      "git_blob_sha1": "d6c1f96ed46ca2a9ff0800a33263c3003b736ad1",
+      "normalized_text_sha256": "4bca321be01c326bec16f62f1a7b83cfc6d0199ca73759befe53fa49c52384a6",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/test_gate_a_target_direction.py"
+    },
+    {
+      "git_blob_sha1": "4f8bde45422e28d95a9d66cc95a0d03cecd67b86",
+      "normalized_text_sha256": "eb4a5e7728cb9c2d3a41c3383370ec4560cc27818c885487ebbb518464f327a4",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/test_stage0_root_config_provenance.py"
+    },
+    {
+      "git_blob_sha1": "ff8514b3d3bbebbe963ee9101c633c77ebef78e8",
+      "normalized_text_sha256": "4d4ba76edde2ea90fa0ada942c1a187630a449f47f2d215c28ecdbbb505494ed",
+      "path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py"
+    }
   ],
-  "root_input_tree": {
-    "path": "receipts/stage0/roots",
-    "git_tree_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
-    "file_count": 225
+  "stage1_authorized": false,
+  "status": "LOCKED_V13_PREFLIGHT_PENDING",
+  "study_source_sha256": {
+    ".gitignore": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234",
+    "gate-a-target-direction.json": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
+    "gate_a.py": "c33e8e5b34f32c2495978f33f3533843a2c33eedfe2e94dcbf28a0bf8b1fa283",
+    "policy.py": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
+    "public_history_execution.py": "d8e8d6b7d878bd3a179e6921cfb6ff7714fb7bca2d1c02ab6e9d24659760d913",
+    "runner.py": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497",
+    "stage0.py": "57fbc5f688aa82cfb8799bb6397a32c5e29641dc04762237e3e73e8ed3769472"
   },
   "target": {
     "direction_file": "gate-a-target-direction.json",
     "direction_sha256": "7c2b254a982df6bdea074da722fd5aac4c9c73f59e8c4288da95683ea19f7347",
     "target_reselected": false
-  },
-  "gate_contract": {
-    "required_root_count": 24,
-    "minimum_screen_family_count": 4,
-    "updates_per_encoding": 64,
-    "total_gradient_updates_max": 128,
-    "minimum_tv_fraction": 0.8,
-    "cpu_reserve_seconds": 120,
-    "native_execution": false,
-    "formal_seed_consumed": false,
-    "stage1_authorized": false
-  },
-  "attempt_key": "gate-a-requalification-after-v9-parity-v6",
-  "attempt_path": "receipts/gate-a-requalification-v6/attempts/gate-a-requalification-after-v9-parity-v6.json",
-  "parent_resource_ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v11.json",
-  "parent_resource_ledger_sha256": "46f4b1f369d1ee118c503af857ff85b4902f85b038109cc88580d53e0459f4ec",
-  "reviewer_requirement": "Independent Reviewer must verify the exact v12 preflight lock/report, corrected 13/13 Git blob and normalized text provenance, and cumulative v10/v11/v12 resource receipts before any 120 CPU-s Gate A precharge. v10 and v11 are immutable charged failures; v12 is a pinned 9/9 test and PRELAUNCH_PASS. Gate A remains unstarted and unprecharged. No native game step, optimizer update, formal seed, or Stage 1 is authorized.",
-  "resource_reservation": {
-    "kind": "fixed non-native Gate A requalification",
-    "fixed_cpu_seconds": 120,
-    "status": "AUTHORIZED_NOT_STARTED_AWAITING_INDEPENDENT_REVIEW",
-    "native": false,
-    "formal_seed_consumed": false
-  },
-  "disposition": "STUDY_ONLY",
-  "stage1_authorized": false,
-  "preflight_source_lock_v9_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v9.json",
-  "preflight_source_lock_v9_sha256": "e8907e9ce1c49b3f103a1457c4b8e48ab8c98158af13983796a3039d980e958a",
-  "preflight_report_v9_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v9.json",
-  "preflight_report_v9_sha256": "2b56dc3e1f4cff5c8c13d8ae708178aefa6543c499e3115f2ba11621ea591cb1",
-  "preflight_version": 12,
-  "preflight_source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v12.json",
-  "preflight_source_lock_sha256": "552a30ce12cff69c6188d7cae4ef09c7df7f048b2c377bb9beeeee6eb2c0d943",
-  "preflight_report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v12.json",
-  "preflight_report_sha256": "31f52da6357cbfa74b2d2767fceddc8727a4950b31ab45a75687ee2d3bc13091",
-  "preflight_attempt_key": "builder-gate-a-root-config-provenance-preflight-v12",
-  "preflight_status": "PRELAUNCH_PASS_AWAITING_INDEPENDENT_REVIEW",
-  "cumulative_resource_reconciliation_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-reconciliation-v1.json",
-  "cumulative_resource_reconciliation_sha256": "34bd6baedf9b3b99e807213a39e300b5a6bdce7cfce83591addde386f04bc479",
-  "cumulative_builder_charge_cpu_seconds": 4291.610134,
-  "builder_charge_after_v10_preflight_cpu_seconds": 4231.610134,
-  "projected_builder_total_cpu_seconds": 5871.610134,
-  "projected_native_gate_bc_cpu_seconds": 2980.0,
-  "projected_aggregate_cpu_seconds": 7871.610134,
-  "previous_preflight_v9": {
-    "source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v9.json",
-    "source_lock_sha256": "e8907e9ce1c49b3f103a1457c4b8e48ab8c98158af13983796a3039d980e958a",
-    "report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v9.json",
-    "report_sha256": "2b56dc3e1f4cff5c8c13d8ae708178aefa6543c499e3115f2ba11621ea591cb1",
-    "resource_ledger_sha256": "68cb99fcd66483d7742b8f57f8d3ed94910430425bab57a18d96eba2ed84286b"
-  },
-  "prior_gate_a_lock_path": "receipts/gate-a-requalification-v6/source-lock-v6-before-resource-reconciliation.json",
-  "prior_gate_a_lock_sha256": "55d7b14ab9b614a3deeedca484fb8873704ff8b11626be301d1c0f9a6c9c6d69",
-  "builder_charge_after_v11_preflight_cpu_seconds": 4291.610134,
-  "previous_preflight_v10": {
-    "attempt_key": "builder-gate-a-root-config-provenance-preflight-v10",
-    "source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v10.json",
-    "source_lock_sha256": "47f9e9047f990620f7317be6a755e13cc2de58217714c869702fdd075598d6c4",
-    "source_lock_status": "INVALID_SOURCE_LOCK_NORMALIZED_TEXT_HASH",
-    "terminal_receipt_path": "receipts/gate-a-requalification-v3-preflight/attempt-v10-terminal-invalid-lock.json",
-    "terminal_receipt_sha256": "34c3fca2139ad7f9c8a37e92d08e924dfe08877c46fe9363c398711db53e8f7b",
-    "report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v10.json",
-    "report_sha256": "2bcc124dca42849efae2d439326bceb987fe0e48cb6075a2eff8fcb1e7cdae31",
-    "resource_ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v10.json",
-    "resource_ledger_sha256": "18323863dead4de9a584dee0891925501824d98c39330646e1a53e65caec7ad6",
-    "charged_cpu_seconds": 60.0
-  },
-  "builder_charge_after_v12_preflight_cpu_seconds": 4351.610134,
-  "previous_preflight_v11": {
-    "attempt_key": "builder-gate-a-root-config-provenance-preflight-v11",
-    "status": "FAIL_LAUNCHER_VARIABLE_PATHS_BEFORE_PINNED_PYTHON",
-    "charged_cpu_seconds": 60.0,
-    "terminal_receipt_path": "receipts/gate-a-requalification-v3-preflight/attempt-v11-terminal-failure.json",
-    "terminal_receipt_sha256": "9e56841ac3dc672d48c67d5a71d3e0e2fb37d95a3e82225b141dbf8b3edd700e",
-    "report_sha256": "0cff100d036ff52a1d649e64e56f1b724703d22582fc9bbfe688e725b739cedb",
-    "resource_ledger_sha256": "f986b2aecb505a68626f4fa38a1e57eabb2c11fbcc0be7d13108ed8ccc83571b"
   }
 }
