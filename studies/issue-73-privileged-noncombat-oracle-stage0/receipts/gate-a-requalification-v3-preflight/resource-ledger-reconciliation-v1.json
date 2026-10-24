@@ -1,0 +1,147 @@
+{
+  "schema_id": "issue73-builder-resource-ledger-reconciliation-v1",
+  "status": "RECONCILED_BEFORE_GATE_A",
+  "recorded_at_utc": "2026-10-24T15:11:07Z",
+  "issue": 73,
+  "disposition": "STUDY_ONLY",
+  "common_source_base": {
+    "branch": "codex/issue-73-source-map-relock-v1",
+    "sha": "49624c5c8525ee274bead17f15a1cd8e557c1744"
+  },
+  "baseline": {
+    "description": "Reviewer-passed v6 source-map preflight cumulative state before either sibling attempt branch",
+    "path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v6.json",
+    "normalized_text_sha256": "bdcd0e5504a6fee2d0ba77f798974a3ec56821d5c1328a35a27a8090e5a45aa2",
+    "builder_charge_cpu_seconds": 3691.610134,
+    "native_gate_bc_charge_cpu_seconds": 1580.0,
+    "review_comment_url": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6384616582"
+  },
+  "evidence_branches": [
+    {
+      "branch": "codex/issue-73-gatea-v4-readiness",
+      "sha": "ec15a625f5e87f2dbaa3fb1422a3b0f360ba0b39",
+      "base_sha": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "attempt_count": 5,
+      "charged_cpu_seconds": 300.0,
+      "remote_pushed_unchanged": true
+    },
+    {
+      "branch": "codex/issue-73-root-config-provenance-v1",
+      "sha": "3ce1972c62309aef0ac4183dc57fdd4c7db81fde",
+      "base_sha": "49624c5c8525ee274bead17f15a1cd8e557c1744",
+      "attempt_count": 3,
+      "charged_cpu_seconds": 180.0
+    }
+  ],
+  "attempts": [
+    {
+      "attempt_key": "builder-gate-a-requalification-v4-startup-preflight",
+      "status": "FAIL_ENGINEERING_SOURCE_LOCK_SCHEMA",
+      "reserved_cpu_seconds": 60.0,
+      "parent_builder_charge_cpu_seconds": 3691.610134,
+      "builder_charge_after_cpu_seconds": 3751.610134,
+      "report_path": "receipts/gate-a-requalification-v4/preflight-report-v1.json",
+      "report_sha256": "6d888e448b43a16db01432a7a2203dfac02615bd45257fe0118594f9fb3e5276",
+      "ledger_path": "receipts/gate-a-requalification-v4/preflight-resource-ledger-final-v1.json",
+      "ledger_sha256": "1d8d97fbe3529635fd54e8243f3f1eaa9c791ddcf99d33f371f2f6ddea3f10a8"
+    },
+    {
+      "attempt_key": "builder-gate-a-requalification-v4-startup-preflight-v2",
+      "status": "FAIL_WSL_GIT_METADATA_PATH",
+      "reserved_cpu_seconds": 60.0,
+      "parent_builder_charge_cpu_seconds": 3751.610134,
+      "builder_charge_after_cpu_seconds": 3811.610134,
+      "report_path": "receipts/gate-a-requalification-v4/preflight-report-v2.json",
+      "report_sha256": "2a07d76c6074d7460777c58ca2b1b29d6ab5e0fb35c3418ef889e051b4dbb61b",
+      "ledger_path": "receipts/gate-a-requalification-v4/preflight-resource-ledger-final-v2.json",
+      "ledger_sha256": "b2656901b4867d214927af239ec8005d45d7d61777c3aa8e8dee5fb76fd5df78"
+    },
+    {
+      "attempt_key": "builder-gate-a-requalification-v4-startup-preflight-v3",
+      "status": "FAIL_RUNTIME_GIT_BLOB_ASSERTION",
+      "reserved_cpu_seconds": 60.0,
+      "parent_builder_charge_cpu_seconds": 3811.610134,
+      "builder_charge_after_cpu_seconds": 3871.610134,
+      "report_path": "receipts/gate-a-requalification-v4/preflight-report-v3.json",
+      "report_sha256": "ff84dfc05705487e3336b3b00aea0e7a078f92cda0104f21c24801ad41f8f58f",
+      "ledger_path": "receipts/gate-a-requalification-v4/preflight-resource-ledger-final-v3.json",
+      "ledger_sha256": "53a910f771646607557dbf58f55306b4bff4e64a7247c15ff0bb7f10bee30e57"
+    },
+    {
+      "attempt_key": "builder-gate-a-requalification-v4-startup-preflight-v4",
+      "status": "FAIL_PREFLIGHT_UID_MISMATCH",
+      "reserved_cpu_seconds": 60.0,
+      "parent_builder_charge_cpu_seconds": 3871.610134,
+      "builder_charge_after_cpu_seconds": 3931.610134,
+      "report_path": "receipts/gate-a-requalification-v4/preflight-report-v4.json",
+      "report_sha256": "48445116fa60b4eead93c44c38e519dbaa028d61f5c268cf4db4811b55132dd1",
+      "ledger_path": "receipts/gate-a-requalification-v4/preflight-resource-ledger-final-v4.json",
+      "ledger_sha256": "671e3cfda76099eb989cd22df6845cbc5e17809242a829cff005b1ffe8da3497"
+    },
+    {
+      "attempt_key": "builder-gate-a-requalification-v4-startup-preflight-v5",
+      "status": "FAIL_ROOT_CONFIG_LOCK_MISMATCH",
+      "reserved_cpu_seconds": 60.0,
+      "parent_builder_charge_cpu_seconds": 3931.610134,
+      "builder_charge_after_cpu_seconds": 3991.610134,
+      "report_path": "receipts/gate-a-requalification-v4/preflight-report-v5.json",
+      "report_sha256": "5dfe6941d0e16defda1c241a41fa61950df7b6f8c64ac03a53358737afae315f",
+      "ledger_path": "receipts/gate-a-requalification-v4/preflight-resource-ledger-final-v5.json",
+      "ledger_sha256": "a5ecf0304314543c64ad262567273849a151afa49ea400d088524f411185cfb6"
+    },
+    {
+      "attempt_key": "builder-gate-a-root-config-provenance-preflight-v7",
+      "status": "TERMINAL_FAIL_LAUNCHER_ENVIRONMENT_ASSIGNMENT",
+      "reserved_cpu_seconds": 60.0,
+      "parent_builder_charge_cpu_seconds": 3691.610134,
+      "builder_charge_after_cpu_seconds": 3751.610134,
+      "report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v7.json",
+      "report_sha256": "70001f67690a377f6bff09b76c4444c578315ca3e06c3746e225b73838349716",
+      "ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v7.json",
+      "ledger_sha256": "1f447f432ec791243e6deee0dafc678a6fd2307dfdd3141c14df73811b5828ad"
+    },
+    {
+      "attempt_key": "builder-gate-a-root-config-provenance-preflight-v8",
+      "status": "TERMINAL_FAIL_PRELAUNCH_ROOT_SELECTION_LOCK_SCHEMA",
+      "reserved_cpu_seconds": 60.0,
+      "parent_builder_charge_cpu_seconds": 3751.610134,
+      "builder_charge_after_cpu_seconds": 3811.610134,
+      "report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v8.json",
+      "report_sha256": "bfa85af0bb0a62460e1a9e035f4b5ad353cd6c46554d3f92e722626d760bca08",
+      "ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v8.json",
+      "ledger_sha256": "2307b78ee10abd87e7234c38f52726c3bf6fdb8489fd193cd0a76c4b447418ef"
+    },
+    {
+      "attempt_key": "builder-gate-a-root-config-provenance-preflight-v9",
+      "status": "TERMINAL_PASS_PINNED_RUNTIME_SOURCE_ROOT_AND_NEGATIVE_PREFLIGHT",
+      "reserved_cpu_seconds": 60.0,
+      "parent_builder_charge_cpu_seconds": 3811.610134,
+      "builder_charge_after_cpu_seconds": 3871.610134,
+      "report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v9.json",
+      "report_sha256": "2b56dc3e1f4cff5c8c13d8ae708178aefa6543c499e3115f2ba11621ea591cb1",
+      "ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v9.json",
+      "ledger_sha256": "68cb99fcd66483d7742b8f57f8d3ed94910430425bab57a18d96eba2ed84286b"
+    }
+  ],
+  "attempt_count": 8,
+  "old_readiness_branch_increment_cpu_seconds": 300.0,
+  "root_provenance_branch_increment_cpu_seconds": 180.0,
+  "total_increment_after_shared_baseline_cpu_seconds": 480.0,
+  "reconciled_builder_charge_cpu_seconds": 4171.610134,
+  "next_gate_a_reservation_cpu_seconds": 120.0,
+  "remaining_fixed_native_work_cpu_seconds": 1300.0,
+  "remaining_native_contingency_cpu_seconds": 100.0,
+  "projected_builder_total_cpu_seconds": 5691.610134,
+  "projected_native_gate_bc_cpu_seconds": 2980.0,
+  "protected_reviewer_reserve_cpu_seconds": 2000.0,
+  "projected_aggregate_cpu_seconds": 7691.610134,
+  "builder_ceiling_cpu_seconds": 10000.0,
+  "native_gate_bc_ceiling_cpu_seconds": 6000.0,
+  "aggregate_ceiling_cpu_seconds": 12000.0,
+  "within_registered_ceilings": true,
+  "no_gate_a_precharge_or_invocation": true,
+  "no_native_game_step": true,
+  "formal_seed_consumed": false,
+  "stage1_authorized": false,
+  "reconciliation_note": "The v4 readiness and root-provenance attempts are sibling histories from the common v6 source base. The v9 branch-local ledger included v7-v9 only (+180 CPU-s), omitting five separately precharged v4 readiness attempts (+300 CPU-s). The original per-attempt reports and ledgers are immutable; this reconciliation roll-up counts both disjoint groups exactly once."
+}

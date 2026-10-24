@@ -1,12 +1,12 @@
 {
   "schema_id": "issue73-gate-a-requalification-source-lock-v1",
-  "lock_key": "gate-a-requalification-after-v9-parity-v6",
-  "status": "READY_FOR_INDEPENDENT_REVIEW",
-  "locked_at_utc": "2026-10-24T14:53:11Z",
+  "lock_key": "builder-gate-a-requalification-after-v10-parity-v6-resource-reconciliation-v1",
+  "status": "LOCKED_V10_PREFLIGHT_PENDING",
+  "locked_at_utc": "2026-10-24T15:23:31Z",
   "execution_branch": "codex/issue-73-root-config-provenance-v1",
   "remote_parent_branch": "codex/issue-73-root-config-provenance-v1",
-  "remote_parent_sha": "38734761c44fa367e745ad79ac6566a3e7ec7915",
-  "source_code_commit": "38734761c44fa367e745ad79ac6566a3e7ec7915",
+  "remote_parent_sha": "2526b37b0ea3f32d51fb1876bda8e1e613a7e9a1",
+  "source_code_commit": "2526b37b0ea3f32d51fb1876bda8e1e613a7e9a1",
   "config_sha256": "87dcc49507eb23b1a9430f520836226a5a5db3eaa5d4231a470fb06ac220d2c4",
   "study_source_sha256": {
     ".gitignore": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234",
@@ -20,7 +20,7 @@
   "source_files_git_blob_ids": [
     {
       "path": "studies/issue-73-privileged-noncombat-oracle-stage0/.gitignore",
-      "git_blob_sha1": "69085748dcb648f778e67eda853a6ded7d0b2de7",
+      "git_blob_sha1": "420529e779c50c0a16bf1f3a8268a15d14d43f00",
       "normalized_text_sha256": "536e4dfab1c00ff06bd7a9ffe58ff176cc1f76178201a3941c0fc2b51cbae234"
     },
     {
@@ -55,7 +55,7 @@
     },
     {
       "path": "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
-      "git_blob_sha1": "0a153e6965210ba7182bf145e31f4e2c07d6c608",
+      "git_blob_sha1": "398dd982bd6610a134dde57ada7d75dd0f9f24ec",
       "normalized_text_sha256": "c245ccd4018d3aec8779beafeffeb36ac1cd8f19f02b3c1f167e1171fe0fa497"
     },
     {
@@ -80,7 +80,7 @@
     },
     {
       "path": "studies/issue-73-privileged-noncombat-oracle-stage0/receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py",
-      "git_blob_sha1": "e63568b8d282d0ef793c231a986b6bced01d9cc9",
+      "git_blob_sha1": "ff8514b3d3bbebbe963ee9101c633c77ebef78e8",
       "normalized_text_sha256": "4d4ba76edde2ea90fa0ada942c1a187630a449f47f2d215c28ecdbbb505494ed"
     }
   ],
@@ -97,10 +97,10 @@
     "source_lock_integrity.py": "ddea1b01c915799d9e5c81cdf5097ae413a610868cf5c89f9e8cad09098c2cc0",
     "test_gate_a_target_direction.py": "4bca321be01c326bec16f62f1a7b83cfc6d0199ca73759befe53fa49c52384a6",
     "test_stage0_root_config_provenance.py": "eb4a5e7728cb9c2d3a41c3383370ec4560cc27818c885487ebbb518464f327a4",
-    "receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py": "4d4ba76edde2ea90fa0ada942c1a187630a449f47f2d215c28ecdbbb505494ed"
+    "receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py": "c61c5ee1b64fe2f55dbe078f255585023eaa0db45bf8e25c6b2ff315306656bb"
   },
   "execution_wrapper_path": "receipts/gate-a-requalification-v6/attempts/run_gate_a_v6.py",
-  "execution_wrapper_sha256": "4d4ba76edde2ea90fa0ada942c1a187630a449f47f2d215c28ecdbbb505494ed",
+  "execution_wrapper_sha256": "c61c5ee1b64fe2f55dbe078f255585023eaa0db45bf8e25c6b2ff315306656bb",
   "root_source": {
     "producer_commit": "162027bd60d09c34bbfc75d1453427b101a6a8ae",
     "producer_config_path": "studies/issue-73-privileged-noncombat-oracle-stage0/config.json",
@@ -414,13 +414,13 @@
   },
   "attempt_key": "gate-a-requalification-after-v9-parity-v6",
   "attempt_path": "receipts/gate-a-requalification-v6/attempts/gate-a-requalification-after-v9-parity-v6.json",
-  "parent_resource_ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v9.json",
-  "parent_resource_ledger_sha256": "68cb99fcd66483d7742b8f57f8d3ed94910430425bab57a18d96eba2ed84286b",
-  "reviewer_requirement": "Independent Reviewer must verify this exact v6 source/launcher and pinned-runtime v9 positive/negative prelaunch gate; only after PASS may Builder create the fixed 120 CPU-s Gate A v6 precharge. No Gate A execution or formal seed is authorized by this preflight.",
+  "parent_resource_ledger_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-final-v10.json",
+  "parent_resource_ledger_sha256": "PENDING_V10_PREFLIGHT",
+  "reviewer_requirement": "Independent Reviewer must verify this exact corrected v6 lock, v10 source lock and pinned preflight, and cumulative resource reconciliation before any 120 CPU-s Gate A precharge. The v10 preflight reservation is already charged; Gate A remains unstarted. No formal seed or Stage 1 is authorized.",
   "resource_reservation": {
     "kind": "fixed non-native Gate A requalification",
     "fixed_cpu_seconds": 120,
-    "status": "AUTHORIZED_NOT_STARTED_AWAITING_INDEPENDENT_REVIEW",
+    "status": "AUTHORIZED_NOT_STARTED_AWAITING_V10_PREFLIGHT_AND_INDEPENDENT_REVIEW",
     "native": false,
     "formal_seed_consumed": false
   },
@@ -430,6 +430,27 @@
   "preflight_source_lock_v9_sha256": "e8907e9ce1c49b3f103a1457c4b8e48ab8c98158af13983796a3039d980e958a",
   "preflight_report_v9_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v9.json",
   "preflight_report_v9_sha256": "2b56dc3e1f4cff5c8c13d8ae708178aefa6543c499e3115f2ba11621ea591cb1",
-  "preflight_status": "PASS_PINNED_RUNTIME_SOURCE_ROOT_AND_NEGATIVE_PREFLIGHT",
-  "preflight_attempt_key": "builder-gate-a-root-config-provenance-preflight-v9"
+  "preflight_version": 10,
+  "preflight_source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v10.json",
+  "preflight_source_lock_sha256": "47f9e9047f990620f7317be6a755e13cc2de58217714c869702fdd075598d6c4",
+  "preflight_report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v10.json",
+  "preflight_report_sha256": "PENDING_V10_PREFLIGHT",
+  "preflight_attempt_key": "builder-gate-a-root-config-provenance-preflight-v10",
+  "preflight_status": "LOCKED_PROSPECTIVE_V10_PINNED_RUNTIME_PREFLIGHT",
+  "cumulative_resource_reconciliation_path": "receipts/gate-a-requalification-v3-preflight/resource-ledger-reconciliation-v1.json",
+  "cumulative_resource_reconciliation_sha256": "34bd6baedf9b3b99e807213a39e300b5a6bdce7cfce83591addde386f04bc479",
+  "cumulative_builder_charge_cpu_seconds": 4171.610134,
+  "builder_charge_after_v10_preflight_cpu_seconds": 4231.610134,
+  "projected_builder_total_cpu_seconds": 5751.610134,
+  "projected_native_gate_bc_cpu_seconds": 2980.0,
+  "projected_aggregate_cpu_seconds": 7751.610134,
+  "previous_preflight_v9": {
+    "source_lock_path": "receipts/gate-a-requalification-v3-preflight/source-lock-v9.json",
+    "source_lock_sha256": "e8907e9ce1c49b3f103a1457c4b8e48ab8c98158af13983796a3039d980e958a",
+    "report_path": "receipts/gate-a-requalification-v3-preflight/preflight-report-v9.json",
+    "report_sha256": "2b56dc3e1f4cff5c8c13d8ae708178aefa6543c499e3115f2ba11621ea591cb1",
+    "resource_ledger_sha256": "68cb99fcd66483d7742b8f57f8d3ed94910430425bab57a18d96eba2ed84286b"
+  },
+  "prior_gate_a_lock_path": "receipts/gate-a-requalification-v6/source-lock-v6-before-resource-reconciliation.json",
+  "prior_gate_a_lock_sha256": "55d7b14ab9b614a3deeedca484fb8873704ff8b11626be301d1c0f9a6c9c6d69"
 }
