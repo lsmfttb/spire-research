@@ -1,0 +1,14 @@
+test_canonical_target_hash_accepts_lf_and_uniform_crlf (test_gate_a_target_direction.GateATargetDirectionPreflightTests.test_canonical_target_hash_accepts_lf_and_uniform_crlf) ... ok
+test_committed_source_map_matches_normalized_study_files (test_gate_a_target_direction.GateATargetDirectionPreflightTests.test_committed_source_map_matches_normalized_study_files) ... ok
+test_substantive_target_change_fails_before_optimizer_or_output (test_gate_a_target_direction.GateATargetDirectionPreflightTests.test_substantive_target_change_fails_before_optimizer_or_output) ... ok
+test_target_normalizer_rejects_bare_cr_and_mixed_line_endings (test_gate_a_target_direction.GateATargetDirectionPreflightTests.test_target_normalizer_rejects_bare_cr_and_mixed_line_endings) ... ok
+test_accepts_root_created_under_the_current_config (test_stage0_root_config_provenance.Stage0RootConfigProvenanceTests.test_accepts_root_created_under_the_current_config) ... ok
+test_accepts_root_with_the_locked_historical_producer_digest (test_stage0_root_config_provenance.Stage0RootConfigProvenanceTests.test_accepts_root_with_the_locked_historical_producer_digest) ... ok
+test_historical_root_producer_config_digest_is_explicitly_locked (test_stage0_root_config_provenance.Stage0RootConfigProvenanceTests.test_historical_root_producer_config_digest_is_explicitly_locked) ... ok
+test_rejects_unregistered_root_config_digest (test_stage0_root_config_provenance.Stage0RootConfigProvenanceTests.test_rejects_unregistered_root_config_digest) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 1.257s
+
+OK
+{"error": "list indices must be integers or slices, not str", "error_type": "TypeError", "formal_seed_consumed": false, "stage1_authorized": false, "status": "PRELAUNCH_FAIL"}
