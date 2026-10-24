@@ -52,6 +52,14 @@ class GateATargetDirectionPreflightTests(unittest.TestCase):
             runner.CONFIG["identity"]["study_source_sha256"],
         )
 
+    def test_v6_launcher_compares_the_locked_root_id_list_without_reinterpreting_its_schema(self):
+        launcher = ROOT / "receipts" / "gate-a-requalification-v6" / "attempts" / "run_gate_a_v6.py"
+        source = launcher.read_text(encoding="utf-8")
+        self.assertIn('expected_root_ids = source_lock.get("root_selection")', source)
+        self.assertIn("if root_ids != expected_root_ids:", source)
+        self.assertIn('"selected_root_ids": expected_root_ids', source)
+        self.assertNotIn('source_lock["root_selection"]["selected_root_ids"]', source)
+
     def test_canonical_target_hash_accepts_lf_and_uniform_crlf(self):
         committed = (ROOT / TARGET_FILE).read_bytes()
         canonical_committed = source_lock_integrity.normalize_locked_source_eol(
