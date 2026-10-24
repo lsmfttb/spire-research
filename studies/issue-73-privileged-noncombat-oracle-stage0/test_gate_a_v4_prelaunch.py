@@ -17,7 +17,7 @@ SPEC.loader.exec_module(LAUNCHER)
 class GateAV4LauncherBoundaryTests(unittest.TestCase):
     def test_execute_fails_closed_without_precharged_start_receipt(self):
         with (
-            mock.patch.object(LAUNCHER, "verify_source_lock", return_value=({}, "lock-sha", "head")),
+            mock.patch.object(LAUNCHER, "verify_source_lock", return_value=({}, "lock-sha", "launcher-commit")),
             mock.patch.object(LAUNCHER, "verify_gate_a_inputs", return_value={"root_count": 225}),
             mock.patch.object(LAUNCHER, "EXECUTION_START_PATH", ROOT / "missing-execution-start.json"),
             mock.patch.object(LAUNCHER, "EXECUTION_CLAIM_PATH", ROOT / ".v4-test-claim-do-not-create.json"),
@@ -25,6 +25,34 @@ class GateAV4LauncherBoundaryTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "not precharged"):
                 LAUNCHER.execute_gate_a()
         self.assertFalse((ROOT / ".v4-test-claim-do-not-create.json").exists())
+
+    def test_stale_source_map_fails_before_root_files_are_read(self):
+        import os
+        import sys
+
+        import numpy as np
+        import runner
+        import stage0
+        import torch
+
+        lock = {
+            "config_sha256": runner.CONFIG_SHA256,
+            "runtime": {
+                "python_version": sys.version.split()[0],
+                "numpy_version": np.__version__,
+                "torch_version": torch.__version__,
+                "python_executable": str(Path(sys.executable).resolve()),
+                "execution_uid": os.getuid(),
+            },
+            "study_source_sha256": {"runner.py": "deliberately-stale"},
+        }
+        with (
+            mock.patch.object(stage0, "source_hashes", return_value={"runner.py": "current"}),
+            mock.patch.object(stage0, "load_roots", side_effect=AssertionError("roots must not be loaded")) as load_roots,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "study source map differs"):
+                LAUNCHER.verify_gate_a_inputs(lock)
+        load_roots.assert_not_called()
 
     def test_preflight_mode_is_separate_from_gate_a_execution(self):
         import ast

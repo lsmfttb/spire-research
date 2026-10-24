@@ -19,17 +19,17 @@ SCRIPT = pathlib.Path(__file__).resolve()
 ATTEMPT_ROOT = SCRIPT.parents[1]
 STUDY = SCRIPT.parents[3]
 REPOSITORY = STUDY.parents[1]
-LOCK_PATH = ATTEMPT_ROOT / "source-lock-v3.json"
-LOCK_SHA_PATH = ATTEMPT_ROOT / "source-lock-v3.sha256"
-PREFLIGHT_REPORT_PATH = ATTEMPT_ROOT / "preflight-report-v3.json"
-PREFLIGHT_START_PATH = ATTEMPT_ROOT / "preflight-started-v3.json"
-PREFLIGHT_LEDGER_STARTED_PATH = ATTEMPT_ROOT / "preflight-resource-ledger-started-v3.json"
-PREFLIGHT_LEDGER_FINAL_PATH = ATTEMPT_ROOT / "preflight-resource-ledger-final-v3.json"
-EXECUTION_START_PATH = ATTEMPT_ROOT / "execution-started-v3.json"
-EXECUTION_CLAIM_PATH = ATTEMPT_ROOT / "attempts" / "execution-claim-v3.json"
-EXECUTION_TERMINAL_PATH = ATTEMPT_ROOT / "attempts" / "gate-a-terminal-v3.json"
-EXECUTION_LEDGER_FINAL_PATH = ATTEMPT_ROOT / "resource-ledger-final-v3.json"
-OUTPUT = ATTEMPT_ROOT / "outputs-v3"
+LOCK_PATH = ATTEMPT_ROOT / "source-lock-v4.json"
+LOCK_SHA_PATH = ATTEMPT_ROOT / "source-lock-v4.sha256"
+PREFLIGHT_REPORT_PATH = ATTEMPT_ROOT / "preflight-report-v4.json"
+PREFLIGHT_START_PATH = ATTEMPT_ROOT / "preflight-started-v4.json"
+PREFLIGHT_LEDGER_STARTED_PATH = ATTEMPT_ROOT / "preflight-resource-ledger-started-v4.json"
+PREFLIGHT_LEDGER_FINAL_PATH = ATTEMPT_ROOT / "preflight-resource-ledger-final-v4.json"
+EXECUTION_START_PATH = ATTEMPT_ROOT / "execution-started-v4.json"
+EXECUTION_CLAIM_PATH = ATTEMPT_ROOT / "attempts" / "execution-claim-v4.json"
+EXECUTION_TERMINAL_PATH = ATTEMPT_ROOT / "attempts" / "gate-a-terminal-v4.json"
+EXECUTION_LEDGER_FINAL_PATH = ATTEMPT_ROOT / "resource-ledger-final-v4.json"
+OUTPUT = ATTEMPT_ROOT / "outputs-v4"
 RUNTIME = ATTEMPT_ROOT / "runtime"
 TMP = RUNTIME / "tmp"
 CACHE = RUNTIME / "cache"
@@ -74,20 +74,19 @@ def configure_task_local_runtime() -> None:
     sys.dont_write_bytecode = True
     sys.pycache_prefix = str(PYCACHE)
 
-def git_blob_sha1(payload: bytes, label: str) -> str:
-    canonical = canonical_text(payload, label)
-    header = f"blob {len(canonical)}\0".encode("ascii")
-    return hashlib.sha1(header + canonical).hexdigest()
-
 def verify_source_lock():
     lock_raw = canonical_text(LOCK_PATH.read_bytes(), "Gate A v4 source lock")
     expected_lock_sha = LOCK_SHA_PATH.read_text(encoding="ascii").strip().lower()
     observed_lock_sha = hashlib.sha256(lock_raw).hexdigest()
     if observed_lock_sha != expected_lock_sha:
-        raise RuntimeError("source-lock-v3.sha256 does not match the canonical lock bytes")
+        raise RuntimeError("source-lock-v4.sha256 does not match the canonical lock bytes")
     lock = json.loads(lock_raw)
+    if lock.get("schema_id") != "issue73-gate-a-v4-execution-source-lock-v4":
+        raise RuntimeError("unexpected Gate A v4 source-lock schema")
     if lock.get("attempt_key") != "gate-a-requalification-after-v9-parity-v4":
         raise RuntimeError("unexpected Gate A v4 attempt key")
+    if lock.get("preflight", {}).get("attempt_key") != "builder-gate-a-requalification-v4-startup-preflight-v4":
+        raise RuntimeError("unexpected Gate A v4 readiness preflight attempt key")
     for commit_key in ("study_source_commit", "launcher_source_commit"):
         commit = str(lock.get(commit_key, ""))
         if len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit.lower()):
@@ -98,18 +97,15 @@ def verify_source_lock():
         canonical = canonical_text(checkout, path)
         if hashlib.sha256(canonical).hexdigest() != entry["committed_blob_sha256"]:
             raise RuntimeError(f"locked source SHA-256 changed: {path}")
-        if git_blob_sha1(canonical, path) != entry["git_blob_sha1"]:
-            raise RuntimeError(f"locked Git blob identity changed: {path}")
     verify_parent_evidence(lock)
-    lock_blob_sha1 = git_blob_sha1(lock_raw, "Gate A v4 source lock")
-    return lock, observed_lock_sha, lock["launcher_source_commit"], lock_blob_sha1
+    return lock, observed_lock_sha, lock["launcher_source_commit"]
 def verify_parent_evidence(lock) -> None:
     for item in lock.get("parent_evidence", {}).values():
         path = STUDY / pathlib.PurePosixPath(item["path"])
         if not path.is_file() or sha256_lf(path) != item["sha256"]:
             raise RuntimeError(f"immutable parent evidence changed: {item['path']}")
 
-def verify_preflight_charge(lock, lock_sha: str, lock_blob_sha1: str) -> tuple[dict[str, object], dict[str, object]]:
+def verify_preflight_charge(lock, lock_sha: str) -> tuple[dict[str, object], dict[str, object]]:
     started = read_json(PREFLIGHT_START_PATH)
     ledger = read_json(PREFLIGHT_LEDGER_STARTED_PATH)
     attempt_key = lock["preflight"]["attempt_key"]
@@ -119,10 +115,15 @@ def verify_preflight_charge(lock, lock_sha: str, lock_blob_sha1: str) -> tuple[d
         raise RuntimeError("Gate A readiness preflight lacks its precharged ledger")
     if started.get("source_lock_sha256") != lock_sha or ledger.get("source_lock_sha256") != lock_sha:
         raise RuntimeError("preflight start receipt/ledger does not bind the candidate source lock")
-    if started.get("source_lock_git_blob_sha1") != lock_blob_sha1 or ledger.get("source_lock_git_blob_sha1") != lock_blob_sha1:
-        raise RuntimeError("preflight start receipt/ledger does not bind the source-lock Git blob")
     if started.get("source_lock_commit") != ledger.get("source_lock_commit"):
         raise RuntimeError("preflight receipt and ledger disagree on the lock commit")
+    if started.get("execution_branch") != lock.get("execution_branch") or ledger.get("execution_branch") != lock.get("execution_branch"):
+        raise RuntimeError("preflight receipt/ledger does not bind the execution branch")
+    if started.get("launcher_source_commit") != lock.get("launcher_source_commit") or ledger.get("launcher_source_commit") != lock.get("launcher_source_commit"):
+        raise RuntimeError("preflight receipt/ledger does not bind the reviewed launcher commit")
+    source_lock_commit = str(started.get("source_lock_commit", "")).lower()
+    if len(source_lock_commit) != 40 or any(c not in "0123456789abcdef" for c in source_lock_commit):
+        raise RuntimeError("preflight start receipt does not identify the immutable lock commit")
     if float(started.get("reserved_cpu_seconds", 0)) != 60.0 or float(ledger.get("reservation_cpu_seconds", 0)) != 60.0:
         raise RuntimeError("Gate A readiness preflight requires its fixed 60 CPU-s reservation")
     if float(started.get("builder_charge_after_preflight_cpu_seconds", -1)) != float(started["parent_builder_charge_cpu_seconds"]) + 60.0:
@@ -159,7 +160,6 @@ def verify_gate_a_inputs(lock):
     observed_names = sorted(path.name for path in root_path.glob("root-*.json"))
     if observed_names != expected_names:
         raise RuntimeError("root input file names differ from the locked Git tree")
-    tree_entries = []
     for item in manifest:
         name = str(item["path"])
         if pathlib.PurePosixPath(name).name != name or item.get("mode") != "100644":
@@ -167,15 +167,9 @@ def verify_gate_a_inputs(lock):
         payload = canonical_text((root_path / name).read_bytes(), name)
         if hashlib.sha256(payload).hexdigest() != item["committed_blob_sha256"]:
             raise RuntimeError(f"root input SHA-256 differs from source lock: {name}")
-        blob_sha1 = git_blob_sha1(payload, name)
-        if blob_sha1 != item["git_blob_sha1"]:
-            raise RuntimeError(f"root input Git blob differs from source lock: {name}")
-        tree_entries.append((name.encode("utf-8"), b"100644 " + name.encode("utf-8") + b"\0" + bytes.fromhex(blob_sha1)))
-    tree_body = b"".join(entry for _, entry in sorted(tree_entries, key=lambda pair: pair[0]))
-    tree_object = b"tree " + str(len(tree_body)).encode("ascii") + b"\0" + tree_body
-    observed_tree = hashlib.sha1(tree_object).hexdigest()
-    if observed_tree != lock["root_input_tree"]["git_tree_sha1"]:
-        raise RuntimeError("root input tree differs from source lock")
+    selection = lock.get("root_selection")
+    if not isinstance(selection, dict) or len(selection.get("selected_root_ids", [])) != 24:
+        raise RuntimeError("source lock omits the frozen 24-root Gate A selection")
     roots = stage0.load_roots()
     selected = gate_a.select_corpus(roots)
     selected_ids = [str(row["root_id"]) for row in selected]
@@ -198,6 +192,8 @@ def verify_gate_a_inputs(lock):
         "python_executable": str(pathlib.Path(sys.executable).resolve()), "execution_uid": os.getuid(),
         "source_code_commit": lock["study_source_commit"], "launcher_source_commit": lock["launcher_source_commit"],
         "source_lock_sha256": sha256_lf(LOCK_PATH), "root_count": len(roots),
+        "root_file_manifest_sha256_verified": True,
+        "root_git_tree_sha1_verified_by_launcher": False,
         "selected_root_ids": selected_ids, "selected_root_count": len(selected),
         "selected_screen_family_count": len({str(row["screen"]) for row in selected}),
         "target_sha256": target_sha, "native_module_imported": False,
@@ -208,8 +204,8 @@ def run_preflight(record_report: bool) -> int:
     started_children = resource.getrusage(resource.RUSAGE_CHILDREN)
     started_wall = time.time()
     report = {
-        "schema_id": "issue73-gate-a-v4-startup-preflight-v3",
-        "attempt_key": "builder-gate-a-requalification-v4-startup-preflight-v3",
+        "schema_id": "issue73-gate-a-v4-startup-preflight-v4",
+        "attempt_key": "builder-gate-a-requalification-v4-startup-preflight-v4",
         "status": "FAIL_EXCEPTION",
         "finished_at_utc": None,
         "formal_seed_consumed": False, "gate_a_invoked": False,
@@ -218,8 +214,8 @@ def run_preflight(record_report: bool) -> int:
         "failure": None,
     }
     try:
-        lock, lock_sha, locked_source_commit, lock_blob_sha1 = verify_source_lock()
-        verify_preflight_charge(lock, lock_sha, lock_blob_sha1)
+        lock, lock_sha, locked_source_commit = verify_source_lock()
+        verify_preflight_charge(lock, lock_sha)
         inputs = verify_gate_a_inputs(lock)
         suite = unittest.TestSuite()
         for test_module in ("test_gate_a_target_direction", "test_gate_a_v4_prelaunch"):
@@ -236,7 +232,7 @@ def run_preflight(record_report: bool) -> int:
             "locked_launcher_source_commit": locked_source_commit,
             "runtime_git_head_verified_by_launcher": False,
             "source_lock_sha256": lock_sha,
-            "preflight_reviewer_gate_comment": lock["preflight"]["reviewer_runtime_pass_comment"],
+            "preflight_reviewer_gate_comment": lock["preflight"]["previous_source_map_reviewer_pass_comment"],
         })
     except BaseException as exc:
         report["failure"] = {
@@ -290,7 +286,7 @@ def run_preflight(record_report: bool) -> int:
     return 0 if report["status"] == "PASS" else 2
 
 def execute_gate_a() -> int:
-    lock, lock_sha, locked_source_commit, lock_blob_sha1 = verify_source_lock()
+    lock, lock_sha, locked_source_commit = verify_source_lock()
     if not EXECUTION_START_PATH.is_file():
         raise RuntimeError("Gate A execution is not precharged; refusing to start")
     started = read_json(EXECUTION_START_PATH)
@@ -298,8 +294,15 @@ def execute_gate_a() -> int:
         raise RuntimeError("unique Gate A execution is not in its precharged STARTED state")
     if started.get("source_lock_sha256") != lock_sha:
         raise RuntimeError("Gate A precharge source lock differs from the reviewed lock")
+    if started.get("execution_branch") != lock.get("execution_branch"):
+        raise RuntimeError("Gate A precharge branch differs from the locked execution branch")
+    if started.get("launcher_source_commit") != lock.get("launcher_source_commit"):
+        raise RuntimeError("Gate A precharge launcher commit differs from the source lock")
     if not started.get("reviewer_preflight_pass_comment"):
         raise RuntimeError("independent Reviewer preflight PASS is required before Gate A")
+    approved_commit = str(started.get("reviewed_commit_sha", "")).lower()
+    if len(approved_commit) != 40 or any(c not in "0123456789abcdef" for c in approved_commit):
+        raise RuntimeError("Gate A precharge must record the exact independently reviewed commit SHA")
     if float(started.get("reserved_cpu_seconds", 0)) != 120.0:
         raise RuntimeError("Gate A requires the fixed 120 CPU-s reservation")
     if not PREFLIGHT_REPORT_PATH.is_file():
@@ -318,7 +321,8 @@ def execute_gate_a() -> int:
     with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
         json.dump({
             "attempt_key": lock["attempt_key"], "claimed_at_utc": utc_now(),
-            "pid": os.getpid(), "source_lock_sha256": lock_sha, "started_head": head,
+            "pid": os.getpid(), "source_lock_sha256": lock_sha,
+            "reviewed_commit_sha": approved_commit,
         }, stream, sort_keys=True, indent=2)
         stream.write("\n")
         stream.flush()
@@ -354,7 +358,8 @@ def execute_gate_a() -> int:
         "schema_id": "issue73-gate-a-attempt-v1", "attempt_key": lock["attempt_key"],
         "status": "COMPLETE" if invoked and failure is None and tree_cpu <= 120.0 else "FAIL_OR_INCOMPLETE",
         "gate_status": status, "source_lock_sha256": lock_sha,
-        "source_code_commit": lock["study_source_commit"], "started_head": head,
+        "source_code_commit": lock["study_source_commit"],
+        "reviewed_commit_sha": approved_commit,
         "finished_at_utc": utc_now(), "reserved_cpu_seconds": 120.0,
         "charged_cpu_seconds": 120.0, "measured_process_tree_cpu_seconds": tree_cpu,
         "measured_wall_seconds": float(time.time() - start_wall),
