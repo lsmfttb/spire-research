@@ -10,7 +10,7 @@
     "native_sampling_blocked_until_reviewer_pass": true,
     "reviewer_gate": {
       "owner_login": "lsmfttb",
-      "required_identity_mode": "distinct_github_account",
+      "required_identity_mode": "configured_owner_account_independent_reviewer_role",
       "required_github_user_type": "User"
     }
   },

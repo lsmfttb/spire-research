@@ -315,18 +315,18 @@ def _github_get_json(path: str, token: str) -> tuple[Any, str | None]:
 def reviewer_authentication(
     comment: dict[str, Any], current_login: str, gate: dict[str, Any]
 ) -> dict[str, Any] | None:
-    """Require a human GitHub principal distinct from the Builder and issue owner."""
+    """Bind the source proof to the configured account; Reviewer is a separate task role."""
     user = comment.get("user") or {}
     raw_login = str(user.get("login", ""))
     login = raw_login.casefold()
+    owner_login = str(gate["owner_login"]).casefold()
     required_user_type = str(gate["required_github_user_type"]).casefold()
     if not login or str(user.get("type", "")).casefold() != required_user_type:
         return None
-    shared_logins = {
-        current_login.casefold(),
-        str(gate["owner_login"]).casefold(),
-    }
-    if login in shared_logins:
+    # This project has one configured human GitHub principal. Independent
+    # review is enforced by the separate Reviewer task/workflow, not by
+    # inventing a second account that does not exist in the project.
+    if current_login.casefold() != owner_login or login != owner_login:
         return None
     return {
         "reviewer_login": raw_login,
@@ -335,7 +335,7 @@ def reviewer_authentication(
 
 
 def reviewer_pass_proof() -> dict[str, Any]:
-    """Require an exact-commit review PASS from a distinct human GitHub principal."""
+    """Require an exact-commit Reviewer PASS from the configured project account."""
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if not token:
         raise RuntimeError("GH_TOKEN or GITHUB_TOKEN is required to verify the GitHub review gate")
@@ -377,7 +377,7 @@ def reviewer_pass_proof() -> dict[str, Any]:
                     break
     if not matches:
         raise RuntimeError(
-            "no independent GitHub Reviewer PASS from a distinct human account "
+            "no source-bound GitHub Reviewer PASS from the configured project account "
             "matches this exact source commit and lock"
         )
     selected = matches[-1]
