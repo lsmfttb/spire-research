@@ -7,7 +7,13 @@
     "formal_training_enabled": false,
     "formal_evaluation_enabled": false,
     "formal_owner_seed_table_present": false,
-    "native_sampling_blocked_until_reviewer_pass": true
+    "native_sampling_blocked_until_reviewer_pass": true,
+    "reviewer_gate": {
+      "shared_identity_login": "lsmfttb",
+      "shared_identity_app_id": 1144995,
+      "shared_identity_app_slug": "chatgpt-codex-connector",
+      "shared_identity_app_owner": "openai"
+    }
   },
   "source": {
     "spire_reviewed_commit": "40191f365d9b64390dab0025c77ea9c1c2915175",

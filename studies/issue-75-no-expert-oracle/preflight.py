@@ -312,12 +312,57 @@ def _github_get_json(path: str, token: str) -> tuple[Any, str | None]:
         return json.loads(response.read().decode("utf-8")), response.headers.get("Link")
 
 
+def reviewer_authentication(
+    comment: dict[str, Any], current_login: str, gate: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Accept another GitHub user, or the configured Codex app event for our shared account."""
+    user = comment.get("user") or {}
+    raw_login = str(user.get("login", ""))
+    login = raw_login.casefold()
+    if not login or str(user.get("type", "")).casefold() != "user":
+        return None
+
+    app = comment.get("performed_via_github_app") or {}
+    owner = app.get("owner") or {}
+    raw_app_id = app.get("id")
+    try:
+        app_id = int(raw_app_id) if raw_app_id is not None else None
+    except (TypeError, ValueError):
+        app_id = None
+    app_slug = str(app.get("slug", "")) or None
+    app_owner = str(owner.get("login", "")) or None
+
+    authentication: dict[str, Any] = {
+        "reviewer_login": raw_login,
+        "reviewer_github_app_id": app_id,
+        "reviewer_github_app_slug": app_slug,
+        "reviewer_github_app_owner": app_owner,
+    }
+    shared_logins = {
+        current_login.casefold(),
+        str(gate["shared_identity_login"]).casefold(),
+    }
+    if login not in shared_logins:
+        authentication["identity_mode"] = "distinct_github_account"
+        return authentication
+
+    if (
+        app_id == int(gate["shared_identity_app_id"])
+        and (app_slug or "").casefold() == str(gate["shared_identity_app_slug"]).casefold()
+        and (app_owner or "").casefold() == str(gate["shared_identity_app_owner"]).casefold()
+    ):
+        authentication["identity_mode"] = "codex_connector_app_event"
+        return authentication
+    return None
+
+
 def reviewer_pass_proof() -> dict[str, Any]:
-    """Require an independent exact-commit PASS before any authorized debug sampling."""
+    """Require an exact-commit review PASS with auditable reviewer-channel provenance."""
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if not token:
         raise RuntimeError("GH_TOKEN or GITHUB_TOKEN is required to verify the GitHub review gate")
     lock = verify_source_lock()
+    reviewer_gate = load_json(CONFIG_PATH)["authorization"]["reviewer_gate"]
     current_commit = git("rev-parse", "HEAD")
     lock_sha = normalized_sha256(STUDY / "source-lock.json")
     expected_lines = [
@@ -336,13 +381,13 @@ def reviewer_pass_proof() -> dict[str, Any]:
         if not isinstance(page, list):
             raise RuntimeError("GitHub issue-comment response is not a list")
         for comment in page:
-            user = comment.get("user") or {}
             body = str(comment.get("body", "")).strip().splitlines()
-            login = str(user.get("login", "")).casefold()
-            if body == expected_lines and login not in {"", current_login, "lsmfttb"}:
+            authentication = reviewer_authentication(comment, current_login, reviewer_gate)
+            if body == expected_lines and authentication is not None:
                 matches.append({
                     "comment_id": int(comment["id"]),
-                    "reviewer_login": str(user["login"]),
+                    "reviewer_login": authentication["reviewer_login"],
+                    "reviewer_authentication": authentication,
                 })
         next_url = None
         if link_header:
@@ -353,11 +398,15 @@ def reviewer_pass_proof() -> dict[str, Any]:
                         next_url = next_url[len("https://api.github.com"):]
                     break
     if not matches:
-        raise RuntimeError("no independent GitHub Reviewer PASS matches this exact source commit and lock")
+        raise RuntimeError(
+            "no GitHub Reviewer PASS with distinct-account or configured connector provenance "
+            "matches this exact source commit and lock"
+        )
     selected = matches[-1]
     return {
         "comment_id": selected["comment_id"],
         "reviewer_login": selected["reviewer_login"],
+        "reviewer_authentication": selected["reviewer_authentication"],
         "source_commit": current_commit,
         "source_lock_sha256_lf": lock_sha,
         "formal_training_enabled": lock["formal_training_enabled"],

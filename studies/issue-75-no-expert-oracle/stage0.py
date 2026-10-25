@@ -252,6 +252,7 @@ def _root_worker(root_id: str) -> int:
             or stage_start.get("source_lock_sha256_lf") != lock_sha
             or int(stage_start.get("reviewer_comment_id", -1)) != int(proof["comment_id"])
             or str(stage_start.get("reviewer_login", "")).casefold() != str(proof["reviewer_login"]).casefold()
+            or stage_start.get("reviewer_authentication") != proof["reviewer_authentication"]
             or stage_start.get("status") != "AUTHORIZED_STAGE0_NONFORMAL_ONLY"
             or stage_start.get("formal_training_seed_consumed") is not False
             or stage_start.get("formal_evaluation_seed_consumed") is not False
@@ -276,6 +277,7 @@ def _root_worker(root_id: str) -> int:
             ))
             or int(root_start.get("reviewer_comment_id", -1)) != int(proof["comment_id"])
             or str(root_start.get("reviewer_login", "")).casefold() != str(proof["reviewer_login"]).casefold()
+            or root_start.get("reviewer_authentication") != proof["reviewer_authentication"]
             or root_start.get("formal_training_seed_consumed") is not False
             or root_start.get("formal_evaluation_seed_consumed") is not False
             or int(root_start.get("worker_process_cpu_hard_seconds", -1))
@@ -506,6 +508,7 @@ def _root_worker(root_id: str) -> int:
             "source_commit": source_commit, "source_lock_sha256_lf": lock_sha,
             "reviewer_comment_id": int(proof["comment_id"]),
             "reviewer_login": str(proof["reviewer_login"]),
+            "reviewer_authentication": proof["reviewer_authentication"],
             "policy_sha256": policy_sha, "source_prefix_status": "SOURCE_ROOT_MATCHED",
             "base_terminal_complete": bool(base.complete),
             "base_heart_win": bool(base.heart_win) if base.complete else None,
@@ -541,6 +544,7 @@ def _root_worker(root_id: str) -> int:
             "root_id": root_id,
             "reviewer_comment_id": proof.get("comment_id"),
             "reviewer_login": proof.get("reviewer_login"),
+            "reviewer_authentication": proof.get("reviewer_authentication"),
             "source_commit": proof.get("source_commit"),
             "source_lock_sha256_lf": proof.get("source_lock_sha256_lf"),
             "worker_process_cpu_seconds": max(0.0, process_tree_cpu_seconds() - start_cpu),
@@ -721,6 +725,7 @@ def run_stage0() -> dict[str, Any]:
         "source_lock_sha256_lf": lock_sha,
         "reviewer_comment_id": proof["comment_id"],
         "reviewer_login": proof["reviewer_login"],
+        "reviewer_authentication": proof["reviewer_authentication"],
         "status": "AUTHORIZED_STAGE0_NONFORMAL_ONLY",
         "debug_root_count": len(roots),
         "formal_training_seed_consumed": False,
@@ -841,6 +846,7 @@ def run_stage0() -> dict[str, Any]:
             "owner_seed": owner, "root_id": root_id,
             "source_commit": source_commit, "source_lock_sha256_lf": lock_sha,
             "reviewer_comment_id": proof["comment_id"], "reviewer_login": proof["reviewer_login"],
+            "reviewer_authentication": proof["reviewer_authentication"],
             "worker_process_cpu_hard_seconds": worker_cap,
             "native_root_invocation_caps": {"historical_prefix": 32, "pi0_base": 32, "R": 32, "J": 32},
             "root_proposal_limit": 8,
@@ -1092,6 +1098,7 @@ def run_stage0() -> dict[str, Any]:
         "source_lock_sha256_lf": lock_sha,
         "reviewer_comment_id": proof["comment_id"],
         "reviewer_login": proof["reviewer_login"],
+        "reviewer_authentication": proof["reviewer_authentication"],
         "locked_root_count": len(roots),
         "root_results": [
             {key: value for key, value in row.items()

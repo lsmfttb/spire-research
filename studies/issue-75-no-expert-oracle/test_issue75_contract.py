@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 import algorithm
+import preflight
 
 
 STUDY = Path(__file__).resolve().parent
@@ -52,6 +55,9 @@ class Issue75ContractTests(unittest.TestCase):
         self.assertFalse(config["authorization"]["formal_training_enabled"])
         self.assertFalse(config["authorization"]["formal_evaluation_enabled"])
         self.assertFalse(config["authorization"]["formal_owner_seed_table_present"])
+        self.assertEqual(
+            config["authorization"]["reviewer_gate"]["shared_identity_app_id"], 1144995
+        )
         self.assertEqual(len(config["stage0"]["root_ids"]), 8)
         self.assertEqual(config["search"]["search_invocation_cpu_cap_seconds"], algorithm.SEARCH_CPU_CAP_SECONDS)
         self.assertEqual(config["search"]["search_invocation_started_attempt_cap"], algorithm.SEARCH_STARTED_ATTEMPT_CAP)
@@ -184,6 +190,100 @@ class Issue75ContractTests(unittest.TestCase):
         source = ast.get_source_segment((STUDY / "stage0.py").read_text(encoding="utf-8"), worker)
         self.assertLess(source.index("stage0-start.json"), source.index("initialize_native_runtime"))
         self.assertLess(source.index("parent-created root start receipt"), source.index("initialize_native_runtime"))
+        self.assertIn('stage_start.get("reviewer_authentication")', source)
+        self.assertIn('root_start.get("reviewer_authentication")', source)
+
+    def test_stage0_receipts_preserve_reviewer_authentication_provenance(self) -> None:
+        source = (STUDY / "stage0.py").read_text(encoding="utf-8")
+        self.assertGreaterEqual(
+            source.count('"reviewer_authentication": proof["reviewer_authentication"]'), 4
+        )
+
+    @staticmethod
+    def _reviewer_pass_comment(
+        login: str, app: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        comment: dict[str, object] = {
+            "id": 812345,
+            "user": {"login": login, "type": "User"},
+            "body": "\n".join((
+                "ISSUE75 REVIEW PASS",
+                f"source_commit: {'a' * 40}",
+                f"source_lock_sha256_lf: {'b' * 64}",
+            )),
+        }
+        if app is not None:
+            comment["performed_via_github_app"] = app
+        return comment
+
+    @staticmethod
+    def _run_reviewer_pass(comment: dict[str, object]) -> dict[str, object]:
+        with (
+            patch.dict(os.environ, {"GH_TOKEN": "unit-test-token"}),
+            patch.object(preflight, "verify_source_lock", return_value={
+                "formal_training_enabled": False,
+                "formal_evaluation_enabled": False,
+            }),
+            patch.object(preflight, "git", return_value="a" * 40),
+            patch.object(preflight, "normalized_sha256", return_value="b" * 64),
+            patch.object(preflight, "_github_get_json", side_effect=(
+                ({"login": "lsmfttb"}, None),
+                ([comment], None),
+            )),
+        ):
+            return preflight.reviewer_pass_proof()
+
+    def test_reviewer_gate_accepts_actual_codex_connector_workflow_identity(self) -> None:
+        comment = self._reviewer_pass_comment("lsmfttb", {
+            "id": 1144995,
+            "slug": "chatgpt-codex-connector",
+            "owner": {"login": "openai"},
+        })
+        proof = self._run_reviewer_pass(comment)
+        self.assertEqual(proof["reviewer_login"], "lsmfttb")
+        self.assertEqual(proof["reviewer_authentication"], {
+            "reviewer_login": "lsmfttb",
+            "reviewer_github_app_id": 1144995,
+            "reviewer_github_app_slug": "chatgpt-codex-connector",
+            "reviewer_github_app_owner": "openai",
+            "identity_mode": "codex_connector_app_event",
+        })
+
+    def test_reviewer_gate_rejects_same_identity_without_connector_provenance(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "no GitHub Reviewer PASS"):
+            self._run_reviewer_pass(self._reviewer_pass_comment("lsmfttb"))
+
+    def test_reviewer_gate_rejects_shared_identity_from_wrong_github_app(self) -> None:
+        comment = self._reviewer_pass_comment("lsmfttb", {
+            "id": 1,
+            "slug": "untrusted-app",
+            "owner": {"login": "example"},
+        })
+        with self.assertRaisesRegex(RuntimeError, "no GitHub Reviewer PASS"):
+            self._run_reviewer_pass(comment)
+
+    def test_reviewer_gate_rejects_stale_lock_even_with_connector_provenance(self) -> None:
+        comment = self._reviewer_pass_comment("lsmfttb", {
+            "id": 1144995,
+            "slug": "chatgpt-codex-connector",
+            "owner": {"login": "openai"},
+        })
+        comment["body"] = str(comment["body"]).replace("b" * 64, "c" * 64)
+        with self.assertRaisesRegex(RuntimeError, "no GitHub Reviewer PASS"):
+            self._run_reviewer_pass(comment)
+
+    def test_reviewer_gate_accepts_distinct_github_reviewer_account(self) -> None:
+        proof = self._run_reviewer_pass(self._reviewer_pass_comment("independent-reviewer"))
+        self.assertEqual(proof["reviewer_login"], "independent-reviewer")
+        self.assertEqual(
+            proof["reviewer_authentication"]["identity_mode"], "distinct_github_account"
+        )
+
+    def test_reviewer_gate_rejects_automation_accounts(self) -> None:
+        comment = self._reviewer_pass_comment("review-bot")
+        comment["user"] = {"login": "review-bot", "type": "Bot"}
+        with self.assertRaisesRegex(RuntimeError, "no GitHub Reviewer PASS"):
+            self._run_reviewer_pass(comment)
 
 
 if __name__ == "__main__":
