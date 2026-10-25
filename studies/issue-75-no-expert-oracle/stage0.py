@@ -164,6 +164,8 @@ def _trial_receipt(trial: TrialResult) -> dict[str, Any]:
             ],
             "terminal_outcome_recorded": False,
         })
+        if trial.failure_detail is not None:
+            row["failure_detail"] = dict(trial.failure_detail)
     return row
 
 

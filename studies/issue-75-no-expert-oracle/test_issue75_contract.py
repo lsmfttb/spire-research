@@ -300,17 +300,23 @@ class Issue75ContractTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "does not match the locked Stage-0 source"):
                 runtime._validate_parent_sampling_proof(proof)
 
-    def test_native_checkpoint_owner_adapter_delegates_to_simulator(self) -> None:
+    def test_native_checkpoint_owner_adapter_preserves_adapter_checkpoint_contract(self) -> None:
         class FakeSimulator:
             def capture_checkpoint(self) -> tuple[str]:
-                return ("checkpoint",)
+                return ("native-checkpoint",)
 
             def restore_checkpoint(self, checkpoint: object) -> tuple[str, object]:
-                return ("restored", checkpoint)
+                return ("native-restored", checkpoint)
 
         simulator = FakeSimulator()
         class FakeAdapter:
             _sim = simulator
+
+            def capture_checkpoint(self, snapshot: object) -> tuple[str, object, object]:
+                return ("adapter-checkpoint", snapshot, self._sim.capture_checkpoint())
+
+            def restore_checkpoint(self, checkpoint: tuple[str, object, object]) -> tuple[str, object, object]:
+                return ("adapter-restored", checkpoint, self._sim.restore_checkpoint(checkpoint[2]))
 
             def close(self) -> str:
                 return "closed"
@@ -323,8 +329,11 @@ class Issue75ContractTests(unittest.TestCase):
         adapter = runtime.NativeCheckpointOwnerAdapter(FakeRunner(), FakeAdapter())
         snapshot = object()
         checkpoint = adapter.capture_checkpoint(snapshot)
-        self.assertEqual(checkpoint, ("checkpoint",))
-        self.assertEqual(adapter.restore_checkpoint(checkpoint), ("restored", checkpoint))
+        self.assertEqual(checkpoint, ("adapter-checkpoint", snapshot, ("native-checkpoint",)))
+        self.assertEqual(
+            adapter.restore_checkpoint(checkpoint),
+            ("adapter-restored", checkpoint, ("native-restored", ("native-checkpoint",))),
+        )
         self.assertEqual(adapter.close(), "closed")
 
     def test_incomplete_trial_receipt_keeps_only_safe_missing_attribute_detail(self) -> None:
@@ -338,12 +347,16 @@ class Issue75ContractTests(unittest.TestCase):
             failure_detail=detail,
         )
         payload = runtime._safe_trial_payload(trial)
-        self.assertEqual(payload["failure_detail"], {
+        receipt = stage0._trial_receipt(trial)
+        expected = {
             "kind": "missing_attribute",
             "exception_type": "AttributeError",
             "missing_attribute": "capture_checkpoint",
-        })
+        }
+        self.assertEqual(payload["failure_detail"], expected)
+        self.assertEqual(receipt["failure_detail"], expected)
         self.assertNotIn("private message", json.dumps(payload))
+        self.assertNotIn("private message", json.dumps(receipt))
         self.assertEqual(stage0._decode_trial(payload).failure_detail, detail)
 
     def test_diagnostic_unavailable_is_not_classified_as_uninformative(self) -> None:
@@ -419,6 +432,12 @@ class Issue75ContractTests(unittest.TestCase):
                 self.simulator = FakeSimulator()
                 adapter_rows.append(self)
 
+            def capture_checkpoint(self, snapshot):
+                return ("adapter-checkpoint", snapshot)
+
+            def restore_checkpoint(self, checkpoint):
+                return ("adapter-restored", checkpoint)
+
             def close(self):
                 self.closed = True
 
@@ -478,7 +497,7 @@ class Issue75ContractTests(unittest.TestCase):
         self.assertIs(captured["adapter_override"]._adapter, adapter_rows[0])
         self.assertIs(root.adapter, captured["adapter_override"])
         self.assertIs(root.checkpoint, checkpoint)
-        self.assertEqual(root.adapter.capture_checkpoint("snapshot"), ("checkpoint",))
+        self.assertEqual(root.adapter.capture_checkpoint("snapshot"), ("adapter-checkpoint", "snapshot"))
         self.assertFalse(adapter_rows[0].closed)
 
     def test_native_continuations_reuse_the_adapter_that_owns_each_checkpoint(self) -> None:

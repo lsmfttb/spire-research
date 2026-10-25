@@ -46,12 +46,11 @@ class NativeCheckpointOwnerAdapter:
         return getattr(self._adapter, name)
 
     def capture_checkpoint(self, snapshot: Any) -> Any:
-        # StepSimulator owns the native state and its bound capture API is
-        # zero-argument; `snapshot` is only part of the adapter interface.
-        return self._simulator.capture_checkpoint()
+        # Delegate through the owning adapter to retain its typed checkpoint metadata.
+        return self._adapter.capture_checkpoint(snapshot)
 
     def restore_checkpoint(self, checkpoint: Any) -> Any:
-        return self._simulator.restore_checkpoint(checkpoint)
+        return self._adapter.restore_checkpoint(checkpoint)
 
 
 @dataclass(frozen=True)
