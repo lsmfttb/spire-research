@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
@@ -17,7 +18,7 @@ from algorithm import (
     J_ROOT_TRIAL_CAP, MutationTarget, R_ROOT_TRIAL_CAP, SEARCH_CPU_CAP_SECONDS,
     SEARCH_STARTED_ATTEMPT_CAP, SearchBudgetExhausted,
     TrialResult, canonical, identity_key, process_tree_cpu_seconds,
-    run_search, write_immutable_json,
+    run_search, safe_exception_trace, write_immutable_json,
 )
 from preflight import load_json, normalized_sha256, reviewer_pass_proof, verify_source_lock
 
@@ -157,6 +158,10 @@ def _trial_receipt(trial: TrialResult) -> dict[str, Any]:
     else:
         row.update({
             "failure_boundary": str(trial.failure_boundary or "incomplete_without_terminal_outcome"),
+            "failure_trace": [
+                {"file": filename, "function": function, "line": line}
+                for filename, function, line in trial.failure_trace
+            ],
             "terminal_outcome_recorded": False,
         })
     return row
@@ -168,11 +173,61 @@ def _safe_failure(error: BaseException, *, boundary: str) -> dict[str, Any]:
         "status": "INCOMPLETE",
         "failure_boundary": boundary,
         "error_type": type(error).__name__,
+        "failure_trace": [
+            {"file": filename, "function": function, "line": line}
+            for filename, function, line in safe_exception_trace(error)
+        ],
         "native_checkpoint_persisted": False,
         "privileged_projection_persisted": False,
         "formal_training_seed_consumed": False,
         "formal_evaluation_seed_consumed": False,
     }
+
+
+def _reviewer_proof_from_parent_receipt(
+    stage_start: Mapping[str, Any], *, source_commit: str, lock_sha: str,
+    config: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate the parent's exact-source Reviewer gate without repeating network I/O."""
+    gate = config["authorization"]["reviewer_gate"]
+    login = str(stage_start.get("reviewer_login", ""))
+    authentication = stage_start.get("reviewer_authentication")
+    try:
+        comment_id = int(stage_start.get("reviewer_comment_id", -1))
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("parent Stage-0 receipt has an invalid Reviewer comment ID") from exc
+    expected_authentication = {
+        "identity_mode": str(gate["required_identity_mode"]),
+        "reviewer_login": login,
+    }
+    if (
+        stage_start.get("source_commit") != source_commit
+        or stage_start.get("source_lock_sha256_lf") != lock_sha
+        or stage_start.get("status") != "AUTHORIZED_STAGE0_NONFORMAL_ONLY"
+        or stage_start.get("formal_training_seed_consumed") is not False
+        or stage_start.get("formal_evaluation_seed_consumed") is not False
+        or comment_id <= 0
+        or login.casefold() != str(gate["owner_login"]).casefold()
+        or authentication != expected_authentication
+    ):
+        raise RuntimeError("parent Stage-0 receipt does not contain the locked Reviewer authorization")
+    return {
+        "comment_id": comment_id,
+        "reviewer_login": login,
+        "reviewer_authentication": expected_authentication,
+    }
+
+
+def _worker_authorization_gate_error(stderr: bytes) -> str | None:
+    """Extract only the worker's fixed error-class marker; discard all other stderr."""
+    prefix = "ISSUE75_ROOT_AUTHORIZATION_GATE_REJECTED:"
+    for line in stderr[-4096:].decode("utf-8", "replace").splitlines():
+        if line.startswith(prefix):
+            error_type = line[len(prefix):]
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", error_type):
+                return error_type
+            return None
+    return None
 
 
 def _current_root_worker_pids(root_id: str) -> list[int]:
@@ -277,11 +332,13 @@ def _root_worker(root_id: str) -> int:
     try:
         config, source_lock, lock_sha, source_commit = _load_locked_state()
         _safe_config_preflight(config)
-        proof = reviewer_pass_proof()
         stage_start_path = RECEIPTS / "stage0-start.json"
         if not stage_start_path.is_file():
             raise RuntimeError("root worker requires the parent Stage-0 authorization receipt")
         stage_start = _read_json(stage_start_path)
+        proof = _reviewer_proof_from_parent_receipt(
+            stage_start, source_commit=source_commit, lock_sha=lock_sha, config=config,
+        )
         if (
             stage_start.get("source_commit") != source_commit
             or stage_start.get("source_lock_sha256_lf") != lock_sha
@@ -910,7 +967,7 @@ def run_stage0() -> dict[str, Any]:
                 "process_group_id": int(process.pid),
                 "worker_command_sha256": hashlib.sha256(canonical(worker_command + [root_id]).encode()).hexdigest(),
             })
-            stdout, _stderr, exit_code, process_tree_cpu, worker_cpu_watchdog_triggered = _communicate_with_tree_cpu_cap(
+            stdout, stderr, exit_code, process_tree_cpu, worker_cpu_watchdog_triggered = _communicate_with_tree_cpu_cap(
                 process, cap=float(worker_cap) - 1.0,
             )
         except BaseException:
@@ -932,13 +989,18 @@ def run_stage0() -> dict[str, Any]:
         elif marker and isinstance(marker.get("root_result"), dict):
             summary = _write_result_once(paths["result"], marker["root_result"])
         else:
+            gate_error = _worker_authorization_gate_error(stderr)
             summary = _write_result_once(paths["result"], {
                 "schema_id": "issue75-stage0-root-result-v1",
                 "status": "RESOURCE_BLOCKED" if worker_cpu_watchdog_triggered else "WORKER_FAILED_WITHOUT_TERMINAL_RECEIPT",
                 "owner_seed": owner, "root_id": root_id,
                 "source_commit": source_commit, "source_lock_sha256_lf": lock_sha,
                 "process_exit_code": exit_code,
-                "failure_boundary": "worker_missing_safe_result_marker",
+                "failure_boundary": (
+                    f"worker_authorization_gate_rejected:{gate_error}"
+                    if gate_error else "worker_missing_safe_result_marker"
+                ),
+                "native_sampling_started": False if gate_error else None,
                 "native_checkpoint_persisted": False, "privileged_projection_persisted": False,
                 "formal_training_seed_consumed": False, "formal_evaluation_seed_consumed": False,
             })

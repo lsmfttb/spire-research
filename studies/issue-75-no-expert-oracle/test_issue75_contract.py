@@ -130,6 +130,101 @@ class Issue75ContractTests(unittest.TestCase):
             else:
                 os.environ[stage0.STAGE0_ATTEMPT_ENV] = prior_env
 
+    def test_incomplete_receipts_keep_bounded_static_exception_trace_only(self) -> None:
+        try:
+            raise RuntimeError("private detail must not enter a receipt")
+        except RuntimeError as exc:
+            trace = algorithm.safe_exception_trace(exc)
+        self.assertTrue(trace)
+        self.assertLessEqual(len(trace), 8)
+        self.assertEqual(trace[-1][0], Path(__file__).name)
+        self.assertEqual(trace[-1][1], "test_incomplete_receipts_keep_bounded_static_exception_trace_only")
+        trial = algorithm.TrialResult(
+            attempt_index=1, complete=False, failure_boundary="native_continuation_error:RuntimeError",
+            failure_trace=trace,
+        )
+        expected = [
+            {"file": filename, "function": function, "line": line}
+            for filename, function, line in trace
+        ]
+        for receipt in (runtime._safe_trial_payload(trial), stage0._trial_receipt(trial)):
+            self.assertEqual(receipt["failure_trace"], expected)
+            self.assertNotIn("private detail", json.dumps(receipt))
+            self.assertNotIn(str(STUDY.parent), json.dumps(receipt))
+        with self.assertRaisesRegex(ValueError, "frame limit"):
+            algorithm.safe_exception_trace(RuntimeError(), max_frames=0)
+
+    def test_worker_reuses_only_matching_parent_reviewer_receipt(self) -> None:
+        config = json.loads((STUDY / "config.json").read_text(encoding="utf-8"))
+        gate = config["authorization"]["reviewer_gate"]
+        source_commit = "a" * 40
+        lock_sha = "b" * 64
+        login = str(gate["owner_login"])
+        receipt = {
+            "source_commit": source_commit,
+            "source_lock_sha256_lf": lock_sha,
+            "reviewer_comment_id": 6397788284,
+            "reviewer_login": login,
+            "reviewer_authentication": {
+                "identity_mode": gate["required_identity_mode"],
+                "reviewer_login": login,
+            },
+            "status": "AUTHORIZED_STAGE0_NONFORMAL_ONLY",
+            "formal_training_seed_consumed": False,
+            "formal_evaluation_seed_consumed": False,
+        }
+        proof = stage0._reviewer_proof_from_parent_receipt(
+            receipt, source_commit=source_commit, lock_sha=lock_sha, config=config,
+        )
+        self.assertEqual(proof["comment_id"], receipt["reviewer_comment_id"])
+        self.assertEqual(proof["reviewer_authentication"], receipt["reviewer_authentication"])
+        for key, invalid in (
+            ("source_commit", "c" * 40),
+            ("source_lock_sha256_lf", "d" * 64),
+            ("reviewer_comment_id", 0),
+            ("reviewer_login", "unconfigured-user"),
+            ("status", "PENDING"),
+            ("formal_training_seed_consumed", True),
+            ("reviewer_authentication", {"identity_mode": "other"}),
+        ):
+            changed = dict(receipt)
+            changed[key] = invalid
+            with self.subTest(key=key), self.assertRaises(RuntimeError):
+                stage0._reviewer_proof_from_parent_receipt(
+                    changed, source_commit=source_commit, lock_sha=lock_sha, config=config,
+                )
+
+    def test_worker_auth_gate_error_parser_keeps_only_known_class_marker(self) -> None:
+        self.assertEqual(
+            stage0._worker_authorization_gate_error(
+                b"ISSUE75_ROOT_AUTHORIZATION_GATE_REJECTED:URLError\nsecret detail\n",
+            ),
+            "URLError",
+        )
+        self.assertEqual(
+            stage0._worker_authorization_gate_error(
+                b"x" * 8192 + b"\nISSUE75_ROOT_AUTHORIZATION_GATE_REJECTED:RuntimeError\n",
+            ),
+            "RuntimeError",
+        )
+        self.assertIsNone(stage0._worker_authorization_gate_error(b"secret detail\n"))
+        self.assertIsNone(stage0._worker_authorization_gate_error(
+            b"ISSUE75_ROOT_AUTHORIZATION_GATE_REJECTED:URLError:secret\n",
+        ))
+
+    def test_root_worker_does_not_repeat_github_reviewer_lookup(self) -> None:
+        tree = ast.parse((STUDY / "stage0.py").read_text(encoding="utf-8"))
+        worker = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_root_worker"
+        )
+        calls = [
+            node.func.id if isinstance(node.func, ast.Name)
+            else node.func.attr if isinstance(node.func, ast.Attribute) else ""
+            for node in ast.walk(worker) if isinstance(node, ast.Call)
+        ]
+        self.assertNotIn("reviewer_pass_proof", calls)
+
     def test_checkpoint_adapter_stays_volatile_through_decision_capture(self) -> None:
         import numpy as np
 
@@ -403,7 +498,10 @@ class Issue75ContractTests(unittest.TestCase):
         for node in ast.walk(worker):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                 call_lines.setdefault(node.func.id, []).append(node.lineno)
-        self.assertLess(min(call_lines["reviewer_pass_proof"]), min(call_lines["initialize_native_runtime"]))
+        self.assertLess(
+            min(call_lines["_reviewer_proof_from_parent_receipt"]),
+            min(call_lines["initialize_native_runtime"]),
+        )
         source = ast.get_source_segment((STUDY / "stage0.py").read_text(encoding="utf-8"), worker)
         self.assertLess(source.index("stage0-start.json"), source.index("initialize_native_runtime"))
         self.assertLess(source.index("parent-created root start receipt"), source.index("initialize_native_runtime"))

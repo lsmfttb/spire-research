@@ -144,6 +144,22 @@ class Decision:
         return self.legal_identities[self.chosen_index]
 
 
+def safe_exception_trace(
+    error: BaseException, *, max_frames: int = 8,
+) -> tuple[tuple[str, str, int], ...]:
+    """Return bounded static call-site metadata without exception text or locals."""
+    import traceback
+
+    if not 1 <= int(max_frames) <= 16:
+        raise ValueError("safe exception trace frame limit must be in [1, 16]")
+    frames = traceback.extract_tb(error.__traceback__)[-int(max_frames):]
+    result = []
+    for frame in frames:
+        filename = str(frame.filename).replace("\\", "/").rsplit("/", 1)[-1]
+        result.append((filename[:128] or "<unknown>", str(frame.name)[:128], int(frame.lineno)))
+    return tuple(result)
+
+
 @dataclass(frozen=True)
 class TrialResult:
     attempt_index: int
@@ -153,6 +169,7 @@ class TrialResult:
     root_identity: Mapping[str, Any] | None = None
     decisions: tuple[Decision, ...] = ()
     failure_boundary: str | None = None
+    failure_trace: tuple[tuple[str, str, int], ...] = field(default_factory=tuple, repr=False, compare=False)
     cpu_seconds: float | None = None
     wall_seconds: float | None = None
     native_rng_source: str = "restored_checkpoint_native_rng_same_future_stream"
@@ -169,6 +186,16 @@ class TrialResult:
                 raise ValueError("completed trajectory cannot carry an incomplete failure boundary")
         elif self.heart_win or self.terminal_floor is not None:
             raise ValueError("incomplete trajectories cannot carry fabricated terminal outcomes")
+        if self.complete and self.failure_trace:
+            raise ValueError("completed trajectory cannot carry a failure trace")
+        if len(self.failure_trace) > 8:
+            raise ValueError("failure trace exceeds its bounded receipt limit")
+        for filename, function, line in self.failure_trace:
+            if (
+                not filename or "/" in filename or "\\" in filename
+                or not function or int(line) < 1
+            ):
+                raise ValueError("failure trace must contain only basename/function/line metadata")
 
     @property
     def rank(self) -> tuple[int, float, int]:

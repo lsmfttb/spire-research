@@ -13,7 +13,7 @@ import sys
 import time
 from typing import Any, Iterator, Mapping, Sequence
 
-from algorithm import Decision, SearchBudgetExhausted, TrialResult
+from algorithm import Decision, SearchBudgetExhausted, TrialResult, safe_exception_trace
 from model import ActionConditionedPolicy, model_digest
 
 STUDY = Path(__file__).resolve().parent
@@ -371,6 +371,10 @@ def _safe_trial_payload(trial: TrialResult | None) -> dict[str, Any] | None:
         return {
             "attempt_index": int(trial.attempt_index), "complete": False,
             "failure_boundary": trial.failure_boundary,
+            "failure_trace": [
+                {"file": filename, "function": function, "line": line}
+                for filename, function, line in trial.failure_trace
+            ],
             "cpu_seconds": trial.cpu_seconds, "wall_seconds": trial.wall_seconds,
         }
     return {
@@ -456,6 +460,7 @@ def execute_policy_trajectory(
         return TrialResult(
             attempt_index=int(attempt_index), complete=False,
             failure_boundary=f"native_continuation_error:{type(exc).__name__}",
+            failure_trace=safe_exception_trace(exc),
             cpu_seconds=max(0.0, process_tree_cpu_seconds() - started_cpu),
             wall_seconds=max(0.0, time.monotonic() - started_wall),
         )
