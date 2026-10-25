@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+import subprocess
+import tempfile
 import unittest
+from unittest.mock import patch
 
 import protocol
+import runner
 
 
 def synthetic_roots() -> list[dict]:
@@ -101,6 +107,104 @@ class Issue74ProtocolTests(unittest.TestCase):
         receipt["candidate_index"] = 0
         with self.assertRaises(protocol.ContractError):
             protocol.verify_forced_root_receipt(row, index, receipt)
+
+
+class ReviewerPreflightGateTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory(prefix="issue74-review-gate-",
+                                                dir=Path(__file__).resolve().parent)
+        self.addCleanup(self.temp.cleanup)
+        self.repo = Path(self.temp.name) / "repo"
+        self.here = self.repo / "studies" / "issue-74-oracle-feasibility"
+        self.here.mkdir(parents=True)
+        self.selection_path = self.here / "selection-lock.json"
+        self.preflight_path = self.here / "reviewer-preflight.json"
+        self._git("init", "-q")
+        self._git("config", "user.name", "Issue 74 gate test")
+        self._git("config", "user.email", "issue74-gate-test@example.invalid")
+        (self.repo / "baseline.txt").write_text("baseline\n", encoding="utf-8")
+        self._git("add", "--", "baseline.txt")
+        self._git("commit", "-q", "-m", "fixture baseline")
+        self._write_json(self.selection_path, {
+            "schema_id": "issue74-prospective-selection-lock-v1", "selection": "original"})
+        self._commit_path(self.selection_path, "reviewed selection")
+        self.reviewed_commit = self._git("rev-parse", "HEAD")
+        self._write_valid_preflight()
+        self._commit_path(self.preflight_path, "record reviewer preflight")
+
+    def _git(self, *args: str) -> str:
+        result = subprocess.run(["git", "-C", str(self.repo), *args], text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        if result.returncode:
+            self.fail(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+        return result.stdout.strip()
+
+    def _write_json(self, path: Path, value: dict) -> None:
+        path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n",
+                        encoding="utf-8")
+
+    def _commit_path(self, path: Path, message: str) -> None:
+        relative = path.relative_to(self.repo).as_posix()
+        self._git("add", "--", relative)
+        self._git("commit", "-q", "-m", message)
+
+    def _write_valid_preflight(self) -> None:
+        self._write_json(self.preflight_path, {
+            "status": "PASS",
+            "reviewer_login": "independent-reviewer",
+            "github_comment_url": "https://github.com/lsmfttb/spire-research/issues/74#issuecomment-1234567890",
+            "reviewed_commit": self.reviewed_commit,
+            "reviewed_selection_lock_sha256": runner._text_sha(self.selection_path),
+        })
+
+    def _verify(self) -> dict:
+        with (patch.object(runner, "REPO", self.repo),
+              patch.object(runner, "HERE", self.here),
+              patch.object(runner, "SELECTION_LOCK_PATH", self.selection_path),
+              patch.object(runner, "REVIEWER_PREFLIGHT_PATH", self.preflight_path),
+              patch.object(runner, "_verify_package", return_value={})):
+            return runner.verify_reviewer_preflight()
+
+    def test_committed_preflight_for_exact_reviewed_selection_passes(self) -> None:
+        result = self._verify()
+        self.assertEqual(result["reviewed_commit"], self.reviewed_commit)
+        self.assertEqual(result["selection_lock_sha256"], runner._text_sha(self.selection_path))
+
+    def test_uncommitted_selection_and_matching_preflight_are_rejected(self) -> None:
+        self._write_json(self.selection_path, {
+            "schema_id": "issue74-prospective-selection-lock-v1", "selection": "tampered"})
+        self._write_valid_preflight()
+        with self.assertRaisesRegex(protocol.ContractError, "clean execution worktree"):
+            self._verify()
+
+    def test_committed_selection_tampering_after_review_is_rejected(self) -> None:
+        self._write_json(self.selection_path, {
+            "schema_id": "issue74-prospective-selection-lock-v1", "selection": "tampered"})
+        self._commit_path(self.selection_path, "tamper reviewed selection")
+        with self.assertRaisesRegex(protocol.ContractError, "selected-root lock Git blob changed"):
+            self._verify()
+
+    def test_ancestor_without_the_reviewed_selection_blob_is_rejected(self) -> None:
+        preflight = json.loads(self.preflight_path.read_text(encoding="utf-8"))
+        preflight["reviewed_commit"] = self._git("rev-parse", f"{self.reviewed_commit}^")
+        self._write_json(self.preflight_path, preflight)
+        self._commit_path(self.preflight_path, "cite ancestor without selection lock")
+        with self.assertRaisesRegex(protocol.ContractError, "selected-root lock Git blob changed"):
+            self._verify()
+
+    def test_uncommitted_preflight_edit_is_rejected(self) -> None:
+        self._write_json(self.preflight_path, {
+            "status": "PASS", "reviewer_login": "forged-reviewer"})
+        with self.assertRaisesRegex(protocol.ContractError, "clean execution worktree"):
+            self._verify()
+
+    def test_committed_preflight_tampering_after_pass_is_rejected(self) -> None:
+        tampered = json.loads(self.preflight_path.read_text(encoding="utf-8"))
+        tampered["reviewer_login"] = "forged-reviewer"
+        self._write_json(self.preflight_path, tampered)
+        self._commit_path(self.preflight_path, "tamper reviewer receipt")
+        with self.assertRaisesRegex(protocol.ContractError, "only commit after the reviewed SHA"):
+            self._verify()
 
 
 if __name__ == "__main__":

@@ -58,6 +58,26 @@ def _git(root: Path, *args: str, check: bool = True) -> str:
     return result.stdout.strip()
 
 
+def _git_blob_oid(root: Path, revision: str, relative_path: str) -> str:
+    result = subprocess.run(["git", "-C", str(root), "rev-parse", "--verify",
+                             f"{revision}:{relative_path}"], text=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    if result.returncode:
+        return ""
+    return result.stdout.strip()
+
+
+def _git_blob_text_sha(root: Path, revision: str, relative_path: str) -> str:
+    result = subprocess.run(["git", "-C", str(root), "show", f"{revision}:{relative_path}"],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    if result.returncode:
+        raise protocol.ContractError(f"committed file is missing: {revision}:{relative_path}")
+    raw = result.stdout
+    if b"\r" in raw.replace(b"\r\n", b""):
+        raise protocol.ContractError(f"bare CR in committed text file: {revision}:{relative_path}")
+    return protocol.sha256_bytes(raw.replace(b"\r\n", b"\n"))
+
+
 def _is_ancestor(root: Path, older: str, newer: str) -> bool:
     return subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor",
                            older, newer], check=False).returncode == 0
@@ -345,6 +365,9 @@ def prepare_selection_lock(*, native_root: Path, stsr_root: Path, native_module:
 
 
 def verify_reviewer_preflight() -> dict[str, Any]:
+    dirty = _git(REPO, "status", "--porcelain=v1", "--untracked-files=all")
+    if dirty:
+        raise protocol.ContractError("Reviewer preflight requires a clean execution worktree")
     _verify_package(require_committed=True)
     selection = _json(SELECTION_LOCK_PATH)
     preflight = _json(REVIEWER_PREFLIGHT_PATH)
@@ -354,16 +377,40 @@ def verify_reviewer_preflight() -> dict[str, Any]:
             or not str(preflight.get("github_comment_url", "")).startswith(
                 "https://github.com/lsmfttb/spire-research/issues/74#issuecomment-")):
         raise protocol.ContractError("native sampling requires a durable independent Reviewer PASS comment")
-    selection_sha = _text_sha(SELECTION_LOCK_PATH)
-    if preflight.get("reviewed_selection_lock_sha256") != selection_sha:
-        raise protocol.ContractError("Reviewer PASS does not match the current selected-root lock")
     reviewed_commit = str(preflight.get("reviewed_commit", ""))
-    if not reviewed_commit or not _is_ancestor(REPO, reviewed_commit, _git(REPO, "rev-parse", "HEAD")):
-        raise protocol.ContractError("Reviewer PASS must cite an ancestor commit in this execution branch")
-    changed = _git(REPO, "diff", "--name-only", f"{reviewed_commit}..HEAD").splitlines()
-    allowed = {f"{HERE.relative_to(REPO).as_posix()}/reviewer-preflight.json"}
-    if set(changed) - allowed:
-        raise protocol.ContractError("code or source lock changed after Reviewer PASS")
+    if (len(reviewed_commit) != 40
+            or any(character not in "0123456789abcdef" for character in reviewed_commit)):
+        raise protocol.ContractError("Reviewer PASS must cite a full lowercase commit SHA")
+    head = _git(REPO, "rev-parse", "HEAD")
+    resolved_reviewed = _git(REPO, "rev-parse", "--verify", f"{reviewed_commit}^{{commit}}",
+                             check=False)
+    if resolved_reviewed != reviewed_commit or not _is_ancestor(REPO, reviewed_commit, head):
+        raise protocol.ContractError("Reviewer PASS must cite an exact commit in this execution branch")
+
+    selection_rel = SELECTION_LOCK_PATH.relative_to(REPO).as_posix()
+    preflight_rel = REVIEWER_PREFLIGHT_PATH.relative_to(REPO).as_posix()
+    reviewed_selection_blob = _git_blob_oid(REPO, reviewed_commit, selection_rel)
+    current_selection_blob = _git_blob_oid(REPO, head, selection_rel)
+    if not reviewed_selection_blob or reviewed_selection_blob != current_selection_blob:
+        raise protocol.ContractError("selected-root lock Git blob changed after Reviewer PASS")
+    selection_sha = _text_sha(SELECTION_LOCK_PATH)
+    if (preflight.get("reviewed_selection_lock_sha256") != selection_sha
+            or _git_blob_text_sha(REPO, reviewed_commit, selection_rel) != selection_sha
+            or _git_blob_text_sha(REPO, head, selection_rel) != selection_sha):
+        raise protocol.ContractError("Reviewer PASS does not match the committed selected-root lock")
+
+    if _git_blob_oid(REPO, reviewed_commit, preflight_rel):
+        raise protocol.ContractError("reviewer-preflight receipt must be added after the reviewed commit")
+    current_preflight_blob = _git_blob_oid(REPO, head, preflight_rel)
+    if (not current_preflight_blob
+            or _git_blob_text_sha(REPO, head, preflight_rel) != _text_sha(REVIEWER_PREFLIGHT_PATH)):
+        raise protocol.ContractError("Reviewer preflight receipt must match a committed Git blob")
+    parent = _git(REPO, "rev-parse", "--verify", f"{head}^", check=False)
+    if parent != reviewed_commit:
+        raise protocol.ContractError("Reviewer preflight must be the only commit after the reviewed SHA")
+    changed = set(_git(REPO, "diff", "--name-only", f"{reviewed_commit}..{head}").splitlines())
+    if changed != {preflight_rel}:
+        raise protocol.ContractError("only the committed Reviewer preflight receipt may follow the reviewed SHA")
     return {"reviewed_commit": reviewed_commit, "reviewer": preflight["reviewer_login"],
             "comment_url": preflight["github_comment_url"], "selection_lock_sha256": selection_sha}
 
