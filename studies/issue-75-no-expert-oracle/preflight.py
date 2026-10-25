@@ -228,7 +228,7 @@ def make_source_lock(config: dict[str, Any], provenance: dict[str, Any]) -> dict
         "status": "SOURCE_LOCKED_PENDING_INDEPENDENT_REVIEW",
         "study_id": config["study_id"],
         "source_parent_commit": config["source"]["spire_reviewed_commit"],
-        "source_branch": "codex/issue-75-joint-oracle-stage0-20261025",
+        "source_branch": git("symbolic-ref", "--short", "HEAD"),
         "scope": config["study_scope"],
         "stage0_only": True,
         "formal_training_enabled": False,
