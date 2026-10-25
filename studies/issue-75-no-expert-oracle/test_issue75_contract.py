@@ -4,6 +4,7 @@ import ast
 import json
 import os
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -49,6 +50,17 @@ def _terminal_trial(
 
 
 class Issue75ContractTests(unittest.TestCase):
+    def test_immutable_json_receipt_accepts_crlf_but_never_overwrites_content(self) -> None:
+        with tempfile.TemporaryDirectory(dir=STUDY) as temp_dir:
+            path = Path(temp_dir) / "receipt.json"
+            original = b'{\r\n  "status": "PASS"\r\n}\r\n'
+            path.write_bytes(original)
+            preflight.write_locked_file(path, {"status": "PASS"})
+            self.assertEqual(path.read_bytes(), original)
+            with self.assertRaises(FileExistsError):
+                preflight.write_locked_file(path, {"status": "DIFFERENT"})
+            self.assertEqual(path.read_bytes(), original)
+
     def test_source_locked_stage0_and_search_caps(self) -> None:
         config = json.loads((STUDY / "config.json").read_text(encoding="utf-8"))
         self.assertTrue(config["authorization"]["stage0_nonformal_authorized"])

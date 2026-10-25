@@ -251,7 +251,8 @@ def make_source_lock(config: dict[str, Any], provenance: dict[str, Any]) -> dict
 def write_locked_file(path: Path, value: dict[str, Any]) -> None:
     payload = (json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
     if path.exists():
-        if path.read_bytes() != payload:
+        existing = path.read_bytes()
+        if existing != payload and existing.replace(b"\r\n", b"\n") != payload:
             raise FileExistsError(f"immutable lock already exists with different bytes: {path.name}")
         return
     path.write_bytes(payload)
