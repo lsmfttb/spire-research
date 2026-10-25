@@ -53,6 +53,28 @@ class NativeCheckpointOwnerAdapter:
         return self._adapter.restore_checkpoint(checkpoint)
 
 
+class CheckpointStartAdapter:
+    """Restore a saved native checkpoint when the controlled runner resets its adapter."""
+
+    def __init__(self, adapter: Any, checkpoint: Any):
+        self._adapter = adapter
+        self._checkpoint = checkpoint
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._adapter, name)
+
+    def reset(self, seed: int | None = None) -> Any:
+        # A continuation starts from its captured native state, never a fresh game seed.
+        del seed
+        return self._adapter.restore_checkpoint(self._checkpoint)
+
+    def capture_checkpoint(self, snapshot: Any) -> Any:
+        return self._adapter.capture_checkpoint(snapshot)
+
+    def restore_checkpoint(self, checkpoint: Any) -> Any:
+        return self._adapter.restore_checkpoint(checkpoint)
+
+
 @dataclass(frozen=True)
 class LockedRoot:
     owner_seed: int
@@ -492,6 +514,10 @@ def execute_policy_trajectory(
         raise ValueError("only the non-Expert P0 or BRANCH execution path is available")
     if adapter_override is None:
         raise ValueError("native checkpoint continuation requires its owning simulator adapter")
+    if checkpoint is None:
+        raise ValueError("native checkpoint continuation requires a captured starting checkpoint")
+    adapter_override = CheckpointStartAdapter(adapter_override, checkpoint)
+    checkpoint = None
     policy_digest = model_digest(policy)
     policy_adapter = PolicyAdapter(policy)
     purpose = f"issue75-{root.root_id}-{invocation_seed}-{attempt_index}"

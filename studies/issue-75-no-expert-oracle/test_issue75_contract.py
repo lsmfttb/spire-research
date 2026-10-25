@@ -501,10 +501,18 @@ class Issue75ContractTests(unittest.TestCase):
         self.assertFalse(adapter_rows[0].closed)
 
     def test_native_continuations_reuse_the_adapter_that_owns_each_checkpoint(self) -> None:
-        root_adapter = object()
+        class FakeAdapter:
+            def restore_checkpoint(self, checkpoint: object) -> tuple[str, object]:
+                return ("restored", checkpoint)
+
+            def capture_checkpoint(self, snapshot: object) -> tuple[str, object]:
+                return ("captured", snapshot)
+
+        root_adapter = FakeAdapter()
+        root_checkpoint = object()
         root = runtime.LockedRoot(
             owner_seed=17, root_id="root-test", decision_index=0, policy_decision_index=0,
-            screen="synthetic-test-only", checkpoint=object(), adapter=root_adapter,
+            screen="synthetic-test-only", checkpoint=root_checkpoint, adapter=root_adapter,
             legal_identities=({"card": "a"}, {"card": "b"}), fingerprints={},
             projection_digest="projection", feature_matrix_sha256="features",
         )
@@ -527,10 +535,17 @@ class Issue75ContractTests(unittest.TestCase):
             return captured, trial
 
         captured, trial = run_and_capture(root_value=root)
-        self.assertIs(captured["adapter_override"], root_adapter)
+        start_adapter = captured["adapter_override"]
+        self.assertIsInstance(start_adapter, runtime.CheckpointStartAdapter)
+        self.assertIs(start_adapter._adapter, root_adapter)
+        self.assertIsNone(captured["checkpoint"])
+        self.assertEqual(start_adapter.reset(seed=17), ("restored", root_checkpoint))
+        self.assertEqual(start_adapter.capture_checkpoint("next-snapshot"), ("captured", "next-snapshot"))
+        self.assertEqual(start_adapter.restore_checkpoint("other-checkpoint"), ("restored", "other-checkpoint"))
         self.assertEqual(trial.failure_boundary, "native_continuation_error:ValueError")
 
-        later_adapter = object()
+        later_adapter = FakeAdapter()
+        later_checkpoint = object()
         root_decision = algorithm.Decision(
             step_index=0, state_fingerprint="state-root", legal_identities=root.legal_identities,
             chosen_index=0, is_root=True,
@@ -538,7 +553,7 @@ class Issue75ContractTests(unittest.TestCase):
         later_decision = algorithm.Decision(
             step_index=3, state_fingerprint="state-later",
             legal_identities=({"card": "x"}, {"card": "y"}), chosen_index=0,
-            checkpoint=object(), adapter=later_adapter, is_root=False,
+            checkpoint=later_checkpoint, adapter=later_adapter, is_root=False,
             screen="synthetic-test-only", root_fingerprints={"native_state_sha256": "state-later"},
         )
         parent = algorithm.TrialResult(
@@ -549,7 +564,11 @@ class Issue75ContractTests(unittest.TestCase):
             parent_attempt_index=9, parent_decision=later_decision, alternative_index=1,
         )
         captured, trial = run_and_capture(root_value=root, mutation_target=target, parent_trial=parent)
-        self.assertIs(captured["adapter_override"], later_adapter)
+        start_adapter = captured["adapter_override"]
+        self.assertIsInstance(start_adapter, runtime.CheckpointStartAdapter)
+        self.assertIs(start_adapter._adapter, later_adapter)
+        self.assertIsNone(captured["checkpoint"])
+        self.assertEqual(start_adapter.reset(seed=17), ("restored", later_checkpoint))
         self.assertEqual(trial.failure_boundary, "native_continuation_error:ValueError")
 
     def test_root_scheduler_is_seed_locked_and_cyclic(self) -> None:
