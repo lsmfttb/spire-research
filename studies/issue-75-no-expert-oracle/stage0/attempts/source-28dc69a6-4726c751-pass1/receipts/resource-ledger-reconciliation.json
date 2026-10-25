@@ -1,0 +1,117 @@
+{
+  "schema_id": "issue75-stage0-resource-ledger-reconciliation-v1",
+  "recorded_after": "source-28dc69a6-4726c751-pass1",
+  "source_commit": "28dc69a69661988098476b55268608db42d91b42",
+  "source_lock_sha256_lf": "4726c75129e8f4ba2d8b990b84f3c1652f71cad599e0e38b97c07d63f1bee827",
+  "reviewer_pass_comment_id": 6399133050,
+  "prior_stage0_report_totals": {
+    "reports": [
+      {
+        "attempt_id": "source-d7e7d881-5da90777",
+        "builder_cpu_charged_seconds": 2485.903803,
+        "native_worker_cpu_charged_seconds": 1280.0
+      },
+      {
+        "attempt_id": "source-5624600b-a20e8012",
+        "builder_cpu_charged_seconds": 1249.256786,
+        "native_worker_cpu_charged_seconds": 43.809594
+      },
+      {
+        "attempt_id": "source-0511d237-b8caced6",
+        "builder_cpu_charged_seconds": 2037.402322,
+        "native_worker_cpu_charged_seconds": 829.7044
+      }
+    ],
+    "builder_cpu_charged_seconds": 5772.562911,
+    "native_worker_cpu_charged_seconds": 2153.513994
+  },
+  "prior_cumulative_builder_charge_seconds": 5812.569684,
+  "prior_discrepancy_reconciliation": {
+    "report_total_builder_cpu_seconds": 5772.562911,
+    "prior_handoff_builder_cpu_seconds": 5812.569684,
+    "difference_seconds": 40.006773,
+    "components": [
+      {
+        "seconds": 0.006773,
+        "description": "Exact-root deterministic replay, reported in the prior Builder handoff; no separate process receipt was retained.",
+        "evidence": "https://github.com/lsmfttb/spire-research/issues/75#issuecomment-6397662135",
+        "accounting": "Preserved as charged; not treated as newly measured CPU."
+      },
+      {
+        "seconds": 40.0,
+        "description": "Conservative engineering-repair carry-forward, derived as the remaining difference after the separately reported 0.006773-second replay.",
+        "evidence": "https://github.com/lsmfttb/spire-research/issues/75#issuecomment-6398703246",
+        "accounting": "Not independently metered in a durable receipt. The inferred 40.000000 seconds remain charged conservatively; no refund or claim of measured CPU."
+      }
+    ],
+    "total_reconciled_seconds": 40.006773,
+    "status": "RECONCILED_AS_PRIOR_CHARGES_WITH_EXPLICIT_UNMETERED_COMPONENT"
+  },
+  "current_attempt": {
+    "attempt_id": "source-28dc69a6-4726c751-pass1",
+    "stage0_status": "STAGE0_NONFORMAL_REVIEWABLE_COMPLETE",
+    "resource_accounting": {
+      "preflight_conservative_reserve_cpu_seconds": 1200.0,
+      "native_worker_cpu_charged_seconds": 344.613485,
+      "controller_cpu_seconds": 26.21266,
+      "builder_cpu_charged_seconds": 1570.826145,
+      "builder_cpu_hard_cap_seconds": 50000,
+      "reviewer_cpu_protected_seconds": 10000,
+      "all_in_cpu_hard_cap_seconds": 60000,
+      "native_subset_hard_cap_seconds": 30000,
+      "formal_stage1_cpu_reserved_seconds": 0
+    },
+    "root_summary": {
+      "locked_root_count": 8,
+      "root_status_counts": {
+        "ROOT_BASE_INCOMPLETE": 7,
+        "TECHNICAL_CHAIN_INCOMPLETE": 1
+      },
+      "technical_error_types": {
+        "URLError": 1
+      },
+      "completed_base_terminal_trajectories": 0,
+      "completed_R_terminal_trials": 0,
+      "completed_J_terminal_trials": 0,
+      "completed_later_mutation_trajectories": 0,
+      "diagnostic_optimizer_steps": 0,
+      "available_owner_count": 7,
+      "required_owner_count": 8,
+      "diagnostic_classifications": [
+        "TECHNICAL_CHAIN_INCOMPLETE",
+        "TREATMENT_NOT_DELIVERED",
+        "REAL_RETURN_SIGNAL_UNINFORMATIVE"
+      ]
+    },
+    "formal_training_seed_consumed": false,
+    "formal_evaluation_seed_consumed": false,
+    "native_checkpoint_persisted": false,
+    "privileged_projection_persisted": false
+  },
+  "cumulative_charges_after_current_attempt": {
+    "builder_cpu_charged_seconds": 7383.395829,
+    "builder_cpu_hard_cap_seconds": 50000,
+    "builder_cpu_remaining_seconds": 42616.604171,
+    "native_worker_cpu_charged_seconds": 2498.127479,
+    "native_subset_hard_cap_seconds": 30000,
+    "native_subset_remaining_seconds": 27501.872521,
+    "all_in_cpu_hard_cap_seconds": 60000,
+    "reviewer_cpu_protected_seconds": 10000,
+    "formal_stage1_cpu_reserved_seconds": 0,
+    "reviewer_actual_cpu_total_seconds": null,
+    "all_in_remaining_seconds": null,
+    "all_in_remaining_note": "Not computed because this ledger has no cumulative Reviewer actual-CPU receipts. Reviewer protected reserve remains 10,000 seconds; formal Stage 1 remains unreserved."
+  },
+  "interpretation_limits": [
+    "The three prior Stage-0 report totals are retained as reported; the 40.006773-second gap to the prior cumulative handoff is not erased.",
+    "The 40.000000-second engineering component is a conservative arithmetic carry-forward, not a measured process receipt.",
+    "The current run is conditional on fixed historical Issue 73 debug checkpoints, not standard-start on-policy evidence.",
+    "No terminal R/J trajectories, later mutation witness, diagnostic optimizer update, or efficacy result was produced.",
+    "No formal training/evaluation seed or Stage 1 work was authorized or run."
+  ],
+  "relevant_issue_comments": [
+    "https://github.com/lsmfttb/spire-research/issues/75#issuecomment-6397662135",
+    "https://github.com/lsmfttb/spire-research/issues/75#issuecomment-6398703246",
+    "https://github.com/lsmfttb/spire-research/issues/75#issuecomment-6399140770"
+  ]
+}
