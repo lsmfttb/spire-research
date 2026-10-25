@@ -13,7 +13,7 @@ import sys
 import time
 from typing import Any, Iterator, Mapping, Sequence
 
-from algorithm import Decision, SearchBudgetExhausted, TrialResult, safe_exception_trace
+from algorithm import Decision, SearchBudgetExhausted, TrialResult, safe_exception_detail, safe_exception_trace
 from model import ActionConditionedPolicy, model_digest
 
 STUDY = Path(__file__).resolve().parent
@@ -30,6 +30,26 @@ class RootPrefixStop(Exception):
 
 class SourceRootMismatch(RuntimeError):
     pass
+
+
+class NativeCheckpointOwnerAdapter:
+    """Expose native StepSimulator checkpoint operations through its owning adapter."""
+
+    def __init__(self, runner: Any, adapter: Any):
+        self._adapter = adapter
+        self._simulator = runner.native_simulator(adapter)
+        for name in ("capture_checkpoint", "restore_checkpoint"):
+            if not callable(getattr(self._simulator, name, None)):
+                raise RuntimeError(f"pinned native simulator does not expose {name}")
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._adapter, name)
+
+    def capture_checkpoint(self, snapshot: Any) -> Any:
+        return self._simulator.capture_checkpoint(snapshot)
+
+    def restore_checkpoint(self, checkpoint: Any) -> Any:
+        return self._simulator.restore_checkpoint(checkpoint)
 
 
 @dataclass(frozen=True)
@@ -154,7 +174,42 @@ def load_issue73_runner(config: Mapping[str, Any]) -> Any:
     return module
 
 
-def initialize_native_runtime(output_dir: Path, *, sampling: bool) -> tuple[dict[str, Any], Any, Any, Any]:
+def _validate_parent_sampling_proof(proof: Mapping[str, Any]) -> None:
+    """Validate a parent's checked gate locally without repeating GitHub I/O."""
+    from preflight import git, load_json, normalized_sha256, verify_source_lock
+
+    lock = verify_source_lock()
+    config = load_json(STUDY / "config.json")
+    current_commit = git("rev-parse", "HEAD")
+    current_lock_sha = normalized_sha256(STUDY / "source-lock.json")
+    gate = config["authorization"]["reviewer_gate"]
+    login = str(proof.get("reviewer_login", ""))
+    expected_authentication = {
+        "identity_mode": str(gate["required_identity_mode"]),
+        "reviewer_login": login,
+    }
+    try:
+        comment_id = int(proof.get("comment_id", -1))
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("parent Reviewer proof has an invalid comment ID") from exc
+    if (
+        proof.get("source_commit") != current_commit
+        or proof.get("source_lock_sha256_lf") != current_lock_sha
+        or proof.get("formal_training_enabled") is not False
+        or proof.get("formal_evaluation_enabled") is not False
+        or comment_id <= 0
+        or login.casefold() != str(gate["owner_login"]).casefold()
+        or proof.get("reviewer_authentication") != expected_authentication
+        or lock.get("formal_training_enabled") is not False
+        or lock.get("formal_evaluation_enabled") is not False
+    ):
+        raise RuntimeError("parent Reviewer proof does not match the locked Stage-0 source and authorization")
+
+
+def initialize_native_runtime(
+    output_dir: Path, *, sampling: bool,
+    reviewer_proof: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any], Any, Any, Any]:
     """Validate exact source/runtime pins and install the accepted execution path."""
     from preflight import load_json
 
@@ -162,8 +217,11 @@ def initialize_native_runtime(output_dir: Path, *, sampling: bool) -> tuple[dict
     if sampling:
         if config["authorization"]["native_sampling_blocked_until_reviewer_pass"] is not True:
             raise RuntimeError("source contract does not keep native sampling behind independent review")
-        from preflight import reviewer_pass_proof
-        reviewer_pass_proof()
+        if reviewer_proof is None:
+            from preflight import reviewer_pass_proof
+            reviewer_pass_proof()
+        else:
+            _validate_parent_sampling_proof(reviewer_proof)
     verify_source_repositories(config)
     native_path = verify_native_module(config)
     runner = load_issue73_runner(config)
@@ -240,10 +298,12 @@ def replay_locked_root(
         raise RootPrefixStop()
 
     from sts_combat_rl.sim.lightspeed import LightSpeedAdapter
-    adapter = LightSpeedAdapter(
+    base_adapter = LightSpeedAdapter(
         seed=int(owner_seed), ascension=20, player_class="IRONCLAD", module=module,
     )
+    adapter = base_adapter
     try:
+        adapter = NativeCheckpointOwnerAdapter(runner, base_adapter)
         runner._run_one(
             out=output_dir, module=module, model=model, model_digest=digest,
             seed=int(owner_seed), arm="P0", encoder=encoder,
@@ -258,12 +318,12 @@ def replay_locked_root(
         roots = getattr(exc, "issue73_captured_roots", ())
         for root in roots:
             root.clear()
-        adapter.close()
+        base_adapter.close()
         if isinstance(exc, SourceRootMismatch):
             raise
         raise
     if not found:
-        adapter.close()
+        base_adapter.close()
         raise SourceRootMismatch("the exact registered nonbattle multi-choice root was not reached")
     return LockedRoot(
         owner_seed=int(owner_seed), root_id=str(expected["root_id"]),
@@ -375,6 +435,7 @@ def _safe_trial_payload(trial: TrialResult | None) -> dict[str, Any] | None:
                 {"file": filename, "function": function, "line": line}
                 for filename, function, line in trial.failure_trace
             ],
+            "failure_detail": None if trial.failure_detail is None else dict(trial.failure_detail),
             "cpu_seconds": trial.cpu_seconds, "wall_seconds": trial.wall_seconds,
         }
     return {
@@ -461,6 +522,7 @@ def execute_policy_trajectory(
             attempt_index=int(attempt_index), complete=False,
             failure_boundary=f"native_continuation_error:{type(exc).__name__}",
             failure_trace=safe_exception_trace(exc),
+            failure_detail=safe_exception_detail(exc),
             cpu_seconds=max(0.0, process_tree_cpu_seconds() - started_cpu),
             wall_seconds=max(0.0, time.monotonic() - started_wall),
         )

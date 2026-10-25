@@ -215,6 +215,10 @@ def _reviewer_proof_from_parent_receipt(
         "comment_id": comment_id,
         "reviewer_login": login,
         "reviewer_authentication": expected_authentication,
+        "source_commit": source_commit,
+        "source_lock_sha256_lf": lock_sha,
+        "formal_training_enabled": config["authorization"]["formal_training_enabled"],
+        "formal_evaluation_enabled": config["authorization"]["formal_evaluation_enabled"],
     }
 
 
@@ -277,6 +281,7 @@ def _decode_trial(value: Mapping[str, Any]) -> TrialResult:
         return TrialResult(
             attempt_index=int(value["attempt_index"]), complete=False,
             failure_boundary=str(value.get("failure_boundary", "incomplete")),
+            failure_detail=value.get("failure_detail"),
             cpu_seconds=value.get("cpu_seconds"), wall_seconds=value.get("wall_seconds"),
         )
     import numpy as np
@@ -392,7 +397,9 @@ def _root_worker(root_id: str) -> int:
 
         owner_seed = int(selected["owner_seed"])
         native_out = NATIVE_OUTPUT / root_id
-        runtime_config, runner, module, encoder = initialize_native_runtime(native_out / "setup", sampling=True)
+        runtime_config, runner, module, encoder = initialize_native_runtime(
+            native_out / "setup", sampling=True, reviewer_proof=proof,
+        )
         if runtime_config != config:
             raise RuntimeError("runtime configuration differs from the locked Stage-0 source")
         policy = ActionConditionedPolicy(
@@ -802,6 +809,15 @@ def _safe_config_preflight(config: Mapping[str, Any]) -> None:
         raise RuntimeError("implemented R/J proposal controls differ from the source-locked config")
 
 
+def _diagnostic_classification(status: Any) -> str | None:
+    value = str(status or "")
+    if value.startswith(("UNAVAILABLE", "DIAGNOSTIC_SIGNAL_UNAVAILABLE")):
+        return "DIAGNOSTIC_SIGNAL_UNAVAILABLE"
+    if value.startswith("REAL_RETURN_SIGNAL_UNINFORMATIVE"):
+        return "REAL_RETURN_SIGNAL_UNINFORMATIVE"
+    return None
+
+
 def run_stage0() -> dict[str, Any]:
     config, source_lock, lock_sha, source_commit = _load_locked_state()
     _safe_config_preflight(config)
@@ -1115,7 +1131,7 @@ def run_stage0() -> dict[str, Any]:
             probes.extend(np.asarray(row.candidate_features, dtype="<f4") for row in base.decisions)
         if len(examples) != 8:
             diagnostic = {
-                "status": "REAL_RETURN_SIGNAL_UNINFORMATIVE_BASE_TERMINALS_INCOMPLETE",
+                "status": "DIAGNOSTIC_SIGNAL_UNAVAILABLE_BASE_TERMINALS_INCOMPLETE",
                 "available_complete_base_owner_count": len(examples),
                 "required_owner_count": 8,
                 "diagnostic_optimizer_steps": 0,
@@ -1186,8 +1202,9 @@ def run_stage0() -> dict[str, Any]:
         statuses.append("TECHNICAL_CHAIN_INCOMPLETE")
     if j_mutations == 0:
         statuses.append("TREATMENT_NOT_DELIVERED")
-    if str(diagnostic.get("status", "")).startswith(("UNAVAILABLE", "REAL_RETURN_SIGNAL_UNINFORMATIVE")):
-        statuses.append("REAL_RETURN_SIGNAL_UNINFORMATIVE")
+    diagnostic_classification = _diagnostic_classification(diagnostic.get("status"))
+    if diagnostic_classification is not None:
+        statuses.append(diagnostic_classification)
     if not statuses:
         statuses.append("TECHNICAL_CHAIN_PROVEN")
 

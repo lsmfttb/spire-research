@@ -160,6 +160,20 @@ def safe_exception_trace(
     return tuple(result)
 
 
+def safe_exception_detail(error: BaseException) -> dict[str, str]:
+    """Return bounded static exception metadata without messages or local values."""
+    error_type = type(error).__name__
+    if not error_type.isidentifier():
+        error_type = "UnknownError"
+    result = {"kind": "exception", "exception_type": error_type[:64]}
+    if isinstance(error, AttributeError):
+        missing = getattr(error, "name", None)
+        if isinstance(missing, str) and missing.isidentifier() and len(missing) <= 128:
+            result["kind"] = "missing_attribute"
+            result["missing_attribute"] = missing
+    return result
+
+
 @dataclass(frozen=True)
 class TrialResult:
     attempt_index: int
@@ -170,6 +184,7 @@ class TrialResult:
     decisions: tuple[Decision, ...] = ()
     failure_boundary: str | None = None
     failure_trace: tuple[tuple[str, str, int], ...] = field(default_factory=tuple, repr=False, compare=False)
+    failure_detail: Mapping[str, str] | None = field(default=None, repr=False, compare=False)
     cpu_seconds: float | None = None
     wall_seconds: float | None = None
     native_rng_source: str = "restored_checkpoint_native_rng_same_future_stream"
@@ -188,6 +203,8 @@ class TrialResult:
             raise ValueError("incomplete trajectories cannot carry fabricated terminal outcomes")
         if self.complete and self.failure_trace:
             raise ValueError("completed trajectory cannot carry a failure trace")
+        if self.complete and self.failure_detail is not None:
+            raise ValueError("completed trajectory cannot carry failure details")
         if len(self.failure_trace) > 8:
             raise ValueError("failure trace exceeds its bounded receipt limit")
         for filename, function, line in self.failure_trace:
@@ -196,6 +213,21 @@ class TrialResult:
                 or not function or int(line) < 1
             ):
                 raise ValueError("failure trace must contain only basename/function/line metadata")
+        if self.failure_detail is not None:
+            detail = dict(self.failure_detail)
+            if detail.get("kind") not in {"exception", "missing_attribute"}:
+                raise ValueError("failure detail has an unknown kind")
+            if set(detail) - {"kind", "exception_type", "missing_attribute"}:
+                raise ValueError("failure detail contains an unsupported field")
+            exception_type = detail.get("exception_type")
+            if not isinstance(exception_type, str) or not exception_type.isidentifier() or len(exception_type) > 64:
+                raise ValueError("failure detail has an invalid exception type")
+            missing = detail.get("missing_attribute")
+            if detail["kind"] == "missing_attribute":
+                if not isinstance(missing, str) or not missing.isidentifier() or len(missing) > 128:
+                    raise ValueError("failure detail has an invalid missing attribute")
+            elif missing is not None:
+                raise ValueError("generic failure detail cannot carry a missing attribute")
 
     @property
     def rank(self) -> tuple[int, float, int]:

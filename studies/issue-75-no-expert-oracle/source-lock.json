@@ -1,6 +1,6 @@
 {
   "files_sha256_lf": {
-    "algorithm.py": "cb58c0567b55c5208f65a2994bebb95ef8517e6ae60dd97eff9988941e844ac3",
+    "algorithm.py": "481ee659910c0f1ef9f7418eb9ad58f9409a87b95fa65deca8b7adc79f26abd2",
     "config.json": "9e3a78a3cd8be0e67842da9820b9123e47b2811b212a99e946153be83c512b31",
     "issue74-root-selection-lock.json": "e55149de194820308450b45eb6f25cb3bf50bf2c4816a67226e821ef9d154025",
     "learning.py": "9004a70eb7c58990a5b9c0ccb68d1b36b40479a713a070e02f3c6037e4ef467a",
@@ -9,9 +9,9 @@
     "native_negative.py": "5ee457c8e676290fc5ab0e296acd1a644e2ac1b7eeb5d9e9a34b77261ad15c77",
     "preflight.py": "30ac715d8ffef7507a9020afcb7fdb211e708f4f3ab7083b1f87133c7ed2d6f8",
     "root-provenance.json": "f98f271e7c54ee6a363a5a4ec89c8dd58ff02aeb45087b85bc530750a02d049e",
-    "runtime.py": "e8980b5ce0e5c9696b8ddee961af7d42b2bba65b1f1a773b48b9a6d8d48df8dc",
-    "stage0.py": "7cc4ce0182c63e7e6add4067f341e67694063cbb957b537a29ef3e94f9260060",
-    "test_issue75_contract.py": "c433a58516b3f9f9aa737746d864153331c1332b09ec72fb0db33e2acb305e23"
+    "runtime.py": "38b9904fe12bd11f4dd1271c0f42cae3e00a7a783b2388dbd3abea63fe061915",
+    "stage0.py": "d1a219a8ddc0d56a5e163050492281354cd5994c5e54b49edb92a64704f124fa",
+    "test_issue75_contract.py": "007b355326439727a0fa5c38b9aa2f24c6a895e02aaee723627420c121f029a2"
   },
   "formal_evaluation_enabled": false,
   "formal_seed_table_present": false,
@@ -845,7 +845,7 @@
   },
   "schema_id": "issue75-no-expert-oracle-source-lock-v1",
   "scope": "STUDY_ONLY",
-  "source_branch": "codex/issue-75-stage0-exec-20261025",
+  "source_branch": "codex/issue-75-stage0-repair-20261026",
   "source_execution_contract": {
     "executor": "sts_combat_rl.sim.controlled_run.execute_controlled_run",
     "expert_used_by_algorithm": false,

@@ -224,6 +224,142 @@ class Issue75ContractTests(unittest.TestCase):
             for node in ast.walk(worker) if isinstance(node, ast.Call)
         ]
         self.assertNotIn("reviewer_pass_proof", calls)
+        runtime_call = next(
+            node for node in ast.walk(worker)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "initialize_native_runtime"
+        )
+        reviewer_proof = next(
+            keyword.value for keyword in runtime_call.keywords
+            if keyword.arg == "reviewer_proof"
+        )
+        self.assertIsInstance(reviewer_proof, ast.Name)
+        self.assertEqual(reviewer_proof.id, "proof")
+
+    def test_root_runtime_reuses_exact_parent_proof_without_github_lookup(self) -> None:
+        config = preflight.load_json(STUDY / "config.json")
+        native_path = STUDY / "runtime.py"
+        fake_module = ModuleType("fake_native")
+        fake_module.__file__ = str(native_path)
+        env = {"identity": {"native_source_commit": config["source"]["sts_lightspeed_commit"]}}
+        fake_runner = type("FakeRunner", (), {
+            "_setup": lambda self, output_dir, *, native_module_path: (
+                env, fake_module, object(), {"runtime": "test"},
+            ),
+        })()
+        proof = {"proof": "already-validated-by-root-worker"}
+        with tempfile.TemporaryDirectory(dir=STUDY) as temp_dir:
+            with (
+                patch.object(runtime, "_validate_parent_sampling_proof") as validate_proof,
+                patch.object(runtime, "verify_source_repositories"),
+                patch.object(runtime, "verify_native_module", return_value=native_path),
+                patch.object(runtime, "binary_sha256", return_value=config["source"]["native_module_sha256"]),
+                patch.object(runtime, "load_issue73_runner", return_value=fake_runner),
+                patch.object(preflight, "reviewer_pass_proof", side_effect=AssertionError("network lookup repeated")),
+            ):
+                result = runtime.initialize_native_runtime(
+                    Path(temp_dir) / "runtime", sampling=True, reviewer_proof=proof,
+                )
+        validate_proof.assert_called_once_with(proof)
+        self.assertEqual(result[0], config)
+
+    def test_parent_sampling_proof_validation_keeps_source_lock_binding(self) -> None:
+        config = preflight.load_json(STUDY / "config.json")
+        source_commit = "a" * 40
+        lock_sha = "b" * 64
+        login = config["authorization"]["reviewer_gate"]["owner_login"]
+        proof = {
+            "comment_id": 12345,
+            "reviewer_login": login,
+            "reviewer_authentication": {
+                "identity_mode": config["authorization"]["reviewer_gate"]["required_identity_mode"],
+                "reviewer_login": login,
+            },
+            "source_commit": source_commit,
+            "source_lock_sha256_lf": lock_sha,
+            "formal_training_enabled": False,
+            "formal_evaluation_enabled": False,
+        }
+        with (
+            patch.object(preflight, "verify_source_lock", return_value={
+                "formal_training_enabled": False, "formal_evaluation_enabled": False,
+            }),
+            patch.object(preflight, "git", return_value=source_commit),
+            patch.object(preflight, "normalized_sha256", return_value=lock_sha),
+            patch.object(preflight, "reviewer_pass_proof", side_effect=AssertionError("network lookup repeated")),
+        ):
+            runtime._validate_parent_sampling_proof(proof)
+        with (
+            patch.object(preflight, "verify_source_lock", return_value={
+                "formal_training_enabled": False, "formal_evaluation_enabled": False,
+            }),
+            patch.object(preflight, "normalized_sha256", return_value=lock_sha),
+            patch.object(preflight, "git", return_value="c" * 40),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "does not match the locked Stage-0 source"):
+                runtime._validate_parent_sampling_proof(proof)
+
+    def test_native_checkpoint_owner_adapter_delegates_to_simulator(self) -> None:
+        class FakeSimulator:
+            def capture_checkpoint(self, snapshot: object) -> tuple[str, object]:
+                return ("checkpoint", snapshot)
+
+            def restore_checkpoint(self, checkpoint: object) -> tuple[str, object]:
+                return ("restored", checkpoint)
+
+        simulator = FakeSimulator()
+        class FakeAdapter:
+            _sim = simulator
+
+            def close(self) -> str:
+                return "closed"
+
+        class FakeRunner:
+            @staticmethod
+            def native_simulator(adapter: object) -> object:
+                return getattr(adapter, "_sim")
+
+        adapter = runtime.NativeCheckpointOwnerAdapter(FakeRunner(), FakeAdapter())
+        snapshot = object()
+        checkpoint = adapter.capture_checkpoint(snapshot)
+        self.assertEqual(checkpoint, ("checkpoint", snapshot))
+        self.assertEqual(adapter.restore_checkpoint(checkpoint), ("restored", checkpoint))
+        self.assertEqual(adapter.close(), "closed")
+
+    def test_incomplete_trial_receipt_keeps_only_safe_missing_attribute_detail(self) -> None:
+        error = AttributeError(
+            "do not persist this private message", name="capture_checkpoint", obj=object(),
+        )
+        detail = algorithm.safe_exception_detail(error)
+        trial = algorithm.TrialResult(
+            attempt_index=1, complete=False,
+            failure_boundary="native_continuation_error:AttributeError",
+            failure_detail=detail,
+        )
+        payload = runtime._safe_trial_payload(trial)
+        self.assertEqual(payload["failure_detail"], {
+            "kind": "missing_attribute",
+            "exception_type": "AttributeError",
+            "missing_attribute": "capture_checkpoint",
+        })
+        self.assertNotIn("private message", json.dumps(payload))
+        self.assertEqual(stage0._decode_trial(payload).failure_detail, detail)
+
+    def test_diagnostic_unavailable_is_not_classified_as_uninformative(self) -> None:
+        self.assertEqual(
+            stage0._diagnostic_classification("UNAVAILABLE_VOLATILE_TRAINING_PAYLOAD_NOT_RETAINED"),
+            "DIAGNOSTIC_SIGNAL_UNAVAILABLE",
+        )
+        self.assertEqual(
+            stage0._diagnostic_classification("DIAGNOSTIC_SIGNAL_UNAVAILABLE_BASE_TERMINALS_INCOMPLETE"),
+            "DIAGNOSTIC_SIGNAL_UNAVAILABLE",
+        )
+        self.assertEqual(
+            stage0._diagnostic_classification("REAL_RETURN_SIGNAL_UNINFORMATIVE_NO_ELITES"),
+            "REAL_RETURN_SIGNAL_UNINFORMATIVE",
+        )
+        self.assertIsNone(stage0._diagnostic_classification("DIAGNOSTIC_TRAINING_COMPLETE"))
 
     def test_checkpoint_adapter_stays_volatile_through_decision_capture(self) -> None:
         import numpy as np
@@ -269,10 +405,18 @@ class Issue75ContractTests(unittest.TestCase):
         matrix = np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype="<f4")
         adapter_rows = []
 
+        class FakeSimulator:
+            def capture_checkpoint(self, snapshot):
+                return ("checkpoint", snapshot)
+
+            def restore_checkpoint(self, checkpoint):
+                return ("restored", checkpoint)
+
         class FakeAdapter:
             def __init__(self, **kwargs):
                 self.kwargs = kwargs
                 self.closed = False
+                self.simulator = FakeSimulator()
                 adapter_rows.append(self)
 
             def close(self):
@@ -312,6 +456,9 @@ class Issue75ContractTests(unittest.TestCase):
         captured = {}
 
         class FakeRunner:
+            def native_simulator(self, adapter):
+                return adapter.simulator
+
             def _load_policy(self, *args, **kwargs):
                 return object(), "policy-digest"
 
@@ -328,9 +475,10 @@ class Issue75ContractTests(unittest.TestCase):
                 )
 
         self.assertEqual(len(adapter_rows), 1)
-        self.assertIs(captured["adapter_override"], adapter_rows[0])
-        self.assertIs(root.adapter, adapter_rows[0])
+        self.assertIs(captured["adapter_override"]._adapter, adapter_rows[0])
+        self.assertIs(root.adapter, captured["adapter_override"])
         self.assertIs(root.checkpoint, checkpoint)
+        self.assertEqual(root.adapter.capture_checkpoint("snapshot"), ("checkpoint", "snapshot"))
         self.assertFalse(adapter_rows[0].closed)
 
     def test_native_continuations_reuse_the_adapter_that_owns_each_checkpoint(self) -> None:
