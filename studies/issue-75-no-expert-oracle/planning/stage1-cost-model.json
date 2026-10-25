@@ -1,0 +1,190 @@
+{
+  "disposition": "STUDY_ONLY",
+  "input_lineage": {
+    "formal_seed_table_present": false,
+    "formal_seeds_consumed": false,
+    "json_receipt_count_verified": 628,
+    "locked_file_count": 12,
+    "runtime_log_count_verified": 272,
+    "runtime_record_count_verified": 536,
+    "source_lock_sha256_lf": "b3ce3d33c27ec392f6d88151bce3c86a8fdce8c9dc0152d417069441f7140d38",
+    "stage0_evidence_snapshot_sha": "7f7538a706710626740cdb635d3711e69eac900f",
+    "stage0_report_sha256": "f35bab535d850668ecb556ac121eccd75848223b3409b6563abb12063a28ffaf",
+    "stage0_source_branch": "codex/issue-75-stage0-repair-20261026",
+    "stage0_source_sha": "c77d64243320639bf156330760d511d2a13eee85"
+  },
+  "limitations": [
+    "Only eight historical Issue 73 checkpoint roots were measured; they are not standard-start pi0 or Stage 1 policy games. Prefix plus continuation is a hybrid CPU proxy, not a Stage 1 outcome.",
+    "Eight root clusters are too few for predictive tail guarantees. Bootstrap quantiles describe resampling uncertainty over those observed roots only.",
+    "Search means use 16 completed Stage 0 continuations per invocation. Stage 1 hard caps, not these means, define the maximum search cost.",
+    "Aggregate Stage 0 controller CPU includes one batch-8 diagnostic update but is not an isolated optimizer timer. Its scaled term is a planning guard, not a proven bound.",
+    "Model excludes any unregistered dependency rebuild, portability repair, checkpoint recovery, source drift or cost beyond the explicit margin. Any activation needs a project-level watchdog and safe stop at the aggregate cap.",
+    "This report is not a scientific outcome or Stage 1 authorization. No formal Stage 1 seeds, games, training or simulator runs are performed by this analysis."
+  ],
+  "measured_stage0": {
+    "controller_cpu_scope": "Whole Stage 0 controller; not isolated optimizer-step time.",
+    "controller_cpu_total": 14.886244999999999,
+    "diagnostic_batch_owners": 8,
+    "diagnostic_probe_states": 180,
+    "diagnostic_updates": 1,
+    "j_individual_attempt": {
+      "max": 3.693468000000003,
+      "mean": 0.9765756953125002,
+      "median": 0.823602000000001,
+      "n": 128,
+      "p2_5_nearest_rank": 0.2627050000000004,
+      "p95_nearest_rank": 2.0328950000000034,
+      "p97_5_nearest_rank": 2.9961649999999977,
+      "sample_sd": 0.6217524968698167
+    },
+    "j_search_invocation": {
+      "max": 24.562059000000005,
+      "mean": 15.671270750000001,
+      "median": 16.3871125,
+      "n": 8,
+      "p2_5_nearest_rank": 8.077484000000002,
+      "p95_nearest_rank": 24.562059000000005,
+      "p97_5_nearest_rank": 24.562059000000005,
+      "sample_sd": 6.010356178928019
+    },
+    "r_individual_attempt": {
+      "max": 4.865390000000001,
+      "mean": 0.9736567890624999,
+      "median": 0.7856034999999988,
+      "n": 128,
+      "p2_5_nearest_rank": 0.3548410000000004,
+      "p95_nearest_rank": 2.2246710000000007,
+      "p97_5_nearest_rank": 2.600026999999997,
+      "sample_sd": 0.6442200255867085
+    },
+    "r_search_invocation": {
+      "max": 24.335350000000002,
+      "mean": 15.619139,
+      "median": 16.2580885,
+      "n": 8,
+      "p2_5_nearest_rank": 8.523585999999996,
+      "p95_nearest_rank": 24.335350000000002,
+      "p97_5_nearest_rank": 24.335350000000002,
+      "sample_sd": 5.574683799935693
+    },
+    "root_count": 8,
+    "root_game_path_proxy": {
+      "max": 1.9738509999999998,
+      "mean": 1.471493875,
+      "median": 1.434769000000001,
+      "n": 8,
+      "p2_5_nearest_rank": 0.9505280000000003,
+      "p95_nearest_rank": 1.9738509999999998,
+      "p97_5_nearest_rank": 1.9738509999999998,
+      "sample_sd": 0.3572468299031343
+    },
+    "root_worker_residual_overhead": {
+      "max": 10.040856999999995,
+      "mean": 9.688175249999997,
+      "median": 9.6500545,
+      "n": 8,
+      "p2_5_nearest_rank": 9.540826000000003,
+      "p95_nearest_rank": 10.040856999999995,
+      "p97_5_nearest_rank": 10.040856999999995,
+      "sample_sd": 0.1588698308551009
+    }
+  },
+  "model_method": {
+    "bootstrap": "20000 resamples of eight paired root profiles with replacement; nearest-rank quantiles.",
+    "bootstrap_quantiles_are_predictive_guarantees": false,
+    "bootstrap_rng_is_game_seed": false,
+    "bootstrap_rng_seed": 750102026,
+    "controller_training_allocation": "max(aggregate Stage 0 controller CPU x 256 updates x (32/8) batch ratio, aggregate controller CPU / 8 roots x 992 game-path analogs); not a measured mean or formal upper bound.",
+    "engineering_margin": "25 percent on search hard cap plus root-bootstrap p95 non-search CPU; an explicit planning margin.",
+    "game_path_proxy": "Historical-source prefix replay CPU + Stage 0 pi0 terminal continuation CPU from each fixed historical checkpoint.",
+    "point_estimate": "Eight paired root means scaled to registered Stage 1 counts.",
+    "reviewer_reserve": "Protected 10,000 CPU-s, outside Builder ceiling and not included as expected experiment spend.",
+    "worker_residual": "Worker process CPU minus prefix, base continuation, R invocation and J invocation CPU."
+  },
+  "registered_workload": {
+    "adamw_updates_total": 256,
+    "complete_game_path_analogs": 992,
+    "evaluation_j_calls": 672,
+    "evaluation_r_calls": 672,
+    "formal_seed_table_included": false,
+    "heldout_arms": [
+      "P0",
+      "P1",
+      "R",
+      "J",
+      "E"
+    ],
+    "heldout_owners": 96,
+    "heldout_scenarios": 480,
+    "maximum_search_cpu_seconds": 108544.0,
+    "maximum_started_search_attempts": 54272,
+    "optimizer_batch_owners": 32,
+    "owners_per_block": 128,
+    "planner_activation_required": true,
+    "search_cpu_cap_per_invocation": 32.0,
+    "stage1_execution_enabled": false,
+    "total_j_calls": 2720,
+    "total_r_calls": 672,
+    "total_search_calls": 3392,
+    "training_blocks": 4,
+    "training_j_calls": 2048,
+    "training_owners": 512
+  },
+  "schema_id": "issue75-stage1-cost-model-v1",
+  "stage0_cumulative_context": {
+    "builder_cpu_cumulative_including_allowance": 14213.839745,
+    "builder_cpu_hard_cap": 50000,
+    "formal_stage1_reserve": 0,
+    "ledger_carryover_to_stage1": false,
+    "native_cpu_cumulative": 4271.67587,
+    "native_cpu_hard_cap": 30000,
+    "reviewer_protected_reserve": 10000,
+    "source_handoff_comment_id": 6402937706
+  },
+  "stage0_resource_context": {
+    "builder_attempt_charged": 1564.3003299999998,
+    "controller_cpu": 14.886244999999999,
+    "formal_stage1_reserve": 0,
+    "native_worker_charged": 349.414085,
+    "reviewer_protected_reserve": 10000
+  },
+  "stage1_builder_projection_cpu_seconds": {
+    "cap_basis_before_margin": 135064.938168,
+    "controller_training_allocation_guard": 15243.514879999999,
+    "engineering_allowance": 33766.234542,
+    "engineering_margin_fraction": 0.25,
+    "expected_game_path_proxy": 1459.721924,
+    "expected_plus_full_reviewer_reserve": 89435.8245,
+    "expected_root_worker_residual_overhead": 9610.669847999998,
+    "expected_search": 53121.917848000005,
+    "expected_total": 79435.8245,
+    "nonsearch_root_bootstrap_p95": 26520.938167999997,
+    "proposed_all_in_hard_cap": 180000.0,
+    "proposed_builder_hard_cap": 170000.0,
+    "protected_reviewer_reserve": 10000.0,
+    "rounding_remainder": 1168.8272900000156,
+    "search_hard_cap": 108544.0,
+    "search_root_bootstrap": {
+      "max": 74392.666012,
+      "mean": 53097.001769312,
+      "median": 53121.917848000005,
+      "n": 20000,
+      "p2_5_nearest_rank": 40397.51132800001,
+      "p95_nearest_rank": 63919.79712,
+      "p97_5_nearest_rank": 65836.25303600001,
+      "sample_sd": 6558.039491466821
+    },
+    "total_root_bootstrap": {
+      "max": 100478.492892,
+      "mean": 79409.88650883539,
+      "median": 79435.8245,
+      "n": 20000,
+      "p2_5_nearest_rank": 66794.542128,
+      "p95_nearest_rank": 90195.22464,
+      "p97_5_nearest_rank": 92061.81117999999,
+      "sample_sd": 6522.552335466205
+    },
+    "total_root_bootstrap_p95": 90195.22464
+  },
+  "status": "PLANNING_ONLY_REQUIRES_SEPARATE_PLANNER_ACTIVATION"
+}
