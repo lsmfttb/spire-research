@@ -302,8 +302,8 @@ class Issue75ContractTests(unittest.TestCase):
 
     def test_native_checkpoint_owner_adapter_delegates_to_simulator(self) -> None:
         class FakeSimulator:
-            def capture_checkpoint(self, snapshot: object) -> tuple[str, object]:
-                return ("checkpoint", snapshot)
+            def capture_checkpoint(self) -> tuple[str]:
+                return ("checkpoint",)
 
             def restore_checkpoint(self, checkpoint: object) -> tuple[str, object]:
                 return ("restored", checkpoint)
@@ -323,7 +323,7 @@ class Issue75ContractTests(unittest.TestCase):
         adapter = runtime.NativeCheckpointOwnerAdapter(FakeRunner(), FakeAdapter())
         snapshot = object()
         checkpoint = adapter.capture_checkpoint(snapshot)
-        self.assertEqual(checkpoint, ("checkpoint", snapshot))
+        self.assertEqual(checkpoint, ("checkpoint",))
         self.assertEqual(adapter.restore_checkpoint(checkpoint), ("restored", checkpoint))
         self.assertEqual(adapter.close(), "closed")
 
@@ -406,8 +406,8 @@ class Issue75ContractTests(unittest.TestCase):
         adapter_rows = []
 
         class FakeSimulator:
-            def capture_checkpoint(self, snapshot):
-                return ("checkpoint", snapshot)
+            def capture_checkpoint(self):
+                return ("checkpoint",)
 
             def restore_checkpoint(self, checkpoint):
                 return ("restored", checkpoint)
@@ -478,7 +478,7 @@ class Issue75ContractTests(unittest.TestCase):
         self.assertIs(captured["adapter_override"]._adapter, adapter_rows[0])
         self.assertIs(root.adapter, captured["adapter_override"])
         self.assertIs(root.checkpoint, checkpoint)
-        self.assertEqual(root.adapter.capture_checkpoint("snapshot"), ("checkpoint", "snapshot"))
+        self.assertEqual(root.adapter.capture_checkpoint("snapshot"), ("checkpoint",))
         self.assertFalse(adapter_rows[0].closed)
 
     def test_native_continuations_reuse_the_adapter_that_owns_each_checkpoint(self) -> None:
