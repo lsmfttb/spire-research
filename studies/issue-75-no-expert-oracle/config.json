@@ -9,10 +9,9 @@
     "formal_owner_seed_table_present": false,
     "native_sampling_blocked_until_reviewer_pass": true,
     "reviewer_gate": {
-      "shared_identity_login": "lsmfttb",
-      "shared_identity_app_id": 1144995,
-      "shared_identity_app_slug": "chatgpt-codex-connector",
-      "shared_identity_app_owner": "openai"
+      "owner_login": "lsmfttb",
+      "required_identity_mode": "distinct_github_account",
+      "required_github_user_type": "User"
     }
   },
   "source": {

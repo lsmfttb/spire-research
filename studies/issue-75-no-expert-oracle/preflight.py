@@ -315,49 +315,27 @@ def _github_get_json(path: str, token: str) -> tuple[Any, str | None]:
 def reviewer_authentication(
     comment: dict[str, Any], current_login: str, gate: dict[str, Any]
 ) -> dict[str, Any] | None:
-    """Accept another GitHub user, or the configured Codex app event for our shared account."""
+    """Require a human GitHub principal distinct from the Builder and issue owner."""
     user = comment.get("user") or {}
     raw_login = str(user.get("login", ""))
     login = raw_login.casefold()
-    if not login or str(user.get("type", "")).casefold() != "user":
+    required_user_type = str(gate["required_github_user_type"]).casefold()
+    if not login or str(user.get("type", "")).casefold() != required_user_type:
         return None
-
-    app = comment.get("performed_via_github_app") or {}
-    owner = app.get("owner") or {}
-    raw_app_id = app.get("id")
-    try:
-        app_id = int(raw_app_id) if raw_app_id is not None else None
-    except (TypeError, ValueError):
-        app_id = None
-    app_slug = str(app.get("slug", "")) or None
-    app_owner = str(owner.get("login", "")) or None
-
-    authentication: dict[str, Any] = {
-        "reviewer_login": raw_login,
-        "reviewer_github_app_id": app_id,
-        "reviewer_github_app_slug": app_slug,
-        "reviewer_github_app_owner": app_owner,
-    }
     shared_logins = {
         current_login.casefold(),
-        str(gate["shared_identity_login"]).casefold(),
+        str(gate["owner_login"]).casefold(),
     }
-    if login not in shared_logins:
-        authentication["identity_mode"] = "distinct_github_account"
-        return authentication
-
-    if (
-        app_id == int(gate["shared_identity_app_id"])
-        and (app_slug or "").casefold() == str(gate["shared_identity_app_slug"]).casefold()
-        and (app_owner or "").casefold() == str(gate["shared_identity_app_owner"]).casefold()
-    ):
-        authentication["identity_mode"] = "codex_connector_app_event"
-        return authentication
-    return None
+    if login in shared_logins:
+        return None
+    return {
+        "reviewer_login": raw_login,
+        "identity_mode": str(gate["required_identity_mode"]),
+    }
 
 
 def reviewer_pass_proof() -> dict[str, Any]:
-    """Require an exact-commit review PASS with auditable reviewer-channel provenance."""
+    """Require an exact-commit review PASS from a distinct human GitHub principal."""
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if not token:
         raise RuntimeError("GH_TOKEN or GITHUB_TOKEN is required to verify the GitHub review gate")
@@ -399,7 +377,7 @@ def reviewer_pass_proof() -> dict[str, Any]:
                     break
     if not matches:
         raise RuntimeError(
-            "no GitHub Reviewer PASS with distinct-account or configured connector provenance "
+            "no independent GitHub Reviewer PASS from a distinct human account "
             "matches this exact source commit and lock"
         )
     selected = matches[-1]

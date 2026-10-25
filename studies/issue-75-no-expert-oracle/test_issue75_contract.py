@@ -56,7 +56,8 @@ class Issue75ContractTests(unittest.TestCase):
         self.assertFalse(config["authorization"]["formal_evaluation_enabled"])
         self.assertFalse(config["authorization"]["formal_owner_seed_table_present"])
         self.assertEqual(
-            config["authorization"]["reviewer_gate"]["shared_identity_app_id"], 1144995
+            config["authorization"]["reviewer_gate"]["required_identity_mode"],
+            "distinct_github_account",
         )
         self.assertEqual(len(config["stage0"]["root_ids"]), 8)
         self.assertEqual(config["search"]["search_invocation_cpu_cap_seconds"], algorithm.SEARCH_CPU_CAP_SECONDS)
@@ -217,7 +218,9 @@ class Issue75ContractTests(unittest.TestCase):
         return comment
 
     @staticmethod
-    def _run_reviewer_pass(comment: dict[str, object]) -> dict[str, object]:
+    def _run_reviewer_pass(
+        comment: dict[str, object], current_login: str = "lsmfttb"
+    ) -> dict[str, object]:
         with (
             patch.dict(os.environ, {"GH_TOKEN": "unit-test-token"}),
             patch.object(preflight, "verify_source_lock", return_value={
@@ -227,49 +230,45 @@ class Issue75ContractTests(unittest.TestCase):
             patch.object(preflight, "git", return_value="a" * 40),
             patch.object(preflight, "normalized_sha256", return_value="b" * 64),
             patch.object(preflight, "_github_get_json", side_effect=(
-                ({"login": "lsmfttb"}, None),
+                ({"login": current_login}, None),
                 ([comment], None),
             )),
         ):
             return preflight.reviewer_pass_proof()
 
-    def test_reviewer_gate_accepts_actual_codex_connector_workflow_identity(self) -> None:
+    def test_reviewer_gate_rejects_owner_connector_pass(self) -> None:
         comment = self._reviewer_pass_comment("lsmfttb", {
             "id": 1144995,
             "slug": "chatgpt-codex-connector",
             "owner": {"login": "openai"},
         })
-        proof = self._run_reviewer_pass(comment)
-        self.assertEqual(proof["reviewer_login"], "lsmfttb")
-        self.assertEqual(proof["reviewer_authentication"], {
-            "reviewer_login": "lsmfttb",
-            "reviewer_github_app_id": 1144995,
-            "reviewer_github_app_slug": "chatgpt-codex-connector",
-            "reviewer_github_app_owner": "openai",
-            "identity_mode": "codex_connector_app_event",
-        })
+        with self.assertRaisesRegex(RuntimeError, "distinct human account"):
+            self._run_reviewer_pass(comment)
 
-    def test_reviewer_gate_rejects_same_identity_without_connector_provenance(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, "no GitHub Reviewer PASS"):
+    def test_reviewer_gate_rejects_builder_identity(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "distinct human account"):
             self._run_reviewer_pass(self._reviewer_pass_comment("lsmfttb"))
 
-    def test_reviewer_gate_rejects_shared_identity_from_wrong_github_app(self) -> None:
+    def test_reviewer_gate_rejects_authenticated_token_identity(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "distinct human account"):
+            self._run_reviewer_pass(
+                self._reviewer_pass_comment("reviewer-token-user"),
+                current_login="reviewer-token-user",
+            )
+
+    def test_reviewer_gate_rejects_owner_identity_from_wrong_github_app(self) -> None:
         comment = self._reviewer_pass_comment("lsmfttb", {
             "id": 1,
             "slug": "untrusted-app",
             "owner": {"login": "example"},
         })
-        with self.assertRaisesRegex(RuntimeError, "no GitHub Reviewer PASS"):
+        with self.assertRaisesRegex(RuntimeError, "distinct human account"):
             self._run_reviewer_pass(comment)
 
-    def test_reviewer_gate_rejects_stale_lock_even_with_connector_provenance(self) -> None:
-        comment = self._reviewer_pass_comment("lsmfttb", {
-            "id": 1144995,
-            "slug": "chatgpt-codex-connector",
-            "owner": {"login": "openai"},
-        })
+    def test_reviewer_gate_rejects_stale_lock_from_distinct_account(self) -> None:
+        comment = self._reviewer_pass_comment("independent-reviewer")
         comment["body"] = str(comment["body"]).replace("b" * 64, "c" * 64)
-        with self.assertRaisesRegex(RuntimeError, "no GitHub Reviewer PASS"):
+        with self.assertRaisesRegex(RuntimeError, "no independent GitHub Reviewer PASS"):
             self._run_reviewer_pass(comment)
 
     def test_reviewer_gate_accepts_distinct_github_reviewer_account(self) -> None:
@@ -282,7 +281,7 @@ class Issue75ContractTests(unittest.TestCase):
     def test_reviewer_gate_rejects_automation_accounts(self) -> None:
         comment = self._reviewer_pass_comment("review-bot")
         comment["user"] = {"login": "review-bot", "type": "Bot"}
-        with self.assertRaisesRegex(RuntimeError, "no GitHub Reviewer PASS"):
+        with self.assertRaisesRegex(RuntimeError, "no independent GitHub Reviewer PASS"):
             self._run_reviewer_pass(comment)
 
 
