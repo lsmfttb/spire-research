@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import importlib
 import importlib.util
@@ -39,7 +39,8 @@ class LockedRoot:
     decision_index: int
     policy_decision_index: int
     screen: str
-    checkpoint: Any
+    checkpoint: Any = field(repr=False, compare=False)
+    adapter: Any = field(repr=False, compare=False)
     legal_identities: tuple[Mapping[str, Any], ...]
     fingerprints: Mapping[str, str]
     projection_digest: str
@@ -184,6 +185,7 @@ def feature_matrix_sha256(matrix: Any) -> str:
 def _safe_root_capture(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "checkpoint": row["checkpoint"],
+        "adapter": row["adapter"],
         "decision_index": int(row["decision_index"]),
         "policy_decision_index": int(row["policy_decision_index"]),
         "screen": str(row["screen"]),
@@ -237,10 +239,15 @@ def replay_locked_root(
         found.update(capture)
         raise RootPrefixStop()
 
+    from sts_combat_rl.sim.lightspeed import LightSpeedAdapter
+    adapter = LightSpeedAdapter(
+        seed=int(owner_seed), ascension=20, player_class="IRONCLAD", module=module,
+    )
     try:
         runner._run_one(
             out=output_dir, module=module, model=model, model_digest=digest,
             seed=int(owner_seed), arm="P0", encoder=encoder,
+            adapter_override=adapter,
             purpose="issue73-stage0-debug-owner", durable=False,
             capture_trace=False, capture_checkpoints=True, capture_all_roots=True,
             root_callback=on_root, cpu_cap_seconds=32.0,
@@ -251,17 +258,19 @@ def replay_locked_root(
         roots = getattr(exc, "issue73_captured_roots", ())
         for root in roots:
             root.clear()
+        adapter.close()
         if isinstance(exc, SourceRootMismatch):
             raise
         raise
     if not found:
+        adapter.close()
         raise SourceRootMismatch("the exact registered nonbattle multi-choice root was not reached")
     return LockedRoot(
         owner_seed=int(owner_seed), root_id=str(expected["root_id"]),
         decision_index=int(found["decision_index"]),
         policy_decision_index=int(found["policy_decision_index"]),
         screen=str(found["screen"]), checkpoint=found["checkpoint"],
-        legal_identities=found["legal_action_identities"],
+        adapter=found["adapter"], legal_identities=found["legal_action_identities"],
         fingerprints=found["fingerprints"], projection_digest=str(found["projection_digest"]),
         feature_matrix_sha256=str(found["feature_matrix_sha256"]),
     )
@@ -314,6 +323,7 @@ def _decision_rows(runner: Any, result: dict[str, Any], *, is_root_run: bool) ->
                 candidate_features=matrix,
                 log_probabilities=item.get("probabilities"),
                 checkpoint=root["checkpoint"],
+                adapter=root["adapter"],
                 is_root=bool(first and is_root_run),
                 screen=str(root["screen"]),
                 root_fingerprints={
@@ -388,6 +398,7 @@ def execute_policy_trajectory(
             raise ValueError("joint mutation parent must be a complete retained trajectory")
         start_decision = mutation_target.parent_decision
         checkpoint = start_decision.checkpoint
+        adapter_override = start_decision.adapter
         forced_index = int(mutation_target.alternative_index)
         force_data = {
             "screen": start_decision.screen,
@@ -403,6 +414,7 @@ def execute_policy_trajectory(
     else:
         start_decision = None
         checkpoint = root.checkpoint
+        adapter_override = root.adapter
         prefix = ()
         if root_action_index is None:
             force_data = None
@@ -412,6 +424,8 @@ def execute_policy_trajectory(
             force_data = root.forced_root(int(root_action_index))
     if source_arm not in {"P0", "BRANCH"}:
         raise ValueError("only the non-Expert P0 or BRANCH execution path is available")
+    if adapter_override is None:
+        raise ValueError("native checkpoint continuation requires its owning simulator adapter")
     policy_digest = model_digest(policy)
     policy_adapter = PolicyAdapter(policy)
     purpose = f"issue75-{root.root_id}-{invocation_seed}-{attempt_index}"
@@ -421,7 +435,7 @@ def execute_policy_trajectory(
         result = runner._run_one(
             out=output_dir, module=module, model=policy_adapter, model_digest=policy_digest,
             seed=int(owner_seed), arm=source_arm, encoder=encoder,
-            checkpoint=checkpoint, forced_root=force_data,
+            adapter_override=adapter_override, checkpoint=checkpoint, forced_root=force_data,
             purpose=purpose, durable=False, capture_trace=True,
             capture_checkpoints=True, capture_all_roots=True,
             cpu_cap_seconds=float(cpu_cap_seconds),

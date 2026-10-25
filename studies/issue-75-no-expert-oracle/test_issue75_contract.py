@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import ast
+import hashlib
+import io
 import json
 import os
+from contextlib import redirect_stdout
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from types import ModuleType
 from unittest.mock import patch
 
 import algorithm
 import preflight
 import runtime
+import stage0
 
 
 STUDY = Path(__file__).resolve().parent
@@ -87,6 +92,203 @@ class Issue75ContractTests(unittest.TestCase):
             + resources["stage0_source_preflight_conservative_cpu_reserve_seconds"],
             resources["builder_process_tree_cpu_hard_seconds"],
         )
+
+    def test_stage0_attempt_directories_are_source_scoped_and_contained(self) -> None:
+        attempt = stage0._attempt_dir_for_id("source-5624600b-a20e8012")
+        self.assertEqual(
+            attempt,
+            (STUDY / "stage0" / "attempts" / "source-5624600b-a20e8012").resolve(),
+        )
+        for invalid in ("", "../outside", "nested/name", "attempt.with.dot"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                stage0._attempt_dir_for_id(invalid)
+        with patch.dict(os.environ, {stage0.STAGE0_ATTEMPT_ENV: str(attempt / "nested")}):
+            with self.assertRaises(RuntimeError):
+                stage0._stage0_dir_from_environment()
+
+    def test_run_debug_defaults_to_a_source_and_lock_scoped_attempt(self) -> None:
+        prior_state = (stage0.STAGE0_DIR, stage0.RECEIPTS, stage0.NATIVE_OUTPUT)
+        prior_env = os.environ.get(stage0.STAGE0_ATTEMPT_ENV)
+        source_commit = "123456789abcdef0123456789abcdef012345678"
+        lock_sha = "a" * 64
+        try:
+            with (
+                patch.object(stage0, "_load_locked_state", return_value=({}, {}, lock_sha, source_commit)),
+                patch.object(stage0, "run_stage0", return_value={"status": "STAGE0_NONFORMAL_REVIEWABLE_COMPLETE"}),
+                patch.object(sys, "argv", ["stage0.py", "--run-debug"]),
+                redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(stage0.main(), 0)
+            self.assertEqual(
+                stage0.STAGE0_DIR,
+                (STUDY / "stage0" / "attempts" / "source-12345678-aaaaaaaa").resolve(),
+            )
+        finally:
+            stage0.STAGE0_DIR, stage0.RECEIPTS, stage0.NATIVE_OUTPUT = prior_state
+            if prior_env is None:
+                os.environ.pop(stage0.STAGE0_ATTEMPT_ENV, None)
+            else:
+                os.environ[stage0.STAGE0_ATTEMPT_ENV] = prior_env
+
+    def test_checkpoint_adapter_stays_volatile_through_decision_capture(self) -> None:
+        import numpy as np
+
+        adapter = object()
+        checkpoint = object()
+        root_row = {
+            "adapter": adapter, "checkpoint": checkpoint, "decision_index": 0,
+            "policy_decision_index": 0, "screen": "synthetic-test-only",
+            "legal_action_identities": ({"card": "a"}, {"card": "b"}),
+            "native_state_sha256": "state", "public_projection_sha256": "projection",
+            "public_resource_state_sha256": "resource", "projection_digest": "projection-digest",
+            "feature_matrix": np.zeros((2, 2), dtype=np.float32),
+        }
+        captured = runtime._safe_root_capture(root_row)
+        self.assertIs(captured["adapter"], adapter)
+
+        trace = [{
+            "kind": "categorical", "step": 0, "chosen_index": 0,
+            "legal_action_identities": root_row["legal_action_identities"],
+            "probabilities": [0.5, 0.5],
+        }]
+        decisions = runtime._decision_rows(
+            runner=object(),
+            result={"_volatile_roots": [dict(root_row)], "decisions": trace},
+            is_root_run=True,
+        )
+        self.assertIs(decisions[0].adapter, adapter)
+        packed = runtime._hash_only_decisions(decisions)
+        self.assertNotIn("adapter", packed[0])
+        self.assertNotIn("checkpoint", packed[0])
+        self.assertEqual(set(packed[0]), {
+            "step_index", "state_fingerprint", "legal_identity_sha256", "chosen_index",
+            "candidate_features_f32le_zlib_base64", "candidate_features_sha256",
+            "candidate_features_shape", "is_root",
+        })
+
+    def test_root_replay_keeps_the_adapter_that_created_its_checkpoint(self) -> None:
+        import numpy as np
+
+        config = json.loads((STUDY / "config.json").read_text(encoding="utf-8"))
+        identities = ({"card": "a"}, {"card": "b"})
+        matrix = np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype="<f4")
+        adapter_rows = []
+
+        class FakeAdapter:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+                self.closed = False
+                adapter_rows.append(self)
+
+            def close(self):
+                self.closed = True
+
+        native_package = ModuleType("sts_combat_rl")
+        native_package.__path__ = []
+        sim_package = ModuleType("sts_combat_rl.sim")
+        sim_package.__path__ = []
+        lightspeed_module = ModuleType("sts_combat_rl.sim.lightspeed")
+        lightspeed_module.LightSpeedAdapter = FakeAdapter
+        modules = {
+            "sts_combat_rl": native_package,
+            "sts_combat_rl.sim": sim_package,
+            "sts_combat_rl.sim.lightspeed": lightspeed_module,
+        }
+        expected = {
+            "root_id": "root-test", "owner_decision_index": 0, "policy_decision_index": 0,
+            "screen": "synthetic-test-only", "legal_action_identities_sha256": hashlib.sha256(
+                runtime.canonical(list(identities)).encode("utf-8")
+            ).hexdigest(),
+            "feature_matrix_sha256": runtime.feature_matrix_sha256(matrix),
+            "projection_digest": "projection-digest",
+            "root_fingerprints": {
+                "native_state_sha256": "state", "public_projection_sha256": "projection",
+                "public_resource_state_sha256": "resource",
+            },
+        }
+        checkpoint = object()
+        row = {
+            "checkpoint": checkpoint, "decision_index": 0, "policy_decision_index": 0,
+            "screen": "synthetic-test-only", "legal_action_identities": identities,
+            "native_state_sha256": "state", "public_projection_sha256": "projection",
+            "public_resource_state_sha256": "resource", "projection_digest": "projection-digest",
+            "feature_matrix": matrix,
+        }
+        captured = {}
+
+        class FakeRunner:
+            def _load_policy(self, *args, **kwargs):
+                return object(), "policy-digest"
+
+            def _run_one(self, **kwargs):
+                captured.update(kwargs)
+                row["adapter"] = kwargs["adapter_override"]
+                kwargs["root_callback"](row)
+
+        with patch.object(runtime, "binary_sha256", return_value=config["source"]["issue73_pi_init_sha256"]):
+            with patch.dict(sys.modules, modules):
+                root = runtime.replay_locked_root(
+                    runner=FakeRunner(), module=object(), encoder=object(), output_dir=STUDY,
+                    owner_seed=17, expected=expected,
+                )
+
+        self.assertEqual(len(adapter_rows), 1)
+        self.assertIs(captured["adapter_override"], adapter_rows[0])
+        self.assertIs(root.adapter, adapter_rows[0])
+        self.assertIs(root.checkpoint, checkpoint)
+        self.assertFalse(adapter_rows[0].closed)
+
+    def test_native_continuations_reuse_the_adapter_that_owns_each_checkpoint(self) -> None:
+        root_adapter = object()
+        root = runtime.LockedRoot(
+            owner_seed=17, root_id="root-test", decision_index=0, policy_decision_index=0,
+            screen="synthetic-test-only", checkpoint=object(), adapter=root_adapter,
+            legal_identities=({"card": "a"}, {"card": "b"}), fingerprints={},
+            projection_digest="projection", feature_matrix_sha256="features",
+        )
+
+        def run_and_capture(*, root_value, mutation_target=None, parent_trial=None):
+            captured = {}
+
+            class FakeRunner:
+                def _run_one(self, **kwargs):
+                    captured.update(kwargs)
+                    raise ValueError("checkpoint belongs to a different simulator adapter")
+
+            with patch.object(runtime, "model_digest", return_value="test-policy-digest"):
+                trial = runtime.execute_policy_trajectory(
+                    runner=FakeRunner(), module=object(), encoder=object(), output_dir=STUDY,
+                    policy=object(), owner_seed=17, root=root_value, attempt_index=1,
+                    invocation_seed=0, root_action_index=0 if mutation_target is None else None,
+                    mutation_target=mutation_target, parent_trial=parent_trial,
+                )
+            return captured, trial
+
+        captured, trial = run_and_capture(root_value=root)
+        self.assertIs(captured["adapter_override"], root_adapter)
+        self.assertEqual(trial.failure_boundary, "native_continuation_error:ValueError")
+
+        later_adapter = object()
+        root_decision = algorithm.Decision(
+            step_index=0, state_fingerprint="state-root", legal_identities=root.legal_identities,
+            chosen_index=0, is_root=True,
+        )
+        later_decision = algorithm.Decision(
+            step_index=3, state_fingerprint="state-later",
+            legal_identities=({"card": "x"}, {"card": "y"}), chosen_index=0,
+            checkpoint=object(), adapter=later_adapter, is_root=False,
+            screen="synthetic-test-only", root_fingerprints={"native_state_sha256": "state-later"},
+        )
+        parent = algorithm.TrialResult(
+            attempt_index=9, complete=True, heart_win=False, terminal_floor=1.0,
+            root_identity={"card": "a"}, decisions=(root_decision, later_decision),
+        )
+        target = algorithm.MutationTarget(
+            parent_attempt_index=9, parent_decision=later_decision, alternative_index=1,
+        )
+        captured, trial = run_and_capture(root_value=root, mutation_target=target, parent_trial=parent)
+        self.assertIs(captured["adapter_override"], later_adapter)
+        self.assertEqual(trial.failure_boundary, "native_continuation_error:ValueError")
 
     def test_root_scheduler_is_seed_locked_and_cyclic(self) -> None:
         args = dict(study_id="issue-75-no-expert-oracle", root_id="root-test", invocation_seed=3)

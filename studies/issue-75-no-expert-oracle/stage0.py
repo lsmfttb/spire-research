@@ -23,9 +23,44 @@ from preflight import load_json, normalized_sha256, reviewer_pass_proof, verify_
 
 STUDY = Path(__file__).resolve().parent
 ROOT = STUDY.parents[1]
-RECEIPTS = STUDY / "stage0" / "receipts"
-NATIVE_OUTPUT = STUDY / "stage0" / "native-output"
+STAGE0_BASE = STUDY / "stage0"
+STAGE0_ATTEMPT_ENV = "ISSUE75_STAGE0_ATTEMPT_DIR"
+
+
+def _stage0_dir_from_environment() -> Path:
+    raw = os.environ.get(STAGE0_ATTEMPT_ENV)
+    if raw is None:
+        return STAGE0_BASE
+    candidate = Path(raw).expanduser().resolve()
+    attempts = (STAGE0_BASE / "attempts").resolve()
+    if candidate.parent != attempts:
+        raise RuntimeError("Stage-0 attempt directory must be a direct child of stage0/attempts")
+    return candidate
+
+
+STAGE0_DIR = _stage0_dir_from_environment()
+RECEIPTS = STAGE0_DIR / "receipts"
+NATIVE_OUTPUT = STAGE0_DIR / "native-output"
 WORKER_MARKER = "ISSUE75_ROOT_RESULT:"
+
+
+def _attempt_dir_for_id(attempt_id: str) -> Path:
+    allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+    if not attempt_id or any(char not in allowed for char in attempt_id):
+        raise ValueError("Stage-0 attempt ID must contain only ASCII letters, digits, hyphens, and underscores")
+    attempts = (STAGE0_BASE / "attempts").resolve()
+    candidate = (attempts / attempt_id).resolve()
+    if candidate.parent != attempts:
+        raise ValueError("Stage-0 attempt directory escaped stage0/attempts")
+    return candidate
+
+
+def _configure_stage0_attempt(attempt_id: str) -> None:
+    global STAGE0_DIR, RECEIPTS, NATIVE_OUTPUT
+    STAGE0_DIR = _attempt_dir_for_id(attempt_id)
+    os.environ[STAGE0_ATTEMPT_ENV] = str(STAGE0_DIR)
+    RECEIPTS = STAGE0_DIR / "receipts"
+    NATIVE_OUTPUT = STAGE0_DIR / "native-output"
 
 
 def _resource_module() -> Any:
@@ -158,8 +193,8 @@ def _current_root_worker_pids(root_id: str) -> list[int]:
 
 
 def _configure_task_runtime() -> None:
-    temp = STUDY / "stage0" / "tmp"
-    cache = STUDY / "stage0" / "cache"
+    temp = STAGE0_DIR / "tmp"
+    cache = STAGE0_DIR / "cache"
     for path in (temp, cache, cache / "torch", cache / "matplotlib"):
         path.mkdir(parents=True, exist_ok=True)
     for name in ("TMPDIR", "TMP", "TEMP"):
@@ -572,8 +607,8 @@ def _parse_worker_stdout(stdout: bytes) -> dict[str, Any] | None:
 
 def _worker_env() -> dict[str, str]:
     env = dict(os.environ)
-    temp = STUDY / "stage0" / "tmp"
-    cache = STUDY / "stage0" / "cache"
+    temp = STAGE0_DIR / "tmp"
+    cache = STAGE0_DIR / "cache"
     temp.mkdir(parents=True, exist_ok=True)
     cache.mkdir(parents=True, exist_ok=True)
     for name in ("TMPDIR", "TMP", "TEMP"):
@@ -582,6 +617,10 @@ def _worker_env() -> dict[str, str]:
     env["TORCH_HOME"] = str(cache / "torch")
     env["MPLCONFIGDIR"] = str(cache / "matplotlib")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    if STAGE0_DIR == STAGE0_BASE:
+        env.pop(STAGE0_ATTEMPT_ENV, None)
+    else:
+        env[STAGE0_ATTEMPT_ENV] = str(STAGE0_DIR)
     return env
 
 
@@ -1026,7 +1065,7 @@ def run_stage0() -> dict[str, Any]:
             movement = policy_probe_diagnostics(frozen_pi0, trained.model, probes)
             if trained.result_model_digest != model_digest(trained.model):
                 raise RuntimeError("diagnostic model digest changed after training")
-            diagnostic_dir = STUDY / "stage0" / "diagnostics"
+            diagnostic_dir = STAGE0_DIR / "diagnostics"
             diagnostic_dir.mkdir(parents=True, exist_ok=True)
             artifact = diagnostic_dir / "pi0-stage0-diagnostic.pt"
             if artifact.exists():
@@ -1136,10 +1175,16 @@ def run_stage0() -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--attempt-id")
     parser.add_argument("--root-worker", action="store_true")
     parser.add_argument("root_id", nargs="?")
     parser.add_argument("--run-debug", action="store_true")
     args = parser.parse_args()
+    if args.attempt_id is not None:
+        try:
+            _configure_stage0_attempt(args.attempt_id)
+        except ValueError as exc:
+            parser.error(str(exc))
     if args.root_worker:
         if not args.root_id:
             parser.error("--root-worker requires a locked root ID")
@@ -1147,6 +1192,9 @@ def main() -> int:
     if args.root_id:
         parser.error("root ID is valid only with --root-worker")
     if args.run_debug:
+        if args.attempt_id is None:
+            _, _, lock_sha, source_commit = _load_locked_state()
+            _configure_stage0_attempt(f"source-{source_commit[:8]}-{lock_sha[:8]}")
         report = run_stage0()
         print(json.dumps(report, sort_keys=True))
         return 0 if report.get("status") == "STAGE0_NONFORMAL_REVIEWABLE_COMPLETE" else 2

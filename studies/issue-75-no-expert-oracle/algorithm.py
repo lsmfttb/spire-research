@@ -134,6 +134,7 @@ class Decision:
     candidate_features: Any = field(default=None, repr=False, compare=False)
     log_probabilities: Any = field(default=None, repr=False, compare=False)
     checkpoint: Any = field(default=None, repr=False, compare=False)
+    adapter: Any = field(default=None, repr=False, compare=False)
     is_root: bool = False
     screen: str = ""
     root_fingerprints: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
