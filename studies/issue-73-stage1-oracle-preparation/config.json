@@ -1,0 +1,142 @@
+{
+  "schema_id": "issue73-stage1-oce-preregistration-v1",
+  "study_id": "issue73_stage1_privileged_noncombat_oracle_oce_v1",
+  "disposition": "PREPARATION_ONLY_DISABLED",
+  "stage1_authorized": false,
+  "stage1_formal_execution_authorized": false,
+  "information_boundary": {
+    "regime": "study-only privileged native-state oracle intervention",
+    "normal_public_api_safe": false,
+    "privileged_projection_use": "O arm only; remains in memory for root scoring and exact action-occurrence binding",
+    "public_deployment": false,
+    "student_training": false,
+    "persist_raw_privileged_projection_or_native_state": false,
+    "persisted_root_identity": "coarse SHA-256 fingerprints only"
+  },
+  "population": {
+    "owner_count": 96,
+    "character": "IRONCLAD",
+    "ascension": 20,
+    "start": "native standard start",
+    "seed_first": 173731001,
+    "seed_last": 173731096,
+    "seeds": [
+      173731001, 173731002, 173731003, 173731004, 173731005, 173731006, 173731007, 173731008,
+      173731009, 173731010, 173731011, 173731012, 173731013, 173731014, 173731015, 173731016,
+      173731017, 173731018, 173731019, 173731020, 173731021, 173731022, 173731023, 173731024,
+      173731025, 173731026, 173731027, 173731028, 173731029, 173731030, 173731031, 173731032,
+      173731033, 173731034, 173731035, 173731036, 173731037, 173731038, 173731039, 173731040,
+      173731041, 173731042, 173731043, 173731044, 173731045, 173731046, 173731047, 173731048,
+      173731049, 173731050, 173731051, 173731052, 173731053, 173731054, 173731055, 173731056,
+      173731057, 173731058, 173731059, 173731060, 173731061, 173731062, 173731063, 173731064,
+      173731065, 173731066, 173731067, 173731068, 173731069, 173731070, 173731071, 173731072,
+      173731073, 173731074, 173731075, 173731076, 173731077, 173731078, 173731079, 173731080,
+      173731081, 173731082, 173731083, 173731084, 173731085, 173731086, 173731087, 173731088,
+      173731089, 173731090, 173731091, 173731092, 173731093, 173731094, 173731095, 173731096
+    ],
+    "blocking": "same owner seed across O/C/E only identifies paired owner block; divergent arm histories are not common-random-number matched"
+  },
+  "arms": {
+    "order": ["O", "C", "E"],
+    "O": "Online multi-decision privileged full-native-state terminal-rollout Oracle. At every eligible noncombat multichoice state evaluate each live legal action occurrence using pi_suffix continuations; select only under the frozen 2-SE rule, otherwise take the exact C fallback.",
+    "C": "Exact 0.80 ExpertNonCombatDriver expert_non_combat_v1 plus 0.20 uniform over live legal occurrences at each multichoice decision; same native Battle Search-v2@400.",
+    "E": "Pure ExpertNonCombatDriver expert_non_combat_v1 at every noncombat multichoice decision; same native Battle Search-v2@400.",
+    "battle": "same pinned native Battle Search-v2, 400 simulations, include all legal actions and potions, in all arms and suffixes",
+    "suffix": "exact 0.80 expert_non_combat_v1 plus 0.20 uniform over currently live legal occurrences; same pinned Battle Search-v2@400"
+  },
+  "oracle": {
+    "eligible_decisions": "every noncombat decision with more than one live legal action occurrence",
+    "max_queries_per_owner": 6,
+    "max_legal_occurrences_per_query": 14,
+    "continuations_per_occurrence": 8,
+    "continuation_terminal_required": true,
+    "continuation_attempt_cpu_cap_seconds": 20,
+    "selection": "unique highest sample mean must exceed every alternative mean by more than 2*sqrt(sample_variance_best/n + sample_variance_alternative/n); otherwise abstain and take the C fallback",
+    "variance": "unbiased sample variance with ddof=1 across the eight independent continuations per occurrence",
+    "tie_or_missing_candidate": "fail closed; never map an absent, reordered, or ambiguous occurrence to a legal action",
+    "no_threshold_tuning": true,
+    "failure_policy": "any missing, invalid, nonterminal, wrong-source, over-cap, or interrupted fixed continuation invalidates that owner attempt; no retry or result-subset analysis"
+  },
+  "estimand": {
+    "primary": "owner-paired difference in terminal floor O-C",
+    "secondary": "owner-paired difference in terminal floor O-E",
+    "terminal_floor": "native terminal floor_num; lower-level outcome is retained descriptively but not substituted for the registered primary endpoint",
+    "inference": "20,000 owner bootstrap resamples with replacement; nearest-rank 95% percentile interval at zero-based indices 499 and 19,499; resampling unit is the owner block",
+    "bootstrap_seed": 173739999,
+    "all_arms_required": true,
+    "missing_owner_policy": "no exclusions, replacement owners, partial arms, or retries; report incomplete phase without a primary estimate"
+  },
+  "measurements": [
+    "terminal floor and native terminal outcome",
+    "noncombat decisions and nonfallback Oracle changes",
+    "early versus later noncombat decision timing",
+    "Oracle query count and candidate/sample count",
+    "2-SE abstention/fallback count and reason",
+    "charged CPU and wall latency by natural owner and continuation attempt",
+    "privileged exposure flags and locked source identities"
+  ],
+  "decision_timing_summary": {
+    "source": "controller decision transition index and terminal completed_transitions count",
+    "early_if": "2 * decision_step < completed_transitions",
+    "later_if": "otherwise",
+    "interpretation": "within-run descriptive split only; not a treatment subgroup or inferential endpoint"
+  },
+  "source": {
+    "spire_base_commit": "182a353116035d337f6ae0bc92c491209632bcd7",
+    "stage0_directory": "studies/issue-73-privileged-noncombat-oracle-stage0",
+    "stage0_config_sha256": "87dcc49507eb23b1a9430f520836226a5a5db3eaa5d4231a470fb06ac220d2c4",
+    "native_repository": "https://github.com/lsmfttb/sts_lightspeed.git",
+    "native_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+    "native_integration_commit": "d61c7c2a120aa90730fd8530718a7cd7cd856b46",
+    "stsr_repository": "https://github.com/lsmfttb/STSRL.git",
+    "stsr_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "stage0_gate_c_handoff": "receipts/stage0-gate-bc-v14/reports/gate-c-v14-handoff.json",
+    "stage0_gate_c_handoff_sha256": "6b0585d4980cb03134e586b8b3bd37195414c5668f39a86697bd95836541038f"
+  },
+  "resource_proposal_not_authorization": {
+    "builder_preparation_incremental_cpu_cap_seconds": 4000,
+    "builder_preparation_native_preflight_cpu_cap_seconds": 600,
+    "formal_cpu_authorized": false,
+    "formal_cpu_reserved": false,
+    "proposed_owner_o_natural_cpu_cap_seconds": 120,
+    "proposed_owner_c_natural_cpu_cap_seconds": 120,
+    "proposed_owner_e_natural_cpu_cap_seconds": 120,
+    "proposed_max_o_branch_cpu_seconds_per_owner": 13440,
+    "proposed_max_o_total_cpu_seconds_per_owner": 13560,
+    "proposed_c_and_e_natural_cpu_seconds_total": 23040,
+    "proposed_absolute_stage1_cpu_cap_seconds": 1324800,
+    "proposed_formal_cpu_budget_requires_separate_planner_authorization": true
+  },
+  "stage0_cost_observation_for_planning_only": {
+    "gate_c_fixed_suffix_attempts": 64,
+    "gate_c_suffix_cpu_seconds_sum": 196.41389,
+    "gate_c_suffix_cpu_seconds_mean": 3.069,
+    "gate_c_suffix_cpu_seconds_p95": 5.294,
+    "gate_c_suffix_cpu_seconds_max": 6.920,
+    "debug_roots": 225,
+    "debug_root_mean_legal_occurrences": 4.6133,
+    "debug_root_p95_legal_occurrences": 11,
+    "mean_profile_scenario_total_cpu_seconds": 99801,
+    "p95_marginal_mix_profile_scenario_total_cpu_seconds": 303000,
+    "warning": "engineering extrapolations only: Gate C uses four fixed roots; debug root counts and marginal p95s are not a registered Stage 1 cohort or validated upper-tail prediction; formal execution still requires a separate CPU budget"
+  },
+  "activation": {
+    "requires_new_planner_authorization": true,
+    "requires_new_formal_cpu_budget": true,
+    "requires_reviewer_source_and_protocol_review": true,
+    "requires_committed_config_and_source_lock_update": true,
+    "must_not_relax_2se_after_stage0_or_stage1_outcomes": true
+  },
+  "stage0_interpretation": {
+    "status": "STAGE0_COMPLETE_FEASIBILITY_PASS / NO_ACTION_ADVANTAGE_ESTABLISHED / STUDY_ONLY",
+    "gate_c": "64/64 terminal suffixes; all four action-difference 95% CIs include zero; 2-SE rule abstained on all four roots; all 64 suffixes ended in loss; only two reached Act 2 and none reached Heart",
+    "identified_quantity": "Q(s_full,a;pi_suffix) conditional on a fixed native checkpoint/RNG with stochastic policy continuation; not Q(I_public,a) and not whole-game efficacy",
+    "stage1_design_recommendation": "NO-GO for activation absent independently precommitted technical evidence of useful nonfallback decision coverage; do not alter n=8 or 2-SE rule to force decisions"
+  },
+  "precision_note": {
+    "owner_n": 96,
+    "normal_approx_95_percent_ci_half_width_in_paired_sd": 0.2001,
+    "normal_approx_80_percent_mde_in_paired_sd": 0.286,
+    "interpretation": "planning approximations only; actual paired outcome variance and power are unknown until separately authorized complete O/C/E outcomes exist"
+  }
+}
