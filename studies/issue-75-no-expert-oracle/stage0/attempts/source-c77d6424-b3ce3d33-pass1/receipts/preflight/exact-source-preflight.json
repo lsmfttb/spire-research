@@ -1,0 +1,29 @@
+{
+  "formal_evaluation_enabled": false,
+  "formal_seed_table_present": false,
+  "formal_training_enabled": false,
+  "matches_locked_static_negative_result": true,
+  "native_module_path": "/home/lsmft/stsrl-spikes/build-issue71-8ded-py313/slaythespire.cpython-313-x86_64-linux-gnu.so",
+  "native_negative_result": {
+    "checkpoints_loaded_or_created": 0,
+    "expert_instances_created_or_called": 0,
+    "formal_seeds_consumed": 0,
+    "games_started": 0,
+    "import_only": true,
+    "native_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+    "native_source_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+    "numpy_version": "2.4.6",
+    "privileged_projections_read": 0,
+    "python_version": "3.13.13",
+    "simulator_instances_created": 0,
+    "status": "PINNED_NATIVE_IMPORT_API_NEGATIVE_PASS",
+    "torch_version": "2.12.0+cpu"
+  },
+  "reviewer_comment_id": 6402559931,
+  "reviewer_login": "lsmfttb",
+  "schema_id": "issue75-stage0-exact-source-preflight-v1",
+  "source_commit": "c77d64243320639bf156330760d511d2a13eee85",
+  "source_lock_sha256_lf": "b3ce3d33c27ec392f6d88151bce3c86a8fdce8c9dc0152d417069441f7140d38",
+  "sts_lightspeed_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+  "stsr_source_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96"
+}

@@ -1,0 +1,18 @@
+{
+  "actual_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+  "diff_ignoring_line_endings_clean": true,
+  "dirty_status_entries": 580,
+  "error": "RuntimeError: STSRL_SOURCE_DIR source is not the exact clean pinned commit",
+  "expected_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+  "failed_gate": "verify_source_repositories",
+  "failure_id": "preflight-0001",
+  "formal_evaluation_seed_consumed": false,
+  "formal_training_seed_consumed": false,
+  "native_module_loaded": false,
+  "native_sampling_started": false,
+  "root_workers_started": false,
+  "schema_id": "issue75-stage0-preflight-failure-v1",
+  "source_commit": "c77d64243320639bf156330760d511d2a13eee85",
+  "source_lock_sha256_lf": "b3ce3d33c27ec392f6d88151bce3c86a8fdce8c9dc0152d417069441f7140d38",
+  "source_repo": "STSRL"
+}
