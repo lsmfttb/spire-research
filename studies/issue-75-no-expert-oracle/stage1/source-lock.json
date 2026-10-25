@@ -1,0 +1,98 @@
+{
+  "budget_config_sha256": "331446e26ab0baf84998f5e882fae2c4aa69036f4847b05cdccb3e9501aeafec",
+  "execution_authorized": false,
+  "final_package_commit_binding": "must be named by exact SHA in Reviewer PASS and subsequent Planner activation comments",
+  "formal_seeds_or_games_consumed": 0,
+  "locked_files_sha256_lf": {
+    "algorithm.py": "481ee659910c0f1ef9f7418eb9ad58f9409a87b95fa65deca8b7adc79f26abd2",
+    "config.json": "9e3a78a3cd8be0e67842da9820b9123e47b2811b212a99e946153be83c512b31",
+    "learning.py": "9004a70eb7c58990a5b9c0ccb68d1b36b40479a713a070e02f3c6037e4ef467a",
+    "model.py": "a13ad1e1094b795bf87548fea42a7aaf22c8867550b30a3523484318bc6825e6",
+    "native_negative.py": "5ee457c8e676290fc5ab0e296acd1a644e2ac1b7eeb5d9e9a34b77261ad15c77",
+    "planning/build_stage1_cost_model.py": "615213ba8de4e7b6618bfa15342d03ca58ec9b69fd0d0c7ca233b41487930e74",
+    "planning/stage1-cost-model.json": "db2255c88c6402b35f8a844cd446be7665ef04eecacca0fbb4ebc3335b1460e1",
+    "planning/stage1-cost-model.md": "536504f1d3eecd429a5ab15ae7eb11bdd75740943fc02f050b18bd76d432ee4c",
+    "preflight.py": "30ac715d8ffef7507a9020afcb7fdb211e708f4f3ab7083b1f87133c7ed2d6f8",
+    "runtime.py": "aaa99c6316edb628e34161b733a92f7a0937d853b3761aa08165bc7536905407",
+    "source-lock.json": "b3ce3d33c27ec392f6d88151bce3c86a8fdce8c9dc0152d417069441f7140d38",
+    "source-lock.sha256": "92a6930c9a61aa33fdaa28745d26fcc2292175ddfa7922220ff494e733bb228e",
+    "stage0.py": "3ab0860b235d2ca32749bde5b1e691fee4f68e07be591acd84d266e2d0587b17",
+    "stage1/budget.json": "331446e26ab0baf84998f5e882fae2c4aa69036f4847b05cdccb3e9501aeafec",
+    "stage1/config.json": "e7e891c56c44c5d4c89f7fa6bfab114493c54a4e2e5a69f60024ab431e01b159",
+    "stage1/prepare.py": "99a8defee248f21bd594fff82535211670e34f263b025f83f1cfe92b90e2cfc9",
+    "stage1/seed-table.json": "b61b08cb757ce07eb3a20734ea6bf46decd97437ad30cf4a6d1ce0a90a74d6dd",
+    "stage1/test_activation.py": "63ccbeaf4f16af2f66c48aca033e3ce476af3bd4f03cc2c439cab989f16b60d3",
+    "stage1_budget.py": "a63a01e6ccacfe275355ef013a5761dd1426eff2e69d7bdf5a80578e473c5f80",
+    "test_issue75_contract.py": "36d70edfcaeb90fc3f477a79f995d046153a5fd706531ad5ebc4dd9c52c04210"
+  },
+  "model_training_performed": false,
+  "native_sampling_performed": false,
+  "package_status": "PREPARATION_ONLY_DISABLED",
+  "prepared_from_commit": "a8410ff48ecf168f904726c79da302d10f921984",
+  "runtime": {
+    "native_import_only_negative_test": {
+      "checkpoints_loaded_or_created": 0,
+      "expert_instances_created_or_called": 0,
+      "formal_seeds_consumed": 0,
+      "games_started": 0,
+      "import_only": true,
+      "native_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+      "native_source_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+      "numpy_version": "2.4.6",
+      "privileged_projections_read": 0,
+      "python_version": "3.13.13",
+      "simulator_instances_created": 0,
+      "status": "PINNED_NATIVE_IMPORT_API_NEGATIVE_PASS",
+      "torch_version": "2.12.0+cpu"
+    },
+    "native_module_path": "/home/lsmft/stsrl-spikes/build-issue71-8ded-py313/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+    "numpy_version": "2.4.6",
+    "optimizer_initial_state": {
+      "class": "torch.optim.adamw.AdamW",
+      "param_groups": [
+        {
+          "options": {
+            "amsgrad": false,
+            "betas": [
+              0.9,
+              0.999
+            ],
+            "capturable": false,
+            "decoupled_weight_decay": true,
+            "differentiable": false,
+            "eps": 1e-08,
+            "foreach": null,
+            "fused": null,
+            "lr": 0.0003,
+            "maximize": false,
+            "weight_decay": 0.0
+          },
+          "parameter_count": 6
+        }
+      ],
+      "state_is_empty_before_first_step": true
+    },
+    "optimizer_initial_state_sha256": "399a419a28f1c7ea44981bd02bbbca1b3d17fbfb6238afdb053e767b36f06870",
+    "pi0_model_digest": "38fe80665067f4ba931f825c882985e73dda1dd95fe19105754d55e8308dfeaf",
+    "pi0_model_seed": 73507501,
+    "python_version": "3.13.13",
+    "sts_lightspeed_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+    "stsr_source_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "torch_version": "2.12.0+cpu"
+  },
+  "schema_id": "issue75-stage1-source-lock-v1",
+  "scope": "STUDY_ONLY",
+  "seed_table_sha256": "b61b08cb757ce07eb3a20734ea6bf46decd97437ad30cf4a6d1ce0a90a74d6dd",
+  "stage0": {
+    "cumulative_builder_cpu_seconds": 1564.3003299999998,
+    "cumulative_native_cpu_seconds": 349.414085,
+    "evidence_commit": "7f7538a706710626740cdb635d3711e69eac900f",
+    "evidence_report_sha256": "f35bab535d850668ecb556ac121eccd75848223b3409b6563abb12063a28ffaf",
+    "review_comment_id": 6403333026,
+    "source_commit": "c77d64243320639bf156330760d511d2a13eee85",
+    "source_lock_sha256_lf": "b3ce3d33c27ec392f6d88151bce3c86a8fdce8c9dc0152d417069441f7140d38"
+  },
+  "stage1_config_sha256": "e7e891c56c44c5d4c89f7fa6bfab114493c54a4e2e5a69f60024ab431e01b159",
+  "study_id": "issue-75-no-expert-oracle"
+}

@@ -1,0 +1,20 @@
+{
+  "accounting_method": "Linux /proc process tree own+reaped-descendant CPU ticks; serialized supervised worker tree; fail closed if root/accounting disappears",
+  "concurrent_stage1_process_trees": 1,
+  "future_forecast_required_before_formal_owner_seed": true,
+  "ledger_status": "NOT_ACTIVATED_ZERO_CHARGES",
+  "limits_cpu_seconds": {
+    "all_in": 180000,
+    "builder": 170000,
+    "reviewer_protected": 10000
+  },
+  "reservation_policy": "write-ahead unique run ID; unresolved reservation is charged at its full cap; finished receipt charges measured process-tree CPU",
+  "resume_policy": "completed unit IDs cannot run again; incomplete units require exact previous checkpoint digest and new process-run ID; lost unreceipted processes remain fully reserved",
+  "reviewer_reserve_transferable_to_builder": false,
+  "schema_id": "issue75-stage1-budget-config-v1",
+  "search_call_cpu_cap_seconds": 32,
+  "search_call_started_attempt_cap": 16,
+  "stage0_charges_or_caps_included": false,
+  "stage1_execution_authorized": false,
+  "study_id": "issue-75-no-expert-oracle"
+}
