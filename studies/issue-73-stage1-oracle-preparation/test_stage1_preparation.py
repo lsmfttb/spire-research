@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import protocol
@@ -25,6 +27,10 @@ class Stage1PreparationTests(unittest.TestCase):
         self.assertIs(status["stage1_authorized"], False)
         self.assertEqual(status["formal_owner_seeds_consumed"], 0)
         self.assertEqual(status["owner_count"], 96)
+        accounting = status["resource_accounting"]
+        self.assertEqual(accounting["conservative_preparation_increment_cpu_seconds_charged"], 4000)
+        self.assertEqual(accounting["builder_cumulative_conservative_cpu_seconds"], 9330.657158)
+        self.assertEqual(accounting["aggregate_remaining_after_reviewer_reserve_cpu_seconds"], 669.342842)
         boundary = self.config["information_boundary"]
         self.assertFalse(boundary["normal_public_api_safe"])
         self.assertFalse(boundary["public_deployment"])
@@ -32,13 +38,77 @@ class Stage1PreparationTests(unittest.TestCase):
         self.assertFalse(boundary["persist_raw_privileged_projection_or_native_state"])
 
     def test_run_cli_refuses_before_creating_output_or_consuming_seed(self) -> None:
-        output = HERE / "artifacts" / "disabled-cli-test"
+        output = runner.CANONICAL_RUN_ROOT
         if output.exists():
             self.fail("test output already exists; refusing to overwrite workspace state")
         status = runner.main(["--run", "--output", str(output), "--native-module", "unused",
                               "--native-root", "unused", "--stsr-root", "unused"])
         self.assertEqual(status, 2)
         self.assertFalse(output.exists())
+
+    def test_formal_run_rejects_alternate_output_before_creating_files(self) -> None:
+        alternate = runner.ARTIFACT_ROOT / "alternate-formal-run"
+        if alternate.exists():
+            self.fail("alternate test output already exists; refusing to overwrite workspace state")
+        with self.assertRaisesRegex(protocol.ContractError, "canonical no-rerun directory"):
+            runner.run_formal(self.config, alternate, native_module_path="unused",
+                              native_root="unused", stsr_root="unused")
+        self.assertFalse(alternate.exists())
+
+    def test_updated_local_locks_cannot_activate_uncommitted_source_before_side_effects(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO) as temporary:
+            root = Path(temporary)
+            package = root / "studies" / HERE.name
+            package.mkdir(parents=True)
+            for name in ("config.json", "config.lock.sha256", "protocol.py", "runner.py",
+                         "test_stage1_preparation.py", "preparation-resource-receipt.json",
+                         "source-lock.json"):
+                shutil.copyfile(HERE / name, package / name)
+
+            config_path = package / "config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["review_repair_fixture"] = True
+            config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+            config_lock = package / "config.lock.sha256"
+            config_lock.write_text(protocol.sha256_file(config_path) + "\n", encoding="ascii")
+            for name in ("runner.py", "protocol.py"):
+                with (package / name).open("a", encoding="utf-8") as handle:
+                    handle.write("\n# uncommitted test fixture edit\n")
+
+            source_lock_path = package / "source-lock.json"
+            source_lock = json.loads(source_lock_path.read_text(encoding="utf-8"))
+            for name in ("config.json", "config.lock.sha256", "runner.py", "protocol.py"):
+                source_lock["files"][name] = protocol.sha256_file(package / name)
+            source_lock_path.write_text(json.dumps(source_lock, indent=2, sort_keys=True) + "\n",
+                                        encoding="utf-8")
+
+            actual_head = subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "HEAD"],
+                                                  text=True).strip()
+            package_rel = HERE.resolve().relative_to(REPO.resolve()).as_posix()
+            manifest = subprocess.check_output(["git", "-C", str(REPO), "show",
+                                                f"{actual_head}:{package_rel}/source-lock.json"])
+            real_check_output = subprocess.check_output
+
+            def git_fixture(args: list[str], **kwargs: object) -> str | bytes:
+                if len(args) >= 5 and args[:3] == ["git", "-C", str(root)]:
+                    if args[3:] == ["rev-parse", "HEAD"]:
+                        value = actual_head + "\n"
+                        return value if kwargs.get("text") else value.encode()
+                    if args[3] == "show":
+                        return manifest
+                return real_check_output(args, **kwargs)
+
+            out = package / "artifacts" / "stage1-formal-oce-v1"
+            with mock.patch.object(runner, "HERE", package), \
+                    mock.patch.object(runner, "CANONICAL_RUN_ROOT", out), \
+                    mock.patch.object(runner.subprocess, "check_output", side_effect=git_fixture), \
+                    mock.patch.object(runner.subprocess, "run",
+                                      return_value=subprocess.CompletedProcess([], 0)):
+                with self.assertRaisesRegex(protocol.ContractError,
+                                            "source lock differs from its committed Git blob"):
+                    runner.run_formal(self.config, out, native_module_path="unused",
+                                      native_root="unused", stsr_root="unused")
+            self.assertFalse(out.exists())
 
     def test_fixed_seeds_are_distinct_from_stage0_and_issue71(self) -> None:
         seeds = protocol.owner_seeds(self.config)

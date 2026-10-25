@@ -17,61 +17,130 @@ import protocol
 
 HERE = Path(__file__).resolve().parent
 ARTIFACT_ROOT = HERE / "artifacts"
+CANONICAL_RUN_ROOT = ARTIFACT_ROOT / "stage1-formal-oce-v1"
 
 
-def verify_package(*, native_root: str | None = None, stsr_root: str | None = None,
-                   native_module: str | None = None) -> dict[str, Any]:
-    config = protocol.read_config()
-    stage0 = protocol.verify_stage0_contract(config)
-    source_lock = json.loads((HERE / "source-lock.json").read_text(encoding="utf-8"))
+def verify_local_source_lock(config: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Check the complete local lock and its committed Git blobs before activation."""
+    lock_path = HERE / "source-lock.json"
+    try:
+        source_lock = json.loads(protocol._normalized_text(lock_path))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise protocol.ContractError("Stage 1 preparation source lock is missing or malformed") from exc
     if source_lock.get("schema_id") != "issue73-stage1-preparation-source-lock-v1":
         raise protocol.ContractError("Stage 1 preparation source-lock schema mismatch")
-    for rel, expected in source_lock["files"].items():
+    required = {"config.json", "config.lock.sha256", "protocol.py", "runner.py",
+                "test_stage1_preparation.py", "preparation-resource-receipt.json"}
+    files = source_lock.get("files")
+    if not isinstance(files, Mapping) or set(files) != required:
+        raise protocol.ContractError("Stage 1 preparation source-lock membership mismatch")
+    for rel, expected in sorted(files.items()):
         path = HERE / rel
         if not path.is_file() or protocol.sha256_file(path) != expected:
             raise protocol.ContractError(f"Stage 1 preparation source lock mismatch: {rel}")
-    present = (native_root is not None, stsr_root is not None, native_module is not None)
-    if any(present) and not all(present):
-        raise protocol.ContractError("provide all three pinned source paths or none")
-    external = (protocol.verify_external_sources(config, native_root, stsr_root, native_module)
-                if all(present) else None)
-    head = subprocess.check_output(["git", "-C", str(HERE.parents[1]), "rev-parse", "HEAD"], text=True).strip()
-    if subprocess.run(["git", "-C", str(HERE.parents[1]), "merge-base", "--is-ancestor",
+    if config is None:
+        config = protocol.read_config()
+    else:
+        locked_config = protocol.read_config()
+        if dict(config) != locked_config:
+            raise protocol.ContractError("formal runner config differs from its locked on-disk config")
+    repo = HERE.parents[1]
+    head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+    package_rel = HERE.resolve().relative_to(repo.resolve()).as_posix()
+    manifest_rel = f"{package_rel}/source-lock.json"
+    try:
+        committed_manifest = subprocess.check_output(["git", "-C", str(repo), "show", f"{head}:{manifest_rel}"])
+    except subprocess.CalledProcessError as exc:
+        raise protocol.ContractError("Stage 1 source lock is not present in the current commit") from exc
+    if protocol.sha256_bytes(committed_manifest) != protocol.sha256_file(lock_path):
+        raise protocol.ContractError("Stage 1 source lock differs from its committed Git blob")
+    for rel, expected in sorted(files.items()):
+        try:
+            committed = subprocess.check_output(["git", "-C", str(repo), "show", f"{head}:{package_rel}/{rel}"])
+        except subprocess.CalledProcessError as exc:
+            raise protocol.ContractError(f"locked package file is absent from current commit: {rel}") from exc
+        if protocol.sha256_bytes(committed) != expected:
+            raise protocol.ContractError(f"locked Git blob differs from source lock: {rel}")
+    if subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
                        config["source"]["spire_base_commit"], head], check=False).returncode != 0:
         raise protocol.ContractError("current study checkout does not descend from the registered remote source")
+    return {"head": head, "source_lock_sha256": protocol.sha256_file(lock_path),
+            "locked_files": dict(files)}
+
+
+def _activation_is_enabled(config: Mapping[str, Any]) -> bool:
+    resource = config.get("resource_proposal_not_authorization", {})
+    formal = config.get("formal_execution", {})
+    flags = (config.get("stage1_authorized"), config.get("stage1_formal_execution_authorized"),
+             formal.get("authorized", False), resource.get("formal_cpu_authorized"))
+    if all(value is False for value in flags):
+        return False
+    if all(value is True for value in flags):
+        _require_formal_authorization(config)
+        return True
+    raise protocol.ContractError("Stage 1 activation fields must be committed together")
+
+
+def verify_package(*, config: Mapping[str, Any] | None = None, native_root: str | None = None,
+                   stsr_root: str | None = None, native_module: str | None = None,
+                   require_formal_authorization: bool = False) -> dict[str, Any]:
+    local = verify_local_source_lock(config)
+    config = protocol.read_config()
+    stage0 = protocol.verify_stage0_contract(config)
+    resource_receipt = protocol.verify_preparation_resource_receipt(
+        HERE / "preparation-resource-receipt.json", config)
     seeds = protocol.owner_seeds(config)
     if len(set(seeds) & set(range(173730001, 173730009))):
         raise protocol.ContractError("Stage 1 owner seeds overlap Stage 0 debug seeds")
     if len(set(seeds) & set(range(7410001, 7410513)) or set(seeds) & set(range(7420001, 7420097))):
         raise protocol.ContractError("Stage 1 owner seeds overlap Issue 71 training/evaluation seeds")
-    if config.get("stage1_authorized") is not False or config.get("stage1_formal_execution_authorized") is not False:
-        raise protocol.ContractError("preparation package must remain disabled until separate Planner authorization")
+    activated = _activation_is_enabled(config)
+    if require_formal_authorization and not activated:
+        raise protocol.ContractError("STAGE1_NOT_AUTHORIZED: no formal owner or training seed was consumed")
     boundary = config.get("information_boundary", {})
     if (boundary.get("normal_public_api_safe") is not False
             or boundary.get("public_deployment") is not False
             or boundary.get("student_training") is not False
             or boundary.get("persist_raw_privileged_projection_or_native_state") is not False):
         raise protocol.ContractError("Stage 1 package violates the study-only privileged-information boundary")
-    if config.get("resource_proposal_not_authorization", {}).get("formal_cpu_authorized") is not False:
-        raise protocol.ContractError("formal CPU must remain unauthorized in this preparation package")
-    return {"status": "PREPARATION_PACKAGE_LOCKS_PASS", "stage1_authorized": False,
-            "formal_owner_seeds_consumed": 0, "source": stage0, "external_sources": external,
-            "owner_count": len(seeds), "arms": list(config["arms"]["order"]),
+    present = (native_root is not None, stsr_root is not None, native_module is not None)
+    if any(present) and not all(present):
+        raise protocol.ContractError("provide all three pinned source paths or none")
+    external = (protocol.verify_external_sources(config, native_root, stsr_root, native_module)
+                if all(present) else None)
+    return {"status": "PREPARATION_PACKAGE_LOCKS_PASS", "activation_state": "AUTHORIZED" if activated else "DISABLED",
+            "stage1_authorized": activated, "formal_owner_seeds_consumed": 0, "source": stage0,
+            "local_source": local, "resource_accounting": resource_receipt["accounting"],
+            "external_sources": external, "owner_count": len(seeds),
+            "arms": list(config["arms"]["order"]),
             "config_sha256": protocol.sha256_file(protocol.CONFIG_PATH)}
 
 
 def _require_formal_authorization(config: Mapping[str, Any]) -> float:
-    """Fail before setup/output creation unless a future reviewed config unlocks execution."""
-    resource = config.get("formal_execution", {})
+    """Fail closed unless a separately committed Planner decision enables the formal run."""
+    resource = config.get("resource_proposal_not_authorization", {})
+    formal = config.get("formal_execution", {})
     if (config.get("stage1_authorized") is not True
             or config.get("stage1_formal_execution_authorized") is not True
-            or resource.get("authorized") is not True):
+            or formal.get("authorized") is not True
+            or resource.get("formal_cpu_authorized") is not True):
         raise protocol.ContractError("STAGE1_NOT_AUTHORIZED: no formal owner or training seed was consumed")
-    cap = resource.get("cpu_budget_seconds")
+    cap = formal.get("cpu_budget_seconds")
     if isinstance(cap, bool) or not isinstance(cap, (int, float)) or not 0 < cap <= 1_324_800:
         raise protocol.ContractError("future activation must commit an explicit formal CPU budget within the preregistered cap")
     return float(cap)
 
+
+def _canonical_formal_output(path: Path | None) -> Path:
+    expected = Path(os.path.abspath(CANONICAL_RUN_ROOT))
+    requested = expected if path is None else Path(os.path.abspath(path))
+    if requested != expected:
+        raise protocol.ContractError(f"formal execution uses one canonical no-rerun directory: {expected}")
+    for candidate in (ARTIFACT_ROOT, expected):
+        is_junction = getattr(candidate, "is_junction", None)
+        if candidate.is_symlink() or (callable(is_junction) and is_junction()):
+            raise protocol.ContractError("formal output path cannot use a symlink or junction")
+    return expected
 
 def _load_stage0_runner() -> Any:
     stage0_dir = protocol.STAGE0
@@ -333,11 +402,11 @@ def analyze_complete_owners(config: Mapping[str, Any], out: Path,
 
 def run_formal(config: Mapping[str, Any], out: Path, *, native_module_path: str,
                native_root: str, stsr_root: str) -> dict[str, Any]:
-    """Execute only after a separately reviewed config/source-lock activation."""
+    """Execute only after activation, source, environment, and output identity are locked."""
+    out = _canonical_formal_output(out)
+    verify_package(config=config, native_root=native_root, stsr_root=stsr_root,
+                   native_module=native_module_path, require_formal_authorization=True)
     formal_cpu_cap = _require_formal_authorization(config)
-    out = out.resolve()
-    if not out.is_relative_to(ARTIFACT_ROOT.resolve()):
-        raise protocol.ContractError("formal output must be inside this study's artifacts directory")
     if out.exists() and (out / "phase.complete.json").is_file():
         environment = json.loads((out / "environment.json").read_text(encoding="utf-8"))
         return analyze_complete_owners(config, out, environment["identity"])
@@ -360,7 +429,6 @@ def run_formal(config: Mapping[str, Any], out: Path, *, native_module_path: str,
     stage0 = _load_stage0_runner()
     os.environ["STS_LIGHTSPEED_SOURCE_DIR"] = str(Path(native_root).resolve(strict=True))
     os.environ["STSRL_SOURCE_DIR"] = str(Path(stsr_root).resolve(strict=True))
-    protocol.verify_external_sources(config, native_root, stsr_root, native_module_path)
     setup_dir = out / "setup-attempts"
     setup_dir.mkdir(parents=True, exist_ok=True)
     starts = sorted(setup_dir.glob("*.started.json"))
@@ -489,7 +557,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--native-root", help="exact clean pinned sts_lightspeed checkout")
     parser.add_argument("--stsr-root", help="exact clean pinned STSRL checkout")
     parser.add_argument("--native-module", help="binary whose digest is locked in the Stage 0 source contract")
-    parser.add_argument("--output", type=Path)
+    parser.add_argument("--output", type=Path, help="canonical Stage-1 run directory, or existing analysis directory")
     args = parser.parse_args(argv)
     try:
         if args.check:
@@ -498,10 +566,10 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(report, sort_keys=True))
             return 0
         config = protocol.read_config()
-        _require_formal_authorization(config)
-        if not args.output:
-            raise protocol.ContractError("--run/--analyze requires an existing study artifact directory")
         if args.analyze:
+            if not args.output:
+                raise protocol.ContractError("--analyze requires an existing study artifact directory")
+            _require_formal_authorization(config)
             analysis_out = args.output.resolve()
             if not analysis_out.is_relative_to(ARTIFACT_ROOT.resolve()):
                 raise protocol.ContractError("analysis input must be inside this study's artifacts directory")
@@ -510,7 +578,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if not args.native_module or not args.native_root or not args.stsr_root:
                 raise protocol.ContractError("--run requires all pinned source paths after activation")
-            report = run_formal(config, args.output, native_module_path=args.native_module,
+            run_out = _canonical_formal_output(args.output)
+            report = run_formal(config, run_out, native_module_path=args.native_module,
                                 native_root=args.native_root, stsr_root=args.stsr_root)
         print(json.dumps(report, sort_keys=True))
         return 0

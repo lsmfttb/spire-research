@@ -1,0 +1,35 @@
+{
+  "accounting": {
+    "aggregate_conservative_including_reviewer_reserve_cpu_seconds": 11330.657158,
+    "aggregate_cpu_ceiling_seconds": 12000.0,
+    "aggregate_remaining_after_reviewer_reserve_cpu_seconds": 669.342842,
+    "authorized_native_preflight_cap_cpu_seconds": 600.0,
+    "authorized_preparation_increment_cap_cpu_seconds": 4000.0,
+    "builder_cumulative_conservative_cpu_seconds": 9330.657158,
+    "builder_cumulative_cpu_ceiling_seconds": 10000.0,
+    "builder_remaining_cpu_seconds": 669.342842,
+    "conservative_preparation_increment_cpu_seconds_charged": 4000.0,
+    "native_cumulative_cpu_ceiling_seconds": 6000.0,
+    "native_cumulative_cpu_seconds_after_preparation": 1899.047024,
+    "native_game_cpu_seconds_charged_for_preparation": 0.0,
+    "native_preflight_cpu_seconds_charged": 0.0,
+    "native_preflight_cpu_seconds_remaining": 600.0,
+    "native_remaining_cpu_seconds": 4100.952976,
+    "prior_builder_charged_cpu_seconds": 5330.657158,
+    "prior_native_stage0_charged_cpu_seconds": 1899.047024,
+    "protected_reviewer_reserve_cpu_seconds": 2000.0
+  },
+  "accounting_method": "No process-level cumulative telemetry was retained for the prior preparation. Debit the entire authorized incremental allowance as a conservative Builder charge; this is an upper-bound accounting debit, not a measured CPU claim.",
+  "formal_owner_seeds_consumed": 0,
+  "measured_builder_preparation_cpu_seconds": null,
+  "native_game_execution_performed": false,
+  "native_root_preflight_performed": false,
+  "schema_id": "issue73-stage1-preparation-resource-receipt-v1",
+  "source": {
+    "preparation_authorization_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6391525784",
+    "review_finding_comment": "https://github.com/lsmfttb/spire-research/issues/73#issuecomment-6392198375",
+    "reviewed_baseline_sha": "e4a86a319503627e6dc0826431097118e336a843"
+  },
+  "stage0_receipts_rerun_or_modified": false,
+  "status": "CONSERVATIVE_ALLOWANCE_CHARGED"
+}

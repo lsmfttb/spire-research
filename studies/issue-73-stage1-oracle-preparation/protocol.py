@@ -60,6 +60,58 @@ def read_config(path: Path = CONFIG_PATH, lock_path: Path = LOCK_PATH) -> dict[s
     return value
 
 
+
+def verify_preparation_resource_receipt(path: Path, config: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate the conservative accounting debit for authorized preparation work."""
+    try:
+        receipt = json.loads(_normalized_text(path))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ContractError("durable preparation resource receipt is missing or malformed") from exc
+    if receipt.get("schema_id") != "issue73-stage1-preparation-resource-receipt-v1":
+        raise ContractError("unexpected preparation resource receipt schema")
+    if receipt.get("status") != "CONSERVATIVE_ALLOWANCE_CHARGED":
+        raise ContractError("preparation resource receipt does not record a conservative charge")
+    if receipt.get("measured_builder_preparation_cpu_seconds") is not None:
+        raise ContractError("unmetered preparation CPU must not be reported as measured")
+    if receipt.get("formal_owner_seeds_consumed") != 0 or receipt.get("native_game_execution_performed") is not False:
+        raise ContractError("preparation accounting cannot claim formal owners or native game execution")
+    accounting = receipt.get("accounting")
+    if not isinstance(accounting, Mapping):
+        raise ContractError("preparation resource accounting block is missing")
+    budget = config["resource_proposal_not_authorization"]
+    def require_close(key: str, expected: float) -> float:
+        value = accounting.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise ContractError(f"preparation resource accounting field is invalid: {key}")
+        if not math.isclose(float(value), float(expected), rel_tol=0, abs_tol=1e-6):
+            raise ContractError(f"preparation resource accounting mismatch: {key}")
+        return float(value)
+    prior_builder = require_close("prior_builder_charged_cpu_seconds", 5330.657158)
+    prep_cap = require_close("authorized_preparation_increment_cap_cpu_seconds",
+                             budget["builder_preparation_incremental_cpu_cap_seconds"])
+    charged = require_close("conservative_preparation_increment_cpu_seconds_charged", prep_cap)
+    builder_ceiling = require_close("builder_cumulative_cpu_ceiling_seconds", 10000)
+    builder_total = require_close("builder_cumulative_conservative_cpu_seconds", prior_builder + charged)
+    require_close("builder_remaining_cpu_seconds", builder_ceiling - builder_total)
+    reviewer_reserve = require_close("protected_reviewer_reserve_cpu_seconds", 2000)
+    aggregate_ceiling = require_close("aggregate_cpu_ceiling_seconds", 12000)
+    aggregate_total = require_close("aggregate_conservative_including_reviewer_reserve_cpu_seconds",
+                                    builder_total + reviewer_reserve)
+    require_close("aggregate_remaining_after_reviewer_reserve_cpu_seconds",
+                  aggregate_ceiling - aggregate_total)
+    prior_native = require_close("prior_native_stage0_charged_cpu_seconds", 1899.047024)
+    native_game_cpu = require_close("native_game_cpu_seconds_charged_for_preparation", 0)
+    native_ceiling = require_close("native_cumulative_cpu_ceiling_seconds", 6000)
+    native_total = require_close("native_cumulative_cpu_seconds_after_preparation", prior_native + native_game_cpu)
+    require_close("native_remaining_cpu_seconds", native_ceiling - native_total)
+    preflight_cap = require_close("authorized_native_preflight_cap_cpu_seconds",
+                                  budget["builder_preparation_native_preflight_cpu_cap_seconds"])
+    require_close("native_preflight_cpu_seconds_charged", 0)
+    require_close("native_preflight_cpu_seconds_remaining", preflight_cap)
+    if builder_total > builder_ceiling or aggregate_total > aggregate_ceiling or native_total > native_ceiling:
+        raise ContractError("conservative preparation charge exceeds an authorized cumulative ceiling")
+    return receipt
+
 def verify_stage0_contract(config: Mapping[str, Any]) -> dict[str, Any]:
     """Verify the committed Stage 0 source tree and its accepted Gate C receipt."""
     source = config["source"]
