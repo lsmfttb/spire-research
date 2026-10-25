@@ -4,12 +4,14 @@ import ast
 import json
 import os
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 import algorithm
 import preflight
+import runtime
 
 
 STUDY = Path(__file__).resolve().parent
@@ -290,6 +292,23 @@ class Issue75ContractTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "configured project account"):
             self._run_reviewer_pass(comment)
 
+    def test_runtime_uses_pinned_stsrl_src_directory(self) -> None:
+        with tempfile.TemporaryDirectory(dir=STUDY) as temp_dir:
+            source_root = Path(temp_dir)
+            package_dir = source_root / "src" / "sts_combat_rl"
+            package_dir.mkdir(parents=True)
+            previous_path = sys.path[:]
+            try:
+                resolved = runtime.configure_stsrl_import_path(source_root)
+                self.assertEqual(resolved, package_dir.parent.resolve())
+                self.assertEqual(sys.path[0], str(package_dir.parent.resolve()))
+            finally:
+                sys.path[:] = previous_path
+
+    def test_runtime_rejects_unpinned_stsrl_package_layout(self) -> None:
+        with tempfile.TemporaryDirectory(dir=STUDY) as temp_dir:
+            with self.assertRaisesRegex(RuntimeError, "pinned STSRL source lacks"):
+                runtime.configure_stsrl_import_path(Path(temp_dir))
 
 if __name__ == "__main__":
     unittest.main()

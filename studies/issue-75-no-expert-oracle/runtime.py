@@ -73,6 +73,33 @@ def process_tree_cpu_seconds() -> float:
     return float(own.ru_utime + own.ru_stime + children.ru_utime + children.ru_stime)
 
 
+def configure_stsrl_import_path(source_dir: str | Path) -> Path:
+    """Prefer the source-locked STSRL worktree for the native identity import."""
+    source_root = Path(source_dir).expanduser().resolve(strict=True)
+    package_root_path = source_root / "src"
+    if not package_root_path.is_dir():
+        raise RuntimeError("pinned STSRL source lacks src/sts_combat_rl")
+    package_root = package_root_path.resolve(strict=True)
+    package_dir = package_root / "sts_combat_rl"
+    if not package_dir.is_dir():
+        raise RuntimeError("pinned STSRL source lacks src/sts_combat_rl")
+
+    existing_package = sys.modules.get("sts_combat_rl")
+    if existing_package is not None:
+        package_paths = [
+            Path(value).resolve(strict=True)
+            for value in getattr(existing_package, "__path__", ())
+        ]
+        if not package_paths or any(not path.is_relative_to(package_root) for path in package_paths):
+            raise RuntimeError("sts_combat_rl was imported outside the pinned STSRL source")
+
+    package_root_text = str(package_root)
+    resolved_paths = {str(Path(entry or ".").resolve()) for entry in sys.path}
+    if package_root_text not in resolved_paths:
+        sys.path.insert(0, package_root_text)
+    return package_root
+
+
 def verify_source_repositories(config: Mapping[str, Any]) -> None:
     import subprocess
 
@@ -93,6 +120,8 @@ def verify_source_repositories(config: Mapping[str, Any]) -> None:
         ).stdout.strip()
         if result.stdout.strip() != expected or dirty:
             raise RuntimeError(f"{env_name} source is not the exact clean pinned commit")
+
+    configure_stsrl_import_path(os.environ["STSRL_SOURCE_DIR"])
 
 
 def verify_native_module(config: Mapping[str, Any]) -> Path:
