@@ -303,15 +303,32 @@ class WatchdogTests(unittest.TestCase):
 
 
 class SourceLockTests(unittest.TestCase):
-    def test_stage0_and_stage1_source_locks_bind_reviewed_receipts_and_runtime(self):
+    def test_historical_stage0_lock_passes_from_stage1_descendant(self):
         config = prepare.preflight.load_json(STUDY / "config.json")
         stage0 = prepare._verify_stage0_lock_and_evidence(config)
         self.assertEqual(stage0["source_commit"], prepare.STAGE0_SOURCE_COMMIT)
+        self.assertEqual(stage0["source_lock_sha256_lf"], prepare.STAGE0_SOURCE_LOCK_SHA256)
+        historical_lock = prepare.preflight.load_json(STUDY / "source-lock.json")
+        self.assertEqual(prepare._stage0_historical_file_hashes(), historical_lock["files_sha256_lf"])
         lock = prepare.verify_stage1_package()
         self.assertEqual(lock["stage0"]["source_lock_sha256_lf"], prepare.STAGE0_SOURCE_LOCK_SHA256)
         self.assertIn("stage1_budget.py", lock["locked_files_sha256_lf"])
         self.assertIn("stage1/test_activation.py", lock["locked_files_sha256_lf"])
         self.assertEqual(lock["formal_seeds_or_games_consumed"], 0)
+
+    def test_changed_blob_at_pinned_stage0_source_is_rejected(self):
+        config = prepare.preflight.load_json(STUDY / "config.json")
+        read_blob = prepare._stage0_source_blob
+
+        def changed_blob(source_commit, relative_path):
+            blob = read_blob(source_commit, relative_path)
+            if relative_path == "algorithm.py":
+                return blob + b"\n# changed historical blob\n"
+            return blob
+
+        with mock.patch.object(prepare, "_stage0_source_blob", side_effect=changed_blob):
+            with self.assertRaisesRegex(ValueError, "Stage 0 lock content differs"):
+                prepare._verify_stage0_lock_and_evidence(config)
 
     def test_initial_model_and_empty_optimizer_are_reproducible(self):
         config = prepare.preflight.load_json(STUDY / "config.json")

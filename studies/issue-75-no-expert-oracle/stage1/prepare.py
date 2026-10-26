@@ -53,6 +53,23 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _stage0_source_blob(source_commit: str, relative_path: str) -> bytes:
+    study_prefix = preflight.STUDY.relative_to(preflight.ROOT).as_posix()
+    repository_path = f"{study_prefix}/{relative_path}"
+    return subprocess.run(
+        ["git", "show", f"{source_commit}:{repository_path}"], cwd=STUDY,
+        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    ).stdout
+
+
+def _stage0_historical_file_hashes() -> dict[str, str]:
+    hashes = {}
+    for relative_path in preflight.LOCKED_FILES:
+        blob = _stage0_source_blob(STAGE0_SOURCE_COMMIT, relative_path)
+        hashes[relative_path] = hashlib.sha256(blob.replace(b"\r\n", b"\n")).hexdigest()
+    return hashes
+
+
 def write_immutable(path: Path, value: Mapping[str, Any]) -> str:
     payload = json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False).encode("utf-8") + b"\n"
     if path.exists():
@@ -157,6 +174,10 @@ def _verify_stage0_lock_and_evidence(config: Mapping[str, Any]) -> dict[str, Any
     provenance = preflight.verify_lineage(config)
     preflight.verify_provenance_file(config, provenance)
     expected = preflight.make_source_lock(config, provenance)
+    # Stage 0's file digests bind the exact reviewed source commit. This check
+    # runs from a later Stage 1 descendant, whose implementation files may have
+    # changed while retaining the historical Stage 0 report and provenance.
+    expected["files_sha256_lf"] = _stage0_historical_file_hashes()
     actual = preflight.load_json(STUDY / "source-lock.json")
     # The Stage 0 source lock names its original active branch. We prepare from
     # a descendant cost-model branch, so compare every lock field except the
