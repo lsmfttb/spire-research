@@ -208,7 +208,11 @@ def _load_model(label: str, *, proxy: bool = False) -> tuple[Any, str, dict[str,
             model.load_state_dict(torch.load(path, map_location="cpu", weights_only=True), strict=True)
         else:
             _save_model_once(model, path, model_digest)
-        return model, model_digest(model), {"source": "registered_initial_pi0", "checkpoint_sha256": _file_sha256(path)}
+        digest = model_digest(model)
+        expected_digest = _read_json(STAGE1 / "config.json")["source"]["initial_model_digest"]
+        if digest != expected_digest:
+            raise PermissionError("existing pi0 checkpoint does not match the registered initial-model digest")
+        return model, digest, {"source": "registered_initial_pi0", "checkpoint_sha256": _file_sha256(path)}
     if proxy:
         proxy_record = _read_json(STAGE1 / "preflight-proxy.json")
         relative = str(proxy_record["artifact_path"])
@@ -437,6 +441,7 @@ def _unit_accounting(ledger: Any, unit_id: str) -> dict[str, Any]:
         "charged_cpu_seconds": budget._charge({"reservation": reservation, "finish": finish}),
         "started_attempts": 0 if finish is None else int(finish.get("started_attempts", 0)),
         "checkpoint_sha256": None if finish is None else finish.get("checkpoint_sha256"),
+        "result_sha256": None if finish is None else finish.get("result_sha256"),
     }
 
 
@@ -600,7 +605,12 @@ def _preflight_reports(ledger: Any) -> dict[str, Any]:
         if not history or not result_path.is_file():
             continue
         run = runs[history[-1]]
-        result = _read_json(result_path)
+        if accounting["status"] == "succeeded":
+            result = _existing_unit_receipt(ledger, unit)
+            if result is None:
+                raise PermissionError(f"successful preflight row lacks its bound result receipt: {unit}")
+        else:
+            result = _read_json(result_path)
         reports.append({
             "unit_id": unit,
             "ledger_status": None if run["finish"] is None else run["finish"]["status"],
@@ -771,8 +781,203 @@ def _fixed_probe_features(ledger: Any, examples: Sequence[Any] | None) -> tuple[
     return features, _file_sha256(path)
 
 
+def _valid_digest(value: Any, length: int) -> bool:
+    return isinstance(value, str) and len(value) == length and all(char in "0123456789abcdef" for char in value)
+
+
+def _expected_source_model(ledger: Any, block: int) -> str:
+    if block == 0:
+        return str(_read_json(STAGE1 / "config.json")["source"]["initial_model_digest"])
+    previous = _existing_unit_receipt(ledger, f"UPDATE:{block - 1}")
+    if previous is None:
+        raise PermissionError("registered policy block lacks the preceding completed update receipt")
+    return str(previous["result_model_digest"])
+
+
+def _expected_policy_binding(
+    ledger: Any, phase: str, row: Mapping[str, Any],
+) -> tuple[str, dict[str, Any]]:
+    config = _read_json(STAGE1 / "config.json")
+    arm = str(row["arm"])
+    if arm == "E":
+        source_commit = str(config["source"]["registered_stage0_config"]["stsr_source_commit"])
+        digest = _sha256(_canonical({"expert": "expert_non_combat_v1", "source": source_commit}))
+        return digest, {
+            "source": "isolated_expert_reference",
+            "source_commit": source_commit,
+            "policy_digest": digest,
+            "formal_use": True,
+        }
+
+    model_label, proxy = _arm_policy(phase, arm, row)
+    if proxy:
+        record = _read_json(STAGE1 / "preflight-proxy.json")
+        artifact = (STUDY / str(record["artifact_path"])).resolve(strict=True)
+        if not artifact.is_relative_to(STUDY.resolve()) or _file_sha256(artifact) != record.get("artifact_sha256"):
+            raise PermissionError("registered P1 preflight proxy artifact changed after its source lock")
+        digest = str(record["policy_model_digest"])
+        source = {
+            "source": PROXY_LABEL,
+            "artifact_path": str(record["artifact_path"]),
+            "artifact_sha256": str(record["artifact_sha256"]),
+            "initial_model_digest": str(record["initial_model_digest"]),
+            "policy_model_digest": digest,
+            "formal_use": False,
+        }
+        return digest, source
+
+    if model_label == "pi0":
+        path = _model_path("pi0")
+        if not path.is_file():
+            raise PermissionError("successful registered pi0 row lacks its initial-model checkpoint")
+        return str(config["source"]["initial_model_digest"]), {
+            "source": "registered_initial_pi0", "checkpoint_sha256": _file_sha256(path),
+        }
+
+    try:
+        block = int(model_label.removeprefix("pi")) - 1
+    except ValueError as exc:
+        raise PermissionError("registered owner row names an unknown policy checkpoint") from exc
+    if not 0 <= block < 4:
+        raise PermissionError("registered owner row names a policy checkpoint outside pi1..pi4")
+    update = _existing_unit_receipt(ledger, f"UPDATE:{block}")
+    if update is None:
+        raise PermissionError("registered owner row lacks its completed policy checkpoint receipt")
+    checkpoint = update.get("model_checkpoint")
+    if not isinstance(checkpoint, Mapping):
+        raise PermissionError("policy update receipt lacks its saved model identity")
+    path = _model_path(model_label)
+    expected_relative = path.relative_to(ARTIFACT_ROOT).as_posix()
+    checkpoint_sha = str(checkpoint.get("sha256", ""))
+    digest = str(checkpoint.get("model_digest", ""))
+    if (
+        checkpoint.get("path") != expected_relative
+        or not _valid_digest(checkpoint_sha, 64)
+        or not _valid_digest(digest, 40)
+        or update.get("result_model_digest") != digest
+        or not path.is_file()
+        or _file_sha256(path) != checkpoint_sha
+    ):
+        raise PermissionError("registered policy checkpoint no longer matches its completed update receipt")
+    if model_label == "pi4":
+        report_path = ARTIFACT_ROOT / "training-report.json"
+        if not report_path.is_file():
+            raise PermissionError("formal pi4 row lacks the completed four-block training report")
+        report = _read_json(report_path)
+        if (
+            report.get("package_commit") != ledger.activation.package_commit
+            or report.get("source_lock_sha256") != ledger.activation.source_lock_sha256
+            or report.get("status") != "TRAINING_COMPLETE"
+            or report.get("formal_owner_count") != 512
+            or report.get("p1_formal_model_source") != "pi4"
+            or report.get("p1_formal_model_digest") != digest
+            or report.get("p1_formal_checkpoint", {}).get("sha256") != checkpoint_sha
+        ):
+            raise PermissionError("formal pi4 checkpoint differs from the complete registered training report")
+    return digest, {"source": model_label, "checkpoint_sha256": checkpoint_sha, "formal_use": True}
+
+
+def _validate_success_result(
+    ledger: Any, *, unit_id: str, run_id: str, reservation: Mapping[str, Any],
+    result: Mapping[str, Any], result_path: Path, finish: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    activation = ledger.activation
+    if (
+        reservation.get("unit_id") != unit_id
+        or reservation.get("role") != "builder"
+        or reservation.get("package_commit") != activation.package_commit
+        or reservation.get("source_lock_sha256") != activation.source_lock_sha256
+        or result.get("schema_id") != UNIT_SCHEMA
+        or result.get("status") != "SUCCEEDED"
+        or result.get("unit_id") != unit_id
+        or result.get("package_commit") != activation.package_commit
+        or result.get("source_lock_sha256") != activation.source_lock_sha256
+    ):
+        raise PermissionError(f"successful unit receipt is not bound to its reservation and activation: {unit_id}")
+    if finish is not None:
+        actual_digest = _file_sha256(result_path)
+        if (
+            finish.get("status") != "succeeded"
+            or finish.get("unit_id") != unit_id
+            or finish.get("package_commit") != activation.package_commit
+            or finish.get("source_lock_sha256") != activation.source_lock_sha256
+            or finish.get("result_sha256") != actual_digest
+        ):
+            raise PermissionError(f"successful unit result bytes differ from their immutable ledger finish: {unit_id}")
+
+    registered = next((row for row in _rows() if row["unit_id"] == unit_id), None)
+    if registered is not None:
+        expected_phase = {"preflight": "preflight", "training": "train", "heldout": "evaluate"}[registered["phase"]]
+        if reservation.get("unit_kind") != "owner_arm":
+            raise PermissionError(f"registered owner row has a non-owner reservation: {unit_id}")
+        expected_fields = {
+            "study_id": STUDY_ID,
+            "phase": expected_phase,
+            "formal": registered["formal"],
+            "owner_seed": registered["owner_seed"],
+            "game_seed": registered["game_seed"],
+            "arm": registered["arm"],
+            "paired_owner_key": registered["paired_owner_key"],
+        }
+        if any(result.get(key) != value for key, value in expected_fields.items()):
+            raise PermissionError(f"successful owner result differs from its exact registered row: {unit_id}")
+        native = _read_json(STAGE1 / "config.json")["source"]["registered_stage0_config"]
+        if (
+            result.get("native_source_commit") != native["sts_lightspeed_commit"]
+            or result.get("stsr_source_commit") != native["stsr_source_commit"]
+            or result.get("native_module_sha256") != native["native_module_sha256"]
+        ):
+            raise PermissionError(f"successful owner result differs from the registered native source: {unit_id}")
+        expected_model_digest, expected_policy_source = _expected_policy_binding(
+            ledger, expected_phase, registered,
+        )
+        if (
+            result.get("model_digest") != expected_model_digest
+            or result.get("policy_source") != expected_policy_source
+        ):
+            raise PermissionError(f"successful owner result differs from its registered policy source: {unit_id}")
+        if registered["arm"] != "E" and result.get("expert_decisions") != 0:
+            raise PermissionError("Expert actions appeared outside the isolated E reference arm")
+        resource = result.get("resource")
+        if not isinstance(resource, Mapping) or resource.get("ledger_run_id") != run_id:
+            raise PermissionError(f"successful owner result does not name its exact ledger reservation: {unit_id}")
+    elif unit_id.startswith("UPDATE:"):
+        if reservation.get("unit_kind") != "training_update":
+            raise PermissionError(f"policy update has a non-update reservation: {unit_id}")
+        try:
+            block = int(unit_id.split(":", 1)[1])
+        except (IndexError, ValueError) as exc:
+            raise PermissionError("policy update unit identifier is malformed") from exc
+        checkpoint = result.get("model_checkpoint")
+        path = _model_path(f"pi{block + 1}")
+        if (
+            result.get("ledger_run_id") != run_id
+            or result.get("source_commit") != activation.package_commit
+            or result.get("block_index") != block
+            or result.get("owner_count") != 128
+            or result.get("completed_steps") != 64
+            or result.get("expert_decisions") != 0
+            or result.get("source_model_digest") != _expected_source_model(ledger, block)
+            or not isinstance(checkpoint, Mapping)
+            or checkpoint.get("path") != path.relative_to(ARTIFACT_ROOT).as_posix()
+            or checkpoint.get("model_digest") != result.get("result_model_digest")
+            or not _valid_digest(checkpoint.get("model_digest"), 40)
+            or not _valid_digest(checkpoint.get("sha256"), 64)
+            or not path.is_file()
+            or _file_sha256(path) != checkpoint.get("sha256")
+        ):
+            raise PermissionError(f"successful update receipt differs from its registered block/model: {unit_id}")
+    elif unit_id == "REPORT:HELDOUT":
+        resource = result.get("resource")
+        if not isinstance(resource, Mapping) or resource.get("ledger_run_id") != run_id or not isinstance(result.get("analysis"), Mapping):
+            raise PermissionError("heldout analysis receipt does not match its exact ledger reservation")
+    else:
+        raise PermissionError(f"successful ledger receipt names an unregistered unit: {unit_id}")
+    return dict(result)
+
+
 def _existing_unit_receipt(ledger: Any, unit_id: str) -> dict[str, Any] | None:
-    run_id, _, finish = _existing_unit(ledger, unit_id)
+    run_id, reservation, finish = _existing_unit(ledger, unit_id)
     if run_id is None:
         return None
     if finish is None:
@@ -783,9 +988,10 @@ def _existing_unit_receipt(ledger: Any, unit_id: str) -> dict[str, Any] | None:
     if not result_path.is_file():
         raise PermissionError(f"successful ledger unit lacks its durable result: {unit_id}")
     result = _read_json(result_path)
-    if result.get("status") != "SUCCEEDED" or result.get("unit_id") != unit_id:
-        raise PermissionError(f"unit receipt failed identity/status verification: {unit_id}")
-    return result
+    return _validate_success_result(
+        ledger, unit_id=unit_id, run_id=run_id, reservation=reservation or {},
+        result=result, result_path=result_path, finish=finish,
+    )
 
 
 def _unit_cap(phase: str, row: Mapping[str, Any], estimates: Mapping[str, float] | None) -> float:
@@ -814,7 +1020,7 @@ def _run_unit(ledger: Any, row: Mapping[str, Any], *, phase: str, estimates: Map
     run_id = f"{unit_id}-{uuid.uuid4().hex[:16]}"
     cap = _unit_cap(phase, row, estimates)
     unit_kind = "training_update" if unit_id.startswith("UPDATE:") else "owner_arm"
-    ledger.reserve(
+    reservation = ledger.reserve(
         run_id=run_id,
         unit_id=unit_id,
         role="builder",
@@ -869,8 +1075,11 @@ def _run_unit(ledger: Any, row: Mapping[str, Any], *, phase: str, estimates: Map
         if process.returncode != 0:
             raise RuntimeError(f"Stage 1 worker exited with status {process.returncode}")
         result = _read_json(directory / "result.json")
-        if result.get("status") != "SUCCEEDED" or result.get("unit_id") != unit_id:
-            raise RuntimeError("Stage 1 worker result did not pass unit identity/status checks")
+        result_path = directory / "result.json"
+        _validate_success_result(
+            ledger, unit_id=unit_id, run_id=run_id, reservation=reservation,
+            result=result, result_path=result_path,
+        )
         if measured > cap:
             _finish_failed_unit(
                 ledger, run_id=run_id, unit_id=unit_id, directory=directory,
@@ -878,7 +1087,10 @@ def _run_unit(ledger: Any, row: Mapping[str, Any], *, phase: str, estimates: Map
                 started=started,
             )
             raise budget.ResourceBlocked(f"unit exceeded its process-tree CPU reservation: {unit_id}")
-        ledger.finish(run_id=run_id, measured_cpu_seconds=measured, status="succeeded")
+        ledger.finish(
+            run_id=run_id, measured_cpu_seconds=measured, status="succeeded",
+            result_sha256=_file_sha256(result_path),
+        )
         status = "succeeded"
         return result
     except budget.ProcessTreeBudgetExceeded as exc:
@@ -930,7 +1142,9 @@ def _atomic_torch_save(path: Path, value: Mapping[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _update_block(ledger: Any, block: int, *, estimates: Mapping[str, float]) -> dict[str, Any]:
+def _update_block(
+    ledger: Any, block: int, *, estimates: Mapping[str, float], ledger_run_id: str,
+) -> dict[str, Any]:
     import torch
     import learning
     from model import model_digest
@@ -1013,6 +1227,8 @@ def _update_block(ledger: Any, block: int, *, estimates: Mapping[str, float]) ->
         "probe_state_count": len(probes),
         "probe_diagnostics": probe_diagnostics,
         "expert_decisions": 0,
+        "ledger_run_id": ledger_run_id,
+        "package_commit": ledger.activation.package_commit,
         "source_commit": ledger.activation.package_commit,
         "source_lock_sha256": ledger.activation.source_lock_sha256,
     }
@@ -1037,7 +1253,7 @@ def _run_update_unit(ledger: Any, block: int, *, estimates: Mapping[str, float])
             raise budget.CheckpointMismatch("incomplete optimizer update checkpoint does not match its ledger receipt")
     run_id = f"{unit_id}-{uuid.uuid4().hex[:16]}"
     cap = float(estimates[unit_id])
-    ledger.reserve(
+    reservation = ledger.reserve(
         run_id=run_id, unit_id=unit_id, role="builder",
         reserved_cpu_seconds=cap, unit_kind="training_update",
         previous_run_id=previous_run_id, checkpoint_sha256=resume_digest,
@@ -1081,9 +1297,15 @@ def _run_update_unit(ledger: Any, block: int, *, estimates: Mapping[str, float])
         measured = float(process.cpu_seconds)
         if process.returncode != 0:
             raise RuntimeError(f"Stage 1 update worker exited with status {process.returncode}")
-        result = _read_json(worker_dir / f"result-{run_id}.json")
-        if result.get("status") != "SUCCEEDED" or result.get("unit_id") != unit_id:
-            raise RuntimeError("Stage 1 update result failed identity/status checks")
+        result_path = worker_dir / f"result-{run_id}.json"
+        durable_result_path = worker_dir / "result.json"
+        result = _read_json(result_path)
+        if _file_sha256(result_path) != _file_sha256(durable_result_path):
+            raise PermissionError("policy update worker result differs from the immutable block receipt")
+        _validate_success_result(
+            ledger, unit_id=unit_id, run_id=run_id, reservation=reservation,
+            result=result, result_path=durable_result_path,
+        )
         if measured > cap:
             _finish_failed_unit(
                 ledger, run_id=run_id, unit_id=unit_id, directory=worker_dir,
@@ -1091,7 +1313,10 @@ def _run_update_unit(ledger: Any, block: int, *, estimates: Mapping[str, float])
                 started=time.monotonic(),
             )
             raise budget.ResourceBlocked(f"policy update exceeded its process-tree CPU reservation: {unit_id}")
-        ledger.finish(run_id=run_id, measured_cpu_seconds=measured, status="succeeded")
+        ledger.finish(
+            run_id=run_id, measured_cpu_seconds=measured, status="succeeded",
+            result_sha256=_file_sha256(durable_result_path),
+        )
         return result
     except budget.ProcessTreeBudgetExceeded as exc:
         measured = float(exc.cpu_seconds)
@@ -1416,7 +1641,10 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
 def _worker_update(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
     if str(job["unit_id"]) != f"UPDATE:{int(job['block_index'])}":
         raise PermissionError("update worker unit/block identifiers disagree")
-    result = _update_block(ledger, int(job["block_index"]), estimates={str(job["unit_id"]): 1.0})
+    result = _update_block(
+        ledger, int(job["block_index"]), estimates={str(job["unit_id"]): 1.0},
+        ledger_run_id=str(job["run_id"]),
+    )
     result_path = _inside_artifacts(Path(str(job["result_path"])))
     _write_once(result_path, result)
     return result
@@ -1627,7 +1855,7 @@ def _run_report_analysis(ledger: Any, outcomes: Sequence[Mapping[str, Any]]) -> 
         return existing
     run_id = f"{unit_id}-{uuid.uuid4().hex[:16]}"
     cap = ANALYSIS_REPORT_RESERVATION
-    ledger.reserve(
+    reservation = ledger.reserve(
         run_id=run_id, unit_id=unit_id, role="builder",
         reserved_cpu_seconds=cap, unit_kind="analysis_report",
     )
@@ -1642,18 +1870,26 @@ def _run_report_analysis(ledger: Any, outcomes: Sequence[Mapping[str, Any]]) -> 
             "unit_id": unit_id,
             "package_commit": ledger.activation.package_commit,
             "source_lock_sha256": ledger.activation.source_lock_sha256,
+            "resource": {"ledger_run_id": run_id},
             "analysis": analysis,
             "analysis_cpu_seconds_before_ledger_finalize": measured,
         }
         _write_once(result_path, result)
         measured = max(0.0, time.process_time() - started)
+        _validate_success_result(
+            ledger, unit_id=unit_id, run_id=run_id, reservation=reservation,
+            result=result, result_path=result_path,
+        )
         if measured > cap:
             try:
                 ledger.finish(run_id=run_id, measured_cpu_seconds=measured, status="failed")
             except budget.BudgetOverrun:
                 pass
             raise budget.ResourceBlocked("paired-owner report analysis exceeded its 120 CPU-s reservation")
-        ledger.finish(run_id=run_id, measured_cpu_seconds=measured, status="succeeded")
+        ledger.finish(
+            run_id=run_id, measured_cpu_seconds=measured, status="succeeded",
+            result_sha256=_file_sha256(result_path),
+        )
         return result
     except BaseException as exc:
         current, _, finish = _existing_unit(ledger, unit_id)
@@ -1711,7 +1947,9 @@ def _run_training(ledger: Any) -> dict[str, Any]:
         _run_update_unit(ledger, block, estimates=estimates)
     checkpoints = []
     for block in range(4):
-        receipt = _read_json(_inside_artifacts(ARTIFACT_ROOT / "units" / f"UPDATE-{block}" / "result.json"))
+        receipt = _existing_unit_receipt(ledger, f"UPDATE:{block}")
+        if receipt is None:
+            raise PermissionError(f"completed training block lacks its bound update receipt: {block}")
         checkpoints.append(receipt["model_checkpoint"])
     final_model, final_digest, final_source = _load_model("pi4")
     report = {

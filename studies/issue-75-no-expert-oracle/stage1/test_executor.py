@@ -48,16 +48,47 @@ class FakeReportLedger:
         return list(self.events)
 
     def reserve(self, **event):
-        self.events.append({"event": "reserve", **event})
+        event = {
+            "event": "reserve", "package_commit": self.activation.package_commit,
+            "source_lock_sha256": self.activation.source_lock_sha256, **event,
+        }
+        self.events.append(event)
+        return dict(event)
 
-    def finish(self, *, run_id: str, measured_cpu_seconds: float, status: str, checkpoint_sha256=None):
+    def finish(self, *, run_id: str, measured_cpu_seconds: float, status: str, checkpoint_sha256=None, result_sha256=None):
+        reservation = next(event for event in self.events if event.get("event") == "reserve" and event["run_id"] == run_id)
         self.events.append({
             "event": "finish",
             "run_id": run_id,
+            "unit_id": reservation["unit_id"],
             "measured_cpu_seconds": measured_cpu_seconds,
             "status": status,
             "checkpoint_sha256": checkpoint_sha256,
+            "result_sha256": result_sha256,
+            "package_commit": self.activation.package_commit,
+            "source_lock_sha256": self.activation.source_lock_sha256,
         })
+
+
+class FakeReceiptLedger:
+    def __init__(self):
+        self.activation = types.SimpleNamespace(package_commit="a" * 40, source_lock_sha256="b" * 64)
+        self.events = []
+
+    def read_events(self):
+        return list(self.events)
+
+    def set_success(self, *, run_id, unit_id, result_sha256):
+        self.events = [
+            {"event": "reserve", "run_id": run_id, "unit_id": unit_id, "role": "builder",
+             "unit_kind": "owner_arm", "package_commit": self.activation.package_commit,
+             "source_lock_sha256": self.activation.source_lock_sha256},
+            {"event": "finish", "run_id": run_id, "unit_id": unit_id, "status": "succeeded",
+             "measured_cpu_seconds": 1.0, "reserved_cpu_seconds": 2.0,
+             "package_commit": self.activation.package_commit,
+             "source_lock_sha256": self.activation.source_lock_sha256,
+             "result_sha256": result_sha256},
+        ]
 
 
 class Stage1ExecutorTests(unittest.TestCase):
@@ -217,6 +248,97 @@ class Stage1ExecutorTests(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 executor._load_model("pi-stage0-proxy", proxy=True)
 
+    def test_pi0_rejects_existing_checkpoint_with_wrong_registered_digest(self):
+        try:
+            import torch
+            from model import ActionConditionedPolicy
+        except ModuleNotFoundError as exc:
+            if exc.name in {"numpy", "torch"}:
+                self.skipTest(f"pinned policy runtime dependency unavailable: {exc.name}")
+            raise
+        config = executor._read_json(STUDY / "config.json")
+        model = ActionConditionedPolicy(
+            dimension=executor.POLICY_DIMENSION,
+            seed=int(config["policy"]["initial_model_seed"]),
+            final_weight_std=float(config["policy"]["actor_final_weight_std"]),
+        ).eval()
+        state = model.state_dict()
+        first = next(iter(state))
+        altered = state[first].clone()
+        altered.reshape(-1)[0] += 0.01
+        state[first] = altered
+        path = executor._model_path("pi0")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(state, path)
+        with self.assertRaisesRegex(PermissionError, "registered initial-model digest"):
+            executor._load_model("pi0")
+
+    def test_reused_successful_receipts_bind_activation_row_and_original_bytes(self):
+        ledger = FakeReceiptLedger()
+        row = next(item for item in executor._unit_rows("preflight") if item["arm"] == "E")
+        unit_id = str(row["unit_id"])
+        run_id = unit_id + "-" + "f" * 16
+        source = executor._read_json(executor.STAGE1 / "config.json")["source"]["registered_stage0_config"]
+        digest, policy_source = executor._expected_policy_binding(ledger, "preflight", row)
+        result = {
+            "schema_id": executor.UNIT_SCHEMA,
+            "status": "SUCCEEDED",
+            "package_commit": ledger.activation.package_commit,
+            "source_lock_sha256": ledger.activation.source_lock_sha256,
+            "study_id": executor.STUDY_ID,
+            "unit_id": unit_id,
+            "phase": "preflight",
+            "formal": False,
+            "owner_seed": row["owner_seed"],
+            "game_seed": row["game_seed"],
+            "arm": "E",
+            "paired_owner_key": row["paired_owner_key"],
+            "terminal_outcome": "LOSS",
+            "terminal_floor": 0,
+            "terminal_act": 1,
+            "heart_victory": False,
+            "act2_plus": False,
+            "act3_plus": False,
+            "act4_reached": False,
+            "completed_transitions": 1,
+            "native_source_commit": source["sts_lightspeed_commit"],
+            "stsr_source_commit": source["stsr_source_commit"],
+            "native_module_sha256": source["native_module_sha256"],
+            "model_digest": digest,
+            "policy_source": policy_source,
+            "expert_decisions": 1,
+            "search": [],
+            "training_features": None,
+            "resource": {"ledger_run_id": run_id},
+        }
+        path = executor._unit_directory(unit_id) / "result.json"
+        executor._write_once(path, result)
+        ledger.set_success(run_id=run_id, unit_id=unit_id, result_sha256=executor._file_sha256(path))
+        self.assertEqual(executor._existing_unit_receipt(ledger, unit_id), result)
+
+        edited = dict(result)
+        edited["terminal_floor"] = 999
+        path.write_bytes(executor._canonical(edited) + b"\n")
+        with self.assertRaisesRegex(PermissionError, "immutable ledger finish"):
+            executor._existing_unit_receipt(ledger, unit_id)
+
+        tampered = dict(result)
+        tampered["owner_seed"] = int(row["owner_seed"]) + 1
+        path.write_bytes(executor._canonical(tampered) + b"\n")
+        ledger.set_success(run_id=run_id, unit_id=unit_id, result_sha256=executor._file_sha256(path))
+        with self.assertRaisesRegex(PermissionError, "exact registered row"):
+            executor._existing_unit_receipt(ledger, unit_id)
+
+        for field, value in (("arm", "J"), ("package_commit", "c" * 40),
+                             ("source_lock_sha256", "d" * 64), ("model_digest", "e" * 64)):
+            with self.subTest(field=field):
+                tampered = dict(result)
+                tampered[field] = value
+                path.write_bytes(executor._canonical(tampered) + b"\n")
+                ledger.set_success(run_id=run_id, unit_id=unit_id, result_sha256=executor._file_sha256(path))
+                with self.assertRaises(PermissionError):
+                    executor._existing_unit_receipt(ledger, unit_id)
+
     def test_expert_is_constructed_only_for_the_isolated_e_arm(self):
         row = next(row for row in executor._rows() if row["phase"] == "preflight" and row["arm"] == "E")
         output_dir = executor.ARTIFACT_ROOT / "expert-output"
@@ -265,6 +387,7 @@ class Stage1ExecutorTests(unittest.TestCase):
     def test_training_runs_all_128_owner_rows_before_each_block_update(self):
         order = []
         ledger = FakeLedger(unit_kind="owner_arm")
+        update_receipts = {}
 
         def run_owner(_ledger, row, *, phase, estimates):
             self.assertEqual(phase, "train")
@@ -274,15 +397,23 @@ class Stage1ExecutorTests(unittest.TestCase):
         def update(_ledger, block, *, estimates):
             order.append(("update", block, None))
             path = executor.ARTIFACT_ROOT / "units" / f"UPDATE-{block}" / "result.json"
-            executor._write_once(path, {"model_checkpoint": {"block_index": block}})
-            return {"status": "SUCCEEDED", "unit_id": f"UPDATE:{block}"}
+            receipt = {
+                "status": "SUCCEEDED", "unit_id": f"UPDATE:{block}",
+                "model_checkpoint": {"block_index": block},
+            }
+            executor._write_once(path, receipt)
+            update_receipts[f"UPDATE:{block}"] = receipt
+            return receipt
+
+        def existing_receipt(_ledger, unit_id):
+            return update_receipts.get(unit_id)
 
         with (
             mock.patch.object(executor, "_formal_forecast", return_value={
                 "preflight_report_sha256": "1" * 64, "cost_forecast_sha256": "2" * 64,
             }),
             mock.patch.object(executor, "_forecast_estimates", return_value=({}, {})),
-            mock.patch.object(executor, "_existing_unit_receipt", return_value=None),
+            mock.patch.object(executor, "_existing_unit_receipt", side_effect=existing_receipt),
             mock.patch.object(executor, "_run_unit", side_effect=run_owner),
             mock.patch.object(executor, "_all_units_succeeded", return_value=True),
             mock.patch.object(executor, "_run_update_unit", side_effect=update),
@@ -345,7 +476,7 @@ class Stage1ExecutorTests(unittest.TestCase):
             ledger, unit_id="TRAIN:7500001", run_id=resumed, cap=2.0,
             unit_kind="training_update", previous_run_id=first, checkpoint_sha256=digest,
         )
-        ledger.finish(run_id=resumed, measured_cpu_seconds=0.25, status="succeeded")
+        ledger.finish(run_id=resumed, measured_cpu_seconds=0.25, status="succeeded", result_sha256="d" * 64)
         with self.assertRaises(executor.budget.DuplicateRun):
             self._reserve_test_unit(ledger, unit_id="TRAIN:7500001", run_id="TRAIN:7500001-" + "d" * 16)
 

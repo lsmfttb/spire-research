@@ -217,7 +217,7 @@ class LedgerTests(unittest.TestCase):
         self.reserve("run-2", "TRAIN:7500001", cap=20.0, previous_run_id="run-1",
                      checkpoint_sha256=CHECKPOINT_DIGEST)
         self.ledger.finish(run_id="run-2", measured_cpu_seconds=7.0, status="succeeded",
-                           started_attempts=3)
+                           started_attempts=3, result_sha256="e" * 64)
         with self.assertRaises(budget.DuplicateRun):
             self.reserve("run-3", "TRAIN:7500001")
         row = self.ledger.read_events()

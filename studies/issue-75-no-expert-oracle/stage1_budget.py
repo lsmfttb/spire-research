@@ -555,6 +555,7 @@ class Stage1Ledger:
     def finish(
         self, *, run_id: str, measured_cpu_seconds: float, status: str,
         checkpoint_sha256: str | None = None, started_attempts: int = 0,
+        result_sha256: str | None = None,
     ) -> dict[str, Any]:
         measured = float(measured_cpu_seconds)
         if not math.isfinite(measured) or measured < 0 or status not in {"succeeded", "failed", "incomplete"}:
@@ -566,6 +567,13 @@ class Stage1Ledger:
                 raise ValueError("incomplete work requires a durable checkpoint SHA256")
         elif checkpoint_sha256 is not None:
             raise ValueError("only incomplete work may carry a resume checkpoint")
+        if status == "succeeded":
+            if not isinstance(result_sha256, str) or len(result_sha256) != 64 or any(
+                c not in "0123456789abcdef" for c in result_sha256
+            ):
+                raise ValueError("successful work requires its immutable result SHA256")
+        elif result_sha256 is not None:
+            raise ValueError("only succeeded work may carry a result SHA256")
 
         def operation(rows):
             runs, _ = _state(rows)
@@ -578,6 +586,7 @@ class Stage1Ledger:
                 "run_id": run_id, "unit_id": reservation["unit_id"], "status": status,
                 "measured_cpu_seconds": measured, "reserved_cpu_seconds": reservation["reserved_cpu_seconds"],
                 "started_attempts": started_attempts, "checkpoint_sha256": checkpoint_sha256,
+                "result_sha256": result_sha256,
                 "finished_at_ns": time.time_ns(), "package_commit": self.activation.package_commit,
                 "source_lock_sha256": self.activation.source_lock_sha256,
             }
