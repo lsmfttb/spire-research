@@ -25,6 +25,7 @@ from stage1_budget import (  # noqa: E402
     ALL_IN_LIMIT,
     BUILDER_LIMIT,
     LOCKED_PACKAGE_FILES,
+    LOCKED_REPOSITORY_DEPENDENCIES,
     OWNER_LOGIN,
     REVIEWER_LIMIT,
     canonical,
@@ -396,6 +397,17 @@ def _locked_file_hashes() -> dict[str, str]:
     return values
 
 
+def _locked_repository_dependency_hashes() -> dict[str, str]:
+    repository_root = STUDY.parents[1].resolve()
+    values: dict[str, str] = {}
+    for relative in LOCKED_REPOSITORY_DEPENDENCIES:
+        path = (repository_root / relative).resolve()
+        if not path.is_relative_to(repository_root) or not path.is_file():
+            raise FileNotFoundError(f"required repository source lock input missing: {relative}")
+        values[relative] = preflight.normalized_sha256(path)
+    return values
+
+
 def prepare_stage1_package() -> dict[str, Any]:
     current = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=STUDY, check=True,
@@ -425,6 +437,7 @@ def prepare_stage1_package() -> dict[str, Any]:
         "seed_table_sha256": table_sha256,
         "budget_config_sha256": budget_sha256,
         "locked_files_sha256_lf": locked_files,
+        "locked_repository_dependencies_sha256_lf": _locked_repository_dependency_hashes(),
         "stage0": stage0,
         "runtime": runtime_lock,
         "formal_seeds_or_games_consumed": 0,
@@ -497,7 +510,11 @@ def refresh_stage1_source_lock() -> dict[str, Any]:
         or lock.get("model_training_performed") is not False
     ):
         raise ValueError("refusing to refresh a source lock outside the disabled preparation package")
-    previous_file_set = frozenset(set(SOURCE_FILES) - {"stage1/test_activation_gate.py"})
+    added_repair_files = {
+        "stage1/executor.py", "stage1/test_executor.py", "stage1/preflight-proxy.json",
+    }
+    legacy_self_lock_files = {"source-lock.json", "source-lock.sha256"}
+    previous_file_set = frozenset((set(SOURCE_FILES) - added_repair_files) | legacy_self_lock_files)
     existing_file_set = frozenset(lock.get("locked_files_sha256_lf", {}))
     if existing_file_set not in {frozenset(SOURCE_FILES), previous_file_set}:
         raise ValueError("existing source lock does not contain the exact registered file set")
@@ -512,16 +529,32 @@ def refresh_stage1_source_lock() -> dict[str, Any]:
 
     refreshed = _locked_file_hashes()
     repairable = {
-        "stage1_budget.py", "stage1/prepare.py", "stage1/test_activation.py",
-        "stage1/test_activation_gate.py",
+        "stage1_budget.py", "stage1/prepare.py", "stage1/executor.py",
+        "stage1/test_activation.py", "stage1/test_activation_gate.py",
+        "stage1/test_executor.py", "stage1/preflight-proxy.json",
+        "algorithm.py", "learning.py", "runtime.py",
     }
     changed = {
         relative for relative, digest in refreshed.items()
         if lock["locked_files_sha256_lf"].get(relative) != digest
     }
-    if not changed <= repairable:
-        raise ValueError("source-lock refresh found changes outside the activation-gate repair files")
+    removed = set(lock["locked_files_sha256_lf"]) - set(refreshed)
+    if not changed <= repairable or not removed <= legacy_self_lock_files:
+        raise ValueError("source-lock refresh found changes outside the authorized executor/source-lock repair")
+    repository_dependencies = _locked_repository_dependency_hashes()
+    old_repository_dependencies = lock.get("locked_repository_dependencies_sha256_lf", {})
+    if not isinstance(old_repository_dependencies, dict):
+        raise ValueError("existing repository dependency lock is malformed")
+    if frozenset(old_repository_dependencies) not in {frozenset(), frozenset(repository_dependencies)}:
+        raise ValueError("existing repository dependency lock has an unexpected file set")
+    changed_dependencies = {
+        relative for relative, digest in repository_dependencies.items()
+        if old_repository_dependencies.get(relative) not in {None, digest}
+    }
+    if not changed_dependencies <= {"studies/issue-73-privileged-noncombat-oracle-stage0/runner.py"}:
+        raise ValueError("source-lock refresh found changes outside the authorized Issue 73 runner binding")
     lock["locked_files_sha256_lf"] = refreshed
+    lock["locked_repository_dependencies_sha256_lf"] = repository_dependencies
     payload = json.dumps(lock, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False).encode("utf-8") + b"\n"
     _atomic_replace(lock_path, payload)
     digest = sha256_bytes(payload)

@@ -463,6 +463,8 @@ def _safe_trial_payload(trial: TrialResult | None) -> dict[str, Any] | None:
         }
     return {
         "attempt_index": int(trial.attempt_index), "complete": True,
+        "natural_owner": bool(trial.natural_owner),
+        "search_root_id": trial.search_root_id,
         "heart_win": bool(trial.heart_win), "terminal_floor": float(trial.terminal_floor),
         "root_identity_sha256": hashlib.sha256(canonical(trial.root_identity).encode("utf-8")).hexdigest(),
         "decisions": _hash_only_decisions(trial.decisions),
@@ -477,6 +479,7 @@ def execute_policy_trajectory(
     attempt_index: int, invocation_seed: int, root_action_index: int | None,
     mutation_target: Any | None, parent_trial: TrialResult | None = None,
     cpu_cap_seconds: float = 32.0, source_arm: str = "BRANCH",
+    policy_rng_seed: int | None = None,
 ) -> TrialResult:
     """Restore one genuine in-memory checkpoint and run a true native terminal trajectory."""
     import time
@@ -530,7 +533,7 @@ def execute_policy_trajectory(
             adapter_override=adapter_override, checkpoint=checkpoint, forced_root=force_data,
             purpose=purpose, durable=False, capture_trace=True,
             capture_checkpoints=True, capture_all_roots=True,
-            cpu_cap_seconds=float(cpu_cap_seconds),
+            cpu_cap_seconds=float(cpu_cap_seconds), policy_rng_seed=policy_rng_seed,
         )
     except SearchBudgetExhausted as exc:
         for row in getattr(exc, "issue73_captured_roots", ()):
@@ -569,6 +572,7 @@ def execute_policy_trajectory(
         root_identity=(dict(parent_trial.root_identity) if mutation_target is not None else dict(decisions[0].chosen_identity)), decisions=decisions,
         cpu_seconds=max(0.0, process_tree_cpu_seconds() - started_cpu),
         wall_seconds=max(0.0, time.monotonic() - started_wall),
+        search_root_id=root.root_id,
     )
 
 

@@ -720,10 +720,12 @@ class StudyController:
         capture_trace: bool = True, capture_all_roots: bool = False,
         suffix_random_seed: int | None = None, expert_random_seed: int | None = None,
         root_callback: Any | None = None,
+        policy_rng_seed: int | None = None,
+        capture_root_limit: int | None = None,
     ) -> None:
         from sts_combat_rl.sim.controller_contract import ControllerProvenance
 
-        if arm not in {"TRAIN", "BRANCH", "P0", "P1", "E", "SUFFIX"}:
+        if arm not in {"TRAIN", "BRANCH", "P0", "P1", "R", "J", "E", "SUFFIX"}:
             raise ValueError(f"unknown study arm {arm}")
         self.module = module
         self.arm = arm
@@ -734,6 +736,9 @@ class StudyController:
         self.capture_checkpoints = capture_checkpoints
         self.capture_all_roots = bool(capture_all_roots)
         self.root_callback = root_callback
+        if capture_root_limit is not None and int(capture_root_limit) < 1:
+            raise ValueError("capture_root_limit must be positive when provided")
+        self.capture_root_limit = None if capture_root_limit is None else int(capture_root_limit)
         self.suffix_random_seed = int(
             suffix_random_seed if suffix_random_seed is not None
             else derived_seed(STUDY_ID, seed, arm, model_digest, sampling_purpose + "|suffix")
@@ -751,7 +756,10 @@ class StudyController:
         self.sampling_purpose = sampling_purpose
         self.capture_trace = capture_trace
         self.rng = torch.Generator(device="cpu")
-        self.rng.manual_seed(derived_seed(STUDY_ID, seed, arm, model_digest, sampling_purpose))
+        self.rng.manual_seed(
+            int(policy_rng_seed) if policy_rng_seed is not None
+            else derived_seed(STUDY_ID, seed, arm, model_digest, sampling_purpose)
+        )
         self.roots: list[dict[str, Any]] = []
         self.trace: list[dict[str, Any]] = []
         self.screen_counts: Counter[str] = Counter()
@@ -849,6 +857,7 @@ class StudyController:
             visibility_counts[source] += amount
         self.privacy_counts[str(audit["screen"])] += 1
 
+        policy_rng_state_before_sample = None
         if self.arm == "E":
             with phase("expert_reference_policy_inference"):
                 decision = self.expert.select_action(context)
@@ -870,10 +879,11 @@ class StudyController:
             value = None
             policy_row = False
         else:
+            policy_rng_state_before_sample = self.rng.get_state()
             with phase("policy_inference_and_sampling"):
                 selected, probabilities, value = self.model.choose(matrix, self.rng)
             reason = "sampled_native_semantic_categorical_policy"
-            policy_row = self.arm in {"TRAIN", "P0", "P1", "BRANCH"}
+            policy_row = self.arm in {"TRAIN", "P0", "P1", "R", "J", "BRANCH"}
 
         sampled_index = int(selected) if self.arm != "E" else None
         if not 0 <= selected < len(actions):
@@ -915,13 +925,16 @@ class StudyController:
             "projection_digest": hashlib.sha256(canonical(projection).encode()).hexdigest(),
             "root_identity_digest": self.native_identity_digest,
             "policy_training_row": policy_row,
+            "selection_source": reason,
             "pi_suffix_component": reason if self.arm == "SUFFIX" else None,
             "pi_suffix_master_seed": self.suffix_random_seed if self.arm == "SUFFIX" else None,
             "pi_suffix_expert_seed": self.suffix_expert_seed if self.arm == "SUFFIX" else None,
         }
         self.trace.append({"matrix": matrix, **trace_item} if self.capture_trace else trace_item)
         screen_key = _stage0_screen_key(audit["screen"])
-        if self.checkpoint_screens:
+        if self.capture_root_limit is not None:
+            capture_screen = len(self.roots) < self.capture_root_limit
+        elif self.checkpoint_screens:
             capture_screen = self.capture_all_roots or (
                 screen_key in self.checkpoint_screens
                 and screen_key not in self.captured_checkpoint_screens
@@ -965,7 +978,27 @@ class StudyController:
             })
             self.captured_checkpoint_screens.add(screen_key)
             if self.root_callback is not None:
-                self.root_callback(self.roots[-1])
+                replacement = self.root_callback(self.roots[-1])
+                if replacement is not None:
+                    if isinstance(replacement, bool) or not isinstance(replacement, int):
+                        raise StudyFailure("root callback must return a live legal occurrence index or None")
+                    if not 0 <= replacement < len(actions):
+                        raise StudyFailure("root callback selected an out-of-range native legal occurrence")
+                    if policy_rng_state_before_sample is None:
+                        raise StudyFailure("root callback cannot replace a non-policy action source")
+                    self.rng.set_state(policy_rng_state_before_sample)
+                    selected = replacement
+                    reason = "study_search_selected_live_root_occurrence"
+                    trace_item["chosen_index"] = selected
+                    trace_item["selection_source"] = "study_search_selected_live_root_occurrence"
+                    trace_item["policy_training_row"] = False
+                    if self.trace:
+                        self.trace[-1]["chosen_index"] = selected
+                        self.trace[-1]["selection_source"] = trace_item["selection_source"]
+                        self.trace[-1]["policy_training_row"] = False
+                    self.roots[-1]["candidate_index"] = selected
+                    if not 0 <= selected < len(actions):
+                        raise StudyFailure("root callback did not preserve native action legality")
         return ControllerDecision(
             selected_index=selected,
             provenance=self.provenance,
@@ -1130,13 +1163,16 @@ def _run_one(
     capture_trace: bool = True, capture_all_roots: bool = False,
     suffix_random_seed: int | None = None, expert_random_seed: int | None = None,
     root_callback: Any | None = None, cpu_cap_seconds: float | None = None,
-    capture_action_history: bool = False,
+    capture_action_history: bool = False, policy_rng_seed: int | None = None,
+    capture_root_limit: int | None = None, capture_training_features: bool = False,
 ) -> dict[str, Any]:
     from sts_combat_rl.sim import controlled_run
     from sts_combat_rl.sim.action_space import ActionSpaceConfig
     from sts_combat_rl.sim.lightspeed import LightSpeedAdapter
 
     label = resource_label or f"{arm}_{seed}"
+    if capture_training_features and not capture_trace:
+        raise ValueError("training candidate features require captured controller trace")
     run_path = out / "runs" / f"{label}.json"
     decision_path = out / "decisions" / f"{label}.npz"
     if durable and run_path.exists():
@@ -1151,7 +1187,8 @@ def _run_one(
         capture_all_roots=capture_all_roots,
         forced_root=forced_root, sampling_purpose=purpose, capture_trace=capture_trace,
         suffix_random_seed=suffix_random_seed, expert_random_seed=expert_random_seed,
-        root_callback=root_callback,
+        root_callback=root_callback, policy_rng_seed=policy_rng_seed,
+        capture_root_limit=capture_root_limit,
     )
     controller.run_id = label
     adapter = adapter_override or LightSpeedAdapter(seed=seed, ascension=20, player_class="IRONCLAD", module=module)
@@ -1313,6 +1350,15 @@ def _run_one(
             atomic_json(progress_path, {"study_id": STUDY_ID, "run": label, "boundary": "terminal_committed", "completed_transitions": observer_steps})
         if capture_checkpoints:
             result["_volatile_roots"] = controller.roots
+        if capture_training_features:
+            result["_volatile_training_decisions"] = [
+                {
+                    **{key: value for key, value in item.items() if key != "matrix"},
+                    "candidate_features": item["matrix"],
+                }
+                for item in controller.trace
+                if item.get("kind") == "categorical" and item.get("policy_training_row") is True
+            ]
         if history_adapter is not None:
             if history_adapter._current_event is not None:
                 raise StudyFailure("action-history run completed with a decision that was never stepped")
@@ -2805,173 +2851,12 @@ def _load_decision_artifact(out: Path, run_id: str) -> dict[str, np.ndarray]:
         return {key: data[key].copy() for key in data.files}
 
 
-def _training_update(
-    *, out: Path, block: int, seeds: Sequence[int], model: AllNoncombatPolicy,
-    optimizer: torch.optim.Optimizer, block_start_digest: str,
-) -> dict[str, Any]:
-    reward_by_owner: dict[int, float] = {}
-    lex_by_owner: dict[int, tuple[int, int]] = {}
-    episodes: dict[int, dict[str, np.ndarray]] = {}
-    branch_examples: list[tuple[int, int, int, float]] = []
-    for seed in seeds:
-        run_id = f"TRAIN_{seed}"
-        path = out / "runs" / f"{run_id}.json"
-        if not path.exists():
-            raise StudyFailure(f"training owner {seed} has no complete terminal artifact")
-        run = json.loads(path.read_text(encoding="utf-8"))
-        if not run.get("terminal_complete"):
-            raise StudyFailure(f"training owner {seed} is not a valid terminal game")
-        reward_by_owner[seed] = float(run["terminal"]["reward"])
-        lex_by_owner[seed] = tuple(int(x) for x in run["terminal"]["lexicographic_fitness"])
-        episodes[seed] = _load_decision_artifact(out, run_id)
-        for branch_path in _json_paths(out / "branches", f"TRAIN_{seed}_ROOT_*_ALT_*.json"):
-            branch = json.loads(branch_path.read_text(encoding="utf-8"))
-            if branch.get("superior_to_original_lexicographically") and branch.get("terminal_complete"):
-                delta = max(0.0, float(branch["terminal"]["reward"]) - reward_by_owner[seed])
-                weight = min(delta, float(CONFIG["training"]["branch_advantage_weight_cap"]))
-                if weight > 0.0:
-                    branch_examples.append((
-                        seed,
-                        int(branch["root_decision_index"]),
-                        int(branch["candidate_index"]),
-                        weight,
-                    ))
-    baseline = float(np.mean(list(reward_by_owner.values())))
-    advantages = {seed: reward - baseline for seed, reward in reward_by_owner.items()}
-    optimizer.zero_grad(set_to_none=True)
-    policy_terms: list[torch.Tensor] = []
-    value_terms: list[torch.Tensor] = []
-    entropy_terms: list[torch.Tensor] = []
-    pre_update_root_ranks: dict[tuple[int, int], int] = {}
-    for seed in seeds:
-        data = episodes[seed]
-        features = data["features"]
-        offsets = data["offsets"].astype(int)
-        choices = data["choices"].astype(int)
-        trajectory_log_prob: list[torch.Tensor] = []
-        for decision_index, chosen in enumerate(choices):
-            matrix = torch.as_tensor(features[offsets[decision_index]:offsets[decision_index + 1]], dtype=torch.float32)
-            _, log_probs, value = model.distribution(matrix)
-            if not 0 <= int(chosen) < matrix.shape[0]:
-                raise StudyFailure(f"training owner {seed} has an invalid logged native action index")
-            trajectory_log_prob.append(log_probs[int(chosen)])
-            value_terms.append((value - reward_by_owner[seed]).pow(2))
-            probs = torch.softmax(model.actor(matrix).squeeze(-1), dim=0)
-            entropy_terms.append(-(probs * torch.log(probs.clamp_min(1e-12))).sum())
-            pre_update_root_ranks[(seed, decision_index)] = int(torch.argmax(probs).item())
-        if trajectory_log_prob:
-            policy_terms.append(-advantages[seed] * torch.stack(trajectory_log_prob).sum())
-    pg_loss = torch.stack(policy_terms).mean() if policy_terms else torch.zeros((), requires_grad=True)
-    value_loss = torch.stack(value_terms).mean() if value_terms else torch.zeros((), requires_grad=True)
-    entropy = torch.stack(entropy_terms).mean() if entropy_terms else torch.zeros((), requires_grad=True)
-
-    branch_terms: list[torch.Tensor] = []
-    for seed, decision_index, candidate_index, weight in branch_examples:
-        data = episodes[seed]
-        offsets = data["offsets"].astype(int)
-        features = data["features"]
-        if not 0 <= decision_index < len(data["choices"]):
-            raise StudyFailure("branch example points outside its original sampled root decisions")
-        matrix = torch.as_tensor(features[offsets[decision_index]:offsets[decision_index + 1]], dtype=torch.float32)
-        if not 0 <= candidate_index < matrix.shape[0]:
-            raise StudyFailure("branch action example does not map to a live native candidate")
-        _, log_probs, _ = model.distribution(matrix)
-        branch_terms.append(-float(weight) * log_probs[candidate_index])
-    branch_loss = torch.stack(branch_terms).mean() if branch_terms else torch.zeros((), requires_grad=True)
-    total_loss = (
-        pg_loss
-        + float(CONFIG["training"]["value_loss_coefficient"]) * value_loss
-        - float(CONFIG["training"]["entropy_coefficient"]) * entropy
-        + branch_loss
-    )
-    total_loss.backward()
-    actor_grad_norm = float(torch.nn.utils.clip_grad_norm_(model.actor.parameters(), float(CONFIG["training"]["gradient_clip_norm"])))
-    critic_grad_norm = float(torch.nn.utils.clip_grad_norm_(model.critic.parameters(), float(CONFIG["training"]["gradient_clip_norm"])))
-    if not math.isfinite(actor_grad_norm) or not math.isfinite(critic_grad_norm):
-        raise StudyFailure("policy/value training produced nonfinite gradient norm")
-    actor_connected = any(p.grad is not None and torch.count_nonzero(p.grad).item() > 0 for p in model.actor.parameters())
-    critic_connected = any(p.grad is not None and torch.count_nonzero(p.grad).item() > 0 for p in model.critic.parameters())
-    if not actor_connected or not critic_connected:
-        raise StudyFailure("single optimizer step lacks verified policy/value gradient connectivity")
-    optimizer.step()
-    model.eval()
-    post_update_root_ranks: dict[tuple[int, int], int] = {}
-    for seed, decision_index in pre_update_root_ranks:
-        data = episodes[seed]
-        offsets = data["offsets"].astype(int)
-        matrix = torch.as_tensor(data["features"][offsets[decision_index]:offsets[decision_index + 1]], dtype=torch.float32)
-        with torch.no_grad():
-            post_update_root_ranks[(seed, decision_index)] = int(torch.argmax(model.actor(matrix).squeeze(-1)).item())
-    rank_flips = sum(pre_update_root_ranks[key] != post_update_root_ranks[key] for key in pre_update_root_ranks)
-    metrics = {
-        "block": block,
-        "owners": len(seeds),
-        "terminal_reward_baseline": baseline,
-        "actual_on_policy_episode_count": len(policy_terms),
-        "branch_examples_completed_superior": len(branch_examples),
-        "branch_loss_term": float(branch_loss.detach().item()),
-        "policy_gradient_term": float(pg_loss.detach().item()),
-        "value_loss_term": float(value_loss.detach().item()),
-        "entropy_mean": float(entropy.detach().item()),
-        "total_loss": float(total_loss.detach().item()),
-        "actor_gradient_norm_before_clip": actor_grad_norm,
-        "critic_gradient_norm_before_clip": critic_grad_norm,
-        "policy_gradient_connected": actor_connected,
-        "value_gradient_connected": critic_connected,
-        "single_optimizer_step": True,
-        "optimizer_step_count_increment": 1,
-        "optimizer": "Adam",
-        "learning_rate": float(CONFIG["training"]["learning_rate"]),
-        "rank_flip_count_on_block_probe_roots": rank_flips,
-        "rank_flip_denominator": len(pre_update_root_ranks),
-        "block_start_policy_digest": block_start_digest,
-        "block_end_policy_digest": _model_digest(model),
-        "native_source_commit": EXPECTED_NATIVE,
-        "expert_target_count": 0,
-        "terminal_reward_only": True,
-    }
-    return metrics
 
 
-def _completed_branch_paths(out: Path, run: Mapping[str, Any], seed: int) -> list[Path]:
-    categorical = [item for item in run.get("decisions", []) if item.get("kind") == "categorical"]
-    paths: list[Path] = []
-    for root_index, item in enumerate(categorical[:2]):
-        root = {"chosen_index": item["chosen_index"], "probabilities": item.get("probabilities") or []}
-        for candidate_index in _root_alternatives(root):
-            paths.append(out / "branches" / f"TRAIN_{seed}_ROOT_{root_index}_ALT_{candidate_index}.json")
-    return paths
 
 
-def _load_model_checkpoint(model: AllNoncombatPolicy, optimizer: torch.optim.Optimizer, path: Path) -> dict[str, Any]:
-    state = torch.load(path, map_location="cpu", weights_only=True)
-    model.load_state_dict(state["model_state"])
-    optimizer.load_state_dict(state["optimizer_state"])
-    model.eval()
-    return state
 
 
-def _commit_model_checkpoint(
-    path: Path, *, block: int, model: AllNoncombatPolicy,
-    optimizer: torch.optim.Optimizer, metrics: Mapping[str, Any], config_digest: str,
-) -> str:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + f".{os.getpid()}.tmp")
-    torch.save({
-        "study_id": STUDY_ID,
-        "block": block,
-        "config_sha256": config_digest,
-        "model_state": model.state_dict(),
-        "optimizer_state": optimizer.state_dict(),
-        "metrics": dict(metrics),
-        "model_digest": _model_digest(model),
-        "one_optimizer_step_per_block": True,
-    }, temp)
-    with temp.open("rb") as handle:
-        os.fsync(handle.fileno())
-    os.replace(temp, path)
-    fsync_directory(path.parent)
-    return sha256_file(path)
 
 
 def _require_stage1_authorized(phase: str) -> None:
@@ -2985,234 +2870,12 @@ def _require_stage1_authorized(phase: str) -> None:
 
 
 def run_training(out: Path) -> dict[str, Any]:
-    _require_stage1_authorized("training")
-    preflight_path = out / "preflight-report.json"
-    if not preflight_path.exists():
-        raise StudyFailure("training is gated on the completed fixed-source preflight")
-    preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
-    if not preflight.get("within_builder_ceiling") or not preflight.get("within_all_in_ceiling"):
-        atomic_json(out / "study-status.json", {
-            "status": "SCIENTIFIC_INCOMPLETE_RESOURCE_PROJECTION",
-            "training_seed_consumed": False,
-            "preflight_report": str(preflight_path),
-        })
-        return {"status": "SCIENTIFIC_INCOMPLETE_RESOURCE_PROJECTION", "training_seed_consumed": False}
-    if len(preflight.get("distinct_preflight_seeds", [])) != 8 or preflight.get("completed_preflight_owner_arms") != 16:
-        raise StudyFailure("all eight independent P0/E preflight owners are required before training")
-    env, module, encoder, runtime = _setup(out)
-    if env["identity"] != preflight.get("source_identity"):
-        raise StudyFailure("training environment identity differs from the accepted preflight")
-    if runtime.get("optimizer_id") != CONFIG["runtime_optimizer"]["optimizer_id"]:
-        raise StudyFailure("training runtime optimizer differs from the accepted preflight")
-    config_digest = sha256_file(CONFIG_PATH)
-    model_path = out / "policies" / "pi_init.pt"
-    model, _ = _load_policy(model_path, initial=not model_path.exists())
-    if not model_path.exists():
-        _save_policy(model, model_path)
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=float(CONFIG["training"]["learning_rate"]),
-        betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, amsgrad=False,
-    )
-    checkpoint_dir = out / "checkpoints"
-    existing_blocks = [
-        int(path.stem.split("_")[-1])
-        for path in _json_paths(checkpoint_dir, "block_*.pt")
-        if path.stem.startswith("block_")
-    ]
-    latest_block = max(existing_blocks, default=0)
-    if sorted(existing_blocks) != list(range(1, latest_block + 1)):
-        raise StudyFailure("training checkpoint chain contains a missing block boundary")
-    if latest_block:
-        saved = _load_model_checkpoint(model, optimizer, checkpoint_dir / f"block_{latest_block:02d}.pt")
-        if saved.get("config_sha256") != config_digest or saved.get("block") != latest_block:
-            raise StudyFailure("last training checkpoint belongs to another config")
-        metrics_path = out / "updates" / f"block_{latest_block:02d}.json"
-        if not metrics_path.exists():
-            atomic_json(metrics_path, saved["metrics"])
-    for block in range(latest_block + 1, int(CONFIG["training"]["block_count"]) + 1):
-        checkpoint = checkpoint_dir / f"block_{block:02d}.pt"
-        block_start_digest = _model_digest(model)
-        first = int(CONFIG["training"]["seed_first"]) + (block - 1) * int(CONFIG["training"]["owners_per_block"])
-        seeds = list(range(first, first + int(CONFIG["training"]["owners_per_block"])))
-        atomic_json(out / "study-status.json", {
-            "status": "TRAINING",
-            "training_seed_consumed": True,
-            "current_block": block,
-            "block_seed_first": seeds[0],
-            "block_seed_last": seeds[-1],
-            "block_policy_digest": block_start_digest,
-            "native_source_commit": EXPECTED_NATIVE,
-            "config_sha256": config_digest,
-            "all_nonbattle_decisions_sampled_from_frozen_policy": True,
-            "expert_decisions": 0,
-        })
-        for seed in seeds:
-            _check_budget(out, reserve_branches=max(0.0, INITIAL_BRANCH_RESERVE - BASELINE_BRANCH_CPU - CPU_BRANCH_CHARGE_CURRENT))
-            run_id = f"TRAIN_{seed}"
-            run_path = out / "runs" / f"{run_id}.json"
-            original = None
-            if run_path.exists():
-                original = json.loads(run_path.read_text(encoding="utf-8"))
-                if not original.get("terminal_complete"):
-                    archived = _archive_predecision_optimizer_startup_failure(
-                        out, run_path=run_path, run_id=run_id, seed=seed, arm="TRAIN",
-                    )
-                    if archived is None:
-                        atomic_json(out / "study-status.json", {
-                            "status": "SCIENTIFIC_INCOMPLETE_INVALID_TRAINING_OWNER",
-                            "seed": seed, "run_id": run_id,
-                            "training_seed_consumed": True,
-                            "run_artifact": str(run_path),
-                        })
-                        return {"status": "SCIENTIFIC_INCOMPLETE_INVALID_TRAINING_OWNER", "seed": seed}
-                    original = None
-                if original is not None:
-                    missing_branches = [path for path in _completed_branch_paths(out, original, seed) if not path.exists()]
-                    if not missing_branches:
-                        continue
-            base = native_adapter(module, seed)
-            try:
-                if original is None:
-                    owner_result = _run_one(
-                        out=out, module=module, model=model,
-                        model_digest=block_start_digest, seed=seed, arm="TRAIN",
-                        encoder=encoder, capture_checkpoints=True,
-                        purpose="training-policy", resource_label=run_id,
-                        adapter_override=base,
-                    )
-                    _record_run_if_new(out, owner_result)
-                    if not owner_result.get("terminal_complete"):
-                        atomic_json(out / "study-status.json", {
-                            "status": "SCIENTIFIC_INCOMPLETE_INVALID_TRAINING_OWNER",
-                            "seed": seed, "run_id": run_id, "training_seed_consumed": True,
-                            "run_artifact": str(run_path),
-                        })
-                        return {"status": "SCIENTIFIC_INCOMPLETE_INVALID_TRAINING_OWNER", "seed": seed}
-                    original = owner_result
-                    roots = owner_result.get("_volatile_roots", [])
-                else:
-                    replay_label = f"TRAIN_REPLAY_{seed}_{time.time_ns()}"
-                    replay = _run_one(
-                        out=out, module=module, model=model,
-                        model_digest=block_start_digest, seed=seed, arm="TRAIN",
-                        encoder=encoder, capture_checkpoints=True,
-                        purpose="training-policy", resource_label=replay_label,
-                        durable=False, capture_trace=True, adapter_override=base,
-                    )
-                    append_jsonl(out / "coarse-state.jsonl", {
-                        "study_id": STUDY_ID, "boundary": "deterministic_owner_replay_committed",
-                        "run_id": replay_label, "seed": seed, "cpu_seconds": replay["cpu_seconds"],
-                        "reason": "recreate process-local native checkpoints for unfinished bounded branch attempts",
-                    })
-                    if replay["terminal"] != original["terminal"] or replay["decisions"] != original["decisions"]:
-                        raise StudyFailure(f"deterministic replay for owner {seed} changed its terminal or action trace")
-                    roots = replay.get("_volatile_roots", [])
-                _run_branches_for_owner(
-                    out=out, module=module, model=model,
-                    model_digest=block_start_digest, encoder=encoder,
-                    seed=seed, original=original, roots=roots, adapter=base,
-                )
-                _check_budget(out, reserve_branches=max(0.0, INITIAL_BRANCH_RESERVE - BASELINE_BRANCH_CPU - CPU_BRANCH_CHARGE_CURRENT))
-            finally:
-                base.close()
-        metrics = _training_update(
-            out=out, block=block, seeds=seeds, model=model,
-            optimizer=optimizer, block_start_digest=block_start_digest,
-        )
-        checkpoint_sha = _commit_model_checkpoint(
-            checkpoint, block=block, model=model, optimizer=optimizer,
-            metrics=metrics, config_digest=config_digest,
-        )
-        metrics["checkpoint_sha256"] = checkpoint_sha
-        atomic_json(out / "updates" / f"block_{block:02d}.json", metrics)
-        append_jsonl(out / "coarse-state.jsonl", {
-            "study_id": STUDY_ID, "boundary": "frozen_training_block_updated",
-            "block": block, "seed_first": seeds[0], "seed_last": seeds[-1],
-            "one_optimizer_step": True, "checkpoint_sha256": checkpoint_sha,
-            "policy_digest": metrics["block_end_policy_digest"],
-            "expert_decisions": 0,
-        })
-        latest_block = block
-
-    final_path = out / "policies" / "pi_final.pt"
-    final_sha = _save_policy(model, final_path)
-    initial_model_digest = _load_policy(model_path)[1]
-    status = {
-        "status": "TRAINING_COMPLETE",
-        "training_seed_consumed": True,
-        "owner_count": int(CONFIG["training"]["owner_count"]),
-        "completed_blocks": int(CONFIG["training"]["block_count"]),
-        "pi_init_sha256": sha256_file(model_path),
-        "pi_init_model_digest": initial_model_digest,
-        "pi_final_sha256": final_sha,
-        "pi_final_model_digest": _model_digest(model),
-        "native_source_commit": EXPECTED_NATIVE,
-        "expert_decisions": 0,
-        "one_optimizer_step_per_block": True,
-    }
-    atomic_json(out / "training-status.json", status)
-    atomic_json(out / "study-status.json", status)
-    return status
+    return _run_stage1_executor("train", out)
 
 
 
-def _preflight_source_contract(module: Any, out: Path) -> dict[str, Any]:
-    seed = int(CONFIG["preflight"]["seed_first"])
-    adapter = native_adapter(module, seed)
-    try:
-        snapshot = adapter.reset(seed)
-        actions = adapter.legal_actions(snapshot)
-        access = module.PrivilegedNoncombatProjectionAccess(adapter._sim, "training_oracle_only")
-        projection = access.project_v1()
-        qualification = access.training_population_qualification_v1()
-        matrix, audit = SemanticHashEncoder(CONFIG["model"]["hash_dimension"]).encode(projection, len(actions))
-        record = {
-            "study_id": STUDY_ID,
-            "type": "projection_only_setup_probe_not_a_complete_owner_run",
-            "seed": seed,
-            "native_source_commit": projection.get("native_source_commit"),
-            "projection_schema_id": projection.get("schema_id"),
-            "audience": projection.get("audience"),
-            "public_api_safe": projection.get("public_api_safe"),
-            "policy_training_authorized_marker": projection.get("policy_training_authorized"),
-            "training_population_qualification": qualification,
-            "screen_identity": projection.get("screen_identity"),
-            "candidate_order_source": projection.get("candidate_order_source"),
-            "legal_action_count": len(actions),
-            "projected_candidate_count": len(projection.get("candidates", [])),
-            "coverage_status": projection.get("coverage_status"),
-            "feature_sources": audit["feature_source_counts"],
-            "encoder_matrix_shape": list(matrix.shape),
-            "opaque_bindings_used_for_model_input": False,
-            "process_cpu_seconds": 0.0096,
-            "historical_unmetered_probe_attempts_charged_cpu_seconds": 2.0,
-        }
-        if qualification.get("disable_prismatic_shard") is not True:
-            raise StudyFailure("fixed native source does not apply predeclared Prismatic Shard stage restriction")
-        if qualification.get("native_source_commit") != EXPECTED_NATIVE:
-            raise StudyFailure("native population qualification is not source-bound to the pinned commit")
-        atomic_json(out / "preflight-projection-probe.json", record)
-        return record
-    finally:
-        adapter.close()
 
 
-def _native_fixture_record(out: Path) -> dict[str, Any]:
-    path = ROOT / "native-fixture-evidence.json"
-    if not path.exists():
-        raise StudyFailure("exact-source Match-and-Keep/Colosseum native fixture evidence is missing")
-    evidence = json.loads(path.read_text(encoding="utf-8"))
-    if (
-        evidence.get("native_source_commit") != EXPECTED_NATIVE
-        or evidence.get("passed") is not True
-        or evidence.get("required_fixture_gate_passed") is not True
-    ):
-        raise StudyFailure("required exact-source native forced-fixture checks did not pass")
-    target = out / "native-fixture-evidence.json"
-    if not target.exists():
-        atomic_json(target, evidence)
-    return evidence
 
 
 def _setup(
@@ -3230,145 +2893,7 @@ def _setup(
 
 
 def run_preflight(out: Path) -> dict[str, Any]:
-    _require_stage1_authorized("preflight")
-    setup_started = time.process_time()
-    env, module, encoder, runtime = _setup(out)
-    fixture = _native_fixture_record(out)
-    projection_probe = _preflight_source_contract(module, out)
-    init_path = out / "policies" / "pi_init.pt"
-    initial_model, _ = _load_policy(init_path, initial=True)
-    initial_sha = _save_policy(initial_model, init_path) if not init_path.exists() else sha256_file(init_path)
-    initial_model, initial_digest = _load_policy(init_path, initial=not init_path.exists())
-    if init_path.exists() and initial_sha != sha256_file(init_path):
-        raise StudyFailure("initial policy checkpoint changed during preflight")
-    # Keep measured setup as a diagnostic. Cumulative CPU is charged through
-    # the Stage 1 resume ledger, not by re-adding the Stage 0 fixed setup debit.
-    setup_cpu = max(0.0, time.process_time() - setup_started)
-    model_specs = [(int(seed), arm) for seed in range(
-        int(CONFIG["preflight"]["seed_first"]), int(CONFIG["preflight"]["seed_last"]) + 1
-    ) for arm in CONFIG["preflight"]["arms"]]
-    existing = {path.stem: json.loads(path.read_text(encoding="utf-8"))
-                for path in (out / "runs").glob("PRE_*.json")}
-    results: list[dict[str, Any]] = []
-    started = time.process_time()
-    for seed, arm in model_specs:
-        _check_budget(out, reserve_branches=INITIAL_BRANCH_RESERVE)
-        run_id = f"PRE_{seed}_{arm}"
-        if run_id in existing:
-            result = existing[run_id]
-            if not result.get("terminal_complete"):
-                raise StudyFailure(f"durable preflight arm {run_id} is incomplete")
-            results.append(result)
-            continue
-        result = _run_one(
-            out=out, module=module, model=initial_model, model_digest=initial_digest,
-            seed=seed, arm=arm, encoder=encoder, purpose="preflight-policy",
-            resource_label=run_id,
-        )
-        _record_run_if_new(out, result)
-        results.append(result)
-        if not result.get("terminal_complete"):
-            raise StudyFailure(f"preflight arm {run_id} did not complete")
-        _check_budget(out, reserve_branches=INITIAL_BRANCH_RESERVE)
-
-    # Verify deterministic behavior across one and two concurrent workers with
-    # an exact repeated preflight seed; this is a systems check, not a new owner.
-    check_id = f"PRE_WORKER_CHECK_{CONFIG['preflight']['seed_first']}_P0"
-    check_path = out / "runs" / f"{check_id}.json"
-    if not check_path.exists():
-        seed = int(CONFIG["preflight"]["seed_first"])
-        first_single = next(item for item in results if item["seed"] == seed and item["arm"] == "P0")
-        # Companion E execution shares the 2-worker scheduler; the repeated P0
-        # is compared to the committed one-worker natural run.
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            future_p0 = executor.submit(_run_one, out=out, module=module, model=initial_model,
-                model_digest=initial_digest, seed=seed, arm="P0", encoder=encoder,
-                purpose="preflight-policy", resource_label=check_id)
-            future_e = executor.submit(_run_one, out=out, module=module, model=initial_model,
-                model_digest=initial_digest, seed=seed, arm="E", encoder=encoder,
-                purpose="preflight-worker-check", resource_label=f"PRE_WORKER_COMPANION_{seed}_E")
-            repeated, companion = future_p0.result(), future_e.result()
-        same = (
-            first_single["terminal"] == repeated["terminal"]
-            and first_single["decisions"] == repeated["decisions"]
-        )
-        check = {
-            "study_id": STUDY_ID, "type": "worker_count_determinism_system_check_not_an_owner",
-            "seed": seed, "one_worker_run": first_single["run_id"],
-            "two_worker_run": check_id, "two_worker_companion": companion["run_id"],
-            "terminal_and_decision_trace_equal": same,
-            "cpu_seconds": repeated["cpu_seconds"] + companion["cpu_seconds"],
-            "charged_as_preflight_setup": True,
-        }
-        atomic_json(check_path, repeated)
-        atomic_json(out / "worker-consistency.json", check)
-        _record_run_if_new(out, repeated)
-        _record_run_if_new(out, companion)
-        if not same:
-            raise StudyFailure("one-worker and two-worker deterministic preflight output differs")
-        results.extend([repeated, companion])
-    else:
-        check = json.loads((out / "worker-consistency.json").read_text(encoding="utf-8"))
-        if not check.get("terminal_and_decision_trace_equal"):
-            raise StudyFailure("durable one/two worker check did not pass")
-
-    owner_results = [item for item in results if "WORKER" not in str(item.get("run_id", ""))]
-    cpu = BASELINE_PARENT_CPU + BASELINE_BRANCH_CPU + time.process_time() + CPU_CHILD_CHARGE
-    individual = [float(item["cpu_seconds"]) for item in results if item.get("terminal_complete") and item.get("arm") in {"P0", "E"} and "WORKER" not in str(item.get("run_id", ""))]
-    if len(individual) < 16:
-        raise StudyFailure("fewer than eight independent P0/E preflight owner arms completed")
-    maximum_run = max(individual)
-    mean_run = float(np.mean(individual))
-    # The cumulative projection charges Stage 0 once, all durable Stage 1
-    # receipts across resume, every still-mandatory arm/repeat, the complete
-    # remaining branch allowance, margin, and the total reviewer reserve.
-    projection = _stage1_budget_projection_for(out, "preflight")
-    projected = float(projection["projected_builder_cpu_seconds"])
-    report = {
-        "study_id": STUDY_ID,
-        "status": "PREFLIGHT_COMPLETE",
-        "source_identity": env["identity"],
-        "runtime_optimizer": runtime,
-        "native_fixtures": fixture,
-        "source_projection_probe": projection_probe,
-        "preflight_setup_cpu_seconds": setup_cpu,
-        "completed_preflight_owner_arms": len([item for item in owner_results if item.get("terminal_complete") and item.get("arm") in {"P0", "E"}]),
-        "distinct_preflight_seeds": sorted({int(item["seed"]) for item in owner_results if item.get("arm") in {"P0", "E"}}),
-        "workers": {"production": 1, "consistency_test": check},
-        "run_cpu_seconds_min": min(individual),
-        "run_cpu_seconds_mean": mean_run,
-        "run_cpu_seconds_max": maximum_run,
-        "cumulative_stage1_cpu_seconds_charged": cpu,
-        "projected_all_in_cpu_seconds_builder": projected,
-        "reviewer_reserve_seconds": projection["reviewer_reserve_total_seconds"],
-        "stage0_reviewer_reserve_credited_seconds": projection["stage0_reviewer_reserve_credited_seconds"],
-        "incremental_stage1_reviewer_reserve_seconds": projection["incremental_stage1_reviewer_reserve_seconds"],
-        "projected_all_in_with_reviewer_reserve": projection["projected_cumulative_all_in_cpu_seconds"],
-        "stage1_budget_projection": projection,
-        "within_builder_ceiling": projection["within_builder_ceiling"],
-        "projection_factors": dict(PROJECTION),
-        "within_all_in_ceiling": projection["within_all_in_ceiling"],
-        "training_seed_consumed": False,
-    }
-    atomic_json(out / "preflight-report.json", report)
-    if not projection["within_builder_ceiling"] or not projection["within_all_in_ceiling"]:
-        report["status"] = "SCIENTIFIC_INCOMPLETE_RESOURCE_PROJECTION"
-        atomic_json(out / "preflight-report.json", report)
-        atomic_json(out / "study-status.json", {
-            "status": "SCIENTIFIC_INCOMPLETE_RESOURCE_PROJECTION",
-            "training_seed_consumed": False,
-            "reason": "conservative preflight estimate exceeds the builder cap or total cap with reviewer reserve",
-            "preflight_report": str(out / "preflight-report.json"),
-        })
-        return report
-    atomic_json(out / "study-status.json", {
-        "status": "PREFLIGHT_COMPLETE",
-        "training_seed_consumed": False,
-        "preflight_report_sha256": sha256_file(out / "preflight-report.json"),
-        "projected_all_in_cpu_seconds_builder": projected,
-        "projected_all_in_with_reviewer_reserve": projection["projected_cumulative_all_in_cpu_seconds"],
-    })
-    return report
+    return _run_stage1_executor("preflight", out)
 
 
 def _write_artifact_manifest(out: Path) -> dict[str, Any]:
@@ -3384,254 +2909,16 @@ def _write_artifact_manifest(out: Path) -> dict[str, Any]:
     return record
 
 
-def _validate_completed_training(out: Path) -> dict[str, Any]:
-    status_path = out / "training-status.json"
-    if not status_path.exists():
-        raise StudyFailure("independent evaluation requires a committed TRAINING_COMPLETE receipt")
-    status = json.loads(status_path.read_text(encoding="utf-8"))
-    if status.get("status") != "TRAINING_COMPLETE" or status.get("owner_count") != 512 or status.get("completed_blocks") != 4:
-        raise StudyFailure("training receipt is incomplete; held-out evaluation is gated")
-    seeds = list(range(int(CONFIG["training"]["seed_first"]), int(CONFIG["training"]["seed_last"]) + 1))
-    for seed in seeds:
-        path = out / "runs" / f"TRAIN_{seed}.json"
-        if not path.exists():
-            raise StudyFailure(f"training receipt omits the predeclared owner seed {seed}")
-        run = json.loads(path.read_text(encoding="utf-8"))
-        if not run.get("terminal_complete") or run.get("seed") != seed or run.get("arm") != "TRAIN":
-            raise StudyFailure(f"training owner {seed} lacks a valid complete native terminal run")
-    checkpoints = [out / "checkpoints" / f"block_{block:02d}.pt" for block in range(1, 5)]
-    if any(not path.exists() for path in checkpoints):
-        raise StudyFailure("the four frozen-block optimizer/model checkpoints are not all present")
-    return status
 
 
-def _shared_probe_rank_flips(out: Path, initial: AllNoncombatPolicy, final: AllNoncombatPolicy) -> dict[str, Any]:
-    counts: dict[str, Counter[str]] = {}
-    total = Counter()
-    for seed in range(int(CONFIG["preflight"]["seed_first"]), int(CONFIG["preflight"]["seed_last"]) + 1):
-        run_path = out / "runs" / f"PRE_{seed}_P0.json"
-        if not run_path.exists():
-            raise StudyFailure(f"shared P0 probe root run {seed} is missing")
-        run = json.loads(run_path.read_text(encoding="utf-8"))
-        artifact = run.get("decision_artifact")
-        decision_path = out / "decisions" / f"{run_path.stem}.npz"
-        if (not artifact or not decision_path.is_file()
-                or sha256_file(decision_path) != run.get("decision_artifact_sha256")):
-            raise StudyFailure(f"shared P0 probe feature artifact for seed {seed} is missing or corrupt")
-        matrices = _load_decision_artifact(out, run_path.stem)
-        rows = [item for item in run.get("decisions", []) if item.get("kind") == "categorical"]
-        features = matrices["features"]
-        offsets = matrices["offsets"].astype(int)
-        if len(rows) != len(offsets) - 1:
-            raise StudyFailure(f"shared P0 probe seed {seed} trace and feature rows differ")
-        for row_index, row in enumerate(rows):
-            matrix = torch.as_tensor(features[offsets[row_index]:offsets[row_index + 1]], dtype=torch.float32)
-            with torch.no_grad():
-                old_order = torch.argsort(initial.actor(matrix).squeeze(-1), descending=True, stable=True).tolist()
-                new_order = torch.argsort(final.actor(matrix).squeeze(-1), descending=True, stable=True).tolist()
-            screen = str(row.get("native_screen", "UNKNOWN"))
-            bucket = counts.setdefault(screen, Counter())
-            bucket["decisions"] += 1
-            bucket["top_action_flips"] += int(bool(old_order and new_order and old_order[0] != new_order[0]))
-            bucket["full_ranking_flips"] += int(old_order != new_order)
-            total["decisions"] += 1
-            total["top_action_flips"] += int(bool(old_order and new_order and old_order[0] != new_order[0]))
-            total["full_ranking_flips"] += int(old_order != new_order)
-    return {
-        "type": "shared_preflight_P0_native_candidate_decisions_not_heldout_outcomes",
-        "owners": int(CONFIG["preflight"]["owner_count"]),
-        "per_screen": {key: dict(value) for key, value in sorted(counts.items())},
-        "overall": dict(total),
-        "top_action_flip_fraction": float(total["top_action_flips"] / total["decisions"]) if total["decisions"] else None,
-        "full_ranking_flip_fraction": float(total["full_ranking_flips"] / total["decisions"]) if total["decisions"] else None,
-    }
 
 
-def _paired_percentile_interval(differences: np.ndarray, *, seed: int, resamples: int) -> dict[str, Any]:
-    if differences.ndim != 1 or len(differences) != 96 or not np.isfinite(differences).all():
-        raise StudyFailure("primary paired bootstrap requires all 96 finite owner-level differences")
-    rng = np.random.default_rng(seed)
-    sampled_indices = rng.integers(0, len(differences), size=(resamples, len(differences)))
-    means = differences[sampled_indices].mean(axis=1)
-    low, high = np.quantile(means, [0.025, 0.975], method="linear")
-    return {
-        "method": "paired_percentile",
-        "confidence": 0.95,
-        "resamples": resamples,
-        "seed": seed,
-        "quantile_method": "linear",
-        "mean_difference": float(np.mean(differences)),
-        "ci_95": [float(low), float(high)],
-        "owner_count": int(len(differences)),
-        "unit": "independent held-out owner seed",
-    }
 
 
-def _summarize_evaluation(out: Path, initial: AllNoncombatPolicy, final: AllNoncombatPolicy) -> dict[str, Any]:
-    seeds = list(range(int(CONFIG["evaluation"]["seed_first"]), int(CONFIG["evaluation"]["seed_last"]) + 1))
-    arms = list(CONFIG["evaluation"]["arms"])
-    runs: dict[str, dict[int, dict[str, Any]]] = {arm: {} for arm in arms}
-    for arm in arms:
-        for seed in seeds:
-            path = out / "runs" / f"EVAL_{seed}_{arm}.json"
-            if not path.exists():
-                raise StudyFailure(f"held-out evaluation is missing {path.name}")
-            run = json.loads(path.read_text(encoding="utf-8"))
-            if (not run.get("terminal_complete") or run.get("seed") != seed
-                    or run.get("arm") != arm or not run.get("completed_native_terminal")):
-                raise StudyFailure(f"held-out arm {arm}, owner {seed} is not a valid complete terminal episode")
-            if run.get("native_source_commit") != EXPECTED_NATIVE:
-                raise StudyFailure(f"held-out arm {arm}, owner {seed} used a different native source")
-            runs[arm][seed] = run
-    if any(len(rows) != 96 for rows in runs.values()):
-        raise StudyFailure("held-out evaluation does not contain exactly 96 outcomes in each arm")
-
-    floors = {arm: np.asarray([runs[arm][seed]["terminal"]["terminal_floor"] for seed in seeds], dtype=float) for arm in arms}
-    primary = floors["P1"] - floors["P0"]
-    bootstrap = CONFIG["evaluation"]["bootstrap"]
-    interval = _paired_percentile_interval(
-        primary,
-        seed=int(bootstrap["seed"]),
-        resamples=int(bootstrap["resamples"]),
-    )
-    low, high = interval["ci_95"]
-    classification = "PRELIMINARY_POSITIVE" if low > 0 else "PRELIMINARY_HARM" if high < 0 else "PRELIMINARY_NULL"
-    metrics: dict[str, Any] = {
-        "study_id": STUDY_ID,
-        "status": "EVALUATION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
-        "classification_before_independent_review": classification,
-        "source_identity": {"native_source_commit": EXPECTED_NATIVE, "stsr_source_commit": EXPECTED_STSRL,
-                            "native_module_sha256": CONFIG["identity"]["native_binary_sha256"]},
-        "owner_seed_first": seeds[0],
-        "owner_seed_last": seeds[-1],
-        "independent_owner_count": len(seeds),
-        "complete_terminal_arm_counts": {arm: len(runs[arm]) for arm in arms},
-        "primary_estimand": "mean held-out owner-level terminal_floor(P1 - P0)",
-        "primary_paired_interval": interval,
-        "secondary_mean_terminal_floor": {arm: float(np.mean(floors[arm])) for arm in arms},
-        "secondary_mean_floor_p1_minus_e": float(np.mean(floors["P1"] - floors["E"])),
-        "secondary_owner_paired_p1_minus_e": _paired_percentile_interval(
-            floors["P1"] - floors["E"], seed=int(bootstrap["seed"]) + 1,
-            resamples=int(bootstrap["resamples"]),
-        ),
-        "heart_victories": {arm: int(sum(bool(runs[arm][seed]["terminal"]["heart_victory"]) for seed in seeds)) for arm in arms},
-        "heart_victory_denominators": {arm: 96 for arm in arms},
-        "act2_plus": {arm: int(sum(bool(runs[arm][seed]["terminal"]["act2_plus"]) for seed in seeds)) for arm in arms},
-        "act3_plus": {arm: int(sum(bool(runs[arm][seed]["terminal"]["act3_plus"]) for seed in seeds)) for arm in arms},
-        "act4_reached": {arm: int(sum(bool(runs[arm][seed]["terminal"]["act4_reached"]) for seed in seeds)) for arm in arms},
-        "fidelity_exposure_counts_by_arm": {},
-        "screen_action_coverage_by_arm": {},
-        "chosen_native_action_kind_counts_by_arm": {},
-        "cpu_wall_rss_by_arm": {},
-        "shared_preflight_policy_rank_flips": _shared_probe_rank_flips(out, initial, final),
-        "all_arms_counted_no_posthoc_censoring": True,
-        "expert_decisions_in_P0_P1_or_training_suffixes": 0,
-        "claims_scope": "frozen native-source restricted surrogate; not normal-information deployability or full real-STS fidelity",
-        "proposed_code_disposition": "study-only implementation; do not promote model or privileged input to public STSRL API",
-    }
-    for arm in arms:
-        exposure_names = sorted({name for run in runs[arm].values() for name in run.get("exposures", {})})
-        metrics["fidelity_exposure_counts_by_arm"][arm] = {
-            name: {"count": sum(bool(runs[arm][seed].get("exposures", {}).get(name, False)) for seed in seeds), "denominator": 96}
-            for name in exposure_names
-        }
-        screen_counts: Counter[str] = Counter()
-        candidate_counts: Counter[str] = Counter()
-        chosen_kinds: Counter[str] = Counter()
-        for seed in seeds:
-            run = runs[arm][seed]
-            for decision in run.get("decisions", []):
-                if decision.get("kind") != "categorical":
-                    continue
-                screen = str(decision.get("native_screen", "UNKNOWN"))
-                screen_counts[screen] += 1
-                candidate_counts[screen] += int(decision.get("projection_audit", {}).get("candidate_count", 0))
-                identities = decision.get("legal_action_identities", [])
-                chosen = int(decision.get("chosen_index", -1))
-                if 0 <= chosen < len(identities):
-                    chosen_kinds[str(identities[chosen].get("kind", "unknown"))] += 1
-        metrics["screen_action_coverage_by_arm"][arm] = {
-            screen: {"multi_choice_decisions": amount, "native_candidates_associated": candidate_counts[screen], "coverage_status": "supported_all_live_actions"}
-            for screen, amount in sorted(screen_counts.items())
-        }
-        metrics["chosen_native_action_kind_counts_by_arm"][arm] = dict(sorted(chosen_kinds.items()))
-        metrics["cpu_wall_rss_by_arm"][arm] = {
-            "cpu_seconds_sum": float(sum(runs[arm][seed].get("cpu_seconds", 0.0) for seed in seeds)),
-            "wall_seconds_sum": float(sum(runs[arm][seed].get("wall_seconds", 0.0) for seed in seeds)),
-            "max_run_cpu_seconds": float(max(runs[arm][seed].get("cpu_seconds", 0.0) for seed in seeds)),
-            "max_run_wall_seconds": float(max(runs[arm][seed].get("wall_seconds", 0.0) for seed in seeds)),
-            "max_sampled_run_rss_kib": int(max(runs[arm][seed].get("max_rss_kib_sampled_for_run", 0) for seed in seeds)),
-        }
-    atomic_json(out / "evaluation-summary.json", metrics)
-    atomic_json(out / "evaluation-status.json", {
-        "status": metrics["status"], "classification_before_independent_review": classification,
-        "owner_count": 96, "terminal_arms": {arm: 96 for arm in arms},
-        "evaluation_summary_sha256": sha256_file(out / "evaluation-summary.json"),
-    })
-    atomic_json(out / "study-status.json", metrics)
-    _write_artifact_manifest(out)
-    return metrics
 
 
 def run_evaluation(out: Path) -> dict[str, Any]:
-    _require_stage1_authorized("evaluation")
-    training = _validate_completed_training(out)
-    if training.get("native_source_commit") != EXPECTED_NATIVE or training.get("expert_decisions") != 0:
-        raise StudyFailure("training source or Expert-isolation receipt failed evaluation gate")
-    if sha256_file(out / "policies" / "pi_init.pt") != training.get("pi_init_sha256"):
-        raise StudyFailure("pi_init checkpoint changed after training")
-    if sha256_file(out / "policies" / "pi_final.pt") != training.get("pi_final_sha256"):
-        raise StudyFailure("pi_final checkpoint does not match the completed training receipt")
-    initial, initial_digest = _load_policy(out / "policies" / "pi_init.pt")
-    final, final_digest = _load_policy(out / "policies" / "pi_final.pt")
-    if initial_digest != training.get("pi_init_model_digest") or final_digest != training.get("pi_final_model_digest"):
-        raise StudyFailure("evaluation policy parameter digest differs from its training receipt")
-    env, module, encoder, runtime = _setup(out)
-    preflight = json.loads((out / "preflight-report.json").read_text(encoding="utf-8"))
-    if env["identity"] != preflight.get("source_identity"):
-        raise StudyFailure("evaluation environment identity differs from the accepted preflight")
-    if runtime.get("optimizer_id") != CONFIG["runtime_optimizer"]["optimizer_id"]:
-        raise StudyFailure("evaluation runtime optimizer differs from the accepted preflight")
-    expert_digest = sha256_bytes(canonical({"expert": "expert_non_combat_v1", "source": EXPECTED_STSRL}).encode("utf-8"))
-    specs = [(int(seed), arm) for seed in range(
-        int(CONFIG["evaluation"]["seed_first"]), int(CONFIG["evaluation"]["seed_last"]) + 1
-    ) for arm in CONFIG["evaluation"]["arms"]]
-    atomic_json(out / "evaluation-status.json", {
-        "status": "EVALUATION_RUNNING", "owner_count": 96, "arms": list(CONFIG["evaluation"]["arms"]),
-        "terminal_outcomes_required": 288, "native_source_commit": EXPECTED_NATIVE,
-        "expert_decisions_in_P0_P1": 0,
-    })
-    for seed, arm in specs:
-        _check_budget(out, reserve_branches=0.0)
-        run_id = f"EVAL_{seed}_{arm}"
-        path = out / "runs" / f"{run_id}.json"
-        if path.exists():
-            previous = json.loads(path.read_text(encoding="utf-8"))
-            if not previous.get("terminal_complete"):
-                atomic_json(out / "evaluation-status.json", {
-                    "status": "SCIENTIFIC_INCOMPLETE_INVALID_EVALUATION_ARM",
-                    "run_id": run_id, "training_seed_consumed": True,
-                    "complete_terminal_arms_so_far": sum(
-                        1 for item in _json_paths(out / "runs", "EVAL_*.json")
-                        if json.loads(item.read_text(encoding="utf-8")).get("terminal_complete")
-                    ),
-                })
-                return json.loads((out / "evaluation-status.json").read_text(encoding="utf-8"))
-            continue
-        model, digest = (initial, initial_digest) if arm == "P0" else (final, final_digest) if arm == "P1" else (initial, expert_digest)
-        result = _run_one(
-            out=out, module=module, model=model, model_digest=digest,
-            seed=seed, arm=arm, encoder=encoder, purpose=f"heldout-{arm.lower()}-evaluation",
-            resource_label=run_id,
-        )
-        _record_run_if_new(out, result)
-        if not result.get("terminal_complete"):
-            atomic_json(out / "evaluation-status.json", {
-                "status": "SCIENTIFIC_INCOMPLETE_INVALID_EVALUATION_ARM",
-                "run_id": run_id, "training_seed_consumed": True,
-            })
-            return json.loads((out / "evaluation-status.json").read_text(encoding="utf-8"))
-    return _summarize_evaluation(out, initial, final)
+    return _run_stage1_executor("evaluate", out)
 
 
 def _checkpoint_replay_probe(
@@ -4005,180 +3292,70 @@ def _validate_artifact_manifest(out: Path) -> bool:
     return actual_manifest == expected
 
 
-def _stage1_has_open_phase(out: Path) -> bool:
-    started: set[str] = set()
-    closed: set[str] = set()
-    states = out / "coarse-state.jsonl"
-    if not states.exists():
-        return False
-    for line in states.read_text(encoding="utf-8").splitlines():
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        phase_id = str(event.get("phase_id", ""))
-        if not phase_id:
-            continue
-        if event.get("boundary") == "phase_started" and str(event.get("phase", "")) in {"preflight", "train", "evaluate"}:
-            started.add(phase_id)
-        elif event.get("boundary") in {"phase_finished", "phase_failed"}:
-            closed.add(phase_id)
-    return bool(started - closed)
 
 
 def _run_stage1_cli_phase(phase: str, out: Path) -> int:
-    """Run one gated Stage 1 phase with a single durable cumulative ledger."""
-    global BASELINE_PARENT_CPU, BASELINE_BRANCH_CPU, INITIAL_BRANCH_RESERVE
-    global ACTIVE_STAGE1_PHASE, STAGE1_STAGE0_BASELINE_CACHE, STAGE1_ACCOUNTING_SNAPSHOT
-    phase_id: str | None = None
-    source_identity: dict[str, Any] | None = None
+    """Route every Stage 1 CLI phase through the source-locked Issue 75 executor."""
     try:
-        expected_out = (ROOT / str(CONFIG["resources"]["stage1_budget"]["artifact_directory"])).resolve()
-        if out != expected_out:
-            raise StudyFailure(f"Stage 1 output must use the single locked ledger directory: {expected_out}")
-        baseline = _stage1_stage0_baseline()
-        source_commit, source_dirty = _git_identity(os.fspath(ROOT))
-        if source_dirty:
-            raise StudyFailure("Stage 1 requires a clean committed study source before phase execution")
-        source_identity = {
-            "study_source_commit": source_commit,
-            "study_source_worktree_clean": True,
-            "study_runner_sha256": sha256_file(ROOT / "runner.py"),
-            "study_policy_sha256": sha256_file(ROOT / "policy.py"),
-            "study_config_sha256": CONFIG_SHA256,
-        }
-        lock_config(out)
-        manifest_path = out / "artifact-manifest.json"
-        if manifest_path.exists() and not _validate_artifact_manifest(out) and not _stage1_has_open_phase(out):
-            raise StudyFailure("completed Stage 1 artifact manifest is missing or does not match its files")
-        branch_accounting = _branch_accounting_from_disk(out)
-        BASELINE_PARENT_CPU, BASELINE_BRANCH_CPU = _existing_cpu_charge(
-            out, branch_accounting=branch_accounting,
-        )
-        STAGE1_ACCOUNTING_SNAPSHOT = _load_stage1_accounting_snapshot(
-            out, branch_accounting=branch_accounting,
-        )
-        INITIAL_BRANCH_RESERVE = float(_stage1_budget_contract()["branch_allowance_seconds"])
-        ACTIVE_STAGE1_PHASE = phase
-        resource_guard = _install_cpu_cap(out)
-        atomic_json(out / f"resource-guard-{phase}.json", resource_guard)
-        phase_id = f"stage1-{phase}:{time.time_ns()}:{os.getpid()}"
-        phase_run_cpu_before = _run_and_replay_cpu_total(out)
-        phase_branch_parent_cpu_before = _branch_parent_cpu_total(out)
-        append_jsonl(out / "coarse-state.jsonl", {
-            "study_id": STUDY_ID, "boundary": "phase_started", "phase": phase,
-            "phase_id": phase_id,
-            "charged_prior_stage0_builder_cpu_seconds": baseline["builder_cpu_seconds"],
-            "charged_prior_stage1_parent_cpu_seconds": BASELINE_PARENT_CPU,
-            "charged_prior_stage1_branch_cpu_seconds": BASELINE_BRANCH_CPU,
-            "reviewer_reserve_total_seconds": _stage1_budget_contract()["reviewer_reserve_min_seconds"],
-            "rlimit_cpu_seconds": resource_guard["rlimit_cpu_seconds"],
-            **source_identity,
-            "formal_training_seed_consumed": False,
-            "formal_evaluation_seed_consumed": False,
-        })
-        runners = {"preflight": run_preflight, "train": run_training, "evaluate": run_evaluation}
-        result = runners[phase](out)
-        phase_cpu = _phase_unattributed_cpu(
-            out, process_cpu=_phase_process_cpu(),
-            run_cpu_before=phase_run_cpu_before,
-            branch_parent_cpu_before=phase_branch_parent_cpu_before,
-        )
-        append_jsonl(out / "coarse-state.jsonl", {
-            "study_id": STUDY_ID, "boundary": "phase_finished", "phase": phase,
-            "phase_id": phase_id, **phase_cpu, "status": result.get("status"),
-        })
-        projection = _stage1_budget_projection_for(out, phase)
-        result = dict(result)
-        result["stage1_budget_projection"] = projection
-        result["phase_cpu_accounting"] = phase_cpu
-        if "cumulative_stage1_cpu_seconds_charged" in result:
-            # run_preflight returns before this wrapper records phase_finished;
-            # publish the final cumulative value from the now-closed ledger.
-            result["cumulative_stage1_cpu_seconds_charged"] = float(
-                projection["stage1_cpu_charged_seconds"]
-            )
-        if not projection["within_builder_ceiling"] or not projection["within_all_in_ceiling"]:
-            result["status"] = "SCIENTIFIC_INCOMPLETE_RESOURCE_PROJECTION"
-            result["training_seed_consumed"] = any(_json_paths(out / "runs", "TRAIN_*.json"))
-            result["evaluation_seed_consumed"] = any(_json_paths(out / "runs", "EVAL_*.json"))
-            atomic_json(out / "study-status.json", {
-                "status": result["status"],
-                "training_seed_consumed": result["training_seed_consumed"],
-                "evaluation_seed_consumed": result["evaluation_seed_consumed"],
-                "stage1_budget_projection": projection,
-            })
-        if phase == "preflight":
-            result.update({
-                "projected_all_in_cpu_seconds_builder": projection["projected_builder_cpu_seconds"],
-                "reviewer_reserve_seconds": projection["reviewer_reserve_total_seconds"],
-                "stage0_reviewer_reserve_credited_seconds": projection["stage0_reviewer_reserve_credited_seconds"],
-                "incremental_stage1_reviewer_reserve_seconds": projection["incremental_stage1_reviewer_reserve_seconds"],
-                "projected_all_in_with_reviewer_reserve": projection["projected_cumulative_all_in_cpu_seconds"],
-                "within_builder_ceiling": projection["within_builder_ceiling"],
-                "within_all_in_ceiling": projection["within_all_in_ceiling"],
-            })
-            atomic_json(out / "preflight-report.json", result)
-            study_status_path = out / "study-status.json"
-            if study_status_path.is_file():
-                study_status = json.loads(study_status_path.read_text(encoding="utf-8"))
-                if study_status.get("status") == result.get("status"):
-                    study_status.update({
-                        "preflight_report_sha256": sha256_file(out / "preflight-report.json"),
-                        "projected_all_in_cpu_seconds_builder": projection["projected_builder_cpu_seconds"],
-                        "projected_all_in_with_reviewer_reserve": projection["projected_cumulative_all_in_cpu_seconds"],
-                    })
-                    atomic_json(study_status_path, study_status)
-        atomic_json(out / f"stage1-{phase}-report.json", result)
-        atomic_json(out / "stage1-status.json", {
-            "status": result.get("status"), "latest_phase": phase,
-            "config_sha256": CONFIG_SHA256,
-            "training_seed_consumed": any(_json_paths(out / "runs", "TRAIN_*.json")),
-            "evaluation_seed_consumed": any(_json_paths(out / "runs", "EVAL_*.json")),
-            "stage1_budget_projection": projection,
-        })
-        _write_artifact_manifest(out)
-        print(canonical(result))
-        return 0 if result.get("status") in {
-            "PREFLIGHT_COMPLETE", "TRAINING_COMPLETE", "EVALUATION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
-        } and projection["within_all_in_ceiling"] else 2
+        result = _run_stage1_executor(phase, out)
     except Exception as exc:
-        failure = {
-            "status": "STAGE1_LAUNCH_GATE_FAILED",
-            "phase": phase, "error_type": type(exc).__name__, "error": str(exc),
-            "config_sha256": CONFIG_SHA256,
-            **(source_identity or {}),
-            "formal_training_seed_consumed": any(_json_paths(out / "runs", "TRAIN_*.json")) if out.is_dir() else False,
-            "formal_evaluation_seed_consumed": any(_json_paths(out / "runs", "EVAL_*.json")) if out.is_dir() else False,
-        }
-        if phase_id is not None and out.is_relative_to(ROOT):
-            phase_cpu = _phase_unattributed_cpu(
-                out, process_cpu=_phase_process_cpu(),
-                run_cpu_before=locals().get("phase_run_cpu_before", 0.0),
-                branch_parent_cpu_before=locals().get("phase_branch_parent_cpu_before", 0.0),
-            )
-            append_jsonl(out / "coarse-state.jsonl", {
-                "study_id": STUDY_ID, "boundary": "phase_failed", "phase": phase,
-                "phase_id": phase_id, **phase_cpu, **failure,
-            })
-            failure["phase_cpu_accounting"] = phase_cpu
-            atomic_json(out / f"stage1-{phase}-failure.json", failure)
-            atomic_json(out / "study-status.json", failure)
-            atomic_json(out / "stage1-status.json", failure)
-            _write_artifact_manifest(out)
-        print(canonical(failure), file=sys.stderr)
-        expected_out = (ROOT / str(CONFIG["resources"]["stage1_budget"]["artifact_directory"])).resolve()
-        if phase_id is None and out == expected_out and out.is_dir():
-            atomic_json(out / "stage1-launch-failure.json", failure)
-            atomic_json(out / "study-status.json", failure)
-            atomic_json(out / "stage1-status.json", failure)
-            if not (out / "artifact-manifest.json").exists():
-                _write_artifact_manifest(out)
+        print(canonical({
+            "status": "STAGE1_EXECUTION_HOLD",
+            "phase": phase,
+            "error_type": type(exc).__name__,
+            "formal_seed_reservations": _stage1_formal_seed_reservations(),
+        }), file=sys.stderr)
         return 2
-    finally:
-        ACTIVE_STAGE1_PHASE = None
-        STAGE1_STAGE0_BASELINE_CACHE = None
-        STAGE1_ACCOUNTING_SNAPSHOT = None
+    print(canonical(result))
+    return 0 if result.get("status") in {
+        "PREFLIGHT_COMPLETE_PENDING_INDEPENDENT_REVIEW", "TRAINING_COMPLETE",
+        "EVALUATION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+    } else 2
+
+
+def _stage1_formal_seed_reservations() -> dict[str, bool | None]:
+    events_path = ROOT / "studies" / "issue-75-no-expert-oracle" / "stage1" / "artifacts" / "ledger" / "events.jsonl"
+    if not events_path.is_file():
+        return {"training": False, "evaluation": False}
+    reserved_training = False
+    reserved_evaluation = False
+    try:
+        for line in events_path.read_text(encoding="utf-8").splitlines():
+            event = json.loads(line)
+            if event.get("event") != "reserve":
+                continue
+            unit = str(event.get("unit_id", ""))
+            reserved_training |= unit.startswith("TRAIN:") or unit.startswith("UPDATE:")
+            reserved_evaluation |= unit.startswith("HELDOUT:")
+    except (OSError, json.JSONDecodeError):
+        return {"training": None, "evaluation": None}
+    return {"training": reserved_training, "evaluation": reserved_evaluation}
+
+
+def _run_stage1_executor(phase: str, out: Path) -> dict[str, Any]:
+    """Load the single locked executor; its own live gate and ledger are mandatory."""
+    import importlib.util
+
+    executor_path = ROOT / "studies" / "issue-75-no-expert-oracle" / "stage1" / "executor.py"
+    spec = importlib.util.spec_from_file_location("issue75_stage1_executor", executor_path)
+    if spec is None or spec.loader is None:
+        raise StudyFailure("source-locked Stage 1 executor is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    previous = sys.modules.get(spec.name)
+    if previous is not None and Path(getattr(previous, "__file__", "")).resolve() != executor_path.resolve():
+        raise StudyFailure("a different Stage 1 executor is already loaded")
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+        return module.run_phase(phase, output_dir=out)
+    except BaseException:
+        if previous is None:
+            sys.modules.pop(spec.name, None)
+        else:
+            sys.modules[spec.name] = previous
+        raise
+
+
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -4192,16 +3369,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     out = args.output.expanduser().resolve()
     if args.phase in {"preflight", "train", "evaluate"}:
-        if CONFIG.get("stage0", {}).get("stage1_authorized") is not True:
-            print(canonical({
-                "status": "STAGE1_NOT_AUTHORIZED",
-                "phase": args.phase,
-                "formal_preflight_seed_consumed": False,
-                "formal_training_seed_consumed": False,
-                "formal_evaluation_seed_consumed": False,
-                "config_sha256": CONFIG_SHA256,
-            }), file=sys.stderr)
-            return 2
         return _run_stage1_cli_phase(args.phase, out)
     phase_id: str | None = None
     try:

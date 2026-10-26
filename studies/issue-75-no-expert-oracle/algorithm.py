@@ -188,6 +188,8 @@ class TrialResult:
     cpu_seconds: float | None = None
     wall_seconds: float | None = None
     native_rng_source: str = "restored_checkpoint_native_rng_same_future_stream"
+    natural_owner: bool = False
+    search_root_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.attempt_index < 1:
@@ -195,8 +197,10 @@ class TrialResult:
         if self.complete:
             if self.terminal_floor is None or not math.isfinite(float(self.terminal_floor)):
                 raise ValueError("a completed native trajectory requires a finite terminal floor")
-            if not self.decisions or not self.decisions[0].is_root:
+            if self.decisions and not self.decisions[0].is_root:
                 raise ValueError("a completed trajectory must retain its actual root decision")
+            if not self.decisions and not self.natural_owner:
+                raise ValueError("a completed branch requires its actual root decision")
             if self.failure_boundary is not None:
                 raise ValueError("completed trajectory cannot carry an incomplete failure boundary")
         elif self.heart_win or self.terminal_floor is not None:

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import hashlib
 import math
 import random
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import numpy as np
 import torch
@@ -50,6 +50,7 @@ class UpdateDiagnostic:
     grad_norm_before_clip: float
     grad_norm_after_clip: float
     elite_owner_count: int
+    elite_root_count: int
 
 
 @dataclass(frozen=True)
@@ -104,11 +105,12 @@ def _owner_losses(
     batch: Sequence[OwnerTrainingExample],
     block_mean: float,
     block_sd: float,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int, int]:
     pg_terms: list[torch.Tensor] = []
     entropies: list[torch.Tensor] = []
     elite_terms: list[torch.Tensor] = []
     elite_owner_count = 0
+    elite_root_count = 0
     zero = next(model.parameters()).sum() * 0.0
     scale = max(float(block_sd), 1.0)
     for example in batch:
@@ -116,17 +118,28 @@ def _owner_losses(
         advantage = max(-3.0, min(3.0, (_utility(example) - block_mean) / scale))
         pg_terms.append(-float(advantage) * log_prob_mean)
         entropies.append(entropy_mean)
-        target = elite_candidate(example.base, example.joint_trajectories)
-        if target is not None:
-            target_log_prob_mean, _ = _decision_terms(model, target.decisions)
-            elite_terms.append(-target_log_prob_mean)
+        by_root: dict[str, list[TrialResult]] = {}
+        for trial in example.joint_trajectories:
+            if not trial.complete or not trial.decisions:
+                continue
+            root_id = trial.search_root_id or trial.decisions[0].state_fingerprint
+            by_root.setdefault(str(root_id), []).append(trial)
+        root_terms: list[torch.Tensor] = []
+        for root_id in sorted(by_root):
+            target = elite_candidate(example.base, by_root[root_id])
+            if target is not None:
+                target_log_prob_mean, _ = _decision_terms(model, target.decisions)
+                root_terms.append(-target_log_prob_mean)
+                elite_root_count += 1
+        if root_terms:
+            elite_terms.append(torch.stack(root_terms).mean())
             elite_owner_count += 1
         else:
             elite_terms.append(zero)
     loss_pg = torch.stack(pg_terms).mean() if pg_terms else zero
     entropy = torch.stack(entropies).mean() if entropies else zero
     loss_elite = torch.stack(elite_terms).mean() if elite_terms else zero
-    return loss_pg, loss_elite, entropy, elite_owner_count
+    return loss_pg, loss_elite, entropy, elite_owner_count, elite_root_count
 
 
 def _grad_norm(loss: torch.Tensor, parameters: Sequence[torch.Tensor], *, retain_graph: bool) -> float:
@@ -150,7 +163,7 @@ def _update(
     optimizer: torch.optim.Optimizer,
 ) -> UpdateDiagnostic:
     parameters = tuple(model.parameters())
-    loss_pg, loss_elite, entropy, elite_count = _owner_losses(model, batch, block_mean, block_sd)
+    loss_pg, loss_elite, entropy, elite_count, elite_root_count = _owner_losses(model, batch, block_mean, block_sd)
     grad_pg = _grad_norm(loss_pg, parameters, retain_graph=True)
     grad_elite = _grad_norm(loss_elite, parameters, retain_graph=True)
     grad_entropy = _grad_norm(entropy, parameters, retain_graph=True)
@@ -175,6 +188,7 @@ def _update(
         grad_norm_before_clip=before,
         grad_norm_after_clip=after,
         elite_owner_count=elite_count,
+        elite_root_count=elite_root_count,
     )
 
 
@@ -223,6 +237,8 @@ def train_policy_iteration_block(
     examples: Sequence[OwnerTrainingExample],
     *,
     block_order_seed: int,
+    step_callback: Callable[[int, ActionConditionedPolicy, torch.optim.Optimizer, tuple[Any, ...], list[int], tuple[UpdateDiagnostic, ...]], None] | None = None,
+    resume_state: Mapping[str, Any] | None = None,
 ) -> BlockTrainingResult:
     """Implement the locked 128-owner/64-step block; caller must hold Planner activation."""
     _validate_examples(examples, expected_count=FORMAL_BLOCK_OWNERS)
@@ -235,7 +251,33 @@ def train_policy_iteration_block(
     rng = random.Random(int(block_order_seed))
     order = list(range(len(examples)))
     diagnostics: list[UpdateDiagnostic] = []
-    for step in range(FORMAL_STEPS_PER_BLOCK):
+    owner_seed_sha256 = hashlib.sha256(
+        ",".join(str(int(row.owner_seed)) for row in examples).encode("ascii")
+    ).hexdigest()
+    first_step = 0
+    if resume_state is not None:
+        if (
+            resume_state.get("schema_id") != "issue75-policy-block-step-checkpoint-v1"
+            or resume_state.get("block_order_seed") != int(block_order_seed)
+            or resume_state.get("source_model_digest") != source_digest
+            or resume_state.get("owner_seed_sha256") != owner_seed_sha256
+        ):
+            raise ValueError("optimizer checkpoint does not belong to this frozen policy block")
+        first_step = int(resume_state.get("completed_steps", 0))
+        if not 1 <= first_step <= FORMAL_STEPS_PER_BLOCK:
+            raise ValueError("optimizer checkpoint has an invalid completed step count")
+        saved_order = [int(index) for index in resume_state.get("owner_order", ())]
+        if sorted(saved_order) != list(range(len(examples))):
+            raise ValueError("optimizer checkpoint has an invalid owner permutation")
+        model.load_state_dict(resume_state["model_state_dict"], strict=True)
+        optimizer.load_state_dict(resume_state["optimizer_state_dict"])
+        rng.setstate(resume_state["python_rng_state"])
+        order = saved_order
+        rows = resume_state.get("diagnostics", ())
+        diagnostics = [UpdateDiagnostic(**dict(row)) for row in rows]
+        if len(diagnostics) != first_step or [row.step for row in diagnostics] != list(range(1, first_step + 1)):
+            raise ValueError("optimizer checkpoint diagnostics do not match the completed update prefix")
+    for step in range(first_step, FORMAL_STEPS_PER_BLOCK):
         if step % (FORMAL_BLOCK_OWNERS // FORMAL_MINIBATCH_OWNERS) == 0:
             rng.shuffle(order)
         offset = (step % (FORMAL_BLOCK_OWNERS // FORMAL_MINIBATCH_OWNERS)) * FORMAL_MINIBATCH_OWNERS
@@ -246,6 +288,10 @@ def train_policy_iteration_block(
             model, batch, block_mean=block_mean, block_sd=block_sd,
             step=step + 1, optimizer=optimizer,
         ))
+        if step_callback is not None:
+            step_callback(
+                step + 1, model, optimizer, rng.getstate(), list(order), tuple(diagnostics),
+            )
     order_digest = hashlib.sha256(
         ",".join(str(int(examples[index].owner_seed)) for index in order).encode("ascii")
     ).hexdigest()

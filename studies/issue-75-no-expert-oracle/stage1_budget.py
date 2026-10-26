@@ -38,8 +38,6 @@ STUDY = Path(__file__).resolve().parent
 STAGE1 = STUDY / "stage1"
 LOCKED_PACKAGE_FILES = (
     "config.json",
-    "source-lock.json",
-    "source-lock.sha256",
     "algorithm.py",
     "learning.py",
     "model.py",
@@ -53,11 +51,18 @@ LOCKED_PACKAGE_FILES = (
     "planning/stage1-cost-model.md",
     "stage1_budget.py",
     "stage1/config.json",
+    "stage1/preflight-proxy.json",
     "stage1/seed-table.json",
     "stage1/budget.json",
     "stage1/prepare.py",
+    "stage1/executor.py",
     "stage1/test_activation.py",
     "stage1/test_activation_gate.py",
+    "stage1/test_executor.py",
+)
+LOCKED_REPOSITORY_DEPENDENCIES = (
+    "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
+    "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
 )
 
 
@@ -71,6 +76,10 @@ def sha256_bytes(value: bytes) -> str:
 
 def _normalized_file_sha256(path: Path) -> str:
     return sha256_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
+
+
+def normalized_file_sha256(path: Path) -> str:
+    return _normalized_file_sha256(path)
 
 
 def verify_stage1_package() -> dict[str, Any]:
@@ -97,6 +106,17 @@ def verify_stage1_package() -> dict[str, Any]:
             raise PermissionError(f"locked Stage 1 package file is unavailable: {relative}")
         if not isinstance(expected, str) or _normalized_file_sha256(path) != expected:
             raise PermissionError(f"Stage 1 package source lock mismatch: {relative}")
+
+    repository_dependencies = lock.get("locked_repository_dependencies_sha256_lf")
+    if not isinstance(repository_dependencies, dict) or set(repository_dependencies) != set(LOCKED_REPOSITORY_DEPENDENCIES):
+        raise PermissionError("Stage 1 lock does not cover the exact Issue 73 runtime dependencies")
+    repository_root = STUDY.parents[1].resolve()
+    for relative, expected in repository_dependencies.items():
+        path = (repository_root / relative).resolve()
+        if not path.is_relative_to(repository_root) or not path.is_file():
+            raise PermissionError(f"locked repository dependency is unavailable: {relative}")
+        if not isinstance(expected, str) or _normalized_file_sha256(path) != expected:
+            raise PermissionError(f"Stage 1 repository dependency lock mismatch: {relative}")
 
     config = json.loads((STAGE1 / "config.json").read_text(encoding="utf-8"))
     disabled = (
@@ -295,6 +315,72 @@ def _live_activation_receipt() -> ActivationReceipt:
     )
 
 
+def verify_preflight_review_pass(
+    *, preflight_report_sha256: str, cost_forecast_sha256: str,
+    not_before: str,
+) -> dict[str, Any]:
+    """Require an exact-source Reviewer attestation for the completed 40-row forecast."""
+    package_commit, lock_digest = _current_package_binding()
+    for name, value in (("preflight report", preflight_report_sha256), ("cost forecast", cost_forecast_sha256)):
+        if not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
+            raise ValueError(f"invalid {name} digest")
+    try:
+        boundary = datetime.fromisoformat(str(not_before).replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("preflight review boundary is not an ISO timestamp") from exc
+    if boundary.tzinfo is None:
+        raise ValueError("preflight review boundary must include a timezone")
+
+    required = {
+        "STAGE1_PREFLIGHT_REVIEW_PASS",
+        f"package_commit: {package_commit}",
+        f"source_lock_sha256: {lock_digest}",
+        f"preflight_report_sha256: {preflight_report_sha256}",
+        f"cost_forecast_sha256: {cost_forecast_sha256}",
+        "scope: STUDY_ONLY",
+    }
+    matches: list[tuple[datetime, int, Mapping[str, Any]]] = []
+    for row in _fetch_authoritative_issue_comments():
+        if not isinstance(row, Mapping):
+            continue
+        user, body = row.get("user"), row.get("body")
+        if not isinstance(user, Mapping) or user.get("login") != OWNER_LOGIN or user.get("type") != "User":
+            continue
+        if not isinstance(body, str) or not required.issubset({line.strip() for line in body.splitlines()}):
+            continue
+        try:
+            created = datetime.fromisoformat(str(row.get("created_at", "")).replace("Z", "+00:00"))
+            updated = datetime.fromisoformat(str(row.get("updated_at", "")).replace("Z", "+00:00"))
+            comment_id = int(row.get("id", 0))
+        except (TypeError, ValueError):
+            continue
+        url = row.get("html_url")
+        parsed = urlsplit(url) if isinstance(url, str) else None
+        if (
+            created.tzinfo is None or updated.tzinfo is None or created < boundary
+            or updated != created or comment_id <= 0 or parsed is None
+            or parsed.scheme != "https" or parsed.netloc != "github.com"
+            or parsed.path != f"/{REPOSITORY}/issues/{ISSUE_NUMBER}"
+            or parsed.query or parsed.fragment != f"issuecomment-{comment_id}"
+        ):
+            continue
+        matches.append((created, comment_id, row))
+    if not matches:
+        raise PermissionError("no later, immutable Reviewer PASS binds the exact 40-row report and cost forecast")
+    created, comment_id, row = max(matches, key=lambda item: item[0])
+    if _current_package_binding() != (package_commit, lock_digest):
+        raise PermissionError("Stage 1 package changed while the preflight review was checked")
+    return {
+        "comment_id": comment_id,
+        "created_at": created.isoformat(),
+        "package_commit": package_commit,
+        "source_lock_sha256": lock_digest,
+        "preflight_report_sha256": preflight_report_sha256,
+        "cost_forecast_sha256": cost_forecast_sha256,
+        "reviewer_login": row["user"]["login"],
+    }
+
+
 class ResourceBlocked(RuntimeError): pass
 class LedgerCorrupt(RuntimeError): pass
 class DuplicateRun(RuntimeError): pass
@@ -377,6 +463,22 @@ class Stage1Ledger:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
 
+    def require_open_reservation(self, *, run_id: str, unit_id: str, role: str = "builder") -> dict[str, Any]:
+        """Confirm a worker is the exact source-bound child of a live ledger reservation."""
+        runs, _ = _state(_events(self.events_path))
+        run = runs.get(str(run_id))
+        if run is None or run["finish"] is not None:
+            raise PermissionError("worker has no open write-ahead ledger reservation")
+        reservation = run["reservation"]
+        if (
+            reservation.get("unit_id") != str(unit_id)
+            or reservation.get("role") != str(role)
+            or reservation.get("package_commit") != self.activation.package_commit
+            or reservation.get("source_lock_sha256") != self.activation.source_lock_sha256
+        ):
+            raise PermissionError("worker reservation does not match its unit and active package binding")
+        return dict(reservation)
+
     @staticmethod
     def _charges(runs):
         result = {"builder": 0.0, "reviewer": 0.0}
@@ -417,6 +519,8 @@ class Stage1Ledger:
                     raise ResourceBlocked(f"unresolved reservation remains charged at full cap: {unit_id}")
                 if done.get("status") != "incomplete":
                     raise DuplicateRun(f"terminal unit cannot be replayed: {unit_id}")
+                if float(done.get("measured_cpu_seconds", 0.0)) > float(done.get("reserved_cpu_seconds", 0.0)):
+                    raise ResourceBlocked("an incomplete unit exceeded its immutable reservation and cannot be resumed")
                 if (
                     previous_run_id != history[-1] or
                     not done.get("checkpoint_sha256") or checkpoint_sha256 != done["checkpoint_sha256"] or
