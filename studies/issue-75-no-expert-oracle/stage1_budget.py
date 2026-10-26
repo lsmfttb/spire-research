@@ -214,7 +214,16 @@ def _verify_activation_comments(
             raise PermissionError("decision comment has an invalid GitHub timestamp") from exc
         if timestamp.tzinfo is None:
             raise PermissionError("decision comment timestamp lacks timezone")
-        return comment_id, timestamp
+        updated = comment.get("updated_at")
+        if not isinstance(updated, str):
+            raise PermissionError("decision comment has no GitHub edit timestamp")
+        try:
+            updated_timestamp = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise PermissionError("decision comment has an invalid GitHub edit timestamp") from exc
+        if updated_timestamp.tzinfo is None or updated_timestamp < timestamp:
+            raise PermissionError("decision comment edit timestamp is invalid")
+        return comment_id, timestamp, updated_timestamp
 
     def marked(marker: str) -> list[Mapping[str, Any]]:
         return [
@@ -223,8 +232,8 @@ def _verify_activation_comments(
             and marker in {line.strip() for line in row["body"].splitlines()}
         ]
 
-    reviewers: list[tuple[int, datetime]] = []
-    planners: list[tuple[int, datetime]] = []
+    reviewers: list[tuple[int, datetime, datetime]] = []
+    planners: list[tuple[int, datetime, datetime]] = []
     for row in marked(REVIEW_MARKER):
         try:
             reviewers.append(check(row, REVIEW_MARKER))
@@ -238,9 +247,10 @@ def _verify_activation_comments(
 
     valid_pairs = [
         (reviewer_id, planner_id, activated_at)
-        for reviewer_id, reviewed_at in reviewers
-        for planner_id, activated_at in planners
+        for reviewer_id, reviewed_at, reviewer_updated_at in reviewers
+        for planner_id, activated_at, _planner_updated_at in planners
         if reviewer_id != planner_id and activated_at > reviewed_at
+        and reviewer_updated_at <= activated_at
     ]
     if not valid_pairs:
         raise PermissionError(

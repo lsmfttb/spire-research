@@ -17,7 +17,7 @@ import stage1_budget as budget
 PACKAGE_COMMIT, LOCK_DIGEST = budget._current_package_binding()
 
 
-def decision(comment_id, marker, timestamp, *, package=PACKAGE_COMMIT, lock=LOCK_DIGEST, url=True, login=None):
+def decision(comment_id, marker, timestamp, *, package=PACKAGE_COMMIT, lock=LOCK_DIGEST, url=True, login=None, updated_timestamp=None):
     comment = {
         "id": comment_id,
         "body": (
@@ -25,6 +25,7 @@ def decision(comment_id, marker, timestamp, *, package=PACKAGE_COMMIT, lock=LOCK
             f"source_lock_sha256: {lock}\nscope: STUDY_ONLY"
         ),
         "created_at": timestamp,
+        "updated_at": updated_timestamp or timestamp,
         "user": {"login": login or budget.OWNER_LOGIN, "type": "User"},
     }
     if url:
@@ -130,6 +131,14 @@ class ActivationGateTests(unittest.TestCase):
                     budget.open_activated_stage1_ledger(ledger_path)
                 fetch_comments.assert_not_called()
         self.assertFalse(ledger_path.exists())
+
+    def test_reviewer_comment_edited_after_planner_activation_is_rejected(self):
+        reviewer = decision(
+            101, budget.REVIEW_MARKER, "2026-01-01T00:00:00Z",
+            updated_timestamp="2026-01-01T00:03:00Z",
+        )
+        planner = decision(102, budget.PLANNER_MARKER, "2026-01-01T00:02:00Z")
+        self.assert_rejected([reviewer, planner])
 
     def test_same_owner_roles_still_require_distinct_ordered_comments(self):
         reviewer = decision(101, budget.REVIEW_MARKER, "2026-01-01T00:01:00Z")

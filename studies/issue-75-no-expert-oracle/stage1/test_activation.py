@@ -26,6 +26,7 @@ def decision(comment_id: int, marker: str, timestamp: str, *, commit: str = PACK
         "id": comment_id,
         "body": f"{marker}\npackage_commit: {commit}\nsource_lock_sha256: {lock}\nscope: STUDY_ONLY",
         "created_at": timestamp,
+        "updated_at": timestamp,
         "html_url": f"https://github.com/lsmfttb/spire-research/issues/75#issuecomment-{comment_id}",
         "user": {"login": login, "type": "User"},
     }
