@@ -607,6 +607,10 @@ def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[st
         lock.get("execution_authorized") is True
         and lock.get("package_status") == "PREFLIGHT_ONLY_ENABLED"
     )
+    formal_enabled = (
+        lock.get("execution_authorized") is True
+        and lock.get("package_status") in {"FORMAL_TRAINING_ENABLED", "FORMAL_EXECUTION_ENABLED"}
+    )
     if (
         lock.get("schema_id") != "issue75-stage1-source-lock-v1"
         or lock.get("study_id") != "issue-75-no-expert-oracle"
@@ -615,7 +619,7 @@ def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[st
         or lock.get("native_sampling_performed") is not False
         or lock.get("model_training_performed") is not False
         or (preflight_transition and not old_disabled)
-        or (not preflight_transition and not new_preflight)
+        or (not preflight_transition and not (new_preflight or formal_enabled))
     ):
         raise ValueError("refusing to refresh a source lock outside the registered Stage 1 package")
 

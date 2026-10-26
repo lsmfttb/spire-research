@@ -4,6 +4,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import json
+import shutil
+import subprocess
+import textwrap
 import sys
 import tempfile
 import types
@@ -134,7 +137,256 @@ class PreflightTreatmentSemanticsTests(unittest.TestCase):
         self.assertFalse(delivered)
         self.assertEqual(root_gaps, [])
 
+
 class Stage1ExecutorTests(unittest.TestCase):
+
+    def _source_bound_child_fixture(self, root: Path) -> Path:
+        repository = root / "source-bound-child-repo"
+        extra_files = (
+            "studies/issue-75-no-expert-oracle/stage1/source-lock.json",
+            "studies/issue-75-no-expert-oracle/stage1/source-lock.sha256",
+            "studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl",
+            "studies/issue-75-no-expert-oracle/stage1/artifacts/units/TRAIN-7500001/failure-TRAIN:7500001-5afd7b3277ee47a7.json",
+            "studies/issue-75-no-expert-oracle/stage1/artifacts/units/TRAIN-7500001/worker-job-TRAIN:7500001-5afd7b3277ee47a7.json",
+        )
+        package_files = set(executor.budget.LOCKED_PACKAGE_FILES)
+        repository_files = set(executor.budget.LOCKED_REPOSITORY_DEPENDENCIES)
+        repository_files.update(extra_files)
+        for relative in sorted(package_files):
+            source = executor.STUDY / relative
+            target = repository / "studies" / "issue-75-no-expert-oracle" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        for relative in sorted(repository_files):
+            source = executor.ROOT / relative
+            target = repository / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+        subprocess.run(["git", "config", "user.name", "Issue 75 focused test"], cwd=repository, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "issue75-focused-test@example.invalid"],
+            cwd=repository, check=True,
+        )
+        subprocess.run(["git", "add", "--all"], cwd=repository, check=True)
+        subprocess.run(["git", "commit", "--quiet", "-m", "isolated locked worker validation fixture"],
+                       cwd=repository, check=True)
+        return repository
+
+    def test_parent_ledger_append_is_validated_by_spawned_nonformal_child(self):
+        with tempfile.TemporaryDirectory(dir=STAGE1) as temp_dir:
+            repository = self._source_bound_child_fixture(Path(temp_dir))
+            study = repository / "studies" / "issue-75-no-expert-oracle"
+            stage1 = study / "stage1"
+            parent_code = textwrap.dedent(r"""
+                import json, os, subprocess, sys
+                from pathlib import Path
+                stage1 = Path(sys.argv[1])
+                study = stage1.parent
+                sys.path[:0] = [str(stage1), str(study)]
+                import executor
+                import stage1_budget as budget
+                ledger = budget.open_stage1_ledger(executor.ARTIFACT_ROOT / "ledger")
+                estimates, _ = executor._forecast_estimates(ledger)
+                recovered = executor._run_scheduler_reservation(ledger, "SCHEDULER:TRAIN", estimates)
+                assert recovered["run_id"] == budget.SCHEDULER_TRAIN_RECOVERY_RUN_ID
+                assert recovered["cap"] == budget.SCHEDULER_TRAIN_RECOVERY_CAP
+                try:
+                    executor._run_scheduler_reservation(ledger, "SCHEDULER:TRAIN", estimates)
+                except budget.ResourceBlocked:
+                    pass
+                else:
+                    raise AssertionError("recovered scheduler must not reserve a second allocation")
+                scheduler_result = executor._finish_scheduler_reservation(
+                    ledger, recovered, phase_started_cpu=executor.time.process_time() - 2.0,
+                )
+                assert executor._existing_scheduler_receipt(ledger, "SCHEDULER:TRAIN") == scheduler_result
+                unit_id = "VALIDATION:SPAWNED-CHILD"
+                run_id = unit_id + "-" + "a" * 16
+                reservation = ledger.reserve(
+                    run_id=run_id, unit_id=unit_id, role="builder",
+                    reserved_cpu_seconds=1.0, unit_kind="validation_probe",
+                )
+                unit_dir = executor._unit_directory(unit_id)
+                job_path = unit_dir / ("worker-job-" + run_id + ".json")
+                job = {
+                    "schema_id": executor.WORKER_SCHEMA,
+                    "package_commit": ledger.binding.package_commit,
+                    "source_lock_sha256": ledger.binding.source_lock_sha256,
+                    "unit_id": unit_id, "run_id": run_id, "phase": "validation_probe",
+                    "row": {"unit_id": unit_id, "formal": False, "kind": "nonformal_validation"},
+                    "output_dir": str(unit_dir / "native"),
+                    "result_path": str(unit_dir / "result.json"),
+                    "previous_run_id": None, "checkpoint_sha256": None,
+                    "retry_reason": reservation.get("retry_reason"),
+                    "pre_game_start_proof": reservation.get("pre_game_start_proof"),
+                    "pre_game_start_proof_sha256": reservation.get("pre_game_start_proof_sha256"),
+                }
+                executor._write_once(job_path, job)
+                child_code = (
+                    "import json,sys; from pathlib import Path; "
+                    "sys.path[:0]=[sys.argv[2],str(Path(sys.argv[2]).parent)]; "
+                    "import executor; "
+                    "j,l,r=executor._validate_worker_job(Path(sys.argv[1]),allow_synthetic=True); "
+                    "print(json.dumps({'unit_id':j['unit_id'],'run_id':j['run_id'],"
+                    "'package_commit':l.binding.package_commit,'source_lock_sha256':l.binding.source_lock_sha256}))"
+                )
+                child = subprocess.run(
+                    [sys.executable, "-c", child_code, str(job_path), str(stage1)],
+                    cwd=study.parents[1], env=os.environ.copy(), text=True,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                )
+                print(json.dumps({
+                    "child_returncode": child.returncode, "child_stdout": child.stdout,
+                    "child_stderr": child.stderr, "job_path": str(job_path),
+                    "output_path": str(unit_dir / "native"), "result_path": str(unit_dir / "result.json"),
+                    "package_commit": ledger.binding.package_commit,
+                    "source_lock_sha256": ledger.binding.source_lock_sha256,
+                    "scheduler_run_id": recovered["run_id"],
+                    "scheduler_recovery_marker_sha256": budget.sha256_bytes(budget.canonical(recovered["recovery"])),
+                    "scheduler_measured_cpu_seconds": scheduler_result["measured_cpu_seconds"],
+                    "scheduler_prior_cpu_upper_bound_seconds": scheduler_result["prior_scheduler_cpu_upper_bound_seconds"],
+                }))
+                if child.returncode != 0:
+                    raise SystemExit(child.returncode)
+            """)
+            env = os.environ.copy()
+            env.update({
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONPYCACHEPREFIX": str(repository / ".python-cache"),
+                "TMPDIR": str(repository / ".tmp"),
+                "TEMP": str(repository / ".tmp"),
+                "TMP": str(repository / ".tmp"),
+                "HOME": str(repository / ".home"),
+            })
+            parent = subprocess.run(
+                [sys.executable, "-c", parent_code, str(stage1)], cwd=repository,
+                env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            self.assertEqual(parent.returncode, 0, parent.stderr + parent.stdout)
+            receipt = json.loads(parent.stdout)
+            child_receipt = json.loads(receipt["child_stdout"])
+            self.assertEqual(receipt["child_returncode"], 0, receipt["child_stderr"])
+            self.assertEqual(child_receipt["unit_id"], "VALIDATION:SPAWNED-CHILD")
+            self.assertEqual(child_receipt["run_id"], "VALIDATION:SPAWNED-CHILD-" + "a" * 16)
+            self.assertEqual(child_receipt["package_commit"], receipt["package_commit"])
+            self.assertEqual(child_receipt["source_lock_sha256"], receipt["source_lock_sha256"])
+            self.assertEqual(receipt["scheduler_run_id"], "SCHEDULER:TRAIN-3e416101548944b3")
+            self.assertEqual(len(receipt["scheduler_recovery_marker_sha256"]), 64)
+            self.assertGreater(receipt["scheduler_measured_cpu_seconds"], 0)
+            self.assertGreater(receipt["scheduler_prior_cpu_upper_bound_seconds"], 0)
+            self.assertLessEqual(receipt["scheduler_measured_cpu_seconds"], 120.0)
+            self.assertFalse(Path(receipt["output_path"]).exists())
+            self.assertFalse(Path(receipt["result_path"]).exists())
+
+            child_code = (
+                "import sys; from pathlib import Path; "
+                "sys.path[:0]=[sys.argv[2],str(Path(sys.argv[2]).parent)]; "
+                "import executor; executor._validate_worker_job(Path(sys.argv[1]),allow_synthetic=True)"
+            )
+            algorithm_path = repository / "studies" / "issue-75-no-expert-oracle" / "algorithm.py"
+            original_algorithm = algorithm_path.read_bytes()
+            algorithm_path.write_bytes(original_algorithm + b"\n")
+            changed_code = subprocess.run(
+                [sys.executable, "-c", child_code, receipt["job_path"], str(stage1)],
+                cwd=repository, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            self.assertNotEqual(changed_code.returncode, 0)
+            self.assertIn("source lock mismatch", changed_code.stderr)
+            algorithm_path.write_bytes(original_algorithm)
+
+            ledger_path = stage1 / "artifacts" / "ledger" / "events.jsonl"
+            ledger_bytes = ledger_path.read_bytes()
+            ledger_path.write_bytes(ledger_bytes[:-1])
+            rewritten_ledger = subprocess.run(
+                [sys.executable, "-c", child_code, receipt["job_path"], str(stage1)],
+                cwd=repository, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            self.assertNotEqual(rewritten_ledger.returncode, 0)
+            self.assertTrue(
+                "ledger history was changed or truncated" in rewritten_ledger.stderr
+                or "torn final ledger event" in rewritten_ledger.stderr
+                or "ledger append is malformed" in rewritten_ledger.stderr
+            )
+
+    def test_pre_game_start_retry_is_single_exact_row_and_rejects_game_artifacts(self):
+        ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
+        events = ledger.read_events()
+        proof = ledger.pre_game_start_retry_info(
+            unit_id=executor.budget.PRE_GAME_START_RETRY_UNIT_ID,
+            predecessor_run_id=executor.budget.PRE_GAME_START_RETRY_RUN_ID,
+        )
+        original_receipt = (
+            STAGE1 / "artifacts" / "units" / "TRAIN-7500001"
+            / f"failure-{executor.budget.PRE_GAME_START_RETRY_RUN_ID}.json"
+        )
+        receipt_sha = executor._file_sha256(original_receipt)
+        cap = executor.budget.PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS
+        retry = ledger._reservation_event(
+            events, run_id="TRAIN:7500001-" + "b" * 16,
+            unit_id="TRAIN:7500001", role="builder",
+            reserved_cpu_seconds=cap, unit_kind="owner_arm",
+            previous_run_id=executor.budget.PRE_GAME_START_RETRY_RUN_ID,
+            retry_reason=executor.budget.PRE_GAME_START_RETRY_REASON,
+            pre_game_start_proof=proof,
+        )
+        self.assertEqual(retry["previous_run_id"], executor.budget.PRE_GAME_START_RETRY_RUN_ID)
+        self.assertLessEqual(retry["reserved_cpu_seconds"], cap)
+        with self.assertRaises(executor.budget.ResourceBlocked):
+            ledger._reservation_event(
+                [*events, retry], run_id="TRAIN:7500001-" + "c" * 16,
+                unit_id="TRAIN:7500001", role="builder",
+                reserved_cpu_seconds=cap, unit_kind="owner_arm",
+                previous_run_id=retry["run_id"],
+                retry_reason=executor.budget.PRE_GAME_START_RETRY_REASON,
+                pre_game_start_proof=proof,
+            )
+        self.assertEqual(ledger.read_events(), events)
+        self.assertEqual(executor._file_sha256(original_receipt), receipt_sha)
+
+        with tempfile.TemporaryDirectory(dir=STAGE1) as temp_dir:
+            artifacts = Path(temp_dir)
+            unit_dir = artifacts / "units" / "TRAIN-7500001"
+            unit_dir.mkdir(parents=True)
+            shutil.copy2(original_receipt, unit_dir / original_receipt.name)
+            original_job = (
+                STAGE1 / "artifacts" / "units" / "TRAIN-7500001"
+                / f"worker-job-{executor.budget.PRE_GAME_START_RETRY_RUN_ID}.json"
+            )
+            shutil.copy2(original_job, unit_dir / original_job.name)
+            (unit_dir / "native").mkdir()
+            runs, units = executor.budget._state(events)
+            with self.assertRaises(executor.budget.ResourceBlocked):
+                executor.budget._pre_game_start_failure_proof(
+                    artifacts, runs, units,
+                    predecessor_run_id=executor.budget.PRE_GAME_START_RETRY_RUN_ID,
+                    require_pristine=True,
+                )
+
+    def test_formal_forecast_counts_open_scheduler_and_retry_once(self):
+        ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
+        estimates, _ = executor._forecast_estimates(ledger)
+        result = ledger.forecast(
+            expected_unit_ids=executor._formal_unit_ids(),
+            future_builder_cpu_seconds=estimates,
+            allowed_completed_unit_ids=[row["unit_id"] for row in executor._unit_rows("preflight")],
+            allowed_open_reservation_unit_ids=["SCHEDULER:TRAIN"],
+        )
+        self.assertEqual(result["status"], "FITS")
+        self.assertAlmostEqual(result["builder_cpu_charged"], 8197.044767, places=6)
+        self.assertEqual(result["authorized_pre_game_start_retry_unit_ids"], ["TRAIN:7500001"])
+        self.assertEqual(result["carried_open_reservation_unit_ids"], ["SCHEDULER:TRAIN"])
+        self.assertAlmostEqual(result["projected_builder_cpu"], 169973.21496399087, places=6)
+        self.assertAlmostEqual(result["projected_all_in_with_reviewer_reserve"], 179973.21496399087, places=6)
+        self.assertLessEqual(result["projected_builder_cpu"], executor.budget.BUILDER_LIMIT)
+        self.assertLessEqual(result["projected_all_in_with_reviewer_reserve"], executor.budget.ALL_IN_LIMIT)
+        with self.assertRaises(executor.budget.ResourceBlocked):
+            ledger.forecast(
+                expected_unit_ids=executor._formal_unit_ids(),
+                future_builder_cpu_seconds=estimates,
+                allowed_completed_unit_ids=[row["unit_id"] for row in executor._unit_rows("preflight")],
+            )
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(dir=STAGE1)
         self.addCleanup(self.temporary.cleanup)

@@ -681,21 +681,30 @@ def _formal_forecast(ledger: Any) -> dict[str, Any]:
         raise PermissionError("formal execution requires all 40 preflight owner-arm rows to be durably successful")
     report, forecast, report_sha, forecast_sha = _accepted_preflight_evidence()
     estimates, dynamic = _forecast_estimates(ledger)
-    if dynamic["projected_total_builder_cpu_seconds"] > budget.BUILDER_LIMIT:
-        raise budget.ResourceBlocked("dynamic full-cohort forecast exceeds the unchanged Builder hard cap")
     live = ledger.forecast(
         expected_unit_ids=_formal_unit_ids(),
         future_builder_cpu_seconds=estimates,
         allowed_completed_unit_ids=[row["unit_id"] for row in _unit_rows("preflight")],
+        allowed_open_reservation_unit_ids=["SCHEDULER:TRAIN"],
     )
-    if live.get("status") != "FITS":
-        raise budget.ResourceBlocked("live Stage 1 ledger no longer fits the exact remaining cohort")
+    if live.get("status") != "FITS" or dynamic["projected_total_builder_cpu_seconds"] > budget.BUILDER_LIMIT:
+        raise budget.ResourceBlocked("corrected full-cohort forecast does not fit the unchanged Builder hard cap")
     return {
+        "schema_id": "issue75-formal-remaining-workload-forecast-v1",
+        "status": "FITS",
+        "package_commit": ledger.binding.package_commit,
+        "source_lock_sha256": ledger.binding.source_lock_sha256,
+        "scope": "STUDY_ONLY",
+        "registered_training_owners": 512,
+        "registered_heldout_owner_arm_rows": 480,
+        "registered_update_units": 4,
+        "registered_heldout_report_units": 1,
         "preflight_report_sha256": report_sha,
         "cost_forecast_sha256": forecast_sha,
         "accepted_planner_decision_comment_id": ACCEPTED_PREFLIGHT_DECISION_ID,
         "accepted_static_forecast_status": forecast["status"],
-        "ledger_forecast": live,
+        "static_builder_projection_cpu_seconds": dynamic["projected_total_builder_cpu_seconds"],
+        "live_ledger_forecast": live,
     }
 
 
@@ -1311,13 +1320,24 @@ def _validate_success_result(
     return dict(result)
 
 
-def _existing_unit_receipt(ledger: Any, unit_id: str) -> dict[str, Any] | None:
+def _existing_unit_receipt(
+    ledger: Any, unit_id: str, *, allow_pre_game_start_retry: bool = False,
+) -> dict[str, Any] | None:
     run_id, reservation, finish = _existing_unit(ledger, unit_id)
     if run_id is None:
         return None
     if finish is None:
         raise budget.ResourceBlocked(f"unresolved reservation is preserved at full cap: {unit_id}")
     if finish.get("status") != "succeeded":
+        if (
+            allow_pre_game_start_retry
+            and unit_id == budget.PRE_GAME_START_RETRY_UNIT_ID
+            and finish.get("status") == "failed"
+        ):
+            ledger.pre_game_start_retry_info(
+                unit_id=unit_id, predecessor_run_id=run_id,
+            )
+            return None
         raise budget.ResourceBlocked(f"failed unit is immutable and cannot be replayed: {unit_id}")
     result_name = f"result-{run_id}.json" if unit_id.startswith("UPDATE:") else "result.json"
     result_path = _unit_directory(unit_id) / result_name
@@ -1590,25 +1610,45 @@ def _run_owner_batch(
     completed = {}
     for row in rows:
         unit_id = str(row["unit_id"])
-        existing = _existing_unit_receipt(ledger, unit_id)
+        existing = _existing_unit_receipt(
+            ledger, unit_id,
+            allow_pre_game_start_retry=(phase == "train" and unit_id == budget.PRE_GAME_START_RETRY_UNIT_ID),
+        )
         if existing is not None:
             completed[unit_id] = existing
             continue
         previous_run_id, _, previous_finish = _existing_unit(ledger, unit_id)
         resume_digest = None
+        retry_proof = None
+        retry_reason = None
         if previous_run_id is not None:
             if phase != "train" or row.get("phase") != "training":
                 raise budget.ResourceBlocked(f"owner/arm rows do not support replay or checkpoint resume: {unit_id}")
-            if previous_finish is None or previous_finish.get("status") != "incomplete":
-                raise budget.ResourceBlocked(f"unit is not an explicitly resumable update: {unit_id}")
-            resume_digest = previous_finish.get("checkpoint_sha256")
-            if not resume_digest:
-                raise budget.CheckpointMismatch("incomplete policy update has no durable step checkpoint")
+            if previous_finish is None:
+                raise budget.ResourceBlocked(f"unit has an unresolved reservation: {unit_id}")
+            if previous_finish.get("status") == "incomplete":
+                resume_digest = previous_finish.get("checkpoint_sha256")
+                if not resume_digest:
+                    raise budget.CheckpointMismatch("incomplete policy update has no durable step checkpoint")
+            elif (
+                previous_finish.get("status") == "failed"
+                and unit_id == budget.PRE_GAME_START_RETRY_UNIT_ID
+                and previous_run_id == budget.PRE_GAME_START_RETRY_RUN_ID
+            ):
+                retry_reason = budget.PRE_GAME_START_RETRY_REASON
+                retry_proof = ledger.pre_game_start_retry_info(
+                    unit_id=unit_id, predecessor_run_id=previous_run_id,
+                )
+            else:
+                raise budget.ResourceBlocked(f"unit is not eligible for retry or checkpoint resume: {unit_id}")
         run_id = f"{unit_id}-{uuid.uuid4().hex[:16]}"
         cap = float(estimates[unit_id])
+        if retry_proof is not None and cap > budget.PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS:
+            raise budget.ResourceBlocked("the one-row retry estimate exceeds its immutable original CPU ceiling")
         pending.append({
             "row": dict(row), "unit_id": unit_id, "run_id": run_id, "cap": cap,
             "previous_run_id": previous_run_id, "checkpoint_sha256": resume_digest,
+            "retry_reason": retry_reason, "pre_game_start_proof": retry_proof,
         })
     if not pending:
         return [completed[str(row["unit_id"])] for row in rows]
@@ -1617,6 +1657,8 @@ def _run_owner_batch(
         "reserved_cpu_seconds": item["cap"], "unit_kind": "owner_arm",
         "previous_run_id": item["previous_run_id"],
         "checkpoint_sha256": item["checkpoint_sha256"],
+        "retry_reason": item["retry_reason"],
+        "pre_game_start_proof": item["pre_game_start_proof"],
     } for item in pending])
     supervisor_items = []
     started = time.monotonic()
@@ -1637,6 +1679,9 @@ def _run_owner_batch(
             "worker_log_path": str(log_path), "runtime_root": str(runtime_root),
             "previous_run_id": item["previous_run_id"],
             "checkpoint_sha256": item["checkpoint_sha256"],
+            "retry_reason": reservation.get("retry_reason"),
+            "pre_game_start_proof": reservation.get("pre_game_start_proof"),
+            "pre_game_start_proof_sha256": reservation.get("pre_game_start_proof_sha256"),
         }
         _write_once(job_path, job)
         supervisor_items.append({
@@ -1691,16 +1736,32 @@ def _run_owner_batch(
 
 
 def _run_scheduler_reservation(ledger: Any, unit_id: str, estimates: Mapping[str, float]) -> dict[str, Any]:
-    previous, _, finish = _existing_unit(ledger, unit_id)
+    previous, reservation, finish = _existing_unit(ledger, unit_id)
     if previous is not None:
-        raise budget.ResourceBlocked(f"scheduler reservation already exists and cannot be repeated: {unit_id}")
+        if unit_id != "SCHEDULER:TRAIN" or reservation is None or finish is not None:
+            raise budget.ResourceBlocked(f"scheduler reservation already exists and cannot be repeated: {unit_id}")
+        runs, _ = _event_state(ledger)
+        recovery_events = runs.get(previous, {}).get("scheduler_recoveries", [])
+        if recovery_events:
+            raise budget.ResourceBlocked("training scheduler recovery was interrupted; preserve and stop without rebooking")
+        cap = float(estimates[unit_id])
+        if float(reservation.get("reserved_cpu_seconds", -1)) != cap:
+            raise budget.ResourceBlocked("training scheduler recovery changed its immutable CPU allocation")
+        recovery = ledger.recover_open_training_scheduler()
+        return {
+            "run_id": previous, "unit_id": unit_id, "cap": cap,
+            "reservation": reservation, "recovery": recovery,
+        }
     run_id = f"{unit_id}-{uuid.uuid4().hex[:16]}"
     cap = float(estimates[unit_id])
     reservation = ledger.reserve(
         run_id=run_id, unit_id=unit_id, role="builder",
         reserved_cpu_seconds=cap, unit_kind="scheduler",
     )
-    return {"run_id": run_id, "unit_id": unit_id, "cap": cap, "reservation": reservation}
+    return {
+        "run_id": run_id, "unit_id": unit_id, "cap": cap,
+        "reservation": reservation, "recovery": None,
+    }
 
 
 def _finish_scheduler_reservation(
@@ -1709,7 +1770,10 @@ def _finish_scheduler_reservation(
 ) -> dict[str, Any]:
     unit_id, run_id = str(reservation["unit_id"]), str(reservation["run_id"])
     cap = float(reservation["cap"])
-    measured = max(0.0, time.process_time() - phase_started_cpu - separately_accounted_cpu_seconds)
+    current_process_cpu = max(0.0, time.process_time() - phase_started_cpu - separately_accounted_cpu_seconds)
+    recovery = reservation.get("recovery")
+    prior_cpu_upper_bound = 0.0 if recovery is None else float(recovery["prior_cpu_upper_bound_seconds"])
+    measured = prior_cpu_upper_bound + current_process_cpu
     success = measured <= cap
     result = {
         "schema_id": UNIT_SCHEMA, "status": "SUCCEEDED" if success else "FAILED",
@@ -1717,6 +1781,11 @@ def _finish_scheduler_reservation(
         "package_commit": ledger.binding.package_commit,
         "source_lock_sha256": ledger.binding.source_lock_sha256,
         "measured_cpu_seconds": measured, "reserved_cpu_seconds": cap,
+        "current_process_cpu_seconds": current_process_cpu,
+        "prior_scheduler_cpu_upper_bound_seconds": prior_cpu_upper_bound,
+        "scheduler_recovery_marker_sha256": (
+            None if recovery is None else budget.sha256_bytes(budget.canonical(recovery))
+        ),
         "scheduler_process_tree_limit": _formal_concurrency(),
     }
     result_path = _unit_directory(unit_id) / "result.json"
@@ -1744,6 +1813,15 @@ def _existing_scheduler_receipt(ledger: Any, unit_id: str) -> dict[str, Any]:
     result = _read_json(path)
     measured = result.get("measured_cpu_seconds")
     reserved = reservation.get("reserved_cpu_seconds")
+    runs, _ = _event_state(ledger)
+    recovery_events = runs.get(run_id, {}).get("scheduler_recoveries", [])
+    if len(recovery_events) > 1:
+        raise PermissionError(f"formal scheduler has duplicate recovery markers: {unit_id}")
+    recovery = recovery_events[0] if recovery_events else None
+    current_process_cpu = result.get("current_process_cpu_seconds")
+    prior_cpu_upper_bound = result.get("prior_scheduler_cpu_upper_bound_seconds")
+    expected_prior = 0.0 if recovery is None else float(recovery["prior_cpu_upper_bound_seconds"])
+    expected_marker_sha = None if recovery is None else budget.sha256_bytes(budget.canonical(recovery))
     if (
         result.get("schema_id") != UNIT_SCHEMA or result.get("status") != "SUCCEEDED"
         or result.get("unit_id") != unit_id or result.get("run_id") != run_id
@@ -1753,6 +1831,11 @@ def _existing_scheduler_receipt(ledger: Any, unit_id: str) -> dict[str, Any]:
         or not isinstance(reserved, (int, float)) or float(measured) < 0
         or float(measured) > float(reserved)
         or result.get("reserved_cpu_seconds") != reserved
+        or not isinstance(current_process_cpu, (int, float)) or not math.isfinite(float(current_process_cpu))
+        or float(current_process_cpu) < 0
+        or prior_cpu_upper_bound != expected_prior
+        or measured != float(current_process_cpu) + expected_prior
+        or result.get("scheduler_recovery_marker_sha256") != expected_marker_sha
         or result.get("scheduler_process_tree_limit") != _formal_concurrency()
         or finish.get("status") != "succeeded"
         or finish.get("measured_cpu_seconds") != measured
@@ -2390,14 +2473,23 @@ def _supervisor_main(job_path: Path) -> int:
     return 0 if status == "SUCCEEDED" and measured <= cap else 2
 
 
-def _worker_main(job_path: Path) -> int:
+def _validate_worker_job(
+    job_path: Path, *, allow_synthetic: bool = False,
+) -> tuple[dict[str, Any], Any, dict[str, Any]]:
+    """Validate a parent-written job and its open source-bound ledger reservation."""
     budget.verify_stage1_package()
     job = _read_json(job_path)
     if job.get("schema_id") != WORKER_SCHEMA:
         raise PermissionError("worker job schema differs from the locked executor")
     unit_id = str(job.get("unit_id", ""))
     run_id = str(job.get("run_id", ""))
-    budget.verify_stage1_phase(str(job.get("phase", "")))
+    phase = str(job.get("phase", ""))
+    synthetic = phase == "validation_probe"
+    if synthetic:
+        if not allow_synthetic:
+            raise PermissionError("synthetic worker validation is test-only")
+    else:
+        budget.verify_stage1_phase(phase)
     if len(run_id) != len(unit_id) + 17 or not run_id.startswith(unit_id + "-"):
         raise PermissionError("worker run ID is not a unique unit-scoped reservation ID")
     suffix = run_id[len(unit_id) + 1:]
@@ -2412,6 +2504,64 @@ def _worker_main(job_path: Path) -> int:
     ):
         raise PermissionError("worker job is not bound to the active ledger reservation")
     reservation = ledger.require_open_reservation(run_id=run_id, unit_id=unit_id)
+    if (
+        job.get("previous_run_id") != reservation.get("previous_run_id")
+        or job.get("checkpoint_sha256") != reservation.get("checkpoint_sha256")
+        or job.get("retry_reason") != reservation.get("retry_reason")
+        or job.get("pre_game_start_proof") != reservation.get("pre_game_start_proof")
+        or job.get("pre_game_start_proof_sha256") != reservation.get("pre_game_start_proof_sha256")
+    ):
+        raise PermissionError("worker resume/retry metadata differs from the durable ledger reservation")
+    expected_job_path = _inside_artifacts(_unit_directory(unit_id) / f"worker-job-{run_id}.json")
+    if job_path.resolve() != expected_job_path:
+        raise PermissionError("worker job path differs from its reserved unit")
+
+    unit_dir = _unit_directory(unit_id)
+    result_path = _inside_artifacts(Path(str(job.get("result_path", ""))))
+    if synthetic:
+        expected_row = {
+            "unit_id": unit_id, "formal": False, "kind": "nonformal_validation",
+        }
+        output_path = _inside_artifacts(Path(str(job.get("output_dir", ""))))
+        if (
+            not unit_id.startswith("VALIDATION:")
+            or job.get("row") != expected_row
+            or reservation.get("unit_kind") != "validation_probe"
+            or output_path != unit_dir / "native"
+            or result_path != unit_dir / "result.json"
+            or output_path.exists() or result_path.exists()
+        ):
+            raise PermissionError("synthetic worker probe must be nonformal and must not enter game execution")
+        return job, ledger, dict(reservation)
+
+    if phase == "update":
+        block = int(job.get("block_index", -1))
+        expected_dir = _inside_artifacts(ARTIFACT_ROOT / "units" / f"UPDATE-{block}")
+        if unit_id != f"UPDATE:{block}" or reservation.get("unit_kind") != "training_update":
+            raise PermissionError("optimizer worker unit differs from its registered update block")
+        if result_path != expected_dir / f"result-{run_id}.json":
+            raise PermissionError("optimizer worker result path differs from its reserved update")
+        return job, ledger, dict(reservation)
+
+    phase_name = {"preflight": "preflight", "train": "training", "evaluate": "heldout"}.get(phase)
+    row = job.get("row")
+    if phase_name is None or not isinstance(row, dict) or row.get("unit_id") != unit_id:
+        raise PermissionError("owner worker is not bound to a registered unit phase")
+    registered = next((item for item in _rows() if item["unit_id"] == unit_id), None)
+    if registered is None or row != registered or registered.get("phase") != phase_name:
+        raise PermissionError("owner worker row differs from the exact locked seed-table record")
+    if reservation.get("unit_kind") != "owner_arm":
+        raise PermissionError("owner worker does not hold an owner-arm reservation")
+    output_path = _inside_artifacts(Path(str(job.get("output_dir", ""))))
+    if output_path != unit_dir / "native":
+        raise PermissionError("owner worker native output path differs from its registered unit")
+    if result_path != unit_dir / "result.json":
+        raise PermissionError("owner worker result path differs from its registered unit")
+    return job, ledger, dict(reservation)
+
+
+def _worker_main(job_path: Path) -> int:
+    job, ledger, reservation = _validate_worker_job(job_path)
     import torch
     execution = _read_json(STAGE1 / "config.json")["execution"]
     intraop = int(execution.get("torch_intraop_threads", 0))
@@ -2421,38 +2571,11 @@ def _worker_main(job_path: Path) -> int:
     torch.set_num_threads(intraop)
     if torch.get_num_interop_threads() != interop:
         torch.set_num_interop_threads(interop)
-    if (
-        job.get("previous_run_id") != reservation.get("previous_run_id")
-        or job.get("checkpoint_sha256") != reservation.get("checkpoint_sha256")
-    ):
-        raise PermissionError("worker resume metadata differs from the durable ledger reservation")
-    expected_job_path = _inside_artifacts(_unit_directory(unit_id) / f"worker-job-{run_id}.json")
-    if job_path.resolve() != expected_job_path:
-        raise PermissionError("worker job path differs from its reserved unit")
+    unit_id = str(job["unit_id"])
+    run_id = str(job["run_id"])
     if job.get("phase") == "update":
-        block = int(job.get("block_index", -1))
-        expected_dir = _inside_artifacts(ARTIFACT_ROOT / "units" / f"UPDATE-{block}")
-        if unit_id != f"UPDATE:{block}" or reservation.get("unit_kind") != "training_update":
-            raise PermissionError("optimizer worker unit differs from its registered update block")
-        if Path(str(job.get("result_path"))).resolve() != expected_dir / f"result-{run_id}.json":
-            raise PermissionError("optimizer worker result path differs from its reserved update")
         result = _worker_update(job, ledger)
     else:
-        phase = str(job.get("phase", ""))
-        phase_name = {"preflight": "preflight", "train": "training", "evaluate": "heldout"}.get(phase)
-        row = job.get("row")
-        if phase_name is None or not isinstance(row, dict) or row.get("unit_id") != unit_id:
-            raise PermissionError("owner worker is not bound to a registered unit phase")
-        registered = next((item for item in _rows() if item["unit_id"] == unit_id), None)
-        if registered is None or row != registered or registered.get("phase") != phase_name:
-            raise PermissionError("owner worker row differs from the exact locked seed-table record")
-        if reservation.get("unit_kind") != "owner_arm":
-            raise PermissionError("owner worker does not hold an owner-arm reservation")
-        unit_dir = _unit_directory(unit_id)
-        if Path(str(job.get("output_dir"))).resolve() != unit_dir / "native":
-            raise PermissionError("owner worker native output path differs from its registered unit")
-        if Path(str(job.get("result_path"))).resolve() != unit_dir / "result.json":
-            raise PermissionError("owner worker result path differs from its registered unit")
         result = _worker_owner(job, ledger)
         _write_once(_inside_artifacts(Path(str(job["result_path"]))), result)
     return 0 if result.get("status") == "SUCCEEDED" else 2
@@ -2712,6 +2835,8 @@ def _run_training(ledger: Any) -> dict[str, Any]:
         _existing_scheduler_receipt(ledger, "SCHEDULER:TRAIN")
         return report
     gate = _formal_forecast(ledger)
+    forecast_path = _inside_artifacts(ARTIFACT_ROOT / "training-remaining-workload-forecast.json")
+    _write_once(forecast_path, gate)
     estimates, _ = _forecast_estimates(ledger)
     scheduler_reservation = _run_scheduler_reservation(ledger, "SCHEDULER:TRAIN", estimates)
     concurrency = _formal_concurrency()

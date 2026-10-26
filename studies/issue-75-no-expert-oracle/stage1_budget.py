@@ -201,14 +201,33 @@ class PackageBinding:
 
 
 def _current_package_binding() -> tuple[str, str]:
-    """Verify the package and bind ledger receipts to the current commit and lock."""
+    """Lock executable inputs while permitting only append-only tracked ledger events."""
     verify_stage1_package()
+    ledger_relative = "studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl"
     working_tree = subprocess.run(
-        ["git", "diff", "--quiet", "HEAD", "--", "."], cwd=STUDY,
-        check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        ["git", "diff", "--no-ext-diff", "--no-renames", "--name-only", "HEAD", "--", "."],
+        cwd=STUDY.parents[1], check=False, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True,
     )
     if working_tree.returncode != 0:
-        raise PermissionError("Stage 1 receipts require a clean tracked study checkout")
+        raise PermissionError("cannot verify tracked Stage 1 source immutability")
+    changed = [line.replace("\\", "/") for line in working_tree.stdout.splitlines() if line]
+    if changed:
+        ledger_path = STAGE1 / "artifacts" / "ledger" / "events.jsonl"
+        if changed != [ledger_relative] or ledger_path.is_symlink() or not ledger_path.is_file():
+            raise PermissionError("Stage 1 tracked changes include immutable code/config or non-ledger artifacts")
+        baseline = subprocess.run(
+            ["git", "show", f"HEAD:{ledger_relative}"], cwd=STUDY.parents[1],
+            check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        current_ledger = ledger_path.read_bytes().replace(b"\r\n", b"\n")
+        baseline_ledger = baseline.stdout.replace(b"\r\n", b"\n")
+        if baseline.returncode != 0 or not current_ledger.startswith(baseline_ledger):
+            raise PermissionError("tracked Stage 1 ledger history was changed or truncated")
+        try:
+            _events(ledger_path)
+        except (LedgerCorrupt, OSError) as exc:
+            raise PermissionError("tracked Stage 1 ledger append is malformed") from exc
     current = subprocess.run(
         ["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=STUDY, check=True,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
@@ -267,16 +286,218 @@ def _state(events: Sequence[Mapping[str, Any]]) -> tuple[dict[str, dict[str, Any
             rid, uid = e.get("run_id"), e.get("unit_id")
             if not isinstance(rid, str) or not rid or rid in runs or not isinstance(uid, str) or not uid:
                 raise LedgerCorrupt("duplicate/empty run id or unit id")
-            runs[rid] = {"reservation": dict(e), "finish": None}
+            runs[rid] = {"reservation": dict(e), "finish": None, "scheduler_recoveries": []}
             units.setdefault(uid, []).append(rid)
         elif e.get("event") == "finish":
             rid = e.get("run_id")
             if rid not in runs or runs[rid]["finish"] is not None:
                 raise LedgerCorrupt("orphan or duplicate finish event")
             runs[rid]["finish"] = dict(e)
+        elif e.get("event") == "scheduler_recovery":
+            rid = e.get("run_id")
+            run = runs.get(rid)
+            upper_bound = e.get("prior_cpu_upper_bound_seconds")
+            if (
+                run is None or run["finish"] is not None
+                or run["reservation"].get("unit_id") != "SCHEDULER:TRAIN"
+                or rid != SCHEDULER_TRAIN_RECOVERY_RUN_ID
+                or e.get("unit_id") != "SCHEDULER:TRAIN"
+                or run.setdefault("scheduler_recoveries", [])
+                or not isinstance(upper_bound, (int, float))
+                or not math.isfinite(float(upper_bound))
+                or not 0 < float(upper_bound) < SCHEDULER_TRAIN_RECOVERY_CAP
+                or e.get("accounting_basis") != "reservation retained at full cap; prior CPU bounded by source-bound event timestamps"
+                or not isinstance(e.get("package_commit"), str)
+                or len(e["package_commit"]) != 40
+                or not isinstance(e.get("source_lock_sha256"), str)
+                or len(e["source_lock_sha256"]) != 64
+                or not isinstance(e.get("created_at_ns"), int)
+            ):
+                raise LedgerCorrupt("orphan or duplicate Stage 1 scheduler recovery marker")
+            run["scheduler_recoveries"].append(dict(e))
         else:
             raise LedgerCorrupt(f"unknown event {e.get('event')!r}")
     return runs, units
+
+
+PRE_GAME_START_RETRY_UNIT_ID = "TRAIN:7500001"
+PRE_GAME_START_RETRY_RUN_ID = "TRAIN:7500001-5afd7b3277ee47a7"
+PRE_GAME_START_RETRY_PACKAGE_COMMIT = "e0161453ba1dd96e18326fdac2fb9c75a234049a"
+PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256 = "932a9ecf39794e5b6f284914ded91eb153ac59cd19bb490a64af2d9744abe30d"
+PRE_GAME_START_FAILURE_RECEIPT_SHA256 = "1c60d8c4e5e4fa64802089d5c7c337186ff53194ec43b4b7a75f64d79dd0acea"
+PRE_GAME_START_WORKER_JOB_SHA256 = "098d19dd2149bea16e66fb7274bfdf38fdae760186f86d003dc17d27e19d8db3"
+PRE_GAME_START_RETRY_REASON = "PRE_GAME_START_INFRA_FAILURE"
+PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS = 165.9459124477378
+PRE_GAME_START_RETRY_MEASURED_CPU_SECONDS = 0.03347004399999998
+PRE_GAME_START_RETRY_WALL_SECONDS = 0.6596911649999999
+PRE_GAME_START_RETRY_RESERVED_AT_NS = 1793049822031952961
+PRE_GAME_START_RETRY_FINISHED_AT_NS = 1793049822696986726
+PRE_GAME_START_PROOF_SCHEMA = "issue75-pre-game-start-infra-proof-v1"
+SCHEDULER_TRAIN_RECOVERY_RUN_ID = "SCHEDULER:TRAIN-3e416101548944b3"
+SCHEDULER_TRAIN_RECOVERY_RESERVED_AT_NS = 1793049822021316152
+SCHEDULER_TRAIN_RECOVERY_CAP = 120.0
+SCHEDULER_RECOVERY_EXIT_MARGIN_SECONDS = 1.0
+
+
+def _pre_game_start_failure_proof(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]], units: Mapping[str, Sequence[str]],
+    *, predecessor_run_id: str, require_pristine: bool,
+) -> dict[str, Any]:
+    """Prove the one reviewed failed row stopped before native owner execution."""
+    unit_id = PRE_GAME_START_RETRY_UNIT_ID
+    history = list(units.get(unit_id, ()))
+    if (predecessor_run_id != PRE_GAME_START_RETRY_RUN_ID or not history
+            or history[0] != predecessor_run_id or len(history) > 2):
+        raise ResourceBlocked("the one-row pre-game-start exception does not match its immutable predecessor")
+    run = runs.get(predecessor_run_id)
+    if not isinstance(run, Mapping):
+        raise ResourceBlocked("the reviewed pre-game-start predecessor is absent")
+    reservation, finish = run.get("reservation"), run.get("finish")
+    expected_reservation = {
+        "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
+        "run_id": PRE_GAME_START_RETRY_RUN_ID, "unit_id": unit_id,
+        "role": "builder", "unit_kind": "owner_arm", "attempt_cap": None,
+        "previous_run_id": None, "checkpoint_sha256": None,
+        "reserved_cpu_seconds": PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS,
+        "package_commit": PRE_GAME_START_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256,
+        "created_at_ns": PRE_GAME_START_RETRY_RESERVED_AT_NS,
+    }
+    expected_finish = {
+        "event": "finish", "schema_id": "issue75-stage1-budget-event-v2",
+        "run_id": PRE_GAME_START_RETRY_RUN_ID, "unit_id": unit_id,
+        "status": "failed", "measured_cpu_seconds": PRE_GAME_START_RETRY_MEASURED_CPU_SECONDS,
+        "reserved_cpu_seconds": PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS,
+        "started_attempts": 0, "checkpoint_sha256": None, "result_sha256": None,
+        "package_commit": PRE_GAME_START_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256,
+        "finished_at_ns": PRE_GAME_START_RETRY_FINISHED_AT_NS,
+    }
+    if not isinstance(reservation, Mapping) or any(reservation.get(k) != v for k, v in expected_reservation.items()):
+        raise ResourceBlocked("the original registered row reservation differs from the reviewed failure")
+    if not isinstance(finish, Mapping) or any(finish.get(k) != v for k, v in expected_finish.items()):
+        raise ResourceBlocked("the original failure is not the exact reviewed zero-start ledger finish")
+
+    units_root = Path(artifacts_root) / "units" / "TRAIN-7500001"
+    failure_path = units_root / f"failure-{PRE_GAME_START_RETRY_RUN_ID}.json"
+    job_path = units_root / f"worker-job-{PRE_GAME_START_RETRY_RUN_ID}.json"
+    try:
+        failure_bytes, job_bytes = failure_path.read_bytes(), job_path.read_bytes()
+    except OSError as exc:
+        raise ResourceBlocked("the immutable pre-game-start failure evidence is missing") from exc
+    if sha256_bytes(failure_bytes) != PRE_GAME_START_FAILURE_RECEIPT_SHA256:
+        raise ResourceBlocked("the original failed-row receipt bytes changed")
+    if sha256_bytes(job_bytes) != PRE_GAME_START_WORKER_JOB_SHA256:
+        raise ResourceBlocked("the original failed-row worker job bytes changed")
+    try:
+        failure, job = json.loads(failure_bytes), json.loads(job_bytes)
+    except json.JSONDecodeError as exc:
+        raise ResourceBlocked("the reviewed failure evidence is not valid JSON") from exc
+    if (
+        failure.get("schema_id") != "issue75-stage1-unit-result-v1"
+        or failure.get("status") != "FAILED" or failure.get("boundary") != "PermissionError"
+        or failure.get("unit_id") != unit_id or failure.get("run_id") != predecessor_run_id
+        or failure.get("measured_cpu_seconds") != PRE_GAME_START_RETRY_MEASURED_CPU_SECONDS
+        or failure.get("wall_seconds") != PRE_GAME_START_RETRY_WALL_SECONDS
+        or failure.get("reserved_cpu_seconds") != PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS
+        or failure.get("checkpoint_sha256") is not None
+        or job.get("schema_id") != "issue75-stage1-worker-job-v1"
+        or job.get("run_id") != predecessor_run_id or job.get("unit_id") != unit_id
+        or job.get("phase") != "train" or job.get("package_commit") != PRE_GAME_START_RETRY_PACKAGE_COMMIT
+        or job.get("source_lock_sha256") != PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256
+        or job.get("row", {}).get("formal") is not True
+        or job.get("row", {}).get("unit_id") != unit_id
+        or job.get("row", {}).get("owner_seed") != 7_500_001
+        or job.get("row", {}).get("game_seed") != 7_500_001
+        or job.get("row", {}).get("arm") != "TRAIN"
+    ):
+        raise ResourceBlocked("the original failure/job no longer prove the reviewed pre-game-start boundary")
+
+    run_id = PRE_GAME_START_RETRY_RUN_ID
+    absence = {
+        "worker_result_absent": not (units_root / "result.json").exists(),
+        "worker_log_absent": not (units_root / f"worker-log-{run_id}.txt").exists(),
+        "native_output_absent": not (units_root / "native").exists(),
+        "runtime_root_absent": not (units_root / "runtime" / run_id).exists(),
+        "search_output_absent": not (Path(artifacts_root) / "search" / "TRAIN-7500001").exists(),
+    }
+    if require_pristine and not all(absence.values()):
+        raise ResourceBlocked("the original owner worker may have entered native/game execution")
+    proof = {
+        "schema_id": PRE_GAME_START_PROOF_SCHEMA,
+        "unit_id": unit_id,
+        "predecessor_run_id": predecessor_run_id,
+        "package_commit": PRE_GAME_START_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256,
+        "failure_boundary": "PermissionError",
+        "started_attempts": 0,
+        "worker_wall_seconds": PRE_GAME_START_RETRY_WALL_SECONDS,
+        "failure_receipt_sha256": PRE_GAME_START_FAILURE_RECEIPT_SHA256,
+        "worker_job_sha256": PRE_GAME_START_WORKER_JOB_SHA256,
+        **absence,
+    }
+    return proof
+
+
+def _validate_pre_game_start_retry_reservation(
+    reservation: Mapping[str, Any], runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]], artifacts_root: Path, *, require_pristine: bool,
+) -> dict[str, Any]:
+    unit_id = str(reservation.get("unit_id", ""))
+    predecessor = str(reservation.get("previous_run_id", ""))
+    history = units.get(unit_id, ())
+    if (
+        unit_id != PRE_GAME_START_RETRY_UNIT_ID or len(history) != 2
+        or list(history) != [PRE_GAME_START_RETRY_RUN_ID, reservation.get("run_id")]
+        or predecessor != PRE_GAME_START_RETRY_RUN_ID
+        or reservation.get("role") != "builder" or reservation.get("unit_kind") != "owner_arm"
+        or reservation.get("attempt_cap") is not None or reservation.get("checkpoint_sha256") is not None
+        or reservation.get("retry_reason") != PRE_GAME_START_RETRY_REASON
+        or not isinstance(reservation.get("reserved_cpu_seconds"), (int, float))
+        or not 0 < float(reservation["reserved_cpu_seconds"]) <= PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS
+    ):
+        raise ResourceBlocked("the new row attempt is not the single authorized pre-game-start retry")
+    proof = _pre_game_start_failure_proof(
+        artifacts_root, runs, units, predecessor_run_id=predecessor,
+        require_pristine=require_pristine,
+    )
+    if reservation.get("pre_game_start_proof") != proof or reservation.get("pre_game_start_proof_sha256") != sha256_bytes(canonical(proof)):
+        raise ResourceBlocked("the retry reservation is not bound to its verified pre-game-start evidence")
+    return proof
+
+
+def _scheduler_train_recovery_cpu_upper_bound(
+    runs: Mapping[str, Mapping[str, Any]], units: Mapping[str, Sequence[str]], artifacts_root: Path,
+) -> float:
+    """Bound pre-repair scheduler CPU from recorded wall timestamps and keep a shutdown margin."""
+    scheduler_history = list(units.get("SCHEDULER:TRAIN", ()))
+    if scheduler_history != [SCHEDULER_TRAIN_RECOVERY_RUN_ID]:
+        raise ResourceBlocked("open training scheduler is not the exact original reservation")
+    scheduler_run = runs[SCHEDULER_TRAIN_RECOVERY_RUN_ID]
+    reservation = scheduler_run["reservation"]
+    if (
+        scheduler_run["finish"] is not None
+        or reservation.get("unit_kind") != "scheduler" or reservation.get("role") != "builder"
+        or reservation.get("reserved_cpu_seconds") != SCHEDULER_TRAIN_RECOVERY_CAP
+        or reservation.get("package_commit") != PRE_GAME_START_RETRY_PACKAGE_COMMIT
+        or reservation.get("source_lock_sha256") != PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256
+        or reservation.get("created_at_ns") != SCHEDULER_TRAIN_RECOVERY_RESERVED_AT_NS
+    ):
+        raise ResourceBlocked("open scheduler reservation differs from its immutable original receipt")
+    proof = _pre_game_start_failure_proof(
+        artifacts_root, runs, units, predecessor_run_id=PRE_GAME_START_RETRY_RUN_ID,
+        require_pristine=True,
+    )
+    if proof.get("started_attempts") != 0:
+        raise ResourceBlocked("scheduler recovery requires the exact zero-start predecessor")
+    failure = runs[PRE_GAME_START_RETRY_RUN_ID]["finish"]
+    elapsed = (int(failure["finished_at_ns"]) - int(reservation["created_at_ns"])) / 1_000_000_000
+    if elapsed < float(proof["worker_wall_seconds"]):
+        raise ResourceBlocked("scheduler recovery timestamps do not cover the worker's measured monotonic wall interval")
+    upper_bound = elapsed + SCHEDULER_RECOVERY_EXIT_MARGIN_SECONDS
+    if not math.isfinite(upper_bound) or elapsed < 0 or upper_bound >= SCHEDULER_TRAIN_RECOVERY_CAP:
+        raise ResourceBlocked("the original scheduler reserve cannot safely fund recovery")
+    return upper_bound
 
 
 def _charge(run: Mapping[str, Any]) -> float:
@@ -344,7 +565,7 @@ class Stage1Ledger:
 
     def require_open_reservation(self, *, run_id: str, unit_id: str, role: str = "builder") -> dict[str, Any]:
         """Confirm a worker is the exact source-bound child of a live ledger reservation."""
-        runs, _ = _state(_events(self.events_path))
+        runs, units = _state(_events(self.events_path))
         run = runs.get(str(run_id))
         if run is None or run["finish"] is not None:
             raise PermissionError("worker has no open write-ahead ledger reservation")
@@ -356,7 +577,47 @@ class Stage1Ledger:
             or reservation.get("source_lock_sha256") != self.binding.source_lock_sha256
         ):
             raise PermissionError("worker reservation does not match its unit and active package binding")
+        if reservation.get("retry_reason") == PRE_GAME_START_RETRY_REASON:
+            _validate_pre_game_start_retry_reservation(
+                reservation, runs, units, self.directory.parent, require_pristine=True,
+            )
+        elif any(reservation.get(key) is not None for key in (
+            "retry_reason", "pre_game_start_proof", "pre_game_start_proof_sha256",
+        )):
+            raise PermissionError("worker reservation contains an unrecognized retry claim")
         return dict(reservation)
+
+    def pre_game_start_retry_info(self, *, unit_id: str, predecessor_run_id: str) -> dict[str, Any]:
+        """Return proof only for the one fixed immutable pre-game-start predecessor."""
+        if unit_id != PRE_GAME_START_RETRY_UNIT_ID or predecessor_run_id != PRE_GAME_START_RETRY_RUN_ID:
+            raise ResourceBlocked("no pre-game-start retry exception is registered for this unit")
+        runs, units = _state(_events(self.events_path))
+        if units.get(unit_id) != [predecessor_run_id] or runs[predecessor_run_id]["finish"] is None:
+            raise ResourceBlocked("pre-game-start retry predecessor has changed")
+        return _pre_game_start_failure_proof(
+            self.directory.parent, runs, units, predecessor_run_id=predecessor_run_id,
+            require_pristine=True,
+        )
+
+    def recover_open_training_scheduler(self) -> dict[str, Any]:
+        """Mark and reuse the exact original 120 CPU-s allocation once, without a second reserve."""
+        def operation(rows):
+            runs, units = _state(rows)
+            run = runs.get(SCHEDULER_TRAIN_RECOVERY_RUN_ID)
+            if run is None or run["finish"] is not None or run.get("scheduler_recoveries"):
+                raise ResourceBlocked("the original training scheduler reservation is already recovered or unavailable")
+            upper_bound = _scheduler_train_recovery_cpu_upper_bound(runs, units, self.directory.parent)
+            event = {
+                "event": "scheduler_recovery", "schema_id": "issue75-stage1-budget-event-v2",
+                "run_id": SCHEDULER_TRAIN_RECOVERY_RUN_ID, "unit_id": "SCHEDULER:TRAIN",
+                "prior_cpu_upper_bound_seconds": upper_bound,
+                "accounting_basis": "reservation retained at full cap; prior CPU bounded by source-bound event timestamps",
+                "package_commit": self.binding.package_commit,
+                "source_lock_sha256": self.binding.source_lock_sha256,
+                "created_at_ns": time.time_ns(),
+            }
+            return event, event
+        return self._tx(operation)
 
     @staticmethod
     def _charges(runs):
@@ -372,7 +633,9 @@ class Stage1Ledger:
                            reserved_cpu_seconds: float, unit_kind: str,
                            attempt_cap: int | None = None,
                            previous_run_id: str | None = None,
-                           checkpoint_sha256: str | None = None):
+                           checkpoint_sha256: str | None = None,
+                           retry_reason: str | None = None,
+                           pre_game_start_proof: Mapping[str, Any] | None = None):
         cap = float(reserved_cpu_seconds)
         if role not in {"builder", "reviewer"} or not run_id or not unit_id or not math.isfinite(cap) or cap <= 0:
             raise ValueError("invalid run, unit, role, or CPU reservation")
@@ -394,16 +657,35 @@ class Stage1Ledger:
             done = last["finish"]
             if done is None:
                 raise ResourceBlocked(f"unresolved reservation remains charged at full cap: {unit_id}")
-            if done.get("status") != "incomplete":
+            if done.get("status") == "incomplete":
+                if retry_reason is not None or pre_game_start_proof is not None:
+                    raise CheckpointMismatch("checkpoint resume cannot claim the pre-game-start exception")
+                if float(done.get("measured_cpu_seconds", 0.0)) > float(done.get("reserved_cpu_seconds", 0.0)):
+                    raise ResourceBlocked("an incomplete unit exceeded its immutable reservation and cannot be resumed")
+                if (previous_run_id != history[-1] or not done.get("checkpoint_sha256")
+                        or checkpoint_sha256 != done["checkpoint_sha256"]
+                        or role != last["reservation"]["role"]):
+                    raise CheckpointMismatch("resume needs the exact prior incomplete run and checkpoint digest")
+            elif done.get("status") == "failed":
+                if history != [PRE_GAME_START_RETRY_RUN_ID] or unit_id != PRE_GAME_START_RETRY_UNIT_ID:
+                    raise ResourceBlocked(f"failed unit is immutable and cannot be replayed: {unit_id}")
+                if previous_run_id != PRE_GAME_START_RETRY_RUN_ID or checkpoint_sha256 is not None:
+                    raise ResourceBlocked("the one-row exception must link its exact failed predecessor")
+                if retry_reason != PRE_GAME_START_RETRY_REASON:
+                    raise ResourceBlocked("failed owner row lacks the explicit pre-game-start failure reason")
+                proof = _pre_game_start_failure_proof(
+                    self.directory.parent, runs, units, predecessor_run_id=previous_run_id,
+                    require_pristine=True,
+                )
+                if pre_game_start_proof != proof:
+                    raise ResourceBlocked("retry proof differs from the verified original failure evidence")
+                if unit_kind != "owner_arm" or role != "builder" or cap > PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS:
+                    raise ResourceBlocked("pre-game-start retry changed the registered owner row or CPU ceiling")
+            else:
                 raise DuplicateRun(f"terminal unit cannot be replayed: {unit_id}")
-            if float(done.get("measured_cpu_seconds", 0.0)) > float(done.get("reserved_cpu_seconds", 0.0)):
-                raise ResourceBlocked("an incomplete unit exceeded its immutable reservation and cannot be resumed")
-            if (previous_run_id != history[-1] or not done.get("checkpoint_sha256")
-                    or checkpoint_sha256 != done["checkpoint_sha256"]
-                    or role != last["reservation"]["role"]):
-                raise CheckpointMismatch("resume needs the exact prior incomplete run and checkpoint digest")
-        elif previous_run_id is not None or checkpoint_sha256 is not None:
-            raise CheckpointMismatch("resume metadata supplied for a new unit")
+        elif (previous_run_id is not None or checkpoint_sha256 is not None
+              or retry_reason is not None or pre_game_start_proof is not None):
+            raise CheckpointMismatch("resume/retry metadata supplied for a new unit")
         charges = self._charges(runs)
         if role == "builder":
             if charges["builder"] + cap > BUILDER_LIMIT:
@@ -420,6 +702,9 @@ class Stage1Ledger:
             "run_id": run_id, "unit_id": unit_id, "role": role, "unit_kind": unit_kind,
             "reserved_cpu_seconds": cap, "attempt_cap": attempt_cap,
             "previous_run_id": previous_run_id, "checkpoint_sha256": checkpoint_sha256,
+            "retry_reason": retry_reason,
+            "pre_game_start_proof": None if pre_game_start_proof is None else dict(pre_game_start_proof),
+            "pre_game_start_proof_sha256": None if pre_game_start_proof is None else sha256_bytes(canonical(pre_game_start_proof)),
             "package_commit": self.binding.package_commit,
             "source_lock_sha256": self.binding.source_lock_sha256,
             "created_at_ns": time.time_ns(),
@@ -446,12 +731,15 @@ class Stage1Ledger:
                 reserved_cpu_seconds: float, unit_kind: str,
                 attempt_cap: int | None = None,
                 previous_run_id: str | None = None,
-                checkpoint_sha256: str | None = None) -> dict[str, Any]:
+                checkpoint_sha256: str | None = None,
+                retry_reason: str | None = None,
+                pre_game_start_proof: Mapping[str, Any] | None = None) -> dict[str, Any]:
         return self.reserve_many([{
             "run_id": run_id, "unit_id": unit_id, "role": role,
             "reserved_cpu_seconds": reserved_cpu_seconds, "unit_kind": unit_kind,
             "attempt_cap": attempt_cap, "previous_run_id": previous_run_id,
-            "checkpoint_sha256": checkpoint_sha256,
+            "checkpoint_sha256": checkpoint_sha256, "retry_reason": retry_reason,
+            "pre_game_start_proof": pre_game_start_proof,
         }])[0]
 
     def finish(
@@ -504,12 +792,15 @@ class Stage1Ledger:
     def forecast(
         self, *, expected_unit_ids: Sequence[str], future_builder_cpu_seconds: Mapping[str, float],
         allowed_completed_unit_ids: Sequence[str] = (),
+        allowed_open_reservation_unit_ids: Sequence[str] = (),
     ):
         expected = list(expected_unit_ids)
         allowed = set(allowed_completed_unit_ids)
+        allowed_open = set(allowed_open_reservation_unit_ids)
         if (not expected or len(set(expected)) != len(expected)
                 or set(expected) != set(future_builder_cpu_seconds)
-                or allowed & set(expected)):
+                or allowed & set(expected) or not allowed_open <= set(expected)
+                or not allowed_open <= {"SCHEDULER:TRAIN"}):
             raise ValueError("forecast must include each exact registered unit once")
         estimates = {unit: float(future_builder_cpu_seconds[unit]) for unit in expected}
         if any(not math.isfinite(value) or value < 0 for value in estimates.values()):
@@ -526,6 +817,8 @@ class Stage1Ledger:
                     or runs[history[-1]]["finish"]["status"] != "succeeded"
                 ):
                     blocked.append(unit)
+            carried_open = []
+            retry_units = []
             for unit in expected:
                 history = units.get(unit, [])
                 if not history:
@@ -533,9 +826,37 @@ class Stage1Ledger:
                     continue
                 last = runs[history[-1]]
                 done = last["finish"]
-                if done is None or done["status"] == "failed":
-                    blocked.append(unit)
-                elif done["status"] == "incomplete":
+                if done is None:
+                    if unit in allowed_open and unit == "SCHEDULER:TRAIN":
+                        if last.get("scheduler_recoveries"):
+                            blocked.append(unit)
+                            continue
+                        try:
+                            _scheduler_train_recovery_cpu_upper_bound(runs, units, self.directory.parent)
+                        except ResourceBlocked:
+                            blocked.append(unit)
+                            continue
+                        if float(last["reservation"].get("reserved_cpu_seconds", -1)) != estimates[unit]:
+                            blocked.append(unit)
+                            continue
+                        carried_open.append(unit)
+                    else:
+                        blocked.append(unit)
+                elif done.get("status") == "failed":
+                    if unit == PRE_GAME_START_RETRY_UNIT_ID and history == [PRE_GAME_START_RETRY_RUN_ID]:
+                        try:
+                            _pre_game_start_failure_proof(
+                                self.directory.parent, runs, units,
+                                predecessor_run_id=PRE_GAME_START_RETRY_RUN_ID, require_pristine=True,
+                            )
+                        except ResourceBlocked:
+                            blocked.append(unit)
+                            continue
+                        future += estimates[unit]
+                        retry_units.append(unit)
+                    else:
+                        blocked.append(unit)
+                elif done.get("status") == "incomplete":
                     future += estimates[unit]
             if blocked:
                 raise ResourceBlocked("forecast stops on unresolved/failed units: " + ", ".join(blocked[:8]))
@@ -551,6 +872,8 @@ class Stage1Ledger:
                 "builder_cpu_charged": charges["builder"], "reviewer_cpu_charged": charges["reviewer"],
                 "future_builder_cpu_forecast": future, "projected_builder_cpu": builder,
                 "projected_all_in_with_reviewer_reserve": all_in,
+                "carried_open_reservation_unit_ids": carried_open,
+                "authorized_pre_game_start_retry_unit_ids": retry_units,
                 "builder_cpu_remaining": BUILDER_LIMIT - builder, "all_in_cpu_remaining": ALL_IN_LIMIT - all_in,
                 "package_commit": self.binding.package_commit,
                 "source_lock_sha256": self.binding.source_lock_sha256,
