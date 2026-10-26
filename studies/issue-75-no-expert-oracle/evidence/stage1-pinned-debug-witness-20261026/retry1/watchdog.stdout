@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/mnt/d/r75fix/studies/issue-75-no-expert-oracle/evidence/stage1-pinned-debug-witness-20261026/driver-retry1.py", line 361, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/mnt/d/r75fix/studies/issue-75-no-expert-oracle/evidence/stage1-pinned-debug-witness-20261026/driver-retry1.py", line 250, in main
+    return _worker()
+  File "/mnt/d/r75fix/studies/issue-75-no-expert-oracle/evidence/stage1-pinned-debug-witness-20261026/driver-retry1.py", line 190, in _worker
+    baseline_completed = sum(
+        bool(item["complete_terminal"]) for item in completed_trials.values()
+        if int(item.attempt_index) not in {int(row["attempt_index"]) for row in mutation_results}
+    )
+  File "/mnt/d/r75fix/studies/issue-75-no-expert-oracle/evidence/stage1-pinned-debug-witness-20261026/driver-retry1.py", line 191, in <genexpr>
+    bool(item["complete_terminal"]) for item in completed_trials.values()
+         ~~~~^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'TrialResult' object is not subscriptable

@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/mnt/d/r75fix/studies/issue-75-no-expert-oracle/evidence/stage1-pinned-debug-witness-20261026/driver.py", line 343, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/mnt/d/r75fix/studies/issue-75-no-expert-oracle/evidence/stage1-pinned-debug-witness-20261026/driver.py", line 250, in main
+    return _worker()
+  File "/mnt/d/r75fix/studies/issue-75-no-expert-oracle/evidence/stage1-pinned-debug-witness-20261026/driver.py", line 86, in _worker
+    raise PermissionError("witness requires the source-locked preparation-only package")
+PermissionError: witness requires the source-locked preparation-only package

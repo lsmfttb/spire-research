@@ -1,0 +1,37 @@
+{
+  "schema_id": "issue75-review-repair-focused-verification-v1",
+  "source_commit": "2060cb15c072c45a7f80e1ec061c3266f8c4b6f4",
+  "stage1_source_lock_sha256": "9e6a3583a00031553927f1e09e4b61c1e1ea89d709ee8ebd82adbee01542f1ff",
+  "executor_tests": {
+    "command": "python3.13 -B studies/issue-75-no-expert-oracle/stage1/test_executor.py",
+    "tests_run": 15,
+    "result": "PASS"
+  },
+  "activation_tests": {
+    "suite_tests_run": 19,
+    "suite_initial_passed": 18,
+    "suite_initial_error": {
+      "test": "SourceLockTests.test_stage0_and_stage1_source_locks_bind_reviewed_receipts_and_runtime",
+      "cause": "verification worktree was detached, so git symbolic-ref --short HEAD failed"
+    },
+    "attached_branch_retest": {
+      "test": "SourceLockTests.test_stage0_and_stage1_source_locks_bind_reviewed_receipts_and_runtime",
+      "result": "FAIL",
+      "error": "Stage 0 lock content differs from its reviewed source/config/provenance",
+      "mismatched_lock_field": "files_sha256_lf",
+      "mismatched_paths": [
+        "algorithm.py",
+        "learning.py",
+        "runtime.py"
+      ]
+    },
+    "limitation": "The Stage 0 lock and the three mismatched files are byte-identical between the issue source commit 4baa6f77e2468d1891495e8d6aae8f5d85880635 and repair commit 2060cb15c072c45a7f80e1ec061c3266f8c4b6f4; the existing Stage 0 lock mismatch was not introduced or changed by this repair."
+  },
+  "study_state": {
+    "stage1_ledger_opened": false,
+    "stage1_preflight_rows_executed": 0,
+    "stage1_formal_rows_executed": 0,
+    "stage1_registered_seed_consumption": 0,
+    "scientific_efficacy_inference": false
+  }
+}
