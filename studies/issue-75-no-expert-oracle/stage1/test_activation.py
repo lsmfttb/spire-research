@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 STUDY = Path(__file__).resolve().parents[1]
 REPO = STUDY.parents[1]
@@ -15,8 +16,7 @@ import prepare
 import stage1_budget as budget
 
 
-PACKAGE_COMMIT = "a" * 40
-LOCK_DIGEST = "b" * 64
+PACKAGE_COMMIT, LOCK_DIGEST = budget._current_package_binding()
 CHECKPOINT_DIGEST = "c" * 64
 
 
@@ -31,11 +31,25 @@ def decision(comment_id: int, marker: str, timestamp: str, *, commit: str = PACK
     }
 
 
+def activation_comments(reviewer=None, planner=None):
+    return [
+        reviewer or decision(1, budget.REVIEW_MARKER, "2026-01-01T00:00:00Z"),
+        planner or decision(2, budget.PLANNER_MARKER, "2026-01-01T00:01:00Z"),
+    ]
+
+
+def open_ledger(directory: Path, comments=None):
+    with mock.patch.object(
+        budget, "_fetch_authoritative_issue_comments",
+        return_value=activation_comments() if comments is None else comments,
+    ) as fetch_comments:
+        ledger = budget.open_activated_stage1_ledger(directory)
+        fetch_comments.assert_called_once_with()
+        return ledger
+
+
 def activation():
-    reviewer = decision(1, budget.REVIEW_MARKER, "2026-01-01T00:00:00Z")
-    planner = decision(2, budget.PLANNER_MARKER, "2026-01-01T00:01:00Z")
-    return budget.verify_activation_comments(reviewer, planner, package_commit=PACKAGE_COMMIT,
-                                             source_lock_sha256=LOCK_DIGEST)
+    return open_ledger(STUDY / "stage1" / "unused-test-ledger").activation
 
 
 class SeedTableTests(unittest.TestCase):
@@ -107,29 +121,62 @@ class ActivationTests(unittest.TestCase):
     def test_ordered_exact_source_gates_accept_same_owner_account_roles(self):
         receipt = activation()
         self.assertEqual(receipt.package_commit, PACKAGE_COMMIT)
+        self.assertEqual(receipt.source_lock_sha256, LOCK_DIGEST)
         self.assertEqual(receipt.reviewer_comment_id, 1)
         self.assertEqual(receipt.planner_comment_id, 2)
 
-    def test_wrong_sha_owner_url_or_order_rejected(self):
+    def assert_activation_rejected(self, comments):
+        with tempfile.TemporaryDirectory(dir=REPO / ".task-tmp") as temp:
+            ledger_path = Path(temp) / "ledger"
+            with mock.patch.object(budget, "_fetch_authoritative_issue_comments", return_value=comments):
+                with self.assertRaises(PermissionError):
+                    budget.open_activated_stage1_ledger(ledger_path)
+            self.assertFalse(ledger_path.exists())
+
+    def test_wrong_order_owner_or_issue_url_rejected(self):
         reviewer = decision(1, budget.REVIEW_MARKER, "2026-01-01T00:01:00Z")
         planner = decision(2, budget.PLANNER_MARKER, "2026-01-01T00:00:00Z")
-        with self.assertRaises(PermissionError):
-            budget.verify_activation_comments(reviewer, planner, package_commit=PACKAGE_COMMIT,
-                                              source_lock_sha256=LOCK_DIGEST)
-        planner["created_at"] = "2026-01-01T00:02:00Z"
-        planner["body"] = planner["body"].replace(PACKAGE_COMMIT, "d" * 40)
-        with self.assertRaises(PermissionError):
-            budget.verify_activation_comments(reviewer, planner, package_commit=PACKAGE_COMMIT,
-                                              source_lock_sha256=LOCK_DIGEST)
+        self.assert_activation_rejected([reviewer, planner])
+
         planner = decision(3, budget.PLANNER_MARKER, "2026-01-01T00:02:00Z", login="unrelated")
-        with self.assertRaises(PermissionError):
-            budget.verify_activation_comments(reviewer, planner, package_commit=PACKAGE_COMMIT,
-                                              source_lock_sha256=LOCK_DIGEST)
+        self.assert_activation_rejected([reviewer, planner])
+
         planner = decision(4, budget.PLANNER_MARKER, "2026-01-01T00:02:00Z")
         planner["html_url"] = "https://github.com/lsmfttb/spire-research/issues/74#issuecomment-4"
-        with self.assertRaises(PermissionError):
-            budget.verify_activation_comments(reviewer, planner, package_commit=PACKAGE_COMMIT,
-                                              source_lock_sha256=LOCK_DIGEST)
+        self.assert_activation_rejected([reviewer, planner])
+
+    def test_comment_url_and_id_are_required_and_must_match(self):
+        reviewer = decision(1, budget.REVIEW_MARKER, "2026-01-01T00:00:00Z")
+        planner = decision(2, budget.PLANNER_MARKER, "2026-01-01T00:01:00Z")
+        planner.pop("html_url")
+        self.assert_activation_rejected([reviewer, planner])
+
+        planner = decision(3, budget.PLANNER_MARKER, "2026-01-01T00:01:00Z")
+        planner["html_url"] = "https://github.com/lsmfttb/spire-research/issues/75#issuecomment-999"
+        self.assert_activation_rejected([reviewer, planner])
+
+        planner = decision(4, budget.PLANNER_MARKER, "2026-01-01T00:01:00Z")
+        planner.pop("id")
+        self.assert_activation_rejected([reviewer, planner])
+
+    def test_comments_must_bind_package_sha_and_lock_of_current_checkout(self):
+        reviewer = decision(1, budget.REVIEW_MARKER, "2026-01-01T00:00:00Z")
+        wrong_package = decision(2, budget.PLANNER_MARKER, "2026-01-01T00:01:00Z", commit="d" * 40)
+        self.assert_activation_rejected([reviewer, wrong_package])
+
+        wrong_lock = decision(3, budget.PLANNER_MARKER, "2026-01-01T00:01:00Z", lock="e" * 64)
+        self.assert_activation_rejected([reviewer, wrong_lock])
+
+    def test_directly_forged_receipt_cannot_create_ledger_or_write_events(self):
+        forged = budget.ActivationReceipt("0" * 40, "0" * 64, 1, 2, "2026-01-01T00:01:00+00:00")
+        with tempfile.TemporaryDirectory(dir=REPO / ".task-tmp") as temp:
+            ledger_path = Path(temp) / "forged-ledger"
+            with self.assertRaises(PermissionError):
+                budget.Stage1Ledger(ledger_path, forged)
+            self.assertFalse(ledger_path.exists())
+
+    def test_empty_authoritative_issue_response_cannot_open_ledger(self):
+        self.assert_activation_rejected([])
 
     def test_disabled_preparation_config_cannot_start_stage1(self):
         config = prepare.preflight.load_json(STUDY / "stage1" / "config.json")
@@ -143,15 +190,16 @@ class ActivationTests(unittest.TestCase):
         self.assertEqual(config["population"]["preflight_arm_schedule"], list(prepare.HELDOUT_ARMS))
         lock = prepare.verify_stage1_package()
         self.assertFalse(lock["execution_authorized"])
-        with self.assertRaises(PermissionError):
-            budget.Stage1Ledger(STUDY / "stage1" / "ledger", None)
+        with mock.patch.object(budget, "_fetch_authoritative_issue_comments", return_value=[]):
+            with self.assertRaises(PermissionError):
+                budget.Stage1Ledger(STUDY / "stage1" / "ledger", None)
 
 
 class LedgerTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(dir=REPO / ".task-tmp")
         self.addCleanup(self.temp.cleanup)
-        self.ledger = budget.Stage1Ledger(Path(self.temp.name), activation())
+        self.ledger = open_ledger(Path(self.temp.name))
 
     def reserve(self, run_id, unit, cap=32.0, *, role="builder", kind="search_invocation", attempts=16, **kwargs):
         return self.ledger.reserve(run_id=run_id, unit_id=unit, role=role,

@@ -19,6 +19,8 @@ import subprocess
 import threading
 import time
 from typing import Any, Mapping, Sequence
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 OWNER_LOGIN = "lsmfttb"
 REPOSITORY = "lsmfttb/spire-research"
@@ -32,6 +34,31 @@ REVIEW_MARKER = "STAGE1_REVIEW_PASS"
 PLANNER_MARKER = "STAGE1_PLANNER_ACTIVATE"
 PR_SET_CHILD_SUBREAPER = 36
 PR_GET_CHILD_SUBREAPER = 37
+STUDY = Path(__file__).resolve().parent
+STAGE1 = STUDY / "stage1"
+LOCKED_PACKAGE_FILES = (
+    "config.json",
+    "source-lock.json",
+    "source-lock.sha256",
+    "algorithm.py",
+    "learning.py",
+    "model.py",
+    "native_negative.py",
+    "preflight.py",
+    "runtime.py",
+    "stage0.py",
+    "test_issue75_contract.py",
+    "planning/build_stage1_cost_model.py",
+    "planning/stage1-cost-model.json",
+    "planning/stage1-cost-model.md",
+    "stage1_budget.py",
+    "stage1/config.json",
+    "stage1/seed-table.json",
+    "stage1/budget.json",
+    "stage1/prepare.py",
+    "stage1/test_activation.py",
+    "stage1/test_activation_gate.py",
+)
 
 
 def canonical(value: Any) -> bytes:
@@ -40,6 +67,71 @@ def canonical(value: Any) -> bytes:
 
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
+
+
+def _normalized_file_sha256(path: Path) -> str:
+    return sha256_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
+
+
+def verify_stage1_package() -> dict[str, Any]:
+    """Verify the disabled package and every exact source-lock entry using only stdlib code."""
+    lock_path = STAGE1 / "source-lock.json"
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    if (
+        lock.get("schema_id") != "issue75-stage1-source-lock-v1"
+        or lock.get("study_id") != "issue-75-no-expert-oracle"
+        or lock.get("scope") != "STUDY_ONLY"
+        or lock.get("execution_authorized") is not False
+        or lock.get("package_status") != "PREPARATION_ONLY_DISABLED"
+        or lock.get("formal_seeds_or_games_consumed") != 0
+        or lock.get("native_sampling_performed") is not False
+        or lock.get("model_training_performed") is not False
+    ):
+        raise PermissionError("Stage 1 package is not the registered disabled preparation package")
+    files = lock.get("locked_files_sha256_lf")
+    if not isinstance(files, dict) or set(files) != set(LOCKED_PACKAGE_FILES):
+        raise PermissionError("Stage 1 lock does not cover the exact registered package file set")
+    for relative, expected in files.items():
+        path = (STUDY / relative).resolve()
+        if not path.is_relative_to(STUDY.resolve()) or not path.is_file():
+            raise PermissionError(f"locked Stage 1 package file is unavailable: {relative}")
+        if not isinstance(expected, str) or _normalized_file_sha256(path) != expected:
+            raise PermissionError(f"Stage 1 package source lock mismatch: {relative}")
+
+    config = json.loads((STAGE1 / "config.json").read_text(encoding="utf-8"))
+    disabled = (
+        "stage1_execution_authorized", "formal_training_enabled", "formal_evaluation_enabled",
+        "nonformal_preflight_enabled", "native_sampling_enabled",
+    )
+    if any(config.get("execution", {}).get(key) is not False for key in disabled):
+        raise PermissionError("a Stage 1 execution flag is not explicitly disabled")
+    for relative, field in (
+        ("stage1/config.json", "stage1_config_sha256"),
+        ("stage1/seed-table.json", "seed_table_sha256"),
+        ("stage1/budget.json", "budget_config_sha256"),
+    ):
+        if lock.get(field) != _normalized_file_sha256(STUDY / relative):
+            raise PermissionError(f"Stage 1 lock does not bind its registered input: {relative}")
+    table = json.loads((STAGE1 / "seed-table.json").read_text(encoding="utf-8"))
+    rows = table.get("rows", [])
+    units = [row.get("unit_id") for row in rows]
+    if (
+        len(rows) != 1032 or len(set(units)) != 1032 or any(not unit for unit in units)
+        or table.get("counts") != {
+            "training_owners": 512, "heldout_owner_arm_rows": 480,
+            "preflight_owner_arm_rows": 40, "preflight_arm_schedule": ["P0", "P1", "R", "J", "E"],
+            "preflight_is_nonformal_and_never_enters_efficacy": True,
+        }
+    ):
+        raise PermissionError("Stage 1 package has an incomplete or changed owner/arm schedule")
+    budget = json.loads((STAGE1 / "budget.json").read_text(encoding="utf-8"))
+    if budget.get("stage1_execution_authorized") is not False or budget.get("ledger_status") != "NOT_ACTIVATED_ZERO_CHARGES":
+        raise PermissionError("Stage 1 budget must remain disabled and uncharged")
+    sidecar = (STAGE1 / "source-lock.sha256").read_text(encoding="ascii").split()
+    lock_digest = _normalized_file_sha256(lock_path)
+    if not sidecar or sidecar[0] != lock_digest:
+        raise PermissionError("Stage 1 source-lock sidecar mismatch")
+    return lock
 
 
 @dataclass(frozen=True)
@@ -51,19 +143,61 @@ class ActivationReceipt:
     authorized_at: str
 
 
-def verify_activation_comments(
-    reviewer: Mapping[str, Any], planner: Mapping[str, Any], *,
+def _fetch_authoritative_issue_comments() -> list[Mapping[str, Any]]:
+    """Fetch all top-level Issue comments from GitHub; activation records are never caller-supplied."""
+    base = f"https://api.github.com/repos/{REPOSITORY}/issues/{ISSUE_NUMBER}/comments"
+    comments: list[Mapping[str, Any]] = []
+    page = 1
+    while True:
+        request = Request(
+            f"{base}?per_page=100&page={page}",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "spire-research-issue75-activation-gate",
+            },
+        )
+        with urlopen(request, timeout=30) as response:
+            payload = json.load(response)
+        if not isinstance(payload, list) or any(not isinstance(row, Mapping) for row in payload):
+            raise PermissionError("GitHub returned an invalid Issue comment response")
+        comments.extend(payload)
+        if len(payload) < 100:
+            break
+        page += 1
+    return comments
+
+
+def _verify_activation_comments(
+    comments: Sequence[Mapping[str, Any]], *,
     package_commit: str, source_lock_sha256: str,
     repository: str = REPOSITORY, issue_number: int = ISSUE_NUMBER,
 ) -> ActivationReceipt:
-    """Validate future exact-SHA Reviewer PASS then Planner GO comments from the project's one owner account."""
+    """Select ordered exact-source decisions from authoritative Issue comment records."""
     if repository != REPOSITORY or issue_number != ISSUE_NUMBER:
         raise PermissionError("activation is bound to lsmfttb/spire-research#75")
-    if len(package_commit) != 40 or any(c not in "0123456789abcdef" for c in package_commit):
+    if not isinstance(package_commit, str) or len(package_commit) != 40 or any(c not in "0123456789abcdef" for c in package_commit):
         raise ValueError("invalid package commit SHA")
-    if len(source_lock_sha256) != 64 or any(c not in "0123456789abcdef" for c in source_lock_sha256):
+    if not isinstance(source_lock_sha256, str) or len(source_lock_sha256) != 64 or any(c not in "0123456789abcdef" for c in source_lock_sha256):
         raise ValueError("invalid source-lock SHA256")
-    def check(comment: Mapping[str, Any], marker: str) -> datetime:
+    if not isinstance(comments, Sequence) or isinstance(comments, (str, bytes)):
+        raise PermissionError("GitHub Issue comments must be a sequence of records")
+
+    def check(comment: Mapping[str, Any], marker: str) -> tuple[int, datetime]:
+        comment_id = comment.get("id")
+        if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
+            raise PermissionError("decision comment has no valid GitHub comment ID")
+        url = comment.get("html_url")
+        if not isinstance(url, str):
+            raise PermissionError("decision comment has no GitHub URL")
+        parsed_url = urlsplit(url)
+        expected_path = f"/{REPOSITORY}/issues/{ISSUE_NUMBER}"
+        if (
+            parsed_url.scheme != "https" or parsed_url.netloc != "github.com"
+            or parsed_url.path != expected_path or parsed_url.query
+            or parsed_url.fragment != f"issuecomment-{comment_id}"
+        ):
+            raise PermissionError("decision comment URL does not identify its exact Issue 75 comment ID")
         user, body, created = comment.get("user"), comment.get("body"), comment.get("created_at")
         if not isinstance(user, Mapping) or user.get("login") != OWNER_LOGIN or user.get("type") != "User":
             raise PermissionError("comment is not from the configured project owner")
@@ -72,22 +206,82 @@ def verify_activation_comments(
             f"source_lock_sha256: {source_lock_sha256}", "scope: STUDY_ONLY",
         }.issubset({line.strip() for line in body.splitlines()}):
             raise PermissionError(f"comment does not bind {marker}, exact source, lock, and STUDY_ONLY scope")
-        url = comment.get("html_url", "")
-        if url and f"/issues/{ISSUE_NUMBER}#issuecomment-" not in url:
-            raise PermissionError("decision comment is not attached to Issue 75")
         if not isinstance(created, str):
-            raise ValueError("comment has no GitHub timestamp")
-        timestamp = datetime.fromisoformat(created.replace("Z", "+00:00"))
+            raise PermissionError("decision comment has no GitHub timestamp")
+        try:
+            timestamp = datetime.fromisoformat(created.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise PermissionError("decision comment has an invalid GitHub timestamp") from exc
         if timestamp.tzinfo is None:
-            raise ValueError("comment timestamp lacks timezone")
-        return timestamp
-    if reviewer.get("id") == planner.get("id"):
-        raise PermissionError("review and activation must be distinct comments")
-    reviewed_at, activated_at = check(reviewer, REVIEW_MARKER), check(planner, PLANNER_MARKER)
-    if activated_at <= reviewed_at:
-        raise PermissionError("Planner activation must follow Reviewer PASS")
+            raise PermissionError("decision comment timestamp lacks timezone")
+        return comment_id, timestamp
+
+    def marked(marker: str) -> list[Mapping[str, Any]]:
+        return [
+            row for row in comments
+            if isinstance(row, Mapping) and isinstance(row.get("body"), str)
+            and marker in {line.strip() for line in row["body"].splitlines()}
+        ]
+
+    reviewers: list[tuple[int, datetime]] = []
+    planners: list[tuple[int, datetime]] = []
+    for row in marked(REVIEW_MARKER):
+        try:
+            reviewers.append(check(row, REVIEW_MARKER))
+        except (PermissionError, ValueError, TypeError):
+            continue
+    for row in marked(PLANNER_MARKER):
+        try:
+            planners.append(check(row, PLANNER_MARKER))
+        except (PermissionError, ValueError, TypeError):
+            continue
+
+    valid_pairs = [
+        (reviewer_id, planner_id, activated_at)
+        for reviewer_id, reviewed_at in reviewers
+        for planner_id, activated_at in planners
+        if reviewer_id != planner_id and activated_at > reviewed_at
+    ]
+    if not valid_pairs:
+        raise PermissionError(
+            "no authoritative ordered Reviewer PASS and later Planner GO comments bind the current package, lock, and STUDY_ONLY scope"
+        )
+    reviewer_id, planner_id, activated_at = max(valid_pairs, key=lambda pair: pair[2])
     return ActivationReceipt(
-        package_commit, source_lock_sha256, int(reviewer["id"]), int(planner["id"]), activated_at.isoformat(),
+        package_commit, source_lock_sha256, reviewer_id, planner_id, activated_at.isoformat(),
+    )
+
+
+def _current_package_binding() -> tuple[str, str]:
+    """Verify the locked package and bind activation to this checkout's commit and lock digest."""
+    verify_stage1_package()
+    working_tree = subprocess.run(
+        ["git", "diff", "--quiet", "HEAD", "--", "."], cwd=STUDY,
+        check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    if working_tree.returncode != 0:
+        raise PermissionError("Stage 1 activation requires a clean tracked study checkout")
+    current = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=STUDY, check=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    ).stdout.strip()
+    if len(current) != 40 or any(char not in "0123456789abcdef" for char in current):
+        raise PermissionError("current package checkout has no valid Git commit SHA")
+    lock_path = STAGE1 / "source-lock.json"
+    lock_digest = _normalized_file_sha256(lock_path)
+    sidecar = (STAGE1 / "source-lock.sha256").read_text(encoding="ascii").split()
+    if not sidecar or sidecar[0] != lock_digest:
+        raise PermissionError("current Stage 1 source-lock digest does not match its checked-in sidecar")
+    return current, lock_digest
+
+
+def _live_activation_receipt() -> ActivationReceipt:
+    package_commit, lock_digest = _current_package_binding()
+    comments = _fetch_authoritative_issue_comments()
+    if _current_package_binding() != (package_commit, lock_digest):
+        raise PermissionError("Stage 1 package changed while authoritative activation comments were fetched")
+    return _verify_activation_comments(
+        comments, package_commit=package_commit, source_lock_sha256=lock_digest,
     )
 
 
@@ -141,14 +335,14 @@ def _charge(run: Mapping[str, Any]) -> float:
 
 
 class Stage1Ledger:
-    """Append-only write-ahead resource accounting; construct only with verified future activation."""
-    def __init__(self, directory: Path, activation: ActivationReceipt):
-        if not isinstance(activation, ActivationReceipt):
-            raise PermissionError("exact Reviewer PASS and later Planner activation required")
+    """Append-only write-ahead accounting; construction always fetches and verifies live activation."""
+    def __init__(self, directory: Path, activation: ActivationReceipt | None = None):
+        if activation is not None:
+            raise PermissionError("caller-supplied activation receipts cannot authorize ledger construction")
+        self.activation = _live_activation_receipt()
         self.directory = Path(directory)
         self.events_path = self.directory / "events.jsonl"
         self.lock_path = self.directory / "events.lock"
-        self.activation = activation
         self.thread_lock = threading.RLock()
 
     def _tx(self, operation):
@@ -343,6 +537,11 @@ class Stage1Ledger:
 
     def read_events(self):
         return self._tx(lambda rows: (_state(rows) and rows, None))
+
+
+def open_activated_stage1_ledger(directory: Path) -> Stage1Ledger:
+    """Open the sole Stage 1 ledger gate after live GitHub and checkout binding checks."""
+    return Stage1Ledger(directory)
 
 
 class ProcessTreeSafetyError(RuntimeError): pass

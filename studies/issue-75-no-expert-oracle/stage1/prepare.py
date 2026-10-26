@@ -20,18 +20,16 @@ STUDY = Path(__file__).resolve().parents[1]
 STAGE1 = STUDY / "stage1"
 sys.path.insert(0, str(STUDY))
 
-import learning  # noqa: E402
-import model  # noqa: E402
-import native_negative  # noqa: E402
 import preflight  # noqa: E402
-import runtime  # noqa: E402
 from stage1_budget import (  # noqa: E402
     ALL_IN_LIMIT,
     BUILDER_LIMIT,
+    LOCKED_PACKAGE_FILES,
     OWNER_LOGIN,
     REVIEWER_LIMIT,
     canonical,
     sha256_bytes,
+    verify_stage1_package as verify_package_lock,
 )
 
 
@@ -43,28 +41,7 @@ STAGE0_REVIEW_COMMENT_ID = 6403333026
 COST_REVIEW_COMMENT_ID = 6403856784
 PLANNER_BUDGET_COMMENT_ID = 6403907358
 HELDOUT_ARMS = ("P0", "P1", "R", "J", "E")
-SOURCE_FILES = (
-    "config.json",
-    "source-lock.json",
-    "source-lock.sha256",
-    "algorithm.py",
-    "learning.py",
-    "model.py",
-    "native_negative.py",
-    "preflight.py",
-    "runtime.py",
-    "stage0.py",
-    "test_issue75_contract.py",
-    "planning/build_stage1_cost_model.py",
-    "planning/stage1-cost-model.json",
-    "planning/stage1-cost-model.md",
-    "stage1_budget.py",
-    "stage1/config.json",
-    "stage1/seed-table.json",
-    "stage1/budget.json",
-    "stage1/prepare.py",
-    "stage1/test_activation.py",
-)
+SOURCE_FILES = LOCKED_PACKAGE_FILES
 
 
 def file_sha256(path: Path) -> str:
@@ -225,6 +202,8 @@ def _verify_stage0_lock_and_evidence(config: Mapping[str, Any]) -> dict[str, Any
 
 
 def _optimizer_descriptor(policy: model.ActionConditionedPolicy) -> dict[str, Any]:
+    import learning
+
     optimizer = learning._new_optimizer(policy)
     state = optimizer.state_dict()
     groups = []
@@ -241,6 +220,10 @@ def _optimizer_descriptor(policy: model.ActionConditionedPolicy) -> dict[str, An
 
 
 def _runtime_lock(config: Mapping[str, Any]) -> dict[str, Any]:
+    import model
+    import native_negative
+    import runtime
+
     runtime.verify_source_repositories(config)
     native_path = runtime.verify_native_module(config)
     negative = native_negative.run_negative_check()
@@ -473,50 +456,92 @@ def prepare_stage1_package() -> dict[str, Any]:
     }
 
 
-def verify_stage1_package() -> dict[str, Any]:
+def _atomic_replace(path: Path, payload: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    for index in range(100):
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.{index}.tmp")
+        try:
+            fd = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            break
+        except FileExistsError:
+            continue
+    else:
+        raise FileExistsError(f"cannot allocate an in-directory temporary file for {path.name}")
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def refresh_stage1_source_lock() -> dict[str, Any]:
+    """Relock only the reviewed activation-gate repair files; preserve the registered study package."""
     lock_path = STAGE1 / "source-lock.json"
+    sidecar_path = STAGE1 / "source-lock.sha256"
     lock = preflight.load_json(lock_path)
-    if lock.get("execution_authorized") is not False or lock.get("package_status") != "PREPARATION_ONLY_DISABLED":
-        raise ValueError("Stage 1 package no longer fails closed")
-    execution = preflight.load_json(STAGE1 / "config.json").get("execution", {})
-    disabled = (
-        "stage1_execution_authorized", "formal_training_enabled", "formal_evaluation_enabled",
-        "nonformal_preflight_enabled", "native_sampling_enabled",
-    )
-    if any(execution.get(key) is not False for key in disabled):
-        raise ValueError("a Stage 1 execution flag is not explicitly disabled")
-    if set(lock.get("locked_files_sha256_lf", {})) != set(SOURCE_FILES):
-        raise ValueError("Stage 1 source lock does not cover the exact prepared package")
-    for relative, expected in lock["locked_files_sha256_lf"].items():
-        actual = preflight.normalized_sha256(STUDY / relative)
-        if actual != expected:
-            raise ValueError(f"Stage 1 package source lock mismatch: {relative}")
-    table = preflight.load_json(STAGE1 / "seed-table.json")
-    rows = table.get("rows", [])
-    ids = [row.get("unit_id") for row in rows]
-    if len(rows) != 1032 or len(set(ids)) != 1032 or any(not value for value in ids):
-        raise ValueError("Stage 1 seed-table owner/arm rows or unit identifiers are incomplete")
-    if table.get("counts") != {
-        "training_owners": 512,
-        "heldout_owner_arm_rows": 480,
-        "preflight_owner_arm_rows": 40,
-        "preflight_arm_schedule": list(HELDOUT_ARMS),
-        "preflight_is_nonformal_and_never_enters_efficacy": True,
-    }:
-        raise ValueError("Stage 1 seed-table population differs from the registered schedule")
-    budget = preflight.load_json(STAGE1 / "budget.json")
-    if budget.get("stage1_execution_authorized") is not False or budget.get("ledger_status") != "NOT_ACTIVATED_ZERO_CHARGES":
-        raise ValueError("Stage 1 budget ledger must remain disabled and uncharged")
-    sidecar = (STAGE1 / "source-lock.sha256").read_text(encoding="ascii").split()[0]
-    if preflight.normalized_sha256(lock_path) != sidecar:
-        raise ValueError("Stage 1 source lock sidecar mismatch")
-    if lock.get("formal_seeds_or_games_consumed") != 0 or lock.get("native_sampling_performed") is not False:
-        raise ValueError("preparation package records unauthorized sampling or formal execution")
-    return lock
+    old_digest = preflight.normalized_sha256(lock_path)
+    sidecar = sidecar_path.read_text(encoding="ascii").split()
+    if not sidecar or sidecar[0] != old_digest:
+        raise ValueError("refusing to refresh a source lock whose existing sidecar is invalid")
+    if (
+        lock.get("schema_id") != "issue75-stage1-source-lock-v1"
+        or lock.get("study_id") != "issue-75-no-expert-oracle"
+        or lock.get("scope") != "STUDY_ONLY"
+        or lock.get("execution_authorized") is not False
+        or lock.get("package_status") != "PREPARATION_ONLY_DISABLED"
+        or lock.get("formal_seeds_or_games_consumed") != 0
+        or lock.get("native_sampling_performed") is not False
+        or lock.get("model_training_performed") is not False
+    ):
+        raise ValueError("refusing to refresh a source lock outside the disabled preparation package")
+    previous_file_set = frozenset(set(SOURCE_FILES) - {"stage1/test_activation_gate.py"})
+    existing_file_set = frozenset(lock.get("locked_files_sha256_lf", {}))
+    if existing_file_set not in {frozenset(SOURCE_FILES), previous_file_set}:
+        raise ValueError("existing source lock does not contain the exact registered file set")
+    immutable_files = {
+        "stage1/config.json": "stage1_config_sha256",
+        "stage1/seed-table.json": "seed_table_sha256",
+        "stage1/budget.json": "budget_config_sha256",
+    }
+    for relative, field in immutable_files.items():
+        if preflight.normalized_sha256(STUDY / relative) != lock.get(field):
+            raise ValueError(f"refusing to change registered Stage 1 input: {relative}")
+
+    refreshed = _locked_file_hashes()
+    repairable = {
+        "stage1_budget.py", "stage1/prepare.py", "stage1/test_activation.py",
+        "stage1/test_activation_gate.py",
+    }
+    changed = {
+        relative for relative, digest in refreshed.items()
+        if lock["locked_files_sha256_lf"].get(relative) != digest
+    }
+    if not changed <= repairable:
+        raise ValueError("source-lock refresh found changes outside the activation-gate repair files")
+    lock["locked_files_sha256_lf"] = refreshed
+    payload = json.dumps(lock, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False).encode("utf-8") + b"\n"
+    _atomic_replace(lock_path, payload)
+    digest = sha256_bytes(payload)
+    _atomic_replace(sidecar_path, f"{digest}  source-lock.json\n".encode("ascii"))
+    verify_stage1_package()
+    return {"status": lock["package_status"], "source_lock_sha256": digest, "relocked_files": sorted(changed)}
+
+
+def verify_stage1_package() -> dict[str, Any]:
+    return verify_package_lock()
 
 
 def main() -> int:
-    print(json.dumps(prepare_stage1_package(), sort_keys=True))
+    if sys.argv[1:] == ["--refresh-source-lock"]:
+        result = refresh_stage1_source_lock()
+    elif not sys.argv[1:]:
+        result = prepare_stage1_package()
+    else:
+        raise SystemExit("usage: prepare.py [--refresh-source-lock]")
+    print(json.dumps(result, sort_keys=True))
     verify_stage1_package()
     return 0
 
