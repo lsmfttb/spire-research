@@ -207,6 +207,31 @@ class LedgerTests(unittest.TestCase):
                                    reserved_cpu_seconds=cap, unit_kind=kind,
                                    attempt_cap=attempts if kind == "search_invocation" else None, **kwargs)
 
+    def test_worker_ledger_reuses_recorded_activation_for_an_open_reservation(self):
+        unit_id = "PREFLIGHT:7520001:P0"
+        run_id = unit_id + "-" + "a" * 16
+        activation = self.ledger.activation
+        self.ledger.reserve(
+            run_id=run_id, unit_id=unit_id, role="builder",
+            reserved_cpu_seconds=1000.0, unit_kind="owner_arm",
+        )
+        with (
+            mock.patch.object(
+                budget, "_current_package_binding",
+                return_value=(activation.package_commit, activation.source_lock_sha256),
+            ),
+            mock.patch.object(budget, "_fetch_authoritative_issue_comments",
+                              side_effect=AssertionError("worker repeated GitHub activation fetch")),
+        ):
+            worker = budget.open_reserved_stage1_worker_ledger(
+                self.ledger.directory, run_id=run_id, unit_id=unit_id,
+            )
+        self.assertEqual(worker.activation, activation)
+        self.assertEqual(
+            worker.require_open_reservation(run_id=run_id, unit_id=unit_id)["activation_receipt"],
+            budget._activation_receipt_data(activation),
+        )
+
     def test_resume_requires_checkpoint_and_preserves_usage(self):
         self.reserve("run-1", "TRAIN:7500001", cap=32.0)
         self.ledger.finish(run_id="run-1", measured_cpu_seconds=9.5, status="incomplete",

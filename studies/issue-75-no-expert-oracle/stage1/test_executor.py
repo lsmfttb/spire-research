@@ -488,6 +488,42 @@ class Stage1ExecutorTests(unittest.TestCase):
         with self.assertRaises(executor.budget.ResourceBlocked):
             self._reserve_test_unit(capped, unit_id="CAP:2", run_id="CAP:2-" + "f" * 16, cap=0.1)
 
+    def test_native_runtime_uses_stage1_activation_without_stage0_gate(self):
+        import preflight
+        import runtime
+
+        config = executor._read_json(STUDY / "config.json")
+        native_path = STUDY / "runtime.py"
+        fake_module = types.ModuleType("fake_native")
+        fake_module.__file__ = str(native_path)
+        env = {"identity": {"native_source_commit": config["source"]["sts_lightspeed_commit"]}}
+        fake_runner = type("FakeRunner", (), {
+            "_setup": lambda self, output_dir, *, native_module_path: (
+                env, fake_module, object(), {"runtime": "test"},
+            ),
+        })()
+        receipt = executor.budget.ActivationReceipt(
+            package_commit="a" * 40,
+            source_lock_sha256="b" * 64,
+            reviewer_comment_id=101,
+            planner_comment_id=102,
+            authorized_at="2026-01-01T00:00:00+00:00",
+        )
+        with tempfile.TemporaryDirectory(dir=STUDY) as temp_dir:
+            with (
+                mock.patch.object(executor.budget, "validate_worker_activation_receipt") as validate_receipt,
+                mock.patch.object(runtime, "verify_source_repositories"),
+                mock.patch.object(runtime, "verify_native_module", return_value=native_path),
+                mock.patch.object(runtime, "binary_sha256", return_value=config["source"]["native_module_sha256"]),
+                mock.patch.object(runtime, "load_issue73_runner", return_value=fake_runner),
+                mock.patch.object(preflight, "reviewer_pass_proof", side_effect=AssertionError("Stage-0 gate used")),
+            ):
+                result = runtime.initialize_native_runtime(
+                    Path(temp_dir) / "runtime", sampling=True, stage1_activation=receipt,
+                )
+        validate_receipt.assert_called_once_with(receipt)
+        self.assertEqual(result[0], config)
+
     def test_worker_accepts_only_the_exact_registered_owner_row(self):
         row = next(item for item in executor._rows() if item["phase"] == "preflight")
         unit_id = row["unit_id"]
@@ -512,7 +548,7 @@ class Stage1ExecutorTests(unittest.TestCase):
         job_path.write_text(json.dumps(job), encoding="utf-8")
         with (
             mock.patch.object(executor.budget, "verify_stage1_package"),
-            mock.patch.object(executor.budget, "open_activated_stage1_ledger", return_value=ledger),
+            mock.patch.object(executor.budget, "open_reserved_stage1_worker_ledger", return_value=ledger),
             mock.patch.object(executor, "_worker_owner", return_value={"status": "SUCCEEDED", "unit_id": unit_id}) as worker,
         ):
             self.assertEqual(executor._worker_main(job_path), 0)
@@ -523,7 +559,7 @@ class Stage1ExecutorTests(unittest.TestCase):
         job_path.write_text(json.dumps(job), encoding="utf-8")
         with (
             mock.patch.object(executor.budget, "verify_stage1_package"),
-            mock.patch.object(executor.budget, "open_activated_stage1_ledger", return_value=ledger),
+            mock.patch.object(executor.budget, "open_reserved_stage1_worker_ledger", return_value=ledger),
             mock.patch.object(executor, "_worker_owner") as worker,
         ):
             with self.assertRaises(PermissionError):
@@ -560,7 +596,7 @@ class Stage1ExecutorTests(unittest.TestCase):
 
         with (
             mock.patch.object(executor.budget, "verify_stage1_package"),
-            mock.patch.object(executor.budget, "open_activated_stage1_ledger", return_value=ledger),
+            mock.patch.object(executor.budget, "open_reserved_stage1_worker_ledger", return_value=ledger),
             mock.patch.object(executor, "_worker_update", side_effect=fake_worker_update) as worker,
         ):
             self.assertEqual(executor._worker_main(job_path), 0)
@@ -571,7 +607,7 @@ class Stage1ExecutorTests(unittest.TestCase):
         job_path.write_text(json.dumps(job), encoding="utf-8")
         with (
             mock.patch.object(executor.budget, "verify_stage1_package"),
-            mock.patch.object(executor.budget, "open_activated_stage1_ledger", return_value=ledger),
+            mock.patch.object(executor.budget, "open_reserved_stage1_worker_ledger", return_value=ledger),
             mock.patch.object(executor, "_worker_update") as worker,
         ):
             with self.assertRaises(PermissionError):

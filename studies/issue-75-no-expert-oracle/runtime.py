@@ -232,6 +232,7 @@ def _validate_parent_sampling_proof(proof: Mapping[str, Any]) -> None:
 def initialize_native_runtime(
     output_dir: Path, *, sampling: bool,
     reviewer_proof: Mapping[str, Any] | None = None,
+    stage1_activation: Any | None = None,
 ) -> tuple[dict[str, Any], Any, Any, Any]:
     """Validate exact source/runtime pins and install the accepted execution path."""
     from preflight import load_json
@@ -240,7 +241,12 @@ def initialize_native_runtime(
     if sampling:
         if config["authorization"]["native_sampling_blocked_until_reviewer_pass"] is not True:
             raise RuntimeError("source contract does not keep native sampling behind independent review")
-        if reviewer_proof is None:
+        if reviewer_proof is not None and stage1_activation is not None:
+            raise RuntimeError("sampling cannot combine Stage-0 and Stage-1 authorization proofs")
+        if stage1_activation is not None:
+            from stage1_budget import validate_worker_activation_receipt
+            validate_worker_activation_receipt(stage1_activation)
+        elif reviewer_proof is None:
             from preflight import reviewer_pass_proof
             reviewer_pass_proof()
         else:

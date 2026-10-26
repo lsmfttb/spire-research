@@ -1381,7 +1381,9 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
         }
     else:
         policy, digest, policy_source = _load_model(model_label, proxy=proxy)
-    config, runner, module, encoder = runtime.initialize_native_runtime(output, sampling=True)
+    config, runner, module, encoder = runtime.initialize_native_runtime(
+        output, sampling=True, stage1_activation=ledger.activation,
+    )
     search_receipts: list[dict[str, Any]] = []
     all_joint_trials: list[Any] = []
     search_seeds = [int(item) for item in row.get("search_invocation_seeds", ())]
@@ -1655,12 +1657,6 @@ def _worker_main(job_path: Path) -> int:
     job = _read_json(job_path)
     if job.get("schema_id") != WORKER_SCHEMA:
         raise PermissionError("worker job schema differs from the locked executor")
-    ledger = budget.open_activated_stage1_ledger(ARTIFACT_ROOT / "ledger")
-    if (
-        job.get("package_commit") != ledger.activation.package_commit
-        or job.get("source_lock_sha256") != ledger.activation.source_lock_sha256
-    ):
-        raise PermissionError("worker job is not bound to the live activation package")
     unit_id = str(job.get("unit_id", ""))
     run_id = str(job.get("run_id", ""))
     if len(run_id) != len(unit_id) + 17 or not run_id.startswith(unit_id + "-"):
@@ -1668,6 +1664,14 @@ def _worker_main(job_path: Path) -> int:
     suffix = run_id[len(unit_id) + 1:]
     if len(suffix) != 16 or any(char not in "0123456789abcdef" for char in suffix):
         raise PermissionError("worker run ID suffix is malformed")
+    ledger = budget.open_reserved_stage1_worker_ledger(
+        ARTIFACT_ROOT / "ledger", run_id=run_id, unit_id=unit_id,
+    )
+    if (
+        job.get("package_commit") != ledger.activation.package_commit
+        or job.get("source_lock_sha256") != ledger.activation.source_lock_sha256
+    ):
+        raise PermissionError("worker job is not bound to the active ledger reservation")
     reservation = ledger.require_open_reservation(run_id=run_id, unit_id=unit_id)
     if (
         job.get("previous_run_id") != reservation.get("previous_run_id")

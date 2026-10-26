@@ -167,6 +167,51 @@ class ActivationReceipt:
     authorized_at: str
 
 
+def _activation_receipt_data(receipt: ActivationReceipt) -> dict[str, Any]:
+    return {
+        "package_commit": receipt.package_commit,
+        "source_lock_sha256": receipt.source_lock_sha256,
+        "reviewer_comment_id": receipt.reviewer_comment_id,
+        "planner_comment_id": receipt.planner_comment_id,
+        "authorized_at": receipt.authorized_at,
+    }
+
+
+def _activation_receipt_from_data(
+    value: Any, *, expected_binding: tuple[str, str],
+) -> ActivationReceipt:
+    fields = {
+        "package_commit", "source_lock_sha256", "reviewer_comment_id",
+        "planner_comment_id", "authorized_at",
+    }
+    if not isinstance(value, Mapping) or set(value) != fields:
+        raise PermissionError("worker ledger lacks the exact recorded activation receipt")
+    reviewer_id, planner_id = value.get("reviewer_comment_id"), value.get("planner_comment_id")
+    authorized_at = value.get("authorized_at")
+    if (
+        value.get("package_commit") != expected_binding[0]
+        or value.get("source_lock_sha256") != expected_binding[1]
+        or not isinstance(reviewer_id, int) or isinstance(reviewer_id, bool) or reviewer_id <= 0
+        or not isinstance(planner_id, int) or isinstance(planner_id, bool) or planner_id <= 0
+        or reviewer_id == planner_id
+        or not isinstance(authorized_at, str)
+    ):
+        raise PermissionError("recorded activation receipt does not bind this package and source lock")
+    try:
+        timestamp = datetime.fromisoformat(authorized_at.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise PermissionError("recorded activation receipt has an invalid timestamp") from exc
+    if timestamp.tzinfo is None:
+        raise PermissionError("recorded activation receipt timestamp lacks a timezone")
+    return ActivationReceipt(
+        package_commit=expected_binding[0],
+        source_lock_sha256=expected_binding[1],
+        reviewer_comment_id=reviewer_id,
+        planner_comment_id=planner_id,
+        authorized_at=timestamp.isoformat(),
+    )
+
+
 def _fetch_authoritative_issue_comments() -> list[Mapping[str, Any]]:
     """Fetch all top-level Issue comments from GitHub; activation records are never caller-supplied."""
     base = f"https://api.github.com/repos/{REPOSITORY}/issues/{ISSUE_NUMBER}/comments"
@@ -325,6 +370,14 @@ def _current_package_binding() -> tuple[str, str]:
     return current, lock_digest
 
 
+def validate_worker_activation_receipt(receipt: ActivationReceipt) -> ActivationReceipt:
+    """Validate a parent's recorded Stage 1 activation against the current locked checkout."""
+    if not isinstance(receipt, ActivationReceipt):
+        raise PermissionError("Stage 1 worker activation must come from the reserved ledger")
+    binding = _current_package_binding()
+    return _activation_receipt_from_data(_activation_receipt_data(receipt), expected_binding=binding)
+
+
 def _live_activation_receipt() -> ActivationReceipt:
     package_commit, lock_digest = _current_package_binding()
     comments = _fetch_authoritative_issue_comments()
@@ -451,15 +504,44 @@ def _charge(run: Mapping[str, Any]) -> float:
 
 
 class Stage1Ledger:
-    """Append-only write-ahead accounting; construction always fetches and verifies live activation."""
+    """Append-only accounting; parents fetch live authorization and workers prove an open reservation."""
     def __init__(self, directory: Path, activation: ActivationReceipt | None = None):
         if activation is not None:
             raise PermissionError("caller-supplied activation receipts cannot authorize ledger construction")
-        self.activation = _live_activation_receipt()
+        self._initialize(directory, _live_activation_receipt())
+
+    def _initialize(self, directory: Path, activation: ActivationReceipt | None) -> None:
+        self.activation = activation
         self.directory = Path(directory)
         self.events_path = self.directory / "events.jsonl"
         self.lock_path = self.directory / "events.lock"
         self.thread_lock = threading.RLock()
+
+    @classmethod
+    def open_reserved_worker(
+        cls, directory: Path, *, run_id: str, unit_id: str,
+    ) -> "Stage1Ledger":
+        """Open only a live parent reservation, without repeating the GitHub comment fetch."""
+        binding = _current_package_binding()
+        ledger = cls.__new__(cls)
+        ledger._initialize(directory, None)
+        runs, _ = _state(_events(ledger.events_path))
+        run = runs.get(str(run_id))
+        if run is None or run["finish"] is not None:
+            raise PermissionError("worker has no open write-ahead ledger reservation")
+        reservation = run["reservation"]
+        if reservation.get("unit_id") != str(unit_id):
+            raise PermissionError("worker reservation does not match its registered unit")
+        if (
+            reservation.get("package_commit") != binding[0]
+            or reservation.get("source_lock_sha256") != binding[1]
+        ):
+            raise PermissionError("worker reservation belongs to a different package or source lock")
+        ledger.activation = _activation_receipt_from_data(
+            reservation.get("activation_receipt"), expected_binding=binding,
+        )
+        ledger.require_open_reservation(run_id=run_id, unit_id=unit_id)
+        return ledger
 
     def _tx(self, operation):
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -495,6 +577,7 @@ class Stage1Ledger:
             or reservation.get("role") != str(role)
             or reservation.get("package_commit") != self.activation.package_commit
             or reservation.get("source_lock_sha256") != self.activation.source_lock_sha256
+            or reservation.get("activation_receipt") != _activation_receipt_data(self.activation)
         ):
             raise PermissionError("worker reservation does not match its unit and active package binding")
         return dict(reservation)
@@ -567,7 +650,9 @@ class Stage1Ledger:
                 "reserved_cpu_seconds": cap, "attempt_cap": attempt_cap,
                 "previous_run_id": previous_run_id, "checkpoint_sha256": checkpoint_sha256,
                 "package_commit": self.activation.package_commit,
-                "source_lock_sha256": self.activation.source_lock_sha256, "created_at_ns": time.time_ns(),
+                "source_lock_sha256": self.activation.source_lock_sha256,
+                "activation_receipt": _activation_receipt_data(self.activation),
+                "created_at_ns": time.time_ns(),
             }
             return event, event
         return self._tx(operation)
@@ -683,8 +768,15 @@ class Stage1Ledger:
 
 
 def open_activated_stage1_ledger(directory: Path) -> Stage1Ledger:
-    """Open the sole Stage 1 ledger gate after live GitHub and checkout binding checks."""
+    """Open the sole parent gate after live GitHub and checkout binding checks."""
     return Stage1Ledger(directory)
+
+
+def open_reserved_stage1_worker_ledger(
+    directory: Path, *, run_id: str, unit_id: str,
+) -> Stage1Ledger:
+    """Validate a durable parent reservation without refetching GitHub in every worker."""
+    return Stage1Ledger.open_reserved_worker(directory, run_id=run_id, unit_id=unit_id)
 
 
 class ProcessTreeSafetyError(RuntimeError): pass
