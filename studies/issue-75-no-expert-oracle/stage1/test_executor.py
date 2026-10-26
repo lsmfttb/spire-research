@@ -163,6 +163,20 @@ class Stage1ExecutorTests(unittest.TestCase):
             **metadata,
         )
 
+    def test_write_once_accepts_crlf_checkout_without_rewriting_or_replacing_receipt(self):
+        path = executor.ARTIFACT_ROOT / "crlf-receipt.json"
+        value = {"status": "retained", "text": "unchanged"}
+        canonical = executor._canonical(value) + b"\n"
+        checked_out = canonical.replace(b"\n", b"\r\n")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(checked_out)
+
+        self.assertEqual(executor._write_once(path, value), executor._sha256(canonical))
+        self.assertEqual(path.read_bytes(), checked_out)
+        with self.assertRaises(FileExistsError):
+            executor._write_once(path, {**value, "status": "changed"})
+        self.assertEqual(path.read_bytes(), checked_out)
+
     def test_paired_owner_differences_bind_all_96_owner_pairs(self):
         rows = []
         for owner in range(96):

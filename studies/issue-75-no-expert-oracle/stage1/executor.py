@@ -68,7 +68,9 @@ def _write_once(path: Path, value: Mapping[str, Any]) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = _canonical(value) + b"\n"
     if path.exists():
-        if path.read_bytes() != payload:
+        # Git's core.autocrlf can translate checked-out JSON newlines.
+        # Normalize only CRLF pairs for comparison; never rewrite evidence.
+        if path.read_bytes().replace(b"\r\n", b"\n") != payload:
             raise FileExistsError(f"refusing to replace immutable Stage 1 receipt {path.name}")
         return _sha256(payload)
     fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
