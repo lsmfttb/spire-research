@@ -95,6 +95,45 @@ class FakeReceiptLedger:
         ]
 
 
+class PreflightTreatmentSemanticsTests(unittest.TestCase):
+    def test_root_gap_does_not_fail_episode_with_a_valid_later_mutation(self):
+        searches = [
+            {"root_id": "gap-root", "root_index": 2, "status": "TREATMENT_NOT_DELIVERED", "mutation_attempts": []},
+            {
+                "root_id": "delivered-root", "root_index": 3, "status": "MUTATION_ATTEMPTED",
+                "mutation_attempts": [{
+                    "complete_terminal": True,
+                    "alternative_differs_from_parent_action": True,
+                    "legal_occurrence_count": 3,
+                    "trajectory_decision_count": 4,
+                }],
+            },
+        ]
+        delivered, root_gaps = executor._preflight_treatment_diagnostics("PREFLIGHT:1:J", "J", searches)
+        self.assertTrue(delivered)
+        self.assertEqual(root_gaps, [{
+            "unit_id": "PREFLIGHT:1:J",
+            "root_id": "gap-root",
+            "root_index": 2,
+            "status": "TREATMENT_NOT_DELIVERED",
+        }])
+
+    def test_episode_treatment_requires_a_valid_terminal_later_mutation(self):
+        searches = [{
+            "root_id": "incomplete-root",
+            "root_index": 0,
+            "status": "MUTATION_ATTEMPTED",
+            "mutation_attempts": [{
+                "complete_terminal": False,
+                "alternative_differs_from_parent_action": True,
+                "legal_occurrence_count": 2,
+                "trajectory_decision_count": 4,
+            }],
+        }]
+        delivered, root_gaps = executor._preflight_treatment_diagnostics("PREFLIGHT:2:J", "J", searches)
+        self.assertFalse(delivered)
+        self.assertEqual(root_gaps, [])
+
 class Stage1ExecutorTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(dir=STAGE1)

@@ -485,7 +485,7 @@ def execute_policy_trajectory(
     attempt_index: int, invocation_seed: int, root_action_index: int | None,
     mutation_target: Any | None, parent_trial: TrialResult | None = None,
     cpu_cap_seconds: float = 32.0, source_arm: str = "BRANCH",
-    policy_rng_seed: int | None = None,
+    policy_rng_seed: int | None = None, transition_guard: Any | None = None,
 ) -> TrialResult:
     """Restore one genuine in-memory checkpoint and run a true native terminal trajectory."""
     import time
@@ -540,6 +540,7 @@ def execute_policy_trajectory(
             purpose=purpose, durable=False, capture_trace=True,
             capture_checkpoints=True, capture_all_roots=True,
             cpu_cap_seconds=float(cpu_cap_seconds), policy_rng_seed=policy_rng_seed,
+            transition_guard=transition_guard,
         )
     except SearchBudgetExhausted as exc:
         for row in getattr(exc, "issue73_captured_roots", ()):

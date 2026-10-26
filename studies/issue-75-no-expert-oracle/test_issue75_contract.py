@@ -57,6 +57,28 @@ def _terminal_trial(
 
 
 class Issue75ContractTests(unittest.TestCase):
+    def test_invocation_budget_stops_before_native_transition_margin(self) -> None:
+        cpu = [0.0]
+        invocation = algorithm.InvocationBudget(
+            cpu_cap_seconds=32.0,
+            started_attempt_cap=16,
+            cpu_reader=lambda: cpu[0],
+        )
+        cpu[0] = 30.0
+        with self.assertRaises(algorithm.SearchBudgetExhausted):
+            invocation.guard_transition(safety_margin_seconds=2.0)
+        self.assertEqual(invocation.stop_reason, "CPU_CAP")
+        self.assertFalse(invocation.can_start_attempt())
+
+    def test_process_cpu_alarm_interrupts_a_synthetic_busy_loop(self) -> None:
+        import time
+        started = time.process_time()
+        with self.assertRaises(algorithm.SearchBudgetExhausted):
+            with runtime.process_cpu_alarm(0.05):
+                while True:
+                    pass
+        self.assertLess(time.process_time() - started, 0.5)
+
     def test_immutable_json_receipt_accepts_crlf_but_never_overwrites_content(self) -> None:
         with tempfile.TemporaryDirectory(dir=STUDY) as temp_dir:
             path = Path(temp_dir) / "receipt.json"

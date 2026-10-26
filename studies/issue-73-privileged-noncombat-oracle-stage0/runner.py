@@ -722,6 +722,7 @@ class StudyController:
         root_callback: Any | None = None,
         policy_rng_seed: int | None = None,
         capture_root_limit: int | None = None,
+        transition_guard: Any | None = None,
     ) -> None:
         from sts_combat_rl.sim.controller_contract import ControllerProvenance
 
@@ -736,6 +737,7 @@ class StudyController:
         self.capture_checkpoints = capture_checkpoints
         self.capture_all_roots = bool(capture_all_roots)
         self.root_callback = root_callback
+        self.transition_guard = transition_guard
         if capture_root_limit is not None and int(capture_root_limit) < 1:
             raise ValueError("capture_root_limit must be positive when provided")
         self.capture_root_limit = None if capture_root_limit is None else int(capture_root_limit)
@@ -800,6 +802,8 @@ class StudyController:
             self.expert.reset_for_run(policy_seed)
 
     def select_action(self, adapter: Any, snapshot: Any, actions: Sequence[Any], context: Any, step_index: int) -> Any:
+        if self.transition_guard is not None:
+            self.transition_guard()
         from sts_combat_rl.sim.controller_contract import ControllerDecision
         from sts_combat_rl.sim.online_controller import is_battle_state
         from sts_combat_rl.sim.decision_record import action_identity_dicts_for_actions
@@ -1165,6 +1169,7 @@ def _run_one(
     root_callback: Any | None = None, cpu_cap_seconds: float | None = None,
     capture_action_history: bool = False, policy_rng_seed: int | None = None,
     capture_root_limit: int | None = None, capture_training_features: bool = False,
+    transition_guard: Any | None = None,
 ) -> dict[str, Any]:
     from sts_combat_rl.sim import controlled_run
     from sts_combat_rl.sim.action_space import ActionSpaceConfig
@@ -1189,6 +1194,7 @@ def _run_one(
         suffix_random_seed=suffix_random_seed, expert_random_seed=expert_random_seed,
         root_callback=root_callback, policy_rng_seed=policy_rng_seed,
         capture_root_limit=capture_root_limit,
+        transition_guard=transition_guard,
     )
     controller.run_id = label
     adapter = adapter_override or LightSpeedAdapter(seed=seed, ascension=20, player_class="IRONCLAD", module=module)

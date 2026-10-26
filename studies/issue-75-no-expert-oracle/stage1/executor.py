@@ -17,7 +17,9 @@ import math
 import os
 from pathlib import Path
 import random
+import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import zlib
@@ -542,6 +544,7 @@ def _forecast_estimates(ledger: Any) -> tuple[dict[str, float], dict[str, Any]]:
         "status": "FITS_IF_LEDGER_ACCEPTS",
         "source": "locked Stage 1 cost-model caps and current exact-source ledger charges",
         "maximum_search_cpu_seconds": float(projection["search_hard_cap"]),
+        "operational_search_stop_margin_cpu_seconds": 2.0,
         "nonsearch_root_bootstrap_p95_cpu_seconds": nonsearch,
         "training_update_guard_cpu_seconds": train_guard,
         "engineering_allowance_initial_cpu_seconds": float(projection["engineering_allowance"]),
@@ -586,9 +589,38 @@ def _formal_forecast(ledger: Any) -> dict[str, Any]:
     return {"preflight_report_sha256": report_sha, "cost_forecast_sha256": forecast_sha, "ledger_forecast": live}
 
 
+def _preflight_treatment_diagnostics(
+    unit_id: str, arm: str, searches: Sequence[Mapping[str, Any]],
+) -> tuple[bool | None, list[dict[str, Any]]]:
+    root_gaps = [
+        {
+            "unit_id": unit_id,
+            "root_id": item.get("root_id"),
+            "root_index": item.get("root_index"),
+            "status": "TREATMENT_NOT_DELIVERED",
+        }
+        for item in searches
+        if item.get("status") == "TREATMENT_NOT_DELIVERED"
+    ]
+    if arm != "J":
+        return None, root_gaps
+    delivered = any(
+        mutation.get("complete_terminal") is True
+        and mutation.get("alternative_differs_from_parent_action") is True
+        and type(mutation.get("legal_occurrence_count")) is int
+        and mutation["legal_occurrence_count"] >= 2
+        and type(mutation.get("trajectory_decision_count")) is int
+        and mutation["trajectory_decision_count"] > 0
+        for search in searches
+        for mutation in search.get("mutation_attempts", ())
+    )
+    return delivered, root_gaps
+
+
 def _preflight_reports(ledger: Any) -> dict[str, Any]:
     reports = []
     treatment_not_delivered = []
+    root_treatment_not_delivered = []
     incomplete = []
     runs, units = _event_state(ledger)
     for row in _unit_rows("preflight"):
@@ -607,6 +639,10 @@ def _preflight_reports(ledger: Any) -> dict[str, Any]:
                 raise PermissionError(f"successful preflight row lacks its bound result receipt: {unit}")
         else:
             result = _read_json(result_path)
+        episode_treatment_delivered, root_gaps = _preflight_treatment_diagnostics(
+            unit, str(row["arm"]), result.get("search", []),
+        )
+        root_treatment_not_delivered.extend(root_gaps)
         reports.append({
             "unit_id": unit,
             "ledger_status": None if run["finish"] is None else run["finish"]["status"],
@@ -616,6 +652,7 @@ def _preflight_reports(ledger: Any) -> dict[str, Any]:
             "terminal_floor": result.get("terminal_floor") if accounting["status"] == "succeeded" else None,
             "heart_victory": result.get("heart_victory") if accounting["status"] == "succeeded" else None,
             "search": result.get("search", []),
+            "episode_treatment_delivered": episode_treatment_delivered,
             "policy_source": result.get("policy_source"),
             "model_digest": result.get("model_digest"),
             "native_source_commit": result.get("native_source_commit"),
@@ -623,9 +660,18 @@ def _preflight_reports(ledger: Any) -> dict[str, Any]:
             "native_module_sha256": result.get("native_module_sha256"),
             "accounting": accounting,
         })
-        if accounting["status"] == "succeeded" and any(item.get("status") == "TREATMENT_NOT_DELIVERED" for item in result.get("search", [])):
+        if (
+            accounting["status"] == "succeeded"
+            and row["arm"] == "J"
+            and episode_treatment_delivered is False
+        ):
             treatment_not_delivered.append(unit)
-    return {"rows": reports, "incomplete": incomplete, "treatment_not_delivered": treatment_not_delivered}
+    return {
+        "rows": reports,
+        "incomplete": incomplete,
+        "treatment_not_delivered": treatment_not_delivered,
+        "root_treatment_not_delivered": root_treatment_not_delivered,
+    }
 
 
 def _write_preflight_reports(ledger: Any) -> dict[str, Any]:
@@ -649,6 +695,7 @@ def _write_preflight_reports(ledger: Any) -> dict[str, Any]:
         "preflight_rows_are_not_efficacy_evidence": True,
         "p1_policy_label": PROXY_LABEL,
         "treatment_not_delivered_units": summary["treatment_not_delivered"],
+        "root_treatment_not_delivered": summary["root_treatment_not_delivered"],
         "incomplete_units": summary["incomplete"],
         "units": summary["rows"],
         "completed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -674,6 +721,188 @@ def _write_preflight_reports(ledger: Any) -> dict[str, Any]:
     report["report_sha256"] = _file_sha256(ARTIFACT_ROOT / "preflight-report.json")
     forecast["forecast_sha256"] = _file_sha256(ARTIFACT_ROOT / "cost-forecast.json")
     return {"status": status, "report": report, "cost_forecast": forecast}
+
+
+class _ReadOnlyHistoricalLedger:
+    """Read existing source-bound events without rebinding or mutating the ledger."""
+
+    def __init__(self, binding: Any, events: Sequence[Mapping[str, Any]]):
+        self.binding = binding
+        self._events = [dict(event) for event in events]
+
+    def read_events(self):
+        return [dict(event) for event in self._events]
+
+    def _tx(self, operation):
+        result, append = operation(self.read_events())
+        if append is not None:
+            raise PermissionError("receipt reconciliation cannot append to the historical ledger")
+        return result
+
+    _charges = staticmethod(budget.Stage1Ledger._charges)
+    forecast = budget.Stage1Ledger.forecast
+
+
+def _reconcile_preflight_receipts() -> dict[str, Any]:
+    """Derive corrected summaries from the completed 40-row receipts; launch no games."""
+    global ARTIFACT_ROOT
+    budget.verify_stage1_package()
+    source_report_path = ARTIFACT_ROOT / "preflight-report.json"
+    events_path = ARTIFACT_ROOT / "ledger" / "events.jsonl"
+    if not source_report_path.is_file() or not events_path.is_file():
+        raise PermissionError("receipt reconciliation requires the retained preflight report and ledger")
+    repair_commit = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=ROOT,
+        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    ).stdout.strip()
+
+    def source_blob(path: Path) -> bytes:
+        relative = path.relative_to(ROOT).as_posix()
+        return subprocess.run(
+            ["git", "show", f"{repair_commit}:{relative}"], cwd=ROOT,
+            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        ).stdout
+
+    source_report_bytes = source_blob(source_report_path)
+    if source_report_bytes != source_report_path.read_bytes().replace(b"\r\n", b"\n"):
+        raise PermissionError("retained preflight report differs from its committed receipt bytes")
+    source_report = json.loads(source_report_bytes)
+    if source_report.get("status") != "PREFLIGHT_TREATMENT_NOT_DELIVERED_NO_FORMAL":
+        raise PermissionError("receipt reconciliation only accepts the reviewed immutable TND preflight")
+    source_report_sha256 = hashlib.sha256(source_report_bytes).hexdigest()
+    events_bytes = source_blob(events_path)
+    if events_bytes != events_path.read_bytes().replace(b"\r\n", b"\n"):
+        raise PermissionError("historical ledger differs from its committed receipt bytes")
+    events = [
+        json.loads(line)
+        for line in events_bytes.decode("utf-8").splitlines()
+        if line.strip()
+    ]
+    runs, units = budget._state(events)
+    binding = budget.PackageBinding(
+        str(source_report.get("package_commit", "")),
+        str(source_report.get("source_lock_sha256", "")),
+    )
+    if not binding.package_commit or not binding.source_lock_sha256:
+        raise PermissionError("source report lacks its original package and lock binding")
+    if any(
+        event.get("package_commit") != binding.package_commit
+        or event.get("source_lock_sha256") != binding.source_lock_sha256
+        for event in events
+    ):
+        raise PermissionError("historical ledger events do not match the retained report binding")
+    expected_units = [str(row["unit_id"]) for row in _unit_rows("preflight")]
+    if len(expected_units) != 40 or set(units) != set(expected_units) or len(runs) != 40:
+        raise PermissionError("historical ledger does not contain exactly the registered 40 unique rows")
+    for unit in expected_units:
+        history = units.get(unit, [])
+        if len(history) != 1 or runs[history[0]]["finish"] is None:
+            raise PermissionError(f"refusing reconciliation of an unpaired or repeated unit: {unit}")
+        if runs[history[0]]["finish"].get("status") != "succeeded":
+            raise PermissionError(f"refusing reconciliation of a non-successful unit: {unit}")
+    ledger = _ReadOnlyHistoricalLedger(binding, events)
+    original_artifact_root = ARTIFACT_ROOT
+    with tempfile.TemporaryDirectory(
+        prefix="issue75-preflight-receipt-read-", dir=STAGE1,
+    ) as scratch:
+        snapshot_root = Path(scratch)
+        for unit in expected_units:
+            result_path = original_artifact_root / "units" / _unit_key(unit) / "result.json"
+            result_blob = source_blob(result_path)
+            if hashlib.sha256(result_blob).hexdigest() != runs[units[unit][0]]["finish"].get("result_sha256"):
+                raise PermissionError(f"committed result bytes differ from their immutable ledger finish: {unit}")
+            snapshot_path = snapshot_root / "units" / _unit_key(unit) / "result.json"
+            snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            snapshot_path.write_bytes(result_blob)
+        initial_model = original_artifact_root / "models" / "pi0.pt"
+        if initial_model.is_file():
+            snapshot_model = snapshot_root / "models" / "pi0.pt"
+            snapshot_model.parent.mkdir(parents=True, exist_ok=True)
+            snapshot_model.write_bytes(source_blob(initial_model))
+        ARTIFACT_ROOT = snapshot_root
+        try:
+            summary = _preflight_reports(ledger)
+        finally:
+            ARTIFACT_ROOT = original_artifact_root
+    source_rows = {
+        str(item.get("unit_id")): item for item in source_report.get("units", [])
+        if isinstance(item, Mapping)
+    }
+    if set(source_rows) != set(expected_units):
+        raise PermissionError("immutable source report does not contain the exact registered row set")
+    for row in summary["rows"]:
+        source_row = source_rows[row["unit_id"]]
+        if source_row.get("result_sha256") != row["result_sha256"]:
+            raise PermissionError(f"retained result digest changed during reconciliation: {row['unit_id']}")
+        if source_row.get("ledger_status") != row["ledger_status"]:
+            raise PermissionError(f"retained ledger status changed during reconciliation: {row['unit_id']}")
+    if len(summary["rows"]) != 40 or summary["incomplete"]:
+        raise PermissionError("reconciliation found incomplete rows; preserve and stop")
+    status = (
+        "PREFLIGHT_INCOMPLETE_NO_FORMAL" if summary["incomplete"]
+        else "PREFLIGHT_TREATMENT_NOT_DELIVERED_NO_FORMAL"
+        if summary["treatment_not_delivered"]
+        else "PREFLIGHT_COMPLETE_PENDING_INDEPENDENT_REVIEW"
+    )
+    report = {
+        "schema_id": "issue75-stage1-preflight-receipt-reconciliation-v1",
+        "status": status,
+        "study_id": STUDY_ID,
+        "scope": "STUDY_ONLY",
+        "package_commit": binding.package_commit,
+        "source_lock_sha256": binding.source_lock_sha256,
+        "source_preflight_report_sha256": source_report_sha256,
+        "reconciliation_source_commit": repair_commit,
+        "reconciliation_source_lock_sha256": budget.normalized_file_sha256(STAGE1 / "source-lock.json"),
+        "registered_rows": 40,
+        "completed_rows": len(summary["rows"]),
+        "terminal_rows": sum(item["terminal_floor"] is not None for item in summary["rows"]),
+        "formal_seeds_consumed": 0,
+        "preflight_rows_are_not_efficacy_evidence": True,
+        "formal_execution_enabled": False,
+        "p1_policy_label": PROXY_LABEL,
+        "treatment_not_delivered_units": summary["treatment_not_delivered"],
+        "episode_treatment_delivered_units": [
+            item["unit_id"] for item in summary["rows"]
+            if item["arm"] == "J" and item["episode_treatment_delivered"] is True
+        ],
+        "root_treatment_not_delivered": summary["root_treatment_not_delivered"],
+        "incomplete_units": summary["incomplete"],
+        "units": summary["rows"],
+        "completed_at": source_report.get("completed_at"),
+    }
+    report_path = ARTIFACT_ROOT / "preflight-report-review-repair.json"
+    _write_once(report_path, report)
+    report_sha256 = _file_sha256(report_path)
+
+    estimates, forecast = _forecast_estimates(ledger)
+    forecast["schema_id"] = "issue75-stage1-cost-forecast-reconciliation-v1"
+    forecast["cost_model_status"] = forecast["status"]
+    forecast["source_preflight_report_sha256"] = source_report_sha256
+    forecast["reconciliation_report_sha256"] = report_sha256
+    forecast["reconciliation_source_commit"] = repair_commit
+    forecast["source_package_commit"] = binding.package_commit
+    forecast["source_lock_sha256"] = binding.source_lock_sha256
+    try:
+        forecast["ledger"] = ledger.forecast(
+            expected_unit_ids=_formal_unit_ids(),
+            future_builder_cpu_seconds=estimates,
+            allowed_completed_unit_ids=expected_units,
+        )
+        forecast["status"] = "PENDING_INDEPENDENT_AFFORDABILITY_REVIEW"
+    except budget.ResourceBlocked as exc:
+        forecast["status"] = "RESOURCE_BLOCKED"
+        forecast["reason"] = str(exc)[:2048]
+    forecast["formal_execution_enabled"] = False
+    forecast["affordability_acceptance"] = "PENDING_INDEPENDENT_REVIEW"
+    forecast_path = ARTIFACT_ROOT / "cost-forecast-review-repair.json"
+    _write_once(forecast_path, forecast)
+    return {
+        "report": report,
+        "report_sha256": report_sha256,
+        "cost_forecast": forecast,
+        "cost_forecast_sha256": _file_sha256(forecast_path),
+    }
 
 
 def _load_training_examples(block: int, *, ledger: Any) -> list[Any]:
@@ -1346,7 +1575,10 @@ def _run_update_unit(ledger: Any, block: int, *, estimates: Mapping[str, float])
 
 
 def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
-    from algorithm import InvocationBudget, run_search, derive_attempt_seed, write_immutable_json
+    from algorithm import (
+        InvocationBudget, SEARCH_CPU_CAP_SECONDS, SEARCH_CPU_STOP_MARGIN_SECONDS,
+        run_search, derive_attempt_seed, write_immutable_json,
+    )
     import runtime
 
     row = dict(job["row"])
@@ -1416,6 +1648,11 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
         attempt_dir = _inside_artifacts(ARTIFACT_ROOT / "search" / _unit_key(str(row["unit_id"])) / f"root-{index}")
         attempt_dir.mkdir(parents=True, exist_ok=True)
         invocation_start_cpu = runtime.process_tree_cpu_seconds()
+        invocation_budget = InvocationBudget(
+            cpu_cap_seconds=SEARCH_CPU_CAP_SECONDS,
+            started_attempt_cap=16,
+            cpu_reader=runtime.process_tree_cpu_seconds,
+        )
         completed: dict[int, Any] = {}
         mutation_attempts: dict[int, dict[str, Any]] = {}
 
@@ -1425,10 +1662,11 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
                 parent = completed.get(int(mutation_target.parent_attempt_index))
                 if parent is None:
                     raise RuntimeError("joint search mutation parent was not retained")
-            remaining = 32.0 - (runtime.process_tree_cpu_seconds() - invocation_start_cpu)
-            if remaining <= 0.1:
+            elapsed = runtime.process_tree_cpu_seconds() - invocation_start_cpu
+            remaining = SEARCH_CPU_CAP_SECONDS - elapsed
+            if remaining <= SEARCH_CPU_STOP_MARGIN_SECONDS + 0.1:
                 from algorithm import SearchBudgetExhausted
-                raise SearchBudgetExhausted("search invocation CPU cap reached before another continuation")
+                raise SearchBudgetExhausted("search invocation CPU safety margin reached before another continuation")
             return runtime.execute_policy_trajectory(
                 runner=runner,
                 module=module,
@@ -1442,7 +1680,10 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
                 root_action_index=root_action_index if root_action_index >= 0 else None,
                 mutation_target=mutation_target,
                 parent_trial=parent,
-                cpu_cap_seconds=min(32.0, remaining),
+                cpu_cap_seconds=min(SEARCH_CPU_CAP_SECONDS, remaining),
+                transition_guard=lambda: invocation_budget.guard_transition(
+                    safety_margin_seconds=SEARCH_CPU_STOP_MARGIN_SECONDS,
+                ),
                 policy_rng_seed=derive_attempt_seed(STUDY_ID, root.root_id, invocation_seed, attempt_index, "policy-suffix"),
             )
 
@@ -1502,17 +1743,25 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
                 receipt["trajectory_decision_count"] = len(trial.decisions)
 
         try:
-            outcome = run_search(
-                arm=search_arm,
-                study_id=STUDY_ID,
-                root_id=root.root_id,
-                invocation_seed=invocation_seed,
-                root_legal_identities=root.legal_identities,
-                attempt_runner=attempt_runner,
-                budget=InvocationBudget(cpu_cap_seconds=32.0, started_attempt_cap=16),
-                attempt_started_recorder=attempt_started,
-                attempt_result_recorder=attempt_result,
+            hard_remaining = SEARCH_CPU_CAP_SECONDS - (
+                runtime.process_tree_cpu_seconds() - invocation_start_cpu
             )
+            alarm_seconds = hard_remaining - SEARCH_CPU_STOP_MARGIN_SECONDS
+            if alarm_seconds <= 0.1:
+                from algorithm import SearchBudgetExhausted
+                raise SearchBudgetExhausted("search invocation CPU safety margin reached before native search")
+            with runtime.process_cpu_alarm(alarm_seconds):
+                outcome = run_search(
+                    arm=search_arm,
+                    study_id=STUDY_ID,
+                    root_id=root.root_id,
+                    invocation_seed=invocation_seed,
+                    root_legal_identities=root.legal_identities,
+                    attempt_runner=attempt_runner,
+                    budget=invocation_budget,
+                    attempt_started_recorder=attempt_started,
+                    attempt_result_recorder=attempt_result,
+                )
         finally:
             root.adapter.restore_checkpoint(root.checkpoint)
             root_record.clear()
@@ -1544,6 +1793,8 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
             "natural_policy_root_identity_sha256": _sha256(_canonical(root.legal_identities[natural_root_index])),
             "root_action_changed_from_sampled_policy": action_change,
             "mutation_attempts": [mutation_attempts[index] for index in sorted(mutation_attempts)],
+            "registered_cpu_cap_seconds": SEARCH_CPU_CAP_SECONDS,
+            "operational_stop_margin_cpu_seconds": SEARCH_CPU_STOP_MARGIN_SECONDS,
             "native_rng_source": outcome.native_rng_source,
             "model_digest": digest,
         })
@@ -2101,7 +2352,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--phase", choices=("preflight", "train", "evaluate"))
     mode.add_argument("--worker-job", type=Path)
+    mode.add_argument("--reconcile-preflight", action="store_true")
     args = parser.parse_args(argv)
+    if args.reconcile_preflight:
+        try:
+            reconciled = _reconcile_preflight_receipts()
+        except BaseException as exc:
+            print(json.dumps({
+                "status": "STAGE1_PREFLIGHT_RECONCILIATION_FAILED",
+                "error_type": type(exc).__name__,
+            }, sort_keys=True), file=sys.stderr)
+            return 2
+        result = {
+            "status": reconciled["report"]["status"],
+            "report_sha256": reconciled["report_sha256"],
+            "cost_forecast_status": reconciled["cost_forecast"]["status"],
+            "cost_forecast_sha256": reconciled["cost_forecast_sha256"],
+            "formal_execution_enabled": False,
+        }
+        print(json.dumps(result, sort_keys=True))
+        return 0
     if args.worker_job is not None:
         try:
             return _worker_main(_inside_artifacts(args.worker_job))

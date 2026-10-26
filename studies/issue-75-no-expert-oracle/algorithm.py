@@ -18,6 +18,11 @@ except ImportError:  # pragma: no cover - native Stage 0 is pinned to Linux
 
 
 SEARCH_CPU_CAP_SECONDS = 32.0
+# The prior receipts showed up to 0.503407 CPU-s of boundary overshoot.
+# Stop two seconds early so a final in-flight native transition remains below
+# the registered 32 CPU-s hard ceiling.
+SEARCH_CPU_STOP_MARGIN_SECONDS = 2.0
+SEARCH_CPU_STOP_SECONDS = SEARCH_CPU_CAP_SECONDS - SEARCH_CPU_STOP_MARGIN_SECONDS
 SEARCH_STARTED_ATTEMPT_CAP = 16
 R_ROOT_TRIAL_CAP = 16
 J_ROOT_TRIAL_CAP = 8
@@ -63,6 +68,8 @@ class InvocationBudget:
         return max(0.0, float(self.cpu_reader()) - self._start_cpu)
 
     def can_start_attempt(self) -> bool:
+        if self.stop_reason == "CPU_CAP":
+            return False
         if self.started_attempts >= self.started_attempt_cap:
             self.stop_reason = self.stop_reason or "STARTED_ATTEMPT_CAP"
             return False
