@@ -5,6 +5,7 @@ This module is preparation-only; it never changes the checked-in disabled flag.
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
+from http.client import IncompleteRead
 import ctypes
 import errno
 import fcntl
@@ -21,6 +22,7 @@ import time
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 OWNER_LOGIN = "lsmfttb"
 REPOSITORY = "lsmfttb/spire-research"
@@ -32,6 +34,8 @@ SEARCH_CPU_CAP_SECONDS = 32.0
 SEARCH_ATTEMPT_CAP = 16
 REVIEW_MARKER = "STAGE1_REVIEW_PASS"
 PLANNER_MARKER = "STAGE1_PLANNER_ACTIVATE"
+COMMENT_PAGE_SIZE = 5
+COMMENT_FETCH_RETRIES = 2
 PR_SET_CHILD_SUBREAPER = 36
 PR_GET_CHILD_SUBREAPER = 37
 STUDY = Path(__file__).resolve().parent
@@ -170,19 +174,35 @@ def _fetch_authoritative_issue_comments() -> list[Mapping[str, Any]]:
     page = 1
     while True:
         request = Request(
-            f"{base}?per_page=100&page={page}",
+            f"{base}?per_page={COMMENT_PAGE_SIZE}&page={page}",
             headers={
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
                 "User-Agent": "spire-research-issue75-activation-gate",
             },
         )
-        with urlopen(request, timeout=30) as response:
-            payload = json.load(response)
+        payload = None
+        last_error: BaseException | None = None
+        for attempt in range(COMMENT_FETCH_RETRIES + 1):
+            try:
+                with urlopen(request, timeout=30) as response:
+                    payload = json.load(response)
+                last_error = None
+                break
+            except HTTPError as exc:
+                if exc.code not in {500, 502, 503, 504}:
+                    raise
+                last_error = exc
+            except (IncompleteRead, URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                last_error = exc
+            if attempt < COMMENT_FETCH_RETRIES:
+                time.sleep(0.25 * (attempt + 1))
+        if last_error is not None:
+            raise PermissionError("GitHub did not return a complete Issue comment page") from last_error
         if not isinstance(payload, list) or any(not isinstance(row, Mapping) for row in payload):
             raise PermissionError("GitHub returned an invalid Issue comment response")
         comments.extend(payload)
-        if len(payload) < 100:
+        if len(payload) < COMMENT_PAGE_SIZE:
             break
         page += 1
     return comments

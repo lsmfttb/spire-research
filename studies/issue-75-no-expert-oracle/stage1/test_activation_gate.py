@@ -1,7 +1,9 @@
 """Standard-library tests for the live Stage 1 activation-to-ledger gate."""
 from __future__ import annotations
 
+from http.client import IncompleteRead
 from io import BytesIO
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -75,10 +77,39 @@ class ActivationGateTests(unittest.TestCase):
         request = api.call_args.args[0]
         self.assertEqual(
             request.full_url,
-            "https://api.github.com/repos/lsmfttb/spire-research/issues/75/comments?per_page=100&page=1",
+            "https://api.github.com/repos/lsmfttb/spire-research/issues/75/comments?per_page=5&page=1",
         )
         self.assertEqual(request.get_header("Accept"), "application/vnd.github+json")
         self.assertEqual(api.call_args.kwargs["timeout"], 30)
+
+    def test_comment_fetch_paginates_all_pages_with_bounded_payloads(self):
+        first_page = [{"id": index} for index in range(budget.COMMENT_PAGE_SIZE)]
+        last_page = [{"id": index} for index in range(budget.COMMENT_PAGE_SIZE, 7)]
+        responses = [
+            BytesIO(json.dumps(first_page).encode("utf-8")),
+            BytesIO(json.dumps(last_page).encode("utf-8")),
+        ]
+        with mock.patch.object(budget, "urlopen", side_effect=responses) as api:
+            comments = budget._fetch_authoritative_issue_comments()
+        self.assertEqual(comments, first_page + last_page)
+        self.assertEqual(api.call_count, 2)
+        self.assertEqual(
+            [call.args[0].full_url for call in api.call_args_list],
+            [
+                "https://api.github.com/repos/lsmfttb/spire-research/issues/75/comments?per_page=5&page=1",
+                "https://api.github.com/repos/lsmfttb/spire-research/issues/75/comments?per_page=5&page=2",
+            ],
+        )
+
+    def test_comment_fetch_retries_incomplete_response_without_changing_page(self):
+        with mock.patch.object(
+            budget, "urlopen",
+            side_effect=[IncompleteRead(b"[{", 100), BytesIO(b"[]")],
+        ) as api, mock.patch.object(budget.time, "sleep") as sleep:
+            self.assertEqual(budget._fetch_authoritative_issue_comments(), [])
+        self.assertEqual(api.call_count, 2)
+        self.assertEqual(api.call_args_list[0].args[0].full_url, api.call_args_list[1].args[0].full_url)
+        sleep.assert_called_once_with(0.25)
 
     def test_directly_forged_receipt_cannot_create_or_write_ledger(self):
         forged = budget.ActivationReceipt("0" * 40, "0" * 64, 1, 2, "2026-01-01T00:01:00+00:00")
