@@ -386,6 +386,38 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertIn("PermissionError", stderr.getvalue())
         self.assertFalse(executor.ARTIFACT_ROOT.exists())
 
+    def test_preflight_resume_propagates_blocked_forecast_and_cli_exit(self):
+        import contextlib
+        import io
+
+        executor.ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
+        report = {
+            "status": "PREFLIGHT_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+            "package_commit": "a" * 40,
+            "source_lock_sha256": "b" * 64,
+        }
+        forecast = {"status": "RESOURCE_BLOCKED", "reason": "full-cohort forecast exceeds remaining cap"}
+        executor._write_once(executor.ARTIFACT_ROOT / "preflight-report.json", report)
+        executor._write_once(executor.ARTIFACT_ROOT / "cost-forecast.json", forecast)
+
+        resumed = executor._run_preflight(self._test_ledger())
+        self.assertEqual(resumed["status"], "RESOURCE_BLOCKED")
+        self.assertEqual(resumed["report"], report)
+        self.assertEqual(resumed["cost_forecast"], forecast)
+
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            mock.patch.object(executor, "run_phase", return_value=resumed),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            status = executor.main(["--phase", "preflight"])
+        self.assertEqual(status, 2)
+        self.assertEqual(stdout.getvalue(), "")
+        cli_report = json.loads(stderr.getvalue())
+        self.assertEqual(cli_report["status"], "RESOURCE_BLOCKED")
+        self.assertEqual(cli_report["phase"], "preflight")
+
     def test_phase_rejects_a_missing_source_binding_before_creating_artifacts(self):
         with (
             mock.patch.object(executor.budget, "verify_stage1_package"),

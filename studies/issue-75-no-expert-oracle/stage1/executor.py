@@ -1920,7 +1920,13 @@ def _run_preflight(ledger: Any) -> dict[str, Any]:
         if report.get("status") != "PREFLIGHT_COMPLETE_PENDING_INDEPENDENT_REVIEW":
             raise budget.ResourceBlocked("an immutable failed/incomplete preflight report already exists")
         forecast_path = ARTIFACT_ROOT / "cost-forecast.json"
-        return {"status": report["status"], "report": report, "cost_forecast": _read_json(forecast_path)}
+        forecast = _read_json(forecast_path)
+        forecast_status = forecast.get("status")
+        if forecast_status == "RESOURCE_BLOCKED":
+            return {"status": forecast_status, "report": report, "cost_forecast": forecast}
+        if forecast_status != "FITS_IF_LEDGER_ACCEPTS":
+            raise budget.ResourceBlocked("retained full-cohort forecast does not permit preflight success")
+        return {"status": report["status"], "report": report, "cost_forecast": forecast}
     _, units = _event_state(ledger)
     if any(
         unit in units and (
@@ -2107,12 +2113,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
     try:
         report = run_phase(args.phase, output_dir=ARTIFACT_ROOT)
-        print(json.dumps({
+        result = {
             "status": report.get("status"),
             "phase": args.phase,
             "package_commit": report.get("package_commit"),
             "source_lock_sha256": report.get("source_lock_sha256"),
-        }, sort_keys=True))
+        }
+        expected_status = {
+            "preflight": "PREFLIGHT_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+            "train": "TRAINING_COMPLETE",
+            "evaluate": "EVALUATION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+        }[args.phase]
+        if report.get("status") != expected_status:
+            print(json.dumps(result, sort_keys=True), file=sys.stderr)
+            return 2
+        print(json.dumps(result, sort_keys=True))
         return 0
     except BaseException as exc:
         # The registered parent interface emits only a coarse failure boundary.
