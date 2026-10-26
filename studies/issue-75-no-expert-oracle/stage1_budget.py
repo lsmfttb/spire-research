@@ -183,7 +183,7 @@ def _verify_activation_comments(
     if not isinstance(comments, Sequence) or isinstance(comments, (str, bytes)):
         raise PermissionError("GitHub Issue comments must be a sequence of records")
 
-    def check(comment: Mapping[str, Any], marker: str) -> tuple[int, datetime]:
+    def check(comment: Mapping[str, Any], marker: str) -> tuple[int, datetime, datetime]:
         comment_id = comment.get("id")
         if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
             raise PermissionError("decision comment has no valid GitHub comment ID")
