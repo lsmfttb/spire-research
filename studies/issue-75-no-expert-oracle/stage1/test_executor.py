@@ -795,5 +795,146 @@ class Stage1ExecutorTests(unittest.TestCase):
             worker.assert_not_called()
 
 
+    def test_update_worker_resumes_from_its_open_checkpoint_reservation(self):
+        ledger = self._test_ledger("update-ledger")
+        unit_id = "UPDATE:0"
+        prior_run_id = unit_id + "-" + "a" * 16
+        self._reserve_test_unit(
+            ledger, unit_id=unit_id, run_id=prior_run_id, cap=2.0,
+            unit_kind="training_update",
+        )
+        checkpoint_path = executor.ARTIFACT_ROOT / "models" / "block-0-step.pt"
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_path.write_bytes(b"prior optimizer checkpoint")
+        prior_checkpoint_sha256 = executor._file_sha256(checkpoint_path)
+        ledger.finish(
+            run_id=prior_run_id, measured_cpu_seconds=0.5, status="incomplete",
+            checkpoint_sha256=prior_checkpoint_sha256,
+        )
+
+        config = executor._read_json(executor.STAGE1 / "config.json")
+        block_seed = int(config["seeds"]["block_order_seeds"][0])
+        source_digest = "3" * 64
+        resume_state = {
+            "schema_id": executor.RESUME_SCHEMA,
+            "block_index": 0,
+            "completed_steps": 17,
+            "source_model_digest": source_digest,
+        }
+        torch_stub = types.ModuleType("torch")
+        torch_stub.set_num_threads = lambda _count: None
+        torch_stub.get_num_interop_threads = lambda: 1
+        torch_stub.set_num_interop_threads = lambda _count: None
+        torch_load_calls = []
+
+        def torch_load(path, **_kwargs):
+            torch_load_calls.append(Path(path))
+            return dict(resume_state)
+
+        torch_stub.load = torch_load
+        torch_stub.save = lambda _value, stream: stream.write(b"mock optimizer state")
+
+        class FakePolicy:
+            def state_dict(self):
+                return {"weight": 1.0}
+
+        class FakeOptimizer:
+            def state_dict(self):
+                return {"step": 17}
+
+        policy = FakePolicy()
+        learning_stub = types.ModuleType("learning")
+        train_calls = []
+
+        def train_block(_frozen, examples, *, block_order_seed, step_callback, resume_state):
+            train_calls.append({
+                "owner_count": len(examples),
+                "block_order_seed": block_order_seed,
+                "resume_state": resume_state,
+            })
+            diagnostics = [types.SimpleNamespace(step=index) for index in range(64)]
+            step_callback(64, policy, FakeOptimizer(), {"rng": "mock"}, list(range(128)), diagnostics)
+            return types.SimpleNamespace(
+                model=policy,
+                diagnostics=diagnostics,
+                block_order_seed=block_order_seed,
+                owner_order_sha256="e" * 64,
+                source_model_digest=source_digest,
+                result_model_digest="d" * 40,
+            )
+
+        learning_stub.train_policy_iteration_block = train_block
+        learning_stub.policy_probe_diagnostics = lambda *_args: {}
+        model_stub = types.ModuleType("model")
+        model_stub.model_digest = lambda _model: "d" * 40
+        prepare_stub = types.ModuleType("prepare")
+        prepare_stub.derive_seed = lambda *_args: block_seed
+        owner_rows = [
+            row for row in executor._rows()
+            if row["phase"] == "training" and int(row["block_index"]) == 0
+        ]
+        examples = [types.SimpleNamespace(owner_seed=int(row["owner_seed"])) for row in owner_rows]
+
+        def save_model_once(model, path, digest_fn):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"mock policy model")
+            return {
+                "path": path.relative_to(executor.ARTIFACT_ROOT).as_posix(),
+                "sha256": executor._file_sha256(path),
+                "model_digest": digest_fn(model),
+            }
+
+        def run_real_worker(specs):
+            self.assertEqual(len(specs), 1)
+            spec = specs[0]
+            job_path = Path(spec["job_path"])
+            job = executor._read_json(job_path)
+            self.assertEqual(job["previous_run_id"], prior_run_id)
+            self.assertEqual(job["checkpoint_sha256"], prior_checkpoint_sha256)
+            self.assertEqual(executor._worker_main(job_path), 0)
+            return {
+                spec["run_id"]: {
+                    "status": "SUCCEEDED",
+                    "measured_cpu_seconds": 0.25,
+                    "boundary": "complete",
+                }
+            }
+
+        with (
+            mock.patch.dict(sys.modules, {
+                "torch": torch_stub, "learning": learning_stub,
+                "model": model_stub, "prepare": prepare_stub,
+            }),
+            mock.patch.object(executor.budget, "verify_stage1_package"),
+            mock.patch.object(executor.budget, "verify_stage1_phase"),
+            mock.patch.object(executor.budget, "open_reserved_stage1_worker_ledger", return_value=ledger),
+            mock.patch.object(executor, "_load_training_examples", return_value=examples),
+            mock.patch.object(executor, "_load_model", return_value=(policy, source_digest, {})),
+            mock.patch.object(executor, "_fixed_probe_features", return_value=([], "f" * 64)),
+            mock.patch.object(executor, "_save_model_once", side_effect=save_model_once),
+            mock.patch.object(executor, "_expected_source_model", return_value=source_digest),
+            mock.patch.object(executor, "_supervise_batch", side_effect=run_real_worker),
+        ):
+            result = executor._run_update_unit(ledger, 0, estimates={unit_id: 2.0})
+            retained = executor._existing_unit_receipt(ledger, unit_id)
+
+        self.assertEqual(result["status"], "SUCCEEDED")
+        self.assertEqual(result["unit_id"], unit_id)
+        self.assertEqual(retained, result)
+        self.assertEqual(torch_load_calls, [checkpoint_path])
+        self.assertEqual(len(train_calls), 1)
+        self.assertEqual(train_calls[0]["owner_count"], 128)
+        self.assertEqual(train_calls[0]["block_order_seed"], block_seed)
+        self.assertEqual(train_calls[0]["resume_state"], resume_state)
+        runs, units = executor._event_state(ledger)
+        latest_run_id = units[unit_id][-1]
+        latest_run = runs[latest_run_id]
+        self.assertEqual(latest_run["reservation"]["previous_run_id"], prior_run_id)
+        self.assertEqual(latest_run["reservation"]["checkpoint_sha256"], prior_checkpoint_sha256)
+        self.assertEqual(latest_run["finish"]["status"], "succeeded")
+        self.assertTrue((executor._unit_directory(unit_id) / f"result-{latest_run_id}.json").is_file())
+        self.assertFalse((executor._unit_directory(unit_id) / "result.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

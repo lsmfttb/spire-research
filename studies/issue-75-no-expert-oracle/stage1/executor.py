@@ -438,6 +438,50 @@ def _existing_unit(ledger: Any, unit_id: str) -> tuple[str | None, dict[str, Any
     return run_id, run["reservation"], run["finish"]
 
 
+def _current_update_reservation(
+    ledger: Any, *, unit_id: str, run_id: str,
+) -> tuple[str | None, dict[str, Any] | None]:
+    """Bind an update worker to its live reservation and the exact resumable predecessor."""
+    reservation = ledger.require_open_reservation(run_id=run_id, unit_id=unit_id)
+    if (
+        reservation.get("run_id") != run_id
+        or reservation.get("unit_kind") != "training_update"
+        or reservation.get("role") != "builder"
+    ):
+        raise PermissionError("update worker does not own the exact live Builder update reservation")
+    runs, units = _event_state(ledger)
+    history = units.get(unit_id, [])
+    if not history or history[-1] != run_id:
+        raise PermissionError("update worker reservation is not the latest unit ledger event")
+
+    previous_run_id = reservation.get("previous_run_id")
+    if previous_run_id is None:
+        if len(history) != 1 or reservation.get("checkpoint_sha256") is not None:
+            raise PermissionError("new policy update reservation has unexpected resume metadata")
+        return None, None
+
+    if len(history) < 2 or history[-2] != previous_run_id:
+        raise PermissionError("update resume does not name the immediately preceding unit run")
+    previous = runs.get(previous_run_id)
+    if (
+        previous is None
+        or previous["reservation"].get("unit_id") != unit_id
+        or previous["reservation"].get("unit_kind") != "training_update"
+        or previous["reservation"].get("role") != "builder"
+    ):
+        raise PermissionError("update resume predecessor is not the same registered Builder unit")
+    previous_finish = previous["finish"]
+    if previous_finish is None or previous_finish.get("status") != "incomplete":
+        raise budget.ResourceBlocked("policy update predecessor is not an incomplete checkpoint run")
+    checkpoint_sha256 = previous_finish.get("checkpoint_sha256")
+    if (
+        not _valid_digest(checkpoint_sha256, 64)
+        or reservation.get("checkpoint_sha256") != checkpoint_sha256
+    ):
+        raise budget.CheckpointMismatch("current update reservation differs from its predecessor checkpoint")
+    return previous_run_id, previous_finish
+
+
 def _unit_accounting(ledger: Any, unit_id: str) -> dict[str, Any]:
     run_id, reservation, finish = _existing_unit(ledger, unit_id)
     if run_id is None or reservation is None:
@@ -1275,7 +1319,8 @@ def _existing_unit_receipt(ledger: Any, unit_id: str) -> dict[str, Any] | None:
         raise budget.ResourceBlocked(f"unresolved reservation is preserved at full cap: {unit_id}")
     if finish.get("status") != "succeeded":
         raise budget.ResourceBlocked(f"failed unit is immutable and cannot be replayed: {unit_id}")
-    result_path = _unit_directory(unit_id) / "result.json"
+    result_name = f"result-{run_id}.json" if unit_id.startswith("UPDATE:") else "result.json"
+    result_path = _unit_directory(unit_id) / result_name
     if not result_path.is_file():
         raise PermissionError(f"successful ledger unit lacks its durable result: {unit_id}")
     result = _read_json(result_path)
@@ -1746,17 +1791,14 @@ def _update_block(
     from model import model_digest
 
     unit_id = f"UPDATE:{block}"
-    existing = _existing_unit_receipt(ledger, unit_id)
-    if existing is not None:
-        return existing
+    previous_run_id, previous_finish = _current_update_reservation(
+        ledger, unit_id=unit_id, run_id=ledger_run_id,
+    )
     examples = _load_training_examples(block, ledger=ledger)
     frozen, source_digest, _ = _load_model(f"pi{block}")
     checkpoint_path = _inside_artifacts(ARTIFACT_ROOT / "models" / f"block-{block}-step.pt")
-    previous_run_id, _, previous_finish = _existing_unit(ledger, unit_id)
     resume_state = None
     if previous_run_id is not None:
-        if previous_finish is None or previous_finish.get("status") != "incomplete":
-            raise budget.ResourceBlocked(f"policy update cannot be resumed: {unit_id}")
         expected = previous_finish.get("checkpoint_sha256")
         if not checkpoint_path.is_file() or _file_sha256(checkpoint_path) != expected:
             raise budget.CheckpointMismatch("optimizer state does not match the incomplete ledger checkpoint")
@@ -1828,22 +1870,32 @@ def _update_block(
         "source_commit": ledger.binding.package_commit,
         "source_lock_sha256": ledger.binding.source_lock_sha256,
     }
-    output = _inside_artifacts(ARTIFACT_ROOT / "units" / f"UPDATE-{block}" / "result.json")
-    _write_once(output, result_receipt)
     return result_receipt
 
 
 def _run_update_unit(ledger: Any, block: int, *, estimates: Mapping[str, float]) -> dict[str, Any]:
     unit_id = f"UPDATE:{block}"
-    existing = _existing_unit_receipt(ledger, unit_id)
-    if existing is not None:
-        return existing
-    previous_run_id, _, previous_finish = _existing_unit(ledger, unit_id)
+    previous_run_id, previous_reservation, previous_finish = _existing_unit(ledger, unit_id)
     resume_digest = None
     if previous_run_id is not None:
-        if previous_finish is None or previous_finish.get("status") != "incomplete":
-            raise budget.ResourceBlocked(f"optimizer update has an unresolved/nonresumable ledger state: {unit_id}")
+        if previous_finish is None:
+            raise budget.ResourceBlocked(f"optimizer update reservation remains unresolved: {unit_id}")
+        if previous_finish.get("status") == "succeeded":
+            existing = _existing_unit_receipt(ledger, unit_id)
+            if existing is None:
+                raise PermissionError(f"succeeded update has no immutable receipt: {unit_id}")
+            return existing
+        if previous_finish.get("status") != "incomplete":
+            raise budget.ResourceBlocked(f"failed optimizer update is immutable and cannot be replayed: {unit_id}")
+        if (
+            previous_reservation is None
+            or previous_reservation.get("unit_kind") != "training_update"
+            or previous_reservation.get("role") != "builder"
+        ):
+            raise PermissionError(f"incomplete predecessor is not the registered Builder update: {unit_id}")
         resume_digest = previous_finish.get("checkpoint_sha256")
+        if not _valid_digest(resume_digest, 64):
+            raise budget.CheckpointMismatch("incomplete optimizer update lacks a valid checkpoint digest")
         checkpoint = _inside_artifacts(ARTIFACT_ROOT / "models" / f"block-{block}-step.pt")
         if not checkpoint.is_file() or _file_sha256(checkpoint) != resume_digest:
             raise budget.CheckpointMismatch("incomplete optimizer update checkpoint does not match its ledger receipt")
