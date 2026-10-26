@@ -20,7 +20,7 @@ import executor
 
 class FakeLedger:
     def __init__(self, *, unit_kind: str):
-        self.activation = types.SimpleNamespace(
+        self.binding = types.SimpleNamespace(
             package_commit="a" * 40,
             source_lock_sha256="b" * 64,
         )
@@ -38,7 +38,7 @@ class FakeLedger:
 
 class FakeReportLedger:
     def __init__(self):
-        self.activation = types.SimpleNamespace(
+        self.binding = types.SimpleNamespace(
             package_commit="a" * 40,
             source_lock_sha256="b" * 64,
         )
@@ -49,8 +49,9 @@ class FakeReportLedger:
 
     def reserve(self, **event):
         event = {
-            "event": "reserve", "package_commit": self.activation.package_commit,
-            "source_lock_sha256": self.activation.source_lock_sha256, **event,
+            "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
+            "package_commit": self.binding.package_commit,
+            "source_lock_sha256": self.binding.source_lock_sha256, **event,
         }
         self.events.append(event)
         return dict(event)
@@ -59,20 +60,21 @@ class FakeReportLedger:
         reservation = next(event for event in self.events if event.get("event") == "reserve" and event["run_id"] == run_id)
         self.events.append({
             "event": "finish",
+            "schema_id": "issue75-stage1-budget-event-v2",
             "run_id": run_id,
             "unit_id": reservation["unit_id"],
             "measured_cpu_seconds": measured_cpu_seconds,
             "status": status,
             "checkpoint_sha256": checkpoint_sha256,
             "result_sha256": result_sha256,
-            "package_commit": self.activation.package_commit,
-            "source_lock_sha256": self.activation.source_lock_sha256,
+            "package_commit": self.binding.package_commit,
+            "source_lock_sha256": self.binding.source_lock_sha256,
         })
 
 
 class FakeReceiptLedger:
     def __init__(self):
-        self.activation = types.SimpleNamespace(package_commit="a" * 40, source_lock_sha256="b" * 64)
+        self.binding = types.SimpleNamespace(package_commit="a" * 40, source_lock_sha256="b" * 64)
         self.events = []
 
     def read_events(self):
@@ -80,13 +82,15 @@ class FakeReceiptLedger:
 
     def set_success(self, *, run_id, unit_id, result_sha256):
         self.events = [
-            {"event": "reserve", "run_id": run_id, "unit_id": unit_id, "role": "builder",
-             "unit_kind": "owner_arm", "package_commit": self.activation.package_commit,
-             "source_lock_sha256": self.activation.source_lock_sha256},
-            {"event": "finish", "run_id": run_id, "unit_id": unit_id, "status": "succeeded",
+            {"event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
+             "run_id": run_id, "unit_id": unit_id, "role": "builder",
+             "unit_kind": "owner_arm", "package_commit": self.binding.package_commit,
+             "source_lock_sha256": self.binding.source_lock_sha256},
+            {"event": "finish", "schema_id": "issue75-stage1-budget-event-v2",
+             "run_id": run_id, "unit_id": unit_id, "status": "succeeded",
              "measured_cpu_seconds": 1.0, "reserved_cpu_seconds": 2.0,
-             "package_commit": self.activation.package_commit,
-             "source_lock_sha256": self.activation.source_lock_sha256,
+             "package_commit": self.binding.package_commit,
+             "source_lock_sha256": self.binding.source_lock_sha256,
              "result_sha256": result_sha256},
         ]
 
@@ -100,14 +104,14 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.addCleanup(setattr, executor, "ARTIFACT_ROOT", self.original_artifact_root)
 
     def _test_ledger(self, name="ledger"):
-        activation = executor.budget.ActivationReceipt(
+        binding = executor.budget.PackageBinding(
             package_commit="a" * 40,
             source_lock_sha256="b" * 64,
-            reviewer_comment_id=101,
-            planner_comment_id=102,
-            authorized_at="2026-01-01T00:00:00+00:00",
         )
-        with mock.patch.object(executor.budget, "_live_activation_receipt", return_value=activation):
+        with mock.patch.object(
+            executor.budget, "_current_package_binding",
+            return_value=(binding.package_commit, binding.source_lock_sha256),
+        ):
             return executor.budget.Stage1Ledger(executor.ARTIFACT_ROOT / name)
 
     def _reserve_test_unit(self, ledger, *, unit_id, run_id, cap=2.0, unit_kind="owner_arm", **metadata):
@@ -273,7 +277,7 @@ class Stage1ExecutorTests(unittest.TestCase):
         with self.assertRaisesRegex(PermissionError, "registered initial-model digest"):
             executor._load_model("pi0")
 
-    def test_reused_successful_receipts_bind_activation_row_and_original_bytes(self):
+    def test_reused_successful_receipts_bind_registered_row_and_original_bytes(self):
         ledger = FakeReceiptLedger()
         row = next(item for item in executor._unit_rows("preflight") if item["arm"] == "E")
         unit_id = str(row["unit_id"])
@@ -283,8 +287,8 @@ class Stage1ExecutorTests(unittest.TestCase):
         result = {
             "schema_id": executor.UNIT_SCHEMA,
             "status": "SUCCEEDED",
-            "package_commit": ledger.activation.package_commit,
-            "source_lock_sha256": ledger.activation.source_lock_sha256,
+            "package_commit": ledger.binding.package_commit,
+            "source_lock_sha256": ledger.binding.source_lock_sha256,
             "study_id": executor.STUDY_ID,
             "unit_id": unit_id,
             "phase": "preflight",
@@ -370,13 +374,26 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertEqual(result["expert_decisions"], 1)
         self.assertEqual(result["policy_source"]["formal_use"], True)
 
-    def test_phase_rejects_a_missing_live_gate_before_creating_artifacts(self):
+    def test_cli_refuses_disabled_formal_phase_before_creating_artifacts(self):
+        import contextlib
+        import io
+
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            status = executor.main(["--phase", "train"])
+        self.assertEqual(status, 2)
+        self.assertIn("STAGE1_EXECUTOR_FAILED", stderr.getvalue())
+        self.assertIn("PermissionError", stderr.getvalue())
+        self.assertFalse(executor.ARTIFACT_ROOT.exists())
+
+    def test_phase_rejects_a_missing_source_binding_before_creating_artifacts(self):
         with (
             mock.patch.object(executor.budget, "verify_stage1_package"),
+            mock.patch.object(executor.budget, "verify_stage1_phase"),
             mock.patch.object(
                 executor.budget,
-                "open_activated_stage1_ledger",
-                side_effect=PermissionError("no exact-source live activation"),
+                "open_stage1_ledger",
+                side_effect=PermissionError("package source binding unavailable"),
             ) as open_ledger,
         ):
             with self.assertRaises(PermissionError):
@@ -488,7 +505,7 @@ class Stage1ExecutorTests(unittest.TestCase):
         with self.assertRaises(executor.budget.ResourceBlocked):
             self._reserve_test_unit(capped, unit_id="CAP:2", run_id="CAP:2-" + "f" * 16, cap=0.1)
 
-    def test_native_runtime_uses_stage1_activation_without_stage0_gate(self):
+    def test_native_runtime_uses_stage1_binding_without_stage0_gate(self):
         import preflight
         import runtime
 
@@ -502,16 +519,13 @@ class Stage1ExecutorTests(unittest.TestCase):
                 env, fake_module, object(), {"runtime": "test"},
             ),
         })()
-        receipt = executor.budget.ActivationReceipt(
+        receipt = executor.budget.PackageBinding(
             package_commit="a" * 40,
             source_lock_sha256="b" * 64,
-            reviewer_comment_id=101,
-            planner_comment_id=102,
-            authorized_at="2026-01-01T00:00:00+00:00",
         )
         with tempfile.TemporaryDirectory(dir=STUDY) as temp_dir:
             with (
-                mock.patch.object(executor.budget, "validate_worker_activation_receipt") as validate_receipt,
+                mock.patch.object(executor.budget, "validate_worker_package_binding") as validate_receipt,
                 mock.patch.object(runtime, "verify_source_repositories"),
                 mock.patch.object(runtime, "verify_native_module", return_value=native_path),
                 mock.patch.object(runtime, "binary_sha256", return_value=config["source"]["native_module_sha256"]),
@@ -519,7 +533,7 @@ class Stage1ExecutorTests(unittest.TestCase):
                 mock.patch.object(preflight, "reviewer_pass_proof", side_effect=AssertionError("Stage-0 gate used")),
             ):
                 result = runtime.initialize_native_runtime(
-                    Path(temp_dir) / "runtime", sampling=True, stage1_activation=receipt,
+                    Path(temp_dir) / "runtime", sampling=True, stage1_binding=receipt,
                 )
         validate_receipt.assert_called_once_with(receipt)
         self.assertEqual(result[0], config)
@@ -534,8 +548,8 @@ class Stage1ExecutorTests(unittest.TestCase):
         job_path.parent.mkdir(parents=True)
         job = {
             "schema_id": executor.WORKER_SCHEMA,
-            "package_commit": ledger.activation.package_commit,
-            "source_lock_sha256": ledger.activation.source_lock_sha256,
+            "package_commit": ledger.binding.package_commit,
+            "source_lock_sha256": ledger.binding.source_lock_sha256,
             "run_id": run_id,
             "unit_id": unit_id,
             "phase": "preflight",
@@ -578,8 +592,8 @@ class Stage1ExecutorTests(unittest.TestCase):
         )
         job = {
             "schema_id": executor.WORKER_SCHEMA,
-            "package_commit": ledger.activation.package_commit,
-            "source_lock_sha256": ledger.activation.source_lock_sha256,
+            "package_commit": ledger.binding.package_commit,
+            "source_lock_sha256": ledger.binding.source_lock_sha256,
             "run_id": run_id,
             "unit_id": unit_id,
             "phase": "update",
@@ -596,6 +610,7 @@ class Stage1ExecutorTests(unittest.TestCase):
 
         with (
             mock.patch.object(executor.budget, "verify_stage1_package"),
+            mock.patch.object(executor.budget, "verify_stage1_phase"),
             mock.patch.object(executor.budget, "open_reserved_stage1_worker_ledger", return_value=ledger),
             mock.patch.object(executor, "_worker_update", side_effect=fake_worker_update) as worker,
         ):
@@ -607,6 +622,7 @@ class Stage1ExecutorTests(unittest.TestCase):
         job_path.write_text(json.dumps(job), encoding="utf-8")
         with (
             mock.patch.object(executor.budget, "verify_stage1_package"),
+            mock.patch.object(executor.budget, "verify_stage1_phase"),
             mock.patch.object(executor.budget, "open_reserved_stage1_worker_ledger", return_value=ledger),
             mock.patch.object(executor, "_worker_update") as worker,
         ):

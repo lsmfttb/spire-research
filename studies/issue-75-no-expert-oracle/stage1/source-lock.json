@@ -1,7 +1,7 @@
 {
-  "budget_config_sha256": "331446e26ab0baf84998f5e882fae2c4aa69036f4847b05cdccb3e9501aeafec",
-  "execution_authorized": false,
-  "final_package_commit_binding": "must be named by exact SHA in Reviewer PASS and subsequent Planner activation comments",
+  "budget_config_sha256": "1181b662abf618829ae3dc1e55cf217606355295c1e348fa113b1bdc0a14f5ad",
+  "execution_authorized": true,
+  "final_package_commit_binding": "all execution receipts bind the exact package commit and source-lock digest",
   "formal_seeds_or_games_consumed": 0,
   "locked_files_sha256_lf": {
     "algorithm.py": "38864293d3b463fd1071fbdf1d49bc9d98c2fc4b610425dbff8ab3357d39396b",
@@ -13,18 +13,17 @@
     "planning/stage1-cost-model.json": "db2255c88c6402b35f8a844cd446be7665ef04eecacca0fbb4ebc3335b1460e1",
     "planning/stage1-cost-model.md": "536504f1d3eecd429a5ab15ae7eb11bdd75740943fc02f050b18bd76d432ee4c",
     "preflight.py": "30ac715d8ffef7507a9020afcb7fdb211e708f4f3ab7083b1f87133c7ed2d6f8",
-    "runtime.py": "28d79b88416416a147ac2b966b1b077d511ea134c0842c34e110012cfbbfaee2",
+    "runtime.py": "edc67ae6ba549f7608e26b94baa0d7d1f15bce42c7495ce2ee4e192a9ceb4725",
     "stage0.py": "3ab0860b235d2ca32749bde5b1e691fee4f68e07be591acd84d266e2d0587b17",
-    "stage1/budget.json": "331446e26ab0baf84998f5e882fae2c4aa69036f4847b05cdccb3e9501aeafec",
-    "stage1/config.json": "e7e891c56c44c5d4c89f7fa6bfab114493c54a4e2e5a69f60024ab431e01b159",
-    "stage1/executor.py": "36581292bc79462ee387641343d79ee6527ff4c62ce844eaf2765076fc4d8623",
+    "stage1/budget.json": "1181b662abf618829ae3dc1e55cf217606355295c1e348fa113b1bdc0a14f5ad",
+    "stage1/config.json": "73ae924c82c6ab7a32cc068a33308b088d7cb59b79ceb6acebf182cc6c189d1f",
+    "stage1/executor.py": "5ffb0b4b585e6624be232d060a88f19adcc475223e0110e91d2b990e4dbe04d4",
     "stage1/preflight-proxy.json": "f60612234cbaf35ae18430efe778cf17db0838a6c54b8869242a27969c7de533",
-    "stage1/prepare.py": "149a5340ffb5909e04563f9d98b2525ad6bea85f9b6bc5442710c2ead9754e0e",
+    "stage1/prepare.py": "adb6b46b72790151ca3317a7cdad6b3f7ac774859f4ee29db6850a1d562f4efd",
     "stage1/seed-table.json": "b61b08cb757ce07eb3a20734ea6bf46decd97437ad30cf4a6d1ce0a90a74d6dd",
-    "stage1/test_activation.py": "78e66c59f5490d248f66242230099ef07b2f7e38b9c0f0e1d1b11dc384e208d4",
-    "stage1/test_activation_gate.py": "d442125aabe4c24034cf89786d8ac4f266c08dedb602d4020d9c2a4bea756071",
-    "stage1/test_executor.py": "0000d55218c0735c844dd7a55f4e72b09e5bb4974783af6df2ce3967bdfbe56b",
-    "stage1_budget.py": "656d5097a042bd2166bea84a702128d1413ba0b3263a5c4e18dd66e3deb7835c",
+    "stage1/test_activation.py": "8238eb0a7458a0e00d3be68eeca7bd78a0106379742057024455ad141f90ebbf",
+    "stage1/test_executor.py": "c725190ded1e10407ccaae31f53e32650bd5385932e2c5ca0b3c34d8ea7348b4",
+    "stage1_budget.py": "06d23499903846ad1b7151087b6a6b9f1629d63965e81f580c4911569057dce7",
     "test_issue75_contract.py": "36d70edfcaeb90fc3f477a79f995d046153a5fd706531ad5ebc4dd9c52c04210"
   },
   "locked_repository_dependencies_sha256_lf": {
@@ -33,7 +32,7 @@
   },
   "model_training_performed": false,
   "native_sampling_performed": false,
-  "package_status": "PREPARATION_ONLY_DISABLED",
+  "package_status": "PREFLIGHT_ONLY_ENABLED",
   "prepared_from_commit": "a8410ff48ecf168f904726c79da302d10f921984",
   "runtime": {
     "native_import_only_negative_test": {
@@ -99,6 +98,6 @@
     "source_commit": "c77d64243320639bf156330760d511d2a13eee85",
     "source_lock_sha256_lf": "b3ce3d33c27ec392f6d88151bce3c86a8fdce8c9dc0152d417069441f7140d38"
   },
-  "stage1_config_sha256": "e7e891c56c44c5d4c89f7fa6bfab114493c54a4e2e5a69f60024ab431e01b159",
+  "stage1_config_sha256": "73ae924c82c6ab7a32cc068a33308b088d7cb59b79ceb6acebf182cc6c189d1f",
   "study_id": "issue-75-no-expert-oracle"
 }

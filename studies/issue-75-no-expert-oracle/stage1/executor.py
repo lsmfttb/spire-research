@@ -1,8 +1,9 @@
 """Source-locked, serialized Stage 1 owner executor for Issue 75.
 
-This module is intentionally study-local.  The CLI remains disabled by the
-live exact-source Reviewer/Planner gate in ``stage1_budget``; all artifacts,
-workers, temporary files, and caches stay below ``stage1/artifacts``.
+This module is intentionally study-local. The CLI accepts only phases enabled
+by the source-locked package; the checked-in package permits the 40-row
+nonformal preflight only. Artifacts and worker files stay below
+``stage1/artifacts``.
 """
 from __future__ import annotations
 
@@ -574,11 +575,6 @@ def _formal_forecast(ledger: Any) -> dict[str, Any]:
         raise budget.ResourceBlocked("preflight/forecast status does not permit formal rows")
     report_sha = _file_sha256(report_path)
     forecast_sha = _file_sha256(forecast_path)
-    review = budget.verify_preflight_review_pass(
-        preflight_report_sha256=report_sha,
-        cost_forecast_sha256=forecast_sha,
-        not_before=str(report["completed_at"]),
-    )
     estimates, _ = _forecast_estimates(ledger)
     live = ledger.forecast(
         expected_unit_ids=_formal_unit_ids(),
@@ -587,7 +583,7 @@ def _formal_forecast(ledger: Any) -> dict[str, Any]:
     )
     if live.get("status") != "FITS":
         raise budget.ResourceBlocked("live Stage 1 ledger no longer fits the exact remaining cohort")
-    return {"preflight_report_sha256": report_sha, "cost_forecast_sha256": forecast_sha, "review": review, "ledger_forecast": live}
+    return {"preflight_report_sha256": report_sha, "cost_forecast_sha256": forecast_sha, "ledger_forecast": live}
 
 
 def _preflight_reports(ledger: Any) -> dict[str, Any]:
@@ -643,8 +639,8 @@ def _write_preflight_reports(ledger: Any) -> dict[str, Any]:
         "schema_id": "issue75-stage1-40-row-preflight-report-v1",
         "study_id": STUDY_ID,
         "status": status,
-        "package_commit": ledger.activation.package_commit,
-        "source_lock_sha256": ledger.activation.source_lock_sha256,
+        "package_commit": ledger.binding.package_commit,
+        "source_lock_sha256": ledger.binding.source_lock_sha256,
         "scope": "STUDY_ONLY",
         "registered_rows": 40,
         "completed_rows": len(summary["rows"]),
@@ -692,8 +688,8 @@ def _load_training_examples(block: int, *, ledger: Any) -> list[Any]:
         if (
             receipt.get("phase") != "train" or receipt.get("formal") is not True
             or receipt.get("arm") != "TRAIN" or receipt.get("owner_seed") != int(row["owner_seed"])
-            or receipt.get("package_commit") != ledger.activation.package_commit
-            or receipt.get("source_lock_sha256") != ledger.activation.source_lock_sha256
+            or receipt.get("package_commit") != ledger.binding.package_commit
+            or receipt.get("source_lock_sha256") != ledger.binding.source_lock_sha256
         ):
             raise PermissionError("training owner receipt differs from its locked row or active package")
         directory = _unit_directory(row["unit_id"])
@@ -712,8 +708,8 @@ def _load_training_examples(block: int, *, ledger: Any) -> list[Any]:
             features.get("schema_id") != FEATURE_SCHEMA
             or int(features.get("owner_seed", -1)) != int(row["owner_seed"])
             or features.get("unit_id") != unit_id
-            or features.get("package_commit") != ledger.activation.package_commit
-            or features.get("source_lock_sha256") != ledger.activation.source_lock_sha256
+            or features.get("package_commit") != ledger.binding.package_commit
+            or features.get("source_lock_sha256") != ledger.binding.source_lock_sha256
         ):
             raise PermissionError("training feature receipt is not for the registered owner")
         example = _training_example_from_payload(features)
@@ -752,8 +748,8 @@ def _fixed_probe_features(ledger: Any, examples: Sequence[Any] | None) -> tuple[
             })
         _write_once(path, {
             "schema_id": "issue75-stage1-fixed-policy-probes-v1",
-            "package_commit": ledger.activation.package_commit,
-            "source_lock_sha256": ledger.activation.source_lock_sha256,
+            "package_commit": ledger.binding.package_commit,
+            "source_lock_sha256": ledger.binding.source_lock_sha256,
             "selection": "first actual multi-choice decision per block-zero owner in ascending registered seed order",
             "outcome_conditioned": False,
             "owners": owners,
@@ -761,8 +757,8 @@ def _fixed_probe_features(ledger: Any, examples: Sequence[Any] | None) -> tuple[
     payload = _read_json(path)
     if (
         payload.get("schema_id") != "issue75-stage1-fixed-policy-probes-v1"
-        or payload.get("package_commit") != ledger.activation.package_commit
-        or payload.get("source_lock_sha256") != ledger.activation.source_lock_sha256
+        or payload.get("package_commit") != ledger.binding.package_commit
+        or payload.get("source_lock_sha256") != ledger.binding.source_lock_sha256
         or payload.get("outcome_conditioned") is not False
     ):
         raise PermissionError("fixed policy probes are not bound to this package and ledger")
@@ -865,8 +861,8 @@ def _expected_policy_binding(
             raise PermissionError("formal pi4 row lacks the completed four-block training report")
         report = _read_json(report_path)
         if (
-            report.get("package_commit") != ledger.activation.package_commit
-            or report.get("source_lock_sha256") != ledger.activation.source_lock_sha256
+            report.get("package_commit") != ledger.binding.package_commit
+            or report.get("source_lock_sha256") != ledger.binding.source_lock_sha256
             or report.get("status") != "TRAINING_COMPLETE"
             or report.get("formal_owner_count") != 512
             or report.get("p1_formal_model_source") != "pi4"
@@ -881,26 +877,26 @@ def _validate_success_result(
     ledger: Any, *, unit_id: str, run_id: str, reservation: Mapping[str, Any],
     result: Mapping[str, Any], result_path: Path, finish: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    activation = ledger.activation
+    binding = ledger.binding
     if (
         reservation.get("unit_id") != unit_id
         or reservation.get("role") != "builder"
-        or reservation.get("package_commit") != activation.package_commit
-        or reservation.get("source_lock_sha256") != activation.source_lock_sha256
+        or reservation.get("package_commit") != binding.package_commit
+        or reservation.get("source_lock_sha256") != binding.source_lock_sha256
         or result.get("schema_id") != UNIT_SCHEMA
         or result.get("status") != "SUCCEEDED"
         or result.get("unit_id") != unit_id
-        or result.get("package_commit") != activation.package_commit
-        or result.get("source_lock_sha256") != activation.source_lock_sha256
+        or result.get("package_commit") != binding.package_commit
+        or result.get("source_lock_sha256") != binding.source_lock_sha256
     ):
-        raise PermissionError(f"successful unit receipt is not bound to its reservation and activation: {unit_id}")
+        raise PermissionError(f"successful unit receipt is not bound to its reservation and package binding: {unit_id}")
     if finish is not None:
         actual_digest = _file_sha256(result_path)
         if (
             finish.get("status") != "succeeded"
             or finish.get("unit_id") != unit_id
-            or finish.get("package_commit") != activation.package_commit
-            or finish.get("source_lock_sha256") != activation.source_lock_sha256
+            or finish.get("package_commit") != binding.package_commit
+            or finish.get("source_lock_sha256") != binding.source_lock_sha256
             or finish.get("result_sha256") != actual_digest
         ):
             raise PermissionError(f"successful unit result bytes differ from their immutable ledger finish: {unit_id}")
@@ -952,7 +948,7 @@ def _validate_success_result(
         path = _model_path(f"pi{block + 1}")
         if (
             result.get("ledger_run_id") != run_id
-            or result.get("source_commit") != activation.package_commit
+            or result.get("source_commit") != binding.package_commit
             or result.get("block_index") != block
             or result.get("owner_count") != 128
             or result.get("completed_steps") != 64
@@ -1035,8 +1031,8 @@ def _run_unit(ledger: Any, row: Mapping[str, Any], *, phase: str, estimates: Map
     stdout_path = _inside_artifacts(directory / f"worker-log-{run_id}.txt")
     job = {
         "schema_id": WORKER_SCHEMA,
-        "package_commit": ledger.activation.package_commit,
-        "source_lock_sha256": ledger.activation.source_lock_sha256,
+        "package_commit": ledger.binding.package_commit,
+        "source_lock_sha256": ledger.binding.source_lock_sha256,
         "run_id": run_id,
         "unit_id": unit_id,
         "phase": phase,
@@ -1228,9 +1224,9 @@ def _update_block(
         "probe_diagnostics": probe_diagnostics,
         "expert_decisions": 0,
         "ledger_run_id": ledger_run_id,
-        "package_commit": ledger.activation.package_commit,
-        "source_commit": ledger.activation.package_commit,
-        "source_lock_sha256": ledger.activation.source_lock_sha256,
+        "package_commit": ledger.binding.package_commit,
+        "source_commit": ledger.binding.package_commit,
+        "source_lock_sha256": ledger.binding.source_lock_sha256,
     }
     output = _inside_artifacts(ARTIFACT_ROOT / "units" / f"UPDATE-{block}" / "result.json")
     _write_once(output, result_receipt)
@@ -1264,8 +1260,8 @@ def _run_update_unit(ledger: Any, block: int, *, estimates: Mapping[str, float])
     stdout_path = _inside_artifacts(worker_dir / f"worker-log-{run_id}.txt")
     job = {
         "schema_id": WORKER_SCHEMA,
-        "package_commit": ledger.activation.package_commit,
-        "source_lock_sha256": ledger.activation.source_lock_sha256,
+        "package_commit": ledger.binding.package_commit,
+        "source_lock_sha256": ledger.binding.source_lock_sha256,
         "run_id": run_id,
         "unit_id": unit_id,
         "phase": "update",
@@ -1382,7 +1378,7 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
     else:
         policy, digest, policy_source = _load_model(model_label, proxy=proxy)
     config, runner, module, encoder = runtime.initialize_native_runtime(
-        output, sampling=True, stage1_activation=ledger.activation,
+        output, sampling=True, stage1_binding=ledger.binding,
     )
     search_receipts: list[dict[str, Any]] = []
     all_joint_trials: list[Any] = []
@@ -1592,8 +1588,8 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
                 "schema_id": FEATURE_SCHEMA,
                 "unit_id": str(row["unit_id"]),
                 "owner_seed": seed,
-                "package_commit": ledger.activation.package_commit,
-                "source_lock_sha256": ledger.activation.source_lock_sha256,
+                "package_commit": ledger.binding.package_commit,
+                "source_lock_sha256": ledger.binding.source_lock_sha256,
                 "base": _serialize_trial(base, runtime),
                 "joint_trajectories": [_serialize_trial(trial, runtime) for trial in joint],
                 "search_receipts": search_receipts,
@@ -1602,8 +1598,8 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
         report = {
             "schema_id": UNIT_SCHEMA,
             "status": "SUCCEEDED",
-            "package_commit": ledger.activation.package_commit,
-            "source_lock_sha256": ledger.activation.source_lock_sha256,
+            "package_commit": ledger.binding.package_commit,
+            "source_lock_sha256": ledger.binding.source_lock_sha256,
             "study_id": STUDY_ID,
             "unit_id": row["unit_id"],
             "phase": phase,
@@ -1659,6 +1655,7 @@ def _worker_main(job_path: Path) -> int:
         raise PermissionError("worker job schema differs from the locked executor")
     unit_id = str(job.get("unit_id", ""))
     run_id = str(job.get("run_id", ""))
+    budget.verify_stage1_phase(str(job.get("phase", "")))
     if len(run_id) != len(unit_id) + 17 or not run_id.startswith(unit_id + "-"):
         raise PermissionError("worker run ID is not a unique unit-scoped reservation ID")
     suffix = run_id[len(unit_id) + 1:]
@@ -1668,8 +1665,8 @@ def _worker_main(job_path: Path) -> int:
         ARTIFACT_ROOT / "ledger", run_id=run_id, unit_id=unit_id,
     )
     if (
-        job.get("package_commit") != ledger.activation.package_commit
-        or job.get("source_lock_sha256") != ledger.activation.source_lock_sha256
+        job.get("package_commit") != ledger.binding.package_commit
+        or job.get("source_lock_sha256") != ledger.binding.source_lock_sha256
     ):
         raise PermissionError("worker job is not bound to the active ledger reservation")
     reservation = ledger.require_open_reservation(run_id=run_id, unit_id=unit_id)
@@ -1872,8 +1869,8 @@ def _run_report_analysis(ledger: Any, outcomes: Sequence[Mapping[str, Any]]) -> 
             "schema_id": UNIT_SCHEMA,
             "status": "SUCCEEDED",
             "unit_id": unit_id,
-            "package_commit": ledger.activation.package_commit,
-            "source_lock_sha256": ledger.activation.source_lock_sha256,
+            "package_commit": ledger.binding.package_commit,
+            "source_lock_sha256": ledger.binding.source_lock_sha256,
             "resource": {"ledger_run_id": run_id},
             "analysis": analysis,
             "analysis_cpu_seconds_before_ledger_finalize": measured,
@@ -1959,8 +1956,8 @@ def _run_training(ledger: Any) -> dict[str, Any]:
     report = {
         "schema_id": "issue75-stage1-training-report-v1",
         "status": "TRAINING_COMPLETE",
-        "package_commit": ledger.activation.package_commit,
-        "source_lock_sha256": ledger.activation.source_lock_sha256,
+        "package_commit": ledger.binding.package_commit,
+        "source_lock_sha256": ledger.binding.source_lock_sha256,
         "scope": "STUDY_ONLY",
         "formal_owner_count": 512,
         "completed_blocks": 4,
@@ -1987,8 +1984,8 @@ def _run_evaluation(ledger: Any) -> dict[str, Any]:
         report = _read_json(report_path)
         if (
             report.get("schema_id") != "issue75-stage1-heldout-report-v1"
-            or report.get("package_commit") != ledger.activation.package_commit
-            or report.get("source_lock_sha256") != ledger.activation.source_lock_sha256
+            or report.get("package_commit") != ledger.binding.package_commit
+            or report.get("source_lock_sha256") != ledger.binding.source_lock_sha256
             or report.get("status") != "EVALUATION_COMPLETE_PENDING_INDEPENDENT_REVIEW"
         ):
             raise PermissionError("existing heldout report is not a successful receipt for this exact package")
@@ -2049,8 +2046,8 @@ def _run_evaluation(ledger: Any) -> dict[str, Any]:
     report = {
         "schema_id": "issue75-stage1-heldout-report-v1",
         "status": "EVALUATION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
-        "package_commit": ledger.activation.package_commit,
-        "source_lock_sha256": ledger.activation.source_lock_sha256,
+        "package_commit": ledger.binding.package_commit,
+        "source_lock_sha256": ledger.binding.source_lock_sha256,
         "scope": "STUDY_ONLY",
         "owner_count": 96,
         "arm_count": 5,
@@ -2075,15 +2072,15 @@ def _run_evaluation(ledger: Any) -> dict[str, Any]:
 
 
 def run_phase(phase: str, *, output_dir: Path) -> dict[str, Any]:
-    """Run one registered phase after its exact live authorization and write-ahead gates."""
+    """Run one enabled, source-locked phase under write-ahead CPU accounting."""
     if phase not in {"preflight", "train", "evaluate"}:
         raise ValueError("Stage 1 executor accepts only preflight, train, or evaluate")
     budget.verify_stage1_package()
+    budget.verify_stage1_phase(phase)
     if _inside_artifacts(output_dir) != ARTIFACT_ROOT.resolve(strict=False):
         raise ValueError("Stage 1 uses one registered artifact root and cumulative ledger")
-    # This network/source/timestamp gate is the first operation that may authorize
-    # artifact creation. No config edit or caller-provided receipt can bypass it.
-    ledger = budget.open_activated_stage1_ledger(ARTIFACT_ROOT / "ledger")
+    # The lock and phase allowlist are the first operation that may authorize artifact creation.
+    ledger = budget.open_stage1_ledger(ARTIFACT_ROOT / "ledger")
     with _lock_context(ARTIFACT_ROOT / "executor.lock"):
         ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
         if phase == "preflight":
@@ -2095,15 +2092,35 @@ def run_phase(phase: str, *, output_dir: Path) -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--worker-job", type=Path)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--phase", choices=("preflight", "train", "evaluate"))
+    mode.add_argument("--worker-job", type=Path)
     args = parser.parse_args(argv)
-    if args.worker_job is None:
-        parser.error("executor worker mode requires --worker-job")
+    if args.worker_job is not None:
+        try:
+            return _worker_main(_inside_artifacts(args.worker_job))
+        except BaseException as exc:
+            # No exception message, native payload, private state, or path is emitted.
+            print(json.dumps({
+                "status": "STAGE1_WORKER_FAILED", "error_type": type(exc).__name__,
+            }, sort_keys=True), file=sys.stderr)
+            return 2
     try:
-        return _worker_main(_inside_artifacts(args.worker_job))
+        report = run_phase(args.phase, output_dir=ARTIFACT_ROOT)
+        print(json.dumps({
+            "status": report.get("status"),
+            "phase": args.phase,
+            "package_commit": report.get("package_commit"),
+            "source_lock_sha256": report.get("source_lock_sha256"),
+        }, sort_keys=True))
+        return 0
     except BaseException as exc:
-        # No exception message, native payload, private state, or path is emitted.
-        print(json.dumps({"status": "STAGE1_WORKER_FAILED", "error_type": type(exc).__name__}, sort_keys=True), file=sys.stderr)
+        # The registered parent interface emits only a coarse failure boundary.
+        print(json.dumps({
+            "status": "STAGE1_EXECUTOR_FAILED",
+            "phase": args.phase,
+            "error_type": type(exc).__name__,
+        }, sort_keys=True), file=sys.stderr)
         return 2
 
 

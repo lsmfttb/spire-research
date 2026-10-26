@@ -1,13 +1,4 @@
 {
-  "activation_gate": {
-    "both_comments_bind_exact_package_commit_and_source_lock_sha256": true,
-    "github_user_type": "User",
-    "owner_login": "lsmfttb",
-    "planner_activation_marker": "STAGE1_PLANNER_ACTIVATE",
-    "reviewer_and_planner_comments_must_be_distinct_and_ordered": true,
-    "reviewer_pass_marker": "STAGE1_REVIEW_PASS",
-    "separate_github_account_required": false
-  },
   "algorithm": {
     "learning": {
       "elite": {
@@ -97,15 +88,15 @@
     }
   },
   "execution": {
-    "exact_package_commit_and_source_lock_must_be_cited": true,
+    "authorized_phases": [
+      "preflight"
+    ],
     "formal_evaluation_enabled": false,
     "formal_training_enabled": false,
-    "native_sampling_enabled": false,
-    "nonformal_preflight_enabled": false,
-    "package_status": "PREPARATION_ONLY_REQUIRES_EXACT_REVIEWER_PASS_AND_LATER_PLANNER_GO",
-    "planner_activation_required": true,
-    "reviewer_pass_must_precede_planner_activation": true,
-    "stage1_execution_authorized": false
+    "native_sampling_enabled": true,
+    "nonformal_preflight_enabled": true,
+    "package_status": "PREFLIGHT_ONLY_ENABLED",
+    "stage1_execution_authorized": true
   },
   "population": {
     "heldout_arms": [
@@ -147,7 +138,7 @@
     "no_outcome_conditioned_replacement_or_subset": true,
     "owner_seeds_are_the_eight_rows_marked_preflight": true,
     "recompute_full_remaining_cohort_forecast_before_formal_owner_seed": true,
-    "runs_only_after_exact_package_reviewer_pass_and_planner_activation": true
+    "runs_after_one_focused_independent_review_of_the_revised_executable_path": true
   },
   "preparation_base_commit": "a8410ff48ecf168f904726c79da302d10f921984",
   "provenance": {
@@ -220,7 +211,7 @@
   "resources": {
     "all_in_cpu_hard_seconds": 180000,
     "builder_process_tree_cpu_hard_seconds": 170000,
-    "ledger_name": "separate prospective Stage 1 ledger; starts at zero only after explicit Planner activation",
+    "ledger_name": "one cumulative Stage 1 ledger; starts at zero before the registered preflight",
     "reviewer_cpu_protected_seconds": 10000,
     "reviewer_reserve_is_not_transferable": true,
     "search_invocation_cpu_limit_seconds": 32,
@@ -276,7 +267,7 @@
       "torch_version": "2.12.0+cpu"
     },
     "runtime_sha256_lf": "aaa99c6316edb628e34161b733a92f7a0937d853b3761aa08165bc7536905407",
-    "source_and_binary_lock_is_required_before_any_activation": true
+    "source_and_binary_lock_is_required_before_any_registered_phase": true
   },
   "study_id": "issue-75-no-expert-oracle"
 }

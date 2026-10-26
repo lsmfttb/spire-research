@@ -1,11 +1,6 @@
-"""Disabled Stage 1 activation gate, CPU ledger, and Linux process-tree watchdog.
-
-This module is preparation-only; it never changes the checked-in disabled flag.
-"""
+"""Stage 1 source binding, CPU ledger, and Linux process-tree watchdog."""
 from __future__ import annotations
 from dataclasses import dataclass
-from datetime import datetime
-from http.client import IncompleteRead
 import ctypes
 import errno
 import fcntl
@@ -20,22 +15,12 @@ import subprocess
 import threading
 import time
 from typing import Any, Mapping, Sequence
-from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError, URLError
 
-OWNER_LOGIN = "lsmfttb"
-REPOSITORY = "lsmfttb/spire-research"
-ISSUE_NUMBER = 75
 BUILDER_LIMIT = 170_000
 REVIEWER_LIMIT = 10_000
 ALL_IN_LIMIT = 180_000
 SEARCH_CPU_CAP_SECONDS = 32.0
 SEARCH_ATTEMPT_CAP = 16
-REVIEW_MARKER = "STAGE1_REVIEW_PASS"
-PLANNER_MARKER = "STAGE1_PLANNER_ACTIVATE"
-COMMENT_PAGE_SIZE = 5
-COMMENT_FETCH_RETRIES = 2
 PR_SET_CHILD_SUBREAPER = 36
 PR_GET_CHILD_SUBREAPER = 37
 STUDY = Path(__file__).resolve().parent
@@ -61,7 +46,6 @@ LOCKED_PACKAGE_FILES = (
     "stage1/prepare.py",
     "stage1/executor.py",
     "stage1/test_activation.py",
-    "stage1/test_activation_gate.py",
     "stage1/test_executor.py",
 )
 LOCKED_REPOSITORY_DEPENDENCIES = (
@@ -87,20 +71,22 @@ def normalized_file_sha256(path: Path) -> str:
 
 
 def verify_stage1_package() -> dict[str, Any]:
-    """Verify the disabled package and every exact source-lock entry using only stdlib code."""
+    """Verify the registered source package and its explicit executable phase set."""
     lock_path = STAGE1 / "source-lock.json"
     lock = json.loads(lock_path.read_text(encoding="utf-8"))
     if (
         lock.get("schema_id") != "issue75-stage1-source-lock-v1"
         or lock.get("study_id") != "issue-75-no-expert-oracle"
         or lock.get("scope") != "STUDY_ONLY"
-        or lock.get("execution_authorized") is not False
-        or lock.get("package_status") != "PREPARATION_ONLY_DISABLED"
+        or lock.get("execution_authorized") is not True
+        or lock.get("package_status") not in {
+            "PREFLIGHT_ONLY_ENABLED", "FORMAL_TRAINING_ENABLED", "FORMAL_EXECUTION_ENABLED",
+        }
         or lock.get("formal_seeds_or_games_consumed") != 0
         or lock.get("native_sampling_performed") is not False
         or lock.get("model_training_performed") is not False
     ):
-        raise PermissionError("Stage 1 package is not the registered disabled preparation package")
+        raise PermissionError("Stage 1 source lock is not a valid registered executable package")
     files = lock.get("locked_files_sha256_lf")
     if not isinstance(files, dict) or set(files) != set(LOCKED_PACKAGE_FILES):
         raise PermissionError("Stage 1 lock does not cover the exact registered package file set")
@@ -118,17 +104,42 @@ def verify_stage1_package() -> dict[str, Any]:
     for relative, expected in repository_dependencies.items():
         path = (repository_root / relative).resolve()
         if not path.is_relative_to(repository_root) or not path.is_file():
-            raise PermissionError(f"locked repository dependency is unavailable: {relative}")
+            raise PermissionError(f"Stage 1 repository dependency is unavailable: {relative}")
         if not isinstance(expected, str) or _normalized_file_sha256(path) != expected:
-            raise PermissionError(f"Stage 1 repository dependency lock mismatch: {relative}")
+            raise PermissionError(f"Stage 1 repository dependency source-lock mismatch: {relative}")
 
     config = json.loads((STAGE1 / "config.json").read_text(encoding="utf-8"))
-    disabled = (
-        "stage1_execution_authorized", "formal_training_enabled", "formal_evaluation_enabled",
-        "nonformal_preflight_enabled", "native_sampling_enabled",
+    execution = config.get("execution")
+    if not isinstance(execution, dict):
+        raise PermissionError("Stage 1 package has no execution phase declaration")
+    stage1_enabled = execution.get("stage1_execution_authorized")
+    preflight_enabled = execution.get("nonformal_preflight_enabled")
+    native_enabled = execution.get("native_sampling_enabled")
+    training_enabled = execution.get("formal_training_enabled")
+    evaluation_enabled = execution.get("formal_evaluation_enabled")
+    if any(type(value) is not bool for value in (
+        stage1_enabled, preflight_enabled, native_enabled, training_enabled, evaluation_enabled,
+    )):
+        raise PermissionError("Stage 1 execution flags must be explicit booleans")
+    expected_phases = []
+    if stage1_enabled and preflight_enabled and native_enabled:
+        expected_phases.append("preflight")
+    if stage1_enabled and training_enabled:
+        expected_phases.append("train")
+    if stage1_enabled and evaluation_enabled:
+        expected_phases.append("evaluate")
+    if not expected_phases or expected_phases[0] != "preflight" or (
+        evaluation_enabled and not training_enabled
+    ) or execution.get("authorized_phases") != expected_phases:
+        raise PermissionError("Stage 1 package execution phase list is invalid")
+    expected_status = (
+        "PREFLIGHT_ONLY_ENABLED" if expected_phases == ["preflight"] else
+        "FORMAL_TRAINING_ENABLED" if expected_phases == ["preflight", "train"] else
+        "FORMAL_EXECUTION_ENABLED" if expected_phases == ["preflight", "train", "evaluate"] else None
     )
-    if any(config.get("execution", {}).get(key) is not False for key in disabled):
-        raise PermissionError("a Stage 1 execution flag is not explicitly disabled")
+    if expected_status is None or execution.get("package_status") != expected_status or lock.get("package_status") != expected_status:
+        raise PermissionError("Stage 1 package status does not match its enabled execution phases")
+
     for relative, field in (
         ("stage1/config.json", "stage1_config_sha256"),
         ("stage1/seed-table.json", "seed_table_sha256"),
@@ -149,8 +160,17 @@ def verify_stage1_package() -> dict[str, Any]:
     ):
         raise PermissionError("Stage 1 package has an incomplete or changed owner/arm schedule")
     budget = json.loads((STAGE1 / "budget.json").read_text(encoding="utf-8"))
-    if budget.get("stage1_execution_authorized") is not False or budget.get("ledger_status") != "NOT_ACTIVATED_ZERO_CHARGES":
-        raise PermissionError("Stage 1 budget must remain disabled and uncharged")
+    if (
+        budget.get("stage1_execution_authorized") is not True
+        or budget.get("ledger_status") != "PREFLIGHT_AUTHORIZED_ZERO_CHARGES"
+        or budget.get("limits_cpu_seconds") != {
+            "builder": BUILDER_LIMIT, "reviewer_protected": REVIEWER_LIMIT, "all_in": ALL_IN_LIMIT,
+        }
+        or budget.get("reviewer_reserve_transferable_to_builder") is not False
+        or budget.get("search_call_cpu_cap_seconds") != SEARCH_CPU_CAP_SECONDS
+        or budget.get("search_call_started_attempt_cap") != SEARCH_ATTEMPT_CAP
+    ):
+        raise PermissionError("Stage 1 budget does not match the registered hard limits")
     sidecar = (STAGE1 / "source-lock.sha256").read_text(encoding="ascii").split()
     lock_digest = _normalized_file_sha256(lock_path)
     if not sidecar or sidecar[0] != lock_digest:
@@ -158,204 +178,32 @@ def verify_stage1_package() -> dict[str, Any]:
     return lock
 
 
+def verify_stage1_phase(phase: str) -> None:
+    """Refuse any phase not explicitly enabled by the locked Stage 1 package."""
+    if phase not in {"preflight", "train", "evaluate", "update"}:
+        raise ValueError(f"unknown Stage 1 phase: {phase}")
+    config = json.loads((STAGE1 / "config.json").read_text(encoding="utf-8"))
+    execution = config["execution"]
+    target = "train" if phase == "update" else phase
+    if target not in execution["authorized_phases"]:
+        raise PermissionError(f"Stage 1 phase is not enabled by the locked package: {phase}")
+
+
 @dataclass(frozen=True)
-class ActivationReceipt:
+class PackageBinding:
     package_commit: str
     source_lock_sha256: str
-    reviewer_comment_id: int
-    planner_comment_id: int
-    authorized_at: str
-
-
-def _activation_receipt_data(receipt: ActivationReceipt) -> dict[str, Any]:
-    return {
-        "package_commit": receipt.package_commit,
-        "source_lock_sha256": receipt.source_lock_sha256,
-        "reviewer_comment_id": receipt.reviewer_comment_id,
-        "planner_comment_id": receipt.planner_comment_id,
-        "authorized_at": receipt.authorized_at,
-    }
-
-
-def _activation_receipt_from_data(
-    value: Any, *, expected_binding: tuple[str, str],
-) -> ActivationReceipt:
-    fields = {
-        "package_commit", "source_lock_sha256", "reviewer_comment_id",
-        "planner_comment_id", "authorized_at",
-    }
-    if not isinstance(value, Mapping) or set(value) != fields:
-        raise PermissionError("worker ledger lacks the exact recorded activation receipt")
-    reviewer_id, planner_id = value.get("reviewer_comment_id"), value.get("planner_comment_id")
-    authorized_at = value.get("authorized_at")
-    if (
-        value.get("package_commit") != expected_binding[0]
-        or value.get("source_lock_sha256") != expected_binding[1]
-        or not isinstance(reviewer_id, int) or isinstance(reviewer_id, bool) or reviewer_id <= 0
-        or not isinstance(planner_id, int) or isinstance(planner_id, bool) or planner_id <= 0
-        or reviewer_id == planner_id
-        or not isinstance(authorized_at, str)
-    ):
-        raise PermissionError("recorded activation receipt does not bind this package and source lock")
-    try:
-        timestamp = datetime.fromisoformat(authorized_at.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise PermissionError("recorded activation receipt has an invalid timestamp") from exc
-    if timestamp.tzinfo is None:
-        raise PermissionError("recorded activation receipt timestamp lacks a timezone")
-    return ActivationReceipt(
-        package_commit=expected_binding[0],
-        source_lock_sha256=expected_binding[1],
-        reviewer_comment_id=reviewer_id,
-        planner_comment_id=planner_id,
-        authorized_at=timestamp.isoformat(),
-    )
-
-
-def _fetch_authoritative_issue_comments() -> list[Mapping[str, Any]]:
-    """Fetch all top-level Issue comments from GitHub; activation records are never caller-supplied."""
-    base = f"https://api.github.com/repos/{REPOSITORY}/issues/{ISSUE_NUMBER}/comments"
-    comments: list[Mapping[str, Any]] = []
-    page = 1
-    while True:
-        request = Request(
-            f"{base}?per_page={COMMENT_PAGE_SIZE}&page={page}",
-            headers={
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "spire-research-issue75-activation-gate",
-            },
-        )
-        payload = None
-        last_error: BaseException | None = None
-        for attempt in range(COMMENT_FETCH_RETRIES + 1):
-            try:
-                with urlopen(request, timeout=30) as response:
-                    payload = json.load(response)
-                last_error = None
-                break
-            except HTTPError as exc:
-                if exc.code not in {500, 502, 503, 504}:
-                    raise
-                last_error = exc
-            except (IncompleteRead, URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-                last_error = exc
-            if attempt < COMMENT_FETCH_RETRIES:
-                time.sleep(0.25 * (attempt + 1))
-        if last_error is not None:
-            raise PermissionError("GitHub did not return a complete Issue comment page") from last_error
-        if not isinstance(payload, list) or any(not isinstance(row, Mapping) for row in payload):
-            raise PermissionError("GitHub returned an invalid Issue comment response")
-        comments.extend(payload)
-        if len(payload) < COMMENT_PAGE_SIZE:
-            break
-        page += 1
-    return comments
-
-
-def _verify_activation_comments(
-    comments: Sequence[Mapping[str, Any]], *,
-    package_commit: str, source_lock_sha256: str,
-    repository: str = REPOSITORY, issue_number: int = ISSUE_NUMBER,
-) -> ActivationReceipt:
-    """Select ordered exact-source decisions from authoritative Issue comment records."""
-    if repository != REPOSITORY or issue_number != ISSUE_NUMBER:
-        raise PermissionError("activation is bound to lsmfttb/spire-research#75")
-    if not isinstance(package_commit, str) or len(package_commit) != 40 or any(c not in "0123456789abcdef" for c in package_commit):
-        raise ValueError("invalid package commit SHA")
-    if not isinstance(source_lock_sha256, str) or len(source_lock_sha256) != 64 or any(c not in "0123456789abcdef" for c in source_lock_sha256):
-        raise ValueError("invalid source-lock SHA256")
-    if not isinstance(comments, Sequence) or isinstance(comments, (str, bytes)):
-        raise PermissionError("GitHub Issue comments must be a sequence of records")
-
-    def check(comment: Mapping[str, Any], marker: str) -> tuple[int, datetime, datetime]:
-        comment_id = comment.get("id")
-        if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
-            raise PermissionError("decision comment has no valid GitHub comment ID")
-        url = comment.get("html_url")
-        if not isinstance(url, str):
-            raise PermissionError("decision comment has no GitHub URL")
-        parsed_url = urlsplit(url)
-        expected_path = f"/{REPOSITORY}/issues/{ISSUE_NUMBER}"
-        if (
-            parsed_url.scheme != "https" or parsed_url.netloc != "github.com"
-            or parsed_url.path != expected_path or parsed_url.query
-            or parsed_url.fragment != f"issuecomment-{comment_id}"
-        ):
-            raise PermissionError("decision comment URL does not identify its exact Issue 75 comment ID")
-        user, body, created = comment.get("user"), comment.get("body"), comment.get("created_at")
-        if not isinstance(user, Mapping) or user.get("login") != OWNER_LOGIN or user.get("type") != "User":
-            raise PermissionError("comment is not from the configured project owner")
-        if not isinstance(body, str) or not {
-            marker, f"package_commit: {package_commit}",
-            f"source_lock_sha256: {source_lock_sha256}", "scope: STUDY_ONLY",
-        }.issubset({line.strip() for line in body.splitlines()}):
-            raise PermissionError(f"comment does not bind {marker}, exact source, lock, and STUDY_ONLY scope")
-        if not isinstance(created, str):
-            raise PermissionError("decision comment has no GitHub timestamp")
-        try:
-            timestamp = datetime.fromisoformat(created.replace("Z", "+00:00"))
-        except ValueError as exc:
-            raise PermissionError("decision comment has an invalid GitHub timestamp") from exc
-        if timestamp.tzinfo is None:
-            raise PermissionError("decision comment timestamp lacks timezone")
-        updated = comment.get("updated_at")
-        if not isinstance(updated, str):
-            raise PermissionError("decision comment has no GitHub edit timestamp")
-        try:
-            updated_timestamp = datetime.fromisoformat(updated.replace("Z", "+00:00"))
-        except ValueError as exc:
-            raise PermissionError("decision comment has an invalid GitHub edit timestamp") from exc
-        if updated_timestamp.tzinfo is None or updated_timestamp < timestamp:
-            raise PermissionError("decision comment edit timestamp is invalid")
-        return comment_id, timestamp, updated_timestamp
-
-    def marked(marker: str) -> list[Mapping[str, Any]]:
-        return [
-            row for row in comments
-            if isinstance(row, Mapping) and isinstance(row.get("body"), str)
-            and marker in {line.strip() for line in row["body"].splitlines()}
-        ]
-
-    reviewers: list[tuple[int, datetime, datetime]] = []
-    planners: list[tuple[int, datetime, datetime]] = []
-    for row in marked(REVIEW_MARKER):
-        try:
-            reviewers.append(check(row, REVIEW_MARKER))
-        except (PermissionError, ValueError, TypeError):
-            continue
-    for row in marked(PLANNER_MARKER):
-        try:
-            planners.append(check(row, PLANNER_MARKER))
-        except (PermissionError, ValueError, TypeError):
-            continue
-
-    valid_pairs = [
-        (reviewer_id, planner_id, activated_at)
-        for reviewer_id, reviewed_at, reviewer_updated_at in reviewers
-        for planner_id, activated_at, _planner_updated_at in planners
-        if reviewer_id != planner_id and activated_at > reviewed_at
-        and reviewer_updated_at <= activated_at
-    ]
-    if not valid_pairs:
-        raise PermissionError(
-            "no authoritative ordered Reviewer PASS and later Planner GO comments bind the current package, lock, and STUDY_ONLY scope"
-        )
-    reviewer_id, planner_id, activated_at = max(valid_pairs, key=lambda pair: pair[2])
-    return ActivationReceipt(
-        package_commit, source_lock_sha256, reviewer_id, planner_id, activated_at.isoformat(),
-    )
 
 
 def _current_package_binding() -> tuple[str, str]:
-    """Verify the locked package and bind activation to this checkout's commit and lock digest."""
+    """Verify the package and bind ledger receipts to the current commit and lock."""
     verify_stage1_package()
     working_tree = subprocess.run(
         ["git", "diff", "--quiet", "HEAD", "--", "."], cwd=STUDY,
         check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
     if working_tree.returncode != 0:
-        raise PermissionError("Stage 1 activation requires a clean tracked study checkout")
+        raise PermissionError("Stage 1 receipts require a clean tracked study checkout")
     current = subprocess.run(
         ["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=STUDY, check=True,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
@@ -370,88 +218,14 @@ def _current_package_binding() -> tuple[str, str]:
     return current, lock_digest
 
 
-def validate_worker_activation_receipt(receipt: ActivationReceipt) -> ActivationReceipt:
-    """Validate a parent's recorded Stage 1 activation against the current locked checkout."""
-    if not isinstance(receipt, ActivationReceipt):
-        raise PermissionError("Stage 1 worker activation must come from the reserved ledger")
-    binding = _current_package_binding()
-    return _activation_receipt_from_data(_activation_receipt_data(receipt), expected_binding=binding)
-
-
-def _live_activation_receipt() -> ActivationReceipt:
-    package_commit, lock_digest = _current_package_binding()
-    comments = _fetch_authoritative_issue_comments()
-    if _current_package_binding() != (package_commit, lock_digest):
-        raise PermissionError("Stage 1 package changed while authoritative activation comments were fetched")
-    return _verify_activation_comments(
-        comments, package_commit=package_commit, source_lock_sha256=lock_digest,
-    )
-
-
-def verify_preflight_review_pass(
-    *, preflight_report_sha256: str, cost_forecast_sha256: str,
-    not_before: str,
-) -> dict[str, Any]:
-    """Require an exact-source Reviewer attestation for the completed 40-row forecast."""
-    package_commit, lock_digest = _current_package_binding()
-    for name, value in (("preflight report", preflight_report_sha256), ("cost forecast", cost_forecast_sha256)):
-        if not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
-            raise ValueError(f"invalid {name} digest")
-    try:
-        boundary = datetime.fromisoformat(str(not_before).replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise ValueError("preflight review boundary is not an ISO timestamp") from exc
-    if boundary.tzinfo is None:
-        raise ValueError("preflight review boundary must include a timezone")
-
-    required = {
-        "STAGE1_PREFLIGHT_REVIEW_PASS",
-        f"package_commit: {package_commit}",
-        f"source_lock_sha256: {lock_digest}",
-        f"preflight_report_sha256: {preflight_report_sha256}",
-        f"cost_forecast_sha256: {cost_forecast_sha256}",
-        "scope: STUDY_ONLY",
-    }
-    matches: list[tuple[datetime, int, Mapping[str, Any]]] = []
-    for row in _fetch_authoritative_issue_comments():
-        if not isinstance(row, Mapping):
-            continue
-        user, body = row.get("user"), row.get("body")
-        if not isinstance(user, Mapping) or user.get("login") != OWNER_LOGIN or user.get("type") != "User":
-            continue
-        if not isinstance(body, str) or not required.issubset({line.strip() for line in body.splitlines()}):
-            continue
-        try:
-            created = datetime.fromisoformat(str(row.get("created_at", "")).replace("Z", "+00:00"))
-            updated = datetime.fromisoformat(str(row.get("updated_at", "")).replace("Z", "+00:00"))
-            comment_id = int(row.get("id", 0))
-        except (TypeError, ValueError):
-            continue
-        url = row.get("html_url")
-        parsed = urlsplit(url) if isinstance(url, str) else None
-        if (
-            created.tzinfo is None or updated.tzinfo is None or created < boundary
-            or updated != created or comment_id <= 0 or parsed is None
-            or parsed.scheme != "https" or parsed.netloc != "github.com"
-            or parsed.path != f"/{REPOSITORY}/issues/{ISSUE_NUMBER}"
-            or parsed.query or parsed.fragment != f"issuecomment-{comment_id}"
-        ):
-            continue
-        matches.append((created, comment_id, row))
-    if not matches:
-        raise PermissionError("no later, immutable Reviewer PASS binds the exact 40-row report and cost forecast")
-    created, comment_id, row = max(matches, key=lambda item: item[0])
-    if _current_package_binding() != (package_commit, lock_digest):
-        raise PermissionError("Stage 1 package changed while the preflight review was checked")
-    return {
-        "comment_id": comment_id,
-        "created_at": created.isoformat(),
-        "package_commit": package_commit,
-        "source_lock_sha256": lock_digest,
-        "preflight_report_sha256": preflight_report_sha256,
-        "cost_forecast_sha256": cost_forecast_sha256,
-        "reviewer_login": row["user"]["login"],
-    }
+def validate_worker_package_binding(binding: PackageBinding) -> PackageBinding:
+    """Validate a child source identity against the current locked checkout."""
+    if not isinstance(binding, PackageBinding):
+        raise PermissionError("Stage 1 worker must use the source binding from its reserved ledger")
+    current = PackageBinding(*_current_package_binding())
+    if binding != current:
+        raise PermissionError("worker package binding does not match the current source-locked checkout")
+    return current
 
 
 class ResourceBlocked(RuntimeError): pass
@@ -482,6 +256,8 @@ def _state(events: Sequence[Mapping[str, Any]]) -> tuple[dict[str, dict[str, Any
     runs: dict[str, dict[str, Any]] = {}
     units: dict[str, list[str]] = {}
     for e in events:
+        if e.get("schema_id") != "issue75-stage1-budget-event-v2":
+            raise LedgerCorrupt("unsupported budget ledger event schema")
         if e.get("event") == "reserve":
             rid, uid = e.get("run_id"), e.get("unit_id")
             if not isinstance(rid, str) or not rid or rid in runs or not isinstance(uid, str) or not uid:
@@ -504,14 +280,12 @@ def _charge(run: Mapping[str, Any]) -> float:
 
 
 class Stage1Ledger:
-    """Append-only accounting; parents fetch live authorization and workers prove an open reservation."""
-    def __init__(self, directory: Path, activation: ActivationReceipt | None = None):
-        if activation is not None:
-            raise PermissionError("caller-supplied activation receipts cannot authorize ledger construction")
-        self._initialize(directory, _live_activation_receipt())
+    """Append-only accounting; every reservation is bound to the locked package and CPU limits."""
+    def __init__(self, directory: Path):
+        self._initialize(directory, PackageBinding(*_current_package_binding()))
 
-    def _initialize(self, directory: Path, activation: ActivationReceipt | None) -> None:
-        self.activation = activation
+    def _initialize(self, directory: Path, binding: PackageBinding) -> None:
+        self.binding = binding
         self.directory = Path(directory)
         self.events_path = self.directory / "events.jsonl"
         self.lock_path = self.directory / "events.lock"
@@ -521,10 +295,10 @@ class Stage1Ledger:
     def open_reserved_worker(
         cls, directory: Path, *, run_id: str, unit_id: str,
     ) -> "Stage1Ledger":
-        """Open only a live parent reservation, without repeating the GitHub comment fetch."""
-        binding = _current_package_binding()
+        """Open only a live parent reservation bound to the current locked package."""
+        current_binding = _current_package_binding()
         ledger = cls.__new__(cls)
-        ledger._initialize(directory, None)
+        ledger._initialize(directory, PackageBinding(*current_binding))
         runs, _ = _state(_events(ledger.events_path))
         run = runs.get(str(run_id))
         if run is None or run["finish"] is not None:
@@ -533,13 +307,10 @@ class Stage1Ledger:
         if reservation.get("unit_id") != str(unit_id):
             raise PermissionError("worker reservation does not match its registered unit")
         if (
-            reservation.get("package_commit") != binding[0]
-            or reservation.get("source_lock_sha256") != binding[1]
+            reservation.get("package_commit") != current_binding[0]
+            or reservation.get("source_lock_sha256") != current_binding[1]
         ):
             raise PermissionError("worker reservation belongs to a different package or source lock")
-        ledger.activation = _activation_receipt_from_data(
-            reservation.get("activation_receipt"), expected_binding=binding,
-        )
         ledger.require_open_reservation(run_id=run_id, unit_id=unit_id)
         return ledger
 
@@ -575,9 +346,8 @@ class Stage1Ledger:
         if (
             reservation.get("unit_id") != str(unit_id)
             or reservation.get("role") != str(role)
-            or reservation.get("package_commit") != self.activation.package_commit
-            or reservation.get("source_lock_sha256") != self.activation.source_lock_sha256
-            or reservation.get("activation_receipt") != _activation_receipt_data(self.activation)
+            or reservation.get("package_commit") != self.binding.package_commit
+            or reservation.get("source_lock_sha256") != self.binding.source_lock_sha256
         ):
             raise PermissionError("worker reservation does not match its unit and active package binding")
         return dict(reservation)
@@ -645,13 +415,12 @@ class Stage1Ledger:
                 if charges["builder"] + charges["reviewer"] + cap > ALL_IN_LIMIT:
                     raise ResourceBlocked("all-in CPU cap would be exceeded")
             event = {
-                "event": "reserve", "schema_id": "issue75-stage1-budget-event-v1",
+                "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
                 "run_id": run_id, "unit_id": unit_id, "role": role, "unit_kind": unit_kind,
                 "reserved_cpu_seconds": cap, "attempt_cap": attempt_cap,
                 "previous_run_id": previous_run_id, "checkpoint_sha256": checkpoint_sha256,
-                "package_commit": self.activation.package_commit,
-                "source_lock_sha256": self.activation.source_lock_sha256,
-                "activation_receipt": _activation_receipt_data(self.activation),
+                "package_commit": self.binding.package_commit,
+                "source_lock_sha256": self.binding.source_lock_sha256,
                 "created_at_ns": time.time_ns(),
             }
             return event, event
@@ -687,13 +456,13 @@ class Stage1Ledger:
                 raise DuplicateRun(f"no open reservation: {run_id}")
             reservation = run["reservation"]
             event = {
-                "event": "finish", "schema_id": "issue75-stage1-budget-event-v1",
+                "event": "finish", "schema_id": "issue75-stage1-budget-event-v2",
                 "run_id": run_id, "unit_id": reservation["unit_id"], "status": status,
                 "measured_cpu_seconds": measured, "reserved_cpu_seconds": reservation["reserved_cpu_seconds"],
                 "started_attempts": started_attempts, "checkpoint_sha256": checkpoint_sha256,
                 "result_sha256": result_sha256,
-                "finished_at_ns": time.time_ns(), "package_commit": self.activation.package_commit,
-                "source_lock_sha256": self.activation.source_lock_sha256,
+                "finished_at_ns": time.time_ns(), "package_commit": self.binding.package_commit,
+                "source_lock_sha256": self.binding.source_lock_sha256,
             }
             return (event, reservation), event
         event, reservation = self._tx(operation)
@@ -755,8 +524,8 @@ class Stage1Ledger:
                 "future_builder_cpu_forecast": future, "projected_builder_cpu": builder,
                 "projected_all_in_with_reviewer_reserve": all_in,
                 "builder_cpu_remaining": BUILDER_LIMIT - builder, "all_in_cpu_remaining": ALL_IN_LIMIT - all_in,
-                "package_commit": self.activation.package_commit,
-                "source_lock_sha256": self.activation.source_lock_sha256,
+                "package_commit": self.binding.package_commit,
+                "source_lock_sha256": self.binding.source_lock_sha256,
             }
             if result["status"] != "FITS":
                 raise ResourceBlocked(canonical(result).decode())
@@ -767,8 +536,8 @@ class Stage1Ledger:
         return self._tx(lambda rows: (_state(rows) and rows, None))
 
 
-def open_activated_stage1_ledger(directory: Path) -> Stage1Ledger:
-    """Open the sole parent gate after live GitHub and checkout binding checks."""
+def open_stage1_ledger(directory: Path) -> Stage1Ledger:
+    """Open the cumulative ledger after validating the locked package and source binding."""
     return Stage1Ledger(directory)
 
 

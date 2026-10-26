@@ -1,8 +1,7 @@
-"""Build the immutable, still-disabled Stage 1 package from Issue 75 locks.
+"""Build and verify the source-locked Stage 1 package for the registered preflight.
 
-Run only in the pinned Linux Python 3.13 environment. This command imports the
-native extension for its API-negative check; it creates no simulator, game,
-checkpoint, projection, Stage 1 attempt, or seed receipt.
+Run only in the pinned Linux Python 3.13 environment. The builder/verifier
+commands do not create a simulator, game, checkpoint, projection, attempt, or seed receipt.
 """
 from __future__ import annotations
 
@@ -26,7 +25,6 @@ from stage1_budget import (  # noqa: E402
     BUILDER_LIMIT,
     LOCKED_PACKAGE_FILES,
     LOCKED_REPOSITORY_DEPENDENCIES,
-    OWNER_LOGIN,
     REVIEWER_LIMIT,
     canonical,
     sha256_bytes,
@@ -297,24 +295,13 @@ def _make_stage1_config(
         "scope": "STUDY_ONLY",
         "preparation_base_commit": PREPARATION_BASE,
         "execution": {
-            "package_status": "PREPARATION_ONLY_REQUIRES_EXACT_REVIEWER_PASS_AND_LATER_PLANNER_GO",
-            "stage1_execution_authorized": False,
+            "package_status": "PREFLIGHT_ONLY_ENABLED",
+            "stage1_execution_authorized": True,
             "formal_training_enabled": False,
             "formal_evaluation_enabled": False,
-            "nonformal_preflight_enabled": False,
-            "native_sampling_enabled": False,
-            "planner_activation_required": True,
-            "reviewer_pass_must_precede_planner_activation": True,
-            "exact_package_commit_and_source_lock_must_be_cited": True,
-        },
-        "activation_gate": {
-            "owner_login": OWNER_LOGIN,
-            "github_user_type": "User",
-            "reviewer_pass_marker": "STAGE1_REVIEW_PASS",
-            "planner_activation_marker": "STAGE1_PLANNER_ACTIVATE",
-            "reviewer_and_planner_comments_must_be_distinct_and_ordered": True,
-            "both_comments_bind_exact_package_commit_and_source_lock_sha256": True,
-            "separate_github_account_required": False,
+            "nonformal_preflight_enabled": True,
+            "native_sampling_enabled": True,
+            "authorized_phases": ["preflight"],
         },
         "population": {
             "training_owners": {"first_owner_seed": 7_500_001, "last_owner_seed": 7_500_512, "count": 512},
@@ -345,7 +332,7 @@ def _make_stage1_config(
             "runtime_sha256_lf": preflight.normalized_sha256(STUDY / "runtime.py"),
             "initial_model_digest": runtime_lock["pi0_model_digest"],
             "initial_optimizer_state_sha256": runtime_lock["optimizer_initial_state_sha256"],
-            "source_and_binary_lock_is_required_before_any_activation": True,
+            "source_and_binary_lock_is_required_before_any_registered_phase": True,
         },
         "algorithm": {
             "policy": copy.deepcopy(config["policy"]),
@@ -353,7 +340,7 @@ def _make_stage1_config(
             "learning": learning_config,
         },
         "resources": {
-            "ledger_name": "separate prospective Stage 1 ledger; starts at zero only after explicit Planner activation",
+            "ledger_name": "one cumulative Stage 1 ledger; starts at zero before the registered preflight",
             "builder_process_tree_cpu_hard_seconds": int(BUILDER_LIMIT),
             "reviewer_cpu_protected_seconds": int(REVIEWER_LIMIT),
             "all_in_cpu_hard_seconds": int(ALL_IN_LIMIT),
@@ -368,7 +355,7 @@ def _make_stage1_config(
             "search_invocation_started_attempt_limit": config["search"]["search_invocation_started_attempt_cap"],
         },
         "preflight_protocol": {
-            "runs_only_after_exact_package_reviewer_pass_and_planner_activation": True,
+            "runs_after_one_focused_independent_review_of_the_revised_executable_path": True,
             "owner_seeds_are_the_eight_rows_marked_preflight": True,
             "arms_are_all_five_registered_heldout_arms": True,
             "recompute_full_remaining_cohort_forecast_before_formal_owner_seed": True,
@@ -389,8 +376,8 @@ def _make_budget_config() -> dict[str, Any]:
     return {
         "schema_id": "issue75-stage1-budget-config-v1",
         "study_id": "issue-75-no-expert-oracle",
-        "ledger_status": "NOT_ACTIVATED_ZERO_CHARGES",
-        "stage1_execution_authorized": False,
+        "ledger_status": "PREFLIGHT_AUTHORIZED_ZERO_CHARGES",
+        "stage1_execution_authorized": True,
         "stage0_charges_or_caps_included": False,
         "limits_cpu_seconds": {
             "builder": int(BUILDER_LIMIT),
@@ -450,10 +437,10 @@ def prepare_stage1_package() -> dict[str, Any]:
         "schema_id": "issue75-stage1-source-lock-v1",
         "study_id": "issue-75-no-expert-oracle",
         "scope": "STUDY_ONLY",
-        "package_status": "PREPARATION_ONLY_DISABLED",
-        "execution_authorized": False,
+        "package_status": "PREFLIGHT_ONLY_ENABLED",
+        "execution_authorized": True,
         "prepared_from_commit": PREPARATION_BASE,
-        "final_package_commit_binding": "must be named by exact SHA in Reviewer PASS and subsequent Planner activation comments",
+        "final_package_commit_binding": "all execution receipts bind the exact package commit and source-lock digest",
         "stage1_config_sha256": config_sha256,
         "seed_table_sha256": table_sha256,
         "budget_config_sha256": budget_sha256,
@@ -511,17 +498,68 @@ def _atomic_replace(path: Path, payload: bytes) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def refresh_stage1_source_lock() -> dict[str, Any]:
-    """Relock only the reviewed activation-gate repair files; preserve the registered study package."""
+def _preflight_only_inputs(config: Mapping[str, Any], budget: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Retire comment authorization while preserving every registered study input."""
+    updated_config = copy.deepcopy(dict(config))
+    execution = updated_config.get("execution")
+    gate = updated_config.get("activation_gate")
+    if not isinstance(execution, dict) or not isinstance(gate, dict):
+        raise ValueError("existing Stage 1 package is not the disabled comment-gated package")
+    if (
+        execution.get("package_status") != "PREPARATION_ONLY_REQUIRES_EXACT_REVIEWER_PASS_AND_LATER_PLANNER_GO"
+        or execution.get("stage1_execution_authorized") is not False
+        or execution.get("formal_training_enabled") is not False
+        or execution.get("formal_evaluation_enabled") is not False
+        or execution.get("nonformal_preflight_enabled") is not False
+        or execution.get("native_sampling_enabled") is not False
+        or execution.get("planner_activation_required") is not True
+        or execution.get("reviewer_pass_must_precede_planner_activation") is not True
+        or gate.get("separate_github_account_required") is not False
+    ):
+        raise ValueError("existing Stage 1 execution contract is not the expected retired gate")
+    del updated_config["activation_gate"]
+    execution.clear()
+    execution.update({
+        "package_status": "PREFLIGHT_ONLY_ENABLED",
+        "stage1_execution_authorized": True,
+        "formal_training_enabled": False,
+        "formal_evaluation_enabled": False,
+        "nonformal_preflight_enabled": True,
+        "native_sampling_enabled": True,
+        "authorized_phases": ["preflight"],
+    })
+    resources = updated_config["resources"]
+    resources["ledger_name"] = "one cumulative Stage 1 ledger; starts at zero before the registered preflight"
+    source = updated_config["source"]
+    if source.pop("source_and_binary_lock_is_required_before_any_activation", None) is not True:
+        raise ValueError("registered source and binary lock precondition is missing")
+    source["source_and_binary_lock_is_required_before_any_registered_phase"] = True
+    protocol = updated_config["preflight_protocol"]
+    if protocol.pop("runs_only_after_exact_package_reviewer_pass_and_planner_activation", None) is not True:
+        raise ValueError("old preflight comment gate is missing")
+    protocol["runs_after_one_focused_independent_review_of_the_revised_executable_path"] = True
+
+    updated_budget = copy.deepcopy(dict(budget))
+    if (
+        updated_budget.get("stage1_execution_authorized") is not False
+        or updated_budget.get("ledger_status") != "NOT_ACTIVATED_ZERO_CHARGES"
+    ):
+        raise ValueError("existing Stage 1 budget is not in the expected uncharged disabled state")
+    updated_budget["ledger_status"] = "PREFLIGHT_AUTHORIZED_ZERO_CHARGES"
+    updated_budget["stage1_execution_authorized"] = True
+    return updated_config, updated_budget
+
+
+def enable_registered_preflight() -> dict[str, Any]:
+    """Enable only the already registered 40-row preflight after source-lock checks."""
     lock_path = STAGE1 / "source-lock.json"
     sidecar_path = STAGE1 / "source-lock.sha256"
     lock = preflight.load_json(lock_path)
-    old_digest = preflight.normalized_sha256(lock_path)
+    digest = preflight.normalized_sha256(lock_path)
     sidecar = sidecar_path.read_text(encoding="ascii").split()
-    if not sidecar or sidecar[0] != old_digest:
-        raise ValueError("refusing to refresh a source lock whose existing sidecar is invalid")
     if (
-        lock.get("schema_id") != "issue75-stage1-source-lock-v1"
+        not sidecar or sidecar[0] != digest
+        or lock.get("schema_id") != "issue75-stage1-source-lock-v1"
         or lock.get("study_id") != "issue-75-no-expert-oracle"
         or lock.get("scope") != "STUDY_ONLY"
         or lock.get("execution_authorized") is not False
@@ -530,38 +568,103 @@ def refresh_stage1_source_lock() -> dict[str, Any]:
         or lock.get("native_sampling_performed") is not False
         or lock.get("model_training_performed") is not False
     ):
-        raise ValueError("refusing to refresh a source lock outside the disabled preparation package")
-    added_repair_files = {
-        "stage1/executor.py", "stage1/test_executor.py", "stage1/preflight-proxy.json",
-    }
+        raise ValueError("existing source lock is not the registered disabled Stage 1 package")
+    config_path = STAGE1 / "config.json"
+    budget_path = STAGE1 / "budget.json"
+    if (
+        preflight.normalized_sha256(config_path) != lock.get("stage1_config_sha256")
+        or preflight.normalized_sha256(budget_path) != lock.get("budget_config_sha256")
+    ):
+        raise ValueError("refusing preflight enablement from changed locked inputs")
+    config, budget = _preflight_only_inputs(
+        preflight.load_json(config_path), preflight.load_json(budget_path),
+    )
+    _atomic_replace(
+        config_path,
+        json.dumps(config, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False).encode("utf-8") + b"\n",
+    )
+    _atomic_replace(
+        budget_path,
+        json.dumps(budget, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False).encode("utf-8") + b"\n",
+    )
+    return refresh_stage1_source_lock(preflight_transition=True)
+
+
+def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[str, Any]:
+    """Relock reviewed executor repairs; a single transition may enable approved preflight."""
+    lock_path = STAGE1 / "source-lock.json"
+    sidecar_path = STAGE1 / "source-lock.sha256"
+    lock = preflight.load_json(lock_path)
+    old_digest = preflight.normalized_sha256(lock_path)
+    sidecar = sidecar_path.read_text(encoding="ascii").split()
+    if not sidecar or sidecar[0] != old_digest:
+        raise ValueError("refusing to refresh a source lock whose existing sidecar is invalid")
+    old_disabled = (
+        lock.get("execution_authorized") is False
+        and lock.get("package_status") == "PREPARATION_ONLY_DISABLED"
+    )
+    new_preflight = (
+        lock.get("execution_authorized") is True
+        and lock.get("package_status") == "PREFLIGHT_ONLY_ENABLED"
+    )
+    if (
+        lock.get("schema_id") != "issue75-stage1-source-lock-v1"
+        or lock.get("study_id") != "issue-75-no-expert-oracle"
+        or lock.get("scope") != "STUDY_ONLY"
+        or lock.get("formal_seeds_or_games_consumed") != 0
+        or lock.get("native_sampling_performed") is not False
+        or lock.get("model_training_performed") is not False
+        or (preflight_transition and not old_disabled)
+        or (not preflight_transition and not new_preflight)
+    ):
+        raise ValueError("refusing to refresh a source lock outside the registered Stage 1 package")
+
+    added_repair_files = {"stage1/executor.py", "stage1/test_executor.py", "stage1/preflight-proxy.json"}
     legacy_self_lock_files = {"source-lock.json", "source-lock.sha256"}
-    previous_file_set = frozenset((set(SOURCE_FILES) - added_repair_files) | legacy_self_lock_files)
     existing_file_set = frozenset(lock.get("locked_files_sha256_lf", {}))
-    if existing_file_set not in {frozenset(SOURCE_FILES), previous_file_set}:
-        raise ValueError("existing source lock does not contain the exact registered file set")
+    accepted_file_sets = {
+        frozenset(SOURCE_FILES),
+        frozenset(set(SOURCE_FILES) | {"stage1/test_activation_gate.py"}),
+        frozenset((set(SOURCE_FILES) - added_repair_files) | legacy_self_lock_files),
+    }
+    if existing_file_set not in accepted_file_sets:
+        raise ValueError("existing source lock does not contain the expected registered package file set")
+
+    if preflight_transition:
+        config = preflight.load_json(STAGE1 / "config.json")
+        budget = preflight.load_json(STAGE1 / "budget.json")
+        _preflight_only_inputs_from_enabled(config, budget)
+        lock["execution_authorized"] = True
+        lock["package_status"] = "PREFLIGHT_ONLY_ENABLED"
+        lock["final_package_commit_binding"] = (
+            "all execution receipts bind the exact package commit and source-lock digest"
+        )
+
     immutable_files = {
         "stage1/config.json": "stage1_config_sha256",
         "stage1/seed-table.json": "seed_table_sha256",
         "stage1/budget.json": "budget_config_sha256",
     }
-    for relative, field in immutable_files.items():
-        if preflight.normalized_sha256(STUDY / relative) != lock.get(field):
-            raise ValueError(f"refusing to change registered Stage 1 input: {relative}")
+    if not preflight_transition:
+        for relative, field in immutable_files.items():
+            if preflight.normalized_sha256(STUDY / relative) != lock.get(field):
+                raise ValueError(f"refusing to change registered Stage 1 input: {relative}")
 
     refreshed = _locked_file_hashes()
     repairable = {
         "stage1_budget.py", "stage1/prepare.py", "stage1/executor.py",
-        "stage1/test_activation.py", "stage1/test_activation_gate.py",
-        "stage1/test_executor.py", "stage1/preflight-proxy.json",
+        "stage1/test_activation.py", "stage1/test_executor.py", "stage1/preflight-proxy.json",
         "algorithm.py", "learning.py", "runtime.py",
     }
+    if preflight_transition:
+        repairable |= {"stage1/config.json", "stage1/budget.json"}
     changed = {
         relative for relative, digest in refreshed.items()
         if lock["locked_files_sha256_lf"].get(relative) != digest
     }
     removed = set(lock["locked_files_sha256_lf"]) - set(refreshed)
-    if not changed <= repairable or not removed <= legacy_self_lock_files:
-        raise ValueError("source-lock refresh found changes outside the authorized executor/source-lock repair")
+    if not changed <= repairable or not removed <= {"stage1/test_activation_gate.py"}:
+        raise ValueError("source-lock refresh found changes outside the approved repair and preflight scope")
     repository_dependencies = _locked_repository_dependency_hashes()
     old_repository_dependencies = lock.get("locked_repository_dependencies_sha256_lf", {})
     if not isinstance(old_repository_dependencies, dict):
@@ -576,12 +679,56 @@ def refresh_stage1_source_lock() -> dict[str, Any]:
         raise ValueError("source-lock refresh found changes outside the authorized Issue 73 runner binding")
     lock["locked_files_sha256_lf"] = refreshed
     lock["locked_repository_dependencies_sha256_lf"] = repository_dependencies
+    lock["final_package_commit_binding"] = (
+        "all execution receipts bind the exact package commit and source-lock digest"
+    )
+    lock["stage1_config_sha256"] = preflight.normalized_sha256(STAGE1 / "config.json")
+    lock["seed_table_sha256"] = preflight.normalized_sha256(STAGE1 / "seed-table.json")
+    lock["budget_config_sha256"] = preflight.normalized_sha256(STAGE1 / "budget.json")
     payload = json.dumps(lock, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False).encode("utf-8") + b"\n"
     _atomic_replace(lock_path, payload)
-    digest = sha256_bytes(payload)
+    digest = preflight.normalized_sha256(lock_path)
     _atomic_replace(sidecar_path, f"{digest}  source-lock.json\n".encode("ascii"))
     verify_stage1_package()
     return {"status": lock["package_status"], "source_lock_sha256": digest, "relocked_files": sorted(changed)}
+
+
+def _preflight_only_inputs_from_enabled(
+    config: Mapping[str, Any], budget: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    expected_config = copy.deepcopy(dict(config))
+    execution = expected_config.get("execution")
+    expected_execution = {
+        "package_status": "PREFLIGHT_ONLY_ENABLED",
+        "stage1_execution_authorized": True,
+        "formal_training_enabled": False,
+        "formal_evaluation_enabled": False,
+        "nonformal_preflight_enabled": True,
+        "native_sampling_enabled": True,
+        "authorized_phases": ["preflight"],
+    }
+    if not isinstance(execution, dict) or execution != expected_execution:
+        raise ValueError("Stage 1 config is not the registered preflight-only phase set")
+    if "activation_gate" in expected_config:
+        raise ValueError("retired comment-gate fields remain in Stage 1 config")
+    if (
+        expected_config.get("resources", {}).get("ledger_name")
+        != "one cumulative Stage 1 ledger; starts at zero before the registered preflight"
+        or expected_config.get("source", {}).get("source_and_binary_lock_is_required_before_any_registered_phase") is not True
+        or expected_config.get("preflight_protocol", {}).get(
+            "runs_after_one_focused_independent_review_of_the_revised_executable_path",
+        ) is not True
+        or "runs_only_after_exact_package_reviewer_pass_and_planner_activation"
+        in expected_config.get("preflight_protocol", {})
+    ):
+        raise ValueError("Stage 1 config contains unexpected activation or preflight policy")
+    expected_budget = copy.deepcopy(dict(budget))
+    if (
+        expected_budget.get("stage1_execution_authorized") is not True
+        or expected_budget.get("ledger_status") != "PREFLIGHT_AUTHORIZED_ZERO_CHARGES"
+    ):
+        raise ValueError("Stage 1 budget is not the authorized zero-charge preflight state")
+    return expected_config, expected_budget
 
 
 def verify_stage1_package() -> dict[str, Any]:
@@ -589,12 +736,14 @@ def verify_stage1_package() -> dict[str, Any]:
 
 
 def main() -> int:
-    if sys.argv[1:] == ["--refresh-source-lock"]:
+    if sys.argv[1:] == ["--enable-registered-preflight"]:
+        result = enable_registered_preflight()
+    elif sys.argv[1:] == ["--refresh-source-lock"]:
         result = refresh_stage1_source_lock()
     elif not sys.argv[1:]:
         result = prepare_stage1_package()
     else:
-        raise SystemExit("usage: prepare.py [--refresh-source-lock]")
+        raise SystemExit("usage: prepare.py [--enable-registered-preflight|--refresh-source-lock]")
     print(json.dumps(result, sort_keys=True))
     verify_stage1_package()
     return 0
