@@ -1,8 +1,8 @@
-"""Source-locked, serialized Stage 1 owner executor for Issue 75.
+"""Source-locked Stage 1 owner executor for Issue 75.
 
 This module is intentionally study-local. The CLI accepts only phases enabled
-by the source-locked package; the checked-in package permits the 40-row
-nonformal preflight only. Artifacts and worker files stay below
+by the source-locked package. Formal owner work uses bounded independent
+supervisors and write-ahead batch CPU reservations. Artifacts and worker files stay below
 ``stage1/artifacts``.
 """
 from __future__ import annotations
@@ -46,6 +46,11 @@ MAX_FEATURE_ROWS = 512
 MAX_TRIAL_DECISIONS = 20_000
 BOOTSTRAP_REPLICATES = 20_000
 ANALYSIS_REPORT_RESERVATION = 120.0
+FORMAL_SCHEDULER_RESERVATION = 120.0
+SUPERVISOR_SCHEMA = "issue75-stage1-supervisor-v1"
+ACCEPTED_PREFLIGHT_REPORT_SHA256 = "30453842d951a0fbbcd49935ae22a47fce413aafcbd017e61c34a2fa3417e81f"
+ACCEPTED_COST_FORECAST_SHA256 = "8933d20699955f5a128eba4ea373df1d0b89f27eb0b4613902c483245ed46c36"
+ACCEPTED_PREFLIGHT_DECISION_ID = 6423390920
 
 
 def _canonical(value: Any) -> bytes:
@@ -495,7 +500,7 @@ def _formal_unit_ids() -> list[str]:
     return (
         [row["unit_id"] for row in _rows() if row["phase"] in {"training", "heldout"}]
         + [f"UPDATE:{index}" for index in range(4)]
-        + ["REPORT:HELDOUT"]
+        + ["SCHEDULER:TRAIN", "SCHEDULER:EVALUATE", "REPORT:HELDOUT"]
     )
 
 
@@ -526,9 +531,13 @@ def _forecast_estimates(ledger: Any) -> tuple[dict[str, float], dict[str, Any]]:
     owner_nonsearch = (nonsearch - train_guard) / owner_count
     unit_ids = _formal_unit_ids()
     allowance = engineering + float(projection["rounding_remainder"]) - ANALYSIS_REPORT_RESERVATION
-    if allowance < 0:
-        raise budget.ResourceBlocked("registered engineering allowance cannot fund heldout report analysis")
-    per_unit_allowance = allowance / len(unit_ids)
+    owner_and_update_count = len(unit_ids) - 3
+    legacy_owner_allowance = allowance * owner_and_update_count / (owner_and_update_count + 1)
+    scheduler_reservations = 2.0 * FORMAL_SCHEDULER_RESERVATION
+    owner_update_allowance = legacy_owner_allowance - scheduler_reservations
+    if owner_update_allowance < 0:
+        raise budget.ResourceBlocked("registered engineering allowance cannot fund scheduler accounting")
+    per_unit_allowance = owner_update_allowance / owner_and_update_count
     estimates: dict[str, float] = {}
     for row in _rows():
         if row["phase"] == "training":
@@ -538,8 +547,10 @@ def _forecast_estimates(ledger: Any) -> tuple[dict[str, float], dict[str, Any]]:
             estimates[row["unit_id"]] = searches + owner_nonsearch + per_unit_allowance
     for block in range(4):
         estimates[f"UPDATE:{block}"] = train_guard / 4.0 + per_unit_allowance
+    estimates["SCHEDULER:TRAIN"] = FORMAL_SCHEDULER_RESERVATION
+    estimates["SCHEDULER:EVALUATE"] = FORMAL_SCHEDULER_RESERVATION
     estimates["REPORT:HELDOUT"] = ANALYSIS_REPORT_RESERVATION
-    if list(estimates) and set(estimates) != set(unit_ids):
+    if set(estimates) != set(unit_ids):
         raise AssertionError("cost forecast unit IDs differ from the locked formal workload")
     summary = {
         "schema_id": "issue75-stage1-cost-forecast-v1",
@@ -553,8 +564,10 @@ def _forecast_estimates(ledger: Any) -> tuple[dict[str, float], dict[str, Any]]:
         "preflight_actual_cpu_seconds": preflight_charge,
         "remaining_engineering_allowance_cpu_seconds": engineering,
         "rounding_remainder_cpu_seconds": float(projection["rounding_remainder"]),
-        "formal_unit_count": len(unit_ids) - 1,
+        "formal_unit_count": owner_count + 4,
         "forecast_unit_count": len(unit_ids),
+        "scheduler_unit_count": 2,
+        "scheduler_reservation_per_phase_cpu_seconds": FORMAL_SCHEDULER_RESERVATION,
         "heldout_report_analysis_reservation_cpu_seconds": ANALYSIS_REPORT_RESERVATION,
         "forecast_builder_cpu_seconds": sum(estimates.values()),
         "projected_total_builder_cpu_seconds": preflight_charge + sum(estimates.values()),
@@ -567,20 +580,65 @@ def _forecast_estimates(ledger: Any) -> tuple[dict[str, float], dict[str, Any]]:
     return estimates, summary
 
 
+def _accepted_preflight_evidence() -> tuple[dict[str, Any], dict[str, Any], str, str]:
+    config = _read_json(STAGE1 / "config.json")
+    acceptance = config.get("preflight_protocol", {}).get("accepted_evidence")
+    expected = {
+        "planner_decision_comment_id": ACCEPTED_PREFLIGHT_DECISION_ID,
+        "scope": "nonformal-feasibility-only-with-prospective-hard-caps",
+        "preflight_report_path": "stage1/artifacts/preflight-report-review-repair.json",
+        "preflight_report_sha256_lf": ACCEPTED_PREFLIGHT_REPORT_SHA256,
+        "cost_forecast_path": "stage1/artifacts/cost-forecast-review-repair.json",
+        "cost_forecast_sha256_lf": ACCEPTED_COST_FORECAST_SHA256,
+        "reported_over_cap_search_invocations": 82,
+        "reported_search_invocation_count": 112,
+        "reported_aggregate_search_cpu_excess_seconds": 11.5538,
+        "reported_maximum_search_cpu_seconds": 32.503407,
+    }
+    if acceptance != expected:
+        raise PermissionError("formal protocol is not bound to the accepted immutable preflight evidence")
+    report_path = STUDY / expected["preflight_report_path"]
+    forecast_path = STUDY / expected["cost_forecast_path"]
+    if not report_path.is_file() or not forecast_path.is_file():
+        raise PermissionError("accepted immutable preflight and affordability reports are absent")
+    report_sha = budget.normalized_file_sha256(report_path)
+    forecast_sha = budget.normalized_file_sha256(forecast_path)
+    if report_sha != ACCEPTED_PREFLIGHT_REPORT_SHA256 or forecast_sha != ACCEPTED_COST_FORECAST_SHA256:
+        raise PermissionError("accepted preflight artifacts changed after Planner review")
+    report = _read_json(report_path)
+    forecast = _read_json(forecast_path)
+    if (
+        report.get("status") != "PREFLIGHT_COMPLETE_PENDING_INDEPENDENT_REVIEW"
+        or report.get("scope") != "STUDY_ONLY"
+        or report.get("registered_rows") != 40
+        or report.get("completed_rows") != 40
+        or report.get("terminal_rows") != 40
+        or report.get("formal_seeds_consumed") != 0
+        or report.get("incomplete_units") != []
+        or len(report.get("episode_treatment_delivered_units", [])) != 8
+        or len(report.get("root_treatment_not_delivered", [])) != 7
+        or forecast.get("status") != "PENDING_INDEPENDENT_AFFORDABILITY_REVIEW"
+        or forecast.get("affordability_acceptance") != "PENDING_INDEPENDENT_REVIEW"
+        or forecast.get("formal_execution_enabled") is not False
+        or forecast.get("source_lock_sha256") != "c195b4fcbc1ee1754a5023bc6bfcde8e9a74cd4837135fcb0bb6d922186ee219"
+        or forecast.get("forecast_builder_cpu_seconds") != 161896.17019694686
+        or forecast.get("preflight_actual_cpu_seconds") != 8077.011297
+        or forecast.get("projected_total_builder_cpu_seconds") != 169973.18149394685
+        or forecast.get("builder_hard_cap_cpu_seconds") != budget.BUILDER_LIMIT
+        or forecast.get("reviewer_protected_cpu_seconds") != budget.REVIEWER_LIMIT
+        or forecast.get("aggregate_hard_cap_cpu_seconds") != budget.ALL_IN_LIMIT
+    ):
+        raise budget.ResourceBlocked("accepted preflight reports do not match the reviewed bounded-risk decision")
+    return report, forecast, report_sha, forecast_sha
+
+
 def _formal_forecast(ledger: Any) -> dict[str, Any]:
     if not _preflight_complete(ledger):
         raise PermissionError("formal execution requires all 40 preflight owner-arm rows to be durably successful")
-    report_path = ARTIFACT_ROOT / "preflight-report.json"
-    forecast_path = ARTIFACT_ROOT / "cost-forecast.json"
-    if not report_path.is_file() or not forecast_path.is_file():
-        raise PermissionError("formal execution requires immutable preflight and cost-forecast reports")
-    report = _read_json(report_path)
-    forecast = _read_json(forecast_path)
-    if report.get("status") != "PREFLIGHT_COMPLETE_PENDING_INDEPENDENT_REVIEW" or forecast.get("status") != "FITS_IF_LEDGER_ACCEPTS":
-        raise budget.ResourceBlocked("preflight/forecast status does not permit formal rows")
-    report_sha = _file_sha256(report_path)
-    forecast_sha = _file_sha256(forecast_path)
-    estimates, _ = _forecast_estimates(ledger)
+    report, forecast, report_sha, forecast_sha = _accepted_preflight_evidence()
+    estimates, dynamic = _forecast_estimates(ledger)
+    if dynamic["projected_total_builder_cpu_seconds"] > budget.BUILDER_LIMIT:
+        raise budget.ResourceBlocked("dynamic full-cohort forecast exceeds the unchanged Builder hard cap")
     live = ledger.forecast(
         expected_unit_ids=_formal_unit_ids(),
         future_builder_cpu_seconds=estimates,
@@ -588,7 +646,13 @@ def _formal_forecast(ledger: Any) -> dict[str, Any]:
     )
     if live.get("status") != "FITS":
         raise budget.ResourceBlocked("live Stage 1 ledger no longer fits the exact remaining cohort")
-    return {"preflight_report_sha256": report_sha, "cost_forecast_sha256": forecast_sha, "ledger_forecast": live}
+    return {
+        "preflight_report_sha256": report_sha,
+        "cost_forecast_sha256": forecast_sha,
+        "accepted_planner_decision_comment_id": ACCEPTED_PREFLIGHT_DECISION_ID,
+        "accepted_static_forecast_status": forecast["status"],
+        "ledger_forecast": live,
+    }
 
 
 def _preflight_treatment_diagnostics(
@@ -1349,6 +1413,311 @@ def _run_unit(ledger: Any, row: Mapping[str, Any], *, phase: str, estimates: Map
         raise
 
 
+def _supervisor_lock_path() -> Path:
+    return _inside_artifacts(ARTIFACT_ROOT / "supervisors.active.lock")
+
+
+@contextmanager
+def _supervisor_activity_lease():
+    path = _supervisor_lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_SH)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def _assert_no_active_supervisors() -> None:
+    path = _supervisor_lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+    locked = False
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            locked = True
+        except BlockingIOError as exc:
+            raise budget.ResourceBlocked(
+                "a prior Stage 1 supervisor is still active; preserve its reservations and wait"
+            ) from exc
+    finally:
+        if locked:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def _formal_concurrency() -> int:
+    config = _read_json(STAGE1 / "config.json")
+    limits = _read_json(STAGE1 / "budget.json")
+    configured = config.get("execution", {}).get("max_concurrent_owner_process_trees")
+    if (
+        type(configured) is not int or configured != 1
+        or limits.get("concurrent_stage1_process_trees") != 1
+    ):
+        raise PermissionError("formal process-tree concurrency differs from its locked resource contract")
+    return configured
+
+
+def _worker_environment(runtime_root: Path) -> dict[str, str]:
+    runtime_root = _inside_artifacts(runtime_root)
+    paths = {
+        "TMPDIR": runtime_root / "tmp",
+        "TMP": runtime_root / "tmp",
+        "TEMP": runtime_root / "tmp",
+        "XDG_CACHE_HOME": runtime_root / "cache",
+        "TORCH_HOME": runtime_root / "cache" / "torch",
+        "PYTHONPYCACHEPREFIX": runtime_root / "cache" / "pycache",
+    }
+    for path in paths.values():
+        path.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env.update({key: str(value) for key, value in paths.items()})
+    for key in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
+                "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS"):
+        env[key] = "1"
+    env["MKL_DYNAMIC"] = "FALSE"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
+
+
+def _supervise_batch(items: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    if not items or len(items) > _formal_concurrency():
+        raise ValueError("supervisor batch exceeds the locked Stage 1 process-tree limit")
+    active: list[tuple[Mapping[str, Any], subprocess.Popen[str]]] = []
+    results: dict[str, dict[str, Any]] = {}
+    for item in items:
+        run_id = str(item["run_id"])
+        try:
+            proc = subprocess.Popen(
+                [sys.executable, str(Path(__file__).resolve()),
+                 "--supervisor-job", str(item["job_path"])],
+                cwd=ROOT, env=dict(item["env"]), stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                close_fds=True, start_new_session=True,
+            )
+            active.append((item, proc))
+        except OSError:
+            results[run_id] = {
+                "schema_id": SUPERVISOR_SCHEMA, "unit_id": str(item["unit_id"]),
+                "run_id": run_id, "status": "SUPERVISOR_START_FAILED",
+                "measured_cpu_seconds": float(item["reserved_cpu_seconds"]),
+                "boundary": "supervisor_start_failed",
+            }
+    while any(proc.poll() is None for _, proc in active):
+        time.sleep(0.01)
+    for item, proc in active:
+        output, _ = proc.communicate()
+        run_id = str(item["run_id"])
+        try:
+            lines = [line for line in output.splitlines() if line.strip()]
+            payload = json.loads(lines[-1]) if lines else {}
+            if (
+                not isinstance(payload, dict)
+                or payload.get("schema_id") != SUPERVISOR_SCHEMA
+                or payload.get("unit_id") != item["unit_id"]
+                or payload.get("run_id") != run_id
+                or not isinstance(payload.get("measured_cpu_seconds"), (int, float))
+                or not math.isfinite(float(payload["measured_cpu_seconds"]))
+                or float(payload["measured_cpu_seconds"]) < 0
+                or (proc.returncode == 0 and payload.get("status") != "SUCCEEDED")
+                or (proc.returncode != 0 and payload.get("status") == "SUCCEEDED")
+            ):
+                raise ValueError("invalid supervisor receipt")
+            results[run_id] = payload
+        except (ValueError, TypeError, json.JSONDecodeError):
+            results[run_id] = {
+                "schema_id": SUPERVISOR_SCHEMA, "unit_id": str(item["unit_id"]),
+                "run_id": run_id, "status": "SUPERVISOR_UNRECEIPTED",
+                "measured_cpu_seconds": float(item["reserved_cpu_seconds"]),
+                "boundary": "missing_or_invalid_supervisor_receipt",
+            }
+    return results
+
+
+def _run_owner_batch(
+    ledger: Any, rows: Sequence[Mapping[str, Any]], *,
+    phase: str, estimates: Mapping[str, float],
+) -> list[dict[str, Any]]:
+    pending = []
+    completed = {}
+    for row in rows:
+        unit_id = str(row["unit_id"])
+        existing = _existing_unit_receipt(ledger, unit_id)
+        if existing is not None:
+            completed[unit_id] = existing
+            continue
+        previous_run_id, _, previous_finish = _existing_unit(ledger, unit_id)
+        resume_digest = None
+        if previous_run_id is not None:
+            if phase != "train" or row.get("phase") != "training":
+                raise budget.ResourceBlocked(f"owner/arm rows do not support replay or checkpoint resume: {unit_id}")
+            if previous_finish is None or previous_finish.get("status") != "incomplete":
+                raise budget.ResourceBlocked(f"unit is not an explicitly resumable update: {unit_id}")
+            resume_digest = previous_finish.get("checkpoint_sha256")
+            if not resume_digest:
+                raise budget.CheckpointMismatch("incomplete policy update has no durable step checkpoint")
+        run_id = f"{unit_id}-{uuid.uuid4().hex[:16]}"
+        cap = float(estimates[unit_id])
+        pending.append({
+            "row": dict(row), "unit_id": unit_id, "run_id": run_id, "cap": cap,
+            "previous_run_id": previous_run_id, "checkpoint_sha256": resume_digest,
+        })
+    if not pending:
+        return [completed[str(row["unit_id"])] for row in rows]
+    reservations = ledger.reserve_many([{
+        "run_id": item["run_id"], "unit_id": item["unit_id"], "role": "builder",
+        "reserved_cpu_seconds": item["cap"], "unit_kind": "owner_arm",
+        "previous_run_id": item["previous_run_id"],
+        "checkpoint_sha256": item["checkpoint_sha256"],
+    } for item in pending])
+    supervisor_items = []
+    started = time.monotonic()
+    for item, reservation in zip(pending, reservations, strict=True):
+        directory = _unit_directory(item["unit_id"])
+        directory.mkdir(parents=True, exist_ok=True)
+        job_path = _inside_artifacts(directory / f"worker-job-{item['run_id']}.json")
+        log_path = _inside_artifacts(directory / f"worker-log-{item['run_id']}.txt")
+        runtime_root = _inside_artifacts(directory / "runtime" / item["run_id"])
+        job = {
+            "schema_id": WORKER_SCHEMA,
+            "package_commit": ledger.binding.package_commit,
+            "source_lock_sha256": ledger.binding.source_lock_sha256,
+            "run_id": item["run_id"], "unit_id": item["unit_id"],
+            "phase": phase, "row": item["row"],
+            "output_dir": str(directory / "native"),
+            "result_path": str(directory / "result.json"),
+            "worker_log_path": str(log_path), "runtime_root": str(runtime_root),
+            "previous_run_id": item["previous_run_id"],
+            "checkpoint_sha256": item["checkpoint_sha256"],
+        }
+        _write_once(job_path, job)
+        supervisor_items.append({
+            "unit_id": item["unit_id"], "run_id": item["run_id"],
+            "job_path": job_path, "env": _worker_environment(runtime_root),
+            "reserved_cpu_seconds": item["cap"], "reservation": reservation,
+            "directory": directory, "started": started,
+        })
+    supervisor_results = _supervise_batch(supervisor_items)
+    failures = []
+    for item in supervisor_items:
+        run_id, unit_id = str(item["run_id"]), str(item["unit_id"])
+        envelope = supervisor_results[run_id]
+        measured = float(envelope["measured_cpu_seconds"])
+        cap = float(item["reserved_cpu_seconds"])
+        result_path = _unit_directory(unit_id) / "result.json"
+        try:
+            if envelope["status"] != "SUCCEEDED" or measured > cap or not result_path.is_file():
+                boundary = str(envelope.get("boundary", envelope.get("status", "worker_failed")))
+                _finish_failed_unit(
+                    ledger, run_id=run_id, unit_id=unit_id, directory=item["directory"],
+                    measured=measured, cap=cap, boundary=boundary, started=started,
+                )
+                failures.append(unit_id)
+                continue
+            result = _read_json(result_path)
+            _validate_success_result(
+                ledger, unit_id=unit_id, run_id=run_id,
+                reservation=item["reservation"], result=result, result_path=result_path,
+            )
+            ledger.finish(
+                run_id=run_id, measured_cpu_seconds=measured, status="succeeded",
+                result_sha256=_file_sha256(result_path),
+            )
+            completed[unit_id] = result
+        except budget.ResourceBlocked:
+            failures.append(unit_id)
+        except BaseException as exc:
+            current, _, finish = _existing_unit(ledger, unit_id)
+            if current == run_id and finish is None:
+                try:
+                    _finish_failed_unit(
+                        ledger, run_id=run_id, unit_id=unit_id, directory=item["directory"],
+                        measured=measured, cap=cap, boundary=type(exc).__name__, started=started,
+                    )
+                except budget.ResourceBlocked:
+                    pass
+            failures.append(unit_id)
+    if failures:
+        raise budget.ResourceBlocked("formal owner batch failed; preserve receipts and stop: " + ", ".join(failures))
+    return [completed[str(row["unit_id"])] for row in rows]
+
+
+def _run_scheduler_reservation(ledger: Any, unit_id: str, estimates: Mapping[str, float]) -> dict[str, Any]:
+    previous, _, finish = _existing_unit(ledger, unit_id)
+    if previous is not None:
+        raise budget.ResourceBlocked(f"scheduler reservation already exists and cannot be repeated: {unit_id}")
+    run_id = f"{unit_id}-{uuid.uuid4().hex[:16]}"
+    cap = float(estimates[unit_id])
+    reservation = ledger.reserve(
+        run_id=run_id, unit_id=unit_id, role="builder",
+        reserved_cpu_seconds=cap, unit_kind="scheduler",
+    )
+    return {"run_id": run_id, "unit_id": unit_id, "cap": cap, "reservation": reservation}
+
+
+def _finish_scheduler_reservation(
+    ledger: Any, reservation: Mapping[str, Any], *,
+    phase_started_cpu: float, separately_accounted_cpu_seconds: float = 0.0,
+) -> dict[str, Any]:
+    unit_id, run_id = str(reservation["unit_id"]), str(reservation["run_id"])
+    cap = float(reservation["cap"])
+    measured = max(0.0, time.process_time() - phase_started_cpu - separately_accounted_cpu_seconds)
+    success = measured <= cap
+    result = {
+        "schema_id": UNIT_SCHEMA, "status": "SUCCEEDED" if success else "FAILED",
+        "unit_id": unit_id, "run_id": run_id,
+        "package_commit": ledger.binding.package_commit,
+        "source_lock_sha256": ledger.binding.source_lock_sha256,
+        "measured_cpu_seconds": measured, "reserved_cpu_seconds": cap,
+        "scheduler_process_tree_limit": _formal_concurrency(),
+    }
+    result_path = _unit_directory(unit_id) / "result.json"
+    _write_once(result_path, result)
+    try:
+        ledger.finish(
+            run_id=run_id, measured_cpu_seconds=measured,
+            status="succeeded" if success else "failed",
+            result_sha256=_file_sha256(result_path) if success else None,
+        )
+    except budget.BudgetOverrun as exc:
+        raise budget.ResourceBlocked("formal scheduler exceeded its reserved CPU allowance; preserve and stop") from exc
+    if not success:
+        raise budget.ResourceBlocked("formal scheduler exceeded its reserved CPU allowance; preserve and stop")
+    return result
+
+
+def _existing_scheduler_receipt(ledger: Any, unit_id: str) -> dict[str, Any]:
+    run_id, reservation, finish = _existing_unit(ledger, unit_id)
+    if run_id is None or reservation is None or finish is None or finish.get("status") != "succeeded":
+        raise budget.ResourceBlocked(f"formal scheduler has no durable successful receipt: {unit_id}")
+    path = _unit_directory(unit_id) / "result.json"
+    if not path.is_file():
+        raise PermissionError(f"formal scheduler receipt is missing: {unit_id}")
+    result = _read_json(path)
+    measured = result.get("measured_cpu_seconds")
+    reserved = reservation.get("reserved_cpu_seconds")
+    if (
+        result.get("schema_id") != UNIT_SCHEMA or result.get("status") != "SUCCEEDED"
+        or result.get("unit_id") != unit_id or result.get("run_id") != run_id
+        or result.get("package_commit") != ledger.binding.package_commit
+        or result.get("source_lock_sha256") != ledger.binding.source_lock_sha256
+        or not isinstance(measured, (int, float)) or not math.isfinite(float(measured))
+        or not isinstance(reserved, (int, float)) or float(measured) < 0
+        or float(measured) > float(reserved)
+        or result.get("reserved_cpu_seconds") != reserved
+        or result.get("scheduler_process_tree_limit") != _formal_concurrency()
+        or finish.get("status") != "succeeded"
+        or finish.get("measured_cpu_seconds") != measured
+        or finish.get("reserved_cpu_seconds") != reserved
+        or _file_sha256(path) != finish.get("result_sha256")
+    ):
+        raise PermissionError(f"formal scheduler receipt differs from its locked ledger: {unit_id}")
+    return result
+
+
 def _load_or_make_initial_model() -> tuple[Any, str]:
     model, digest, _ = _load_model("pi0")
     return model, digest
@@ -1489,91 +1858,49 @@ def _run_update_unit(ledger: Any, block: int, *, estimates: Mapping[str, float])
     worker_dir.mkdir(parents=True, exist_ok=True)
     job_path = _inside_artifacts(worker_dir / f"worker-job-{run_id}.json")
     stdout_path = _inside_artifacts(worker_dir / f"worker-log-{run_id}.txt")
+    runtime_root = _inside_artifacts(worker_dir / "runtime" / run_id)
+    result_path = _inside_artifacts(worker_dir / f"result-{run_id}.json")
     job = {
         "schema_id": WORKER_SCHEMA,
         "package_commit": ledger.binding.package_commit,
         "source_lock_sha256": ledger.binding.source_lock_sha256,
-        "run_id": run_id,
-        "unit_id": unit_id,
-        "phase": "update",
-        "block_index": block,
-        "previous_run_id": previous_run_id,
-        "checkpoint_sha256": resume_digest,
-        "result_path": str(worker_dir / f"result-{run_id}.json"),
+        "run_id": run_id, "unit_id": unit_id, "phase": "update",
+        "block_index": block, "previous_run_id": previous_run_id,
+        "checkpoint_sha256": resume_digest, "result_path": str(result_path),
+        "worker_log_path": str(stdout_path), "runtime_root": str(runtime_root),
     }
     _write_once(job_path, job)
-    env = {
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "TMPDIR": str(_inside_artifacts(ARTIFACT_ROOT / "tmp")),
-        "TMP": str(_inside_artifacts(ARTIFACT_ROOT / "tmp")),
-        "TEMP": str(_inside_artifacts(ARTIFACT_ROOT / "tmp")),
-        "XDG_CACHE_HOME": str(_inside_artifacts(ARTIFACT_ROOT / "cache")),
-        "TORCH_HOME": str(_inside_artifacts(ARTIFACT_ROOT / "cache" / "torch")),
-        "PYTHONPYCACHEPREFIX": str(_inside_artifacts(ARTIFACT_ROOT / "cache" / "pycache")),
-    }
-    for key in ("TMPDIR", "XDG_CACHE_HOME", "TORCH_HOME", "PYTHONPYCACHEPREFIX"):
-        Path(env[key]).mkdir(parents=True, exist_ok=True)
-    watchdog = budget.ProcessTreeWatchdog()
+    env = _worker_environment(runtime_root)
     started = time.monotonic()
-    measured = 0.0
-    try:
-        process = watchdog.run(
-            [sys.executable, str(Path(__file__).resolve()), "--worker-job", str(job_path)],
-            reserved_cpu_seconds=cap, cwd=ROOT, env=env, stdout_path=stdout_path,
-        )
-        measured = float(process.cpu_seconds)
-        if process.returncode != 0:
-            raise RuntimeError(f"Stage 1 update worker exited with status {process.returncode}")
-        result_path = worker_dir / f"result-{run_id}.json"
-        durable_result_path = worker_dir / "result.json"
-        result = _read_json(result_path)
-        if _file_sha256(result_path) != _file_sha256(durable_result_path):
-            raise PermissionError("policy update worker result differs from the immutable block receipt")
-        _validate_success_result(
-            ledger, unit_id=unit_id, run_id=run_id, reservation=reservation,
-            result=result, result_path=durable_result_path,
-        )
-        if measured > cap:
-            _finish_failed_unit(
-                ledger, run_id=run_id, unit_id=unit_id, directory=worker_dir,
-                measured=measured, cap=cap, boundary="measured_process_tree_cpu_over_reservation",
-                started=time.monotonic(),
-            )
-            raise budget.ResourceBlocked(f"policy update exceeded its process-tree CPU reservation: {unit_id}")
-        ledger.finish(
-            run_id=run_id, measured_cpu_seconds=measured, status="succeeded",
-            result_sha256=_file_sha256(durable_result_path),
-        )
-        return result
-    except budget.ProcessTreeBudgetExceeded as exc:
-        measured = float(exc.cpu_seconds)
-        checkpoint = _inside_artifacts(ARTIFACT_ROOT / "models" / f"block-{block}-step.pt")
-        if checkpoint.is_file():
-            digest = _file_sha256(checkpoint)
-            _finish_failed_unit(
-                ledger, run_id=run_id, unit_id=unit_id, directory=worker_dir,
-                measured=measured, cap=cap, boundary="process_tree_cpu_cap",
-                started=started, status="incomplete", checkpoint_sha256=digest,
-            )
-            raise budget.ResourceBlocked(f"policy update stopped at a durable step checkpoint: {unit_id}") from exc
+    envelope = _supervise_batch([{
+        "unit_id": unit_id, "run_id": run_id, "job_path": job_path,
+        "env": env, "reserved_cpu_seconds": cap,
+    }])[run_id]
+    measured = float(envelope["measured_cpu_seconds"])
+    if envelope["status"] != "SUCCEEDED" or measured > cap or not result_path.is_file():
+        checkpoint_path = _inside_artifacts(ARTIFACT_ROOT / "models" / f"block-{block}-step.pt")
+        checkpoint_sha = _file_sha256(checkpoint_path) if checkpoint_path.is_file() else None
+        resumable = checkpoint_sha is not None and measured <= cap
         _finish_failed_unit(
             ledger, run_id=run_id, unit_id=unit_id, directory=worker_dir,
-            measured=measured, cap=cap, boundary="process_tree_cpu_cap",
-            started=started,
+            measured=measured, cap=cap,
+            boundary=str(envelope.get("boundary", envelope["status"])),
+            started=started, status="incomplete" if resumable else "failed",
+            checkpoint_sha256=checkpoint_sha if resumable else None,
         )
-        raise budget.ResourceBlocked(f"policy update exceeded its cap before a durable checkpoint: {unit_id}") from exc
-    except BaseException as exc:
-        measured = max(measured, float(getattr(exc, "cpu_seconds", 0.0)))
-        if "process" not in locals():
-            measured = max(measured, cap)
-        current, _, finish = _existing_unit(ledger, unit_id)
-        if current == run_id and finish is None:
-            _finish_failed_unit(
-                ledger, run_id=run_id, unit_id=unit_id, directory=worker_dir,
-                measured=measured, cap=cap, boundary=type(exc).__name__,
-                started=started,
-            )
-        raise
+        raise budget.ResourceBlocked(
+            f"training update stopped at its reserved supervisor boundary: {unit_id}"
+        )
+    result = _read_json(result_path)
+    _validate_success_result(
+        ledger, unit_id=unit_id, run_id=run_id, reservation=reservation,
+        result=result, result_path=result_path,
+    )
+    ledger.finish(
+        run_id=run_id, measured_cpu_seconds=measured, status="succeeded",
+        result_sha256=_file_sha256(result_path),
+    )
+    return result
 
 
 def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
@@ -1888,7 +2215,6 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
         for root_record in getattr(result if "result" in locals() else {}, "_volatile_roots", ()):
             root_record.clear()
 
-
 def _worker_update(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
     if str(job["unit_id"]) != f"UPDATE:{int(job['block_index'])}":
         raise PermissionError("update worker unit/block identifiers disagree")
@@ -1899,6 +2225,117 @@ def _worker_update(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
     result_path = _inside_artifacts(Path(str(job["result_path"])))
     _write_once(result_path, result)
     return result
+
+
+def _supervisor_main(job_path: Path) -> int:
+    started_cpu = time.process_time()
+    unit_id, run_id = "", ""
+    cap = 0.0
+    status, measured, boundary = "SUPERVISOR_FAILED", 0.0, "supervisor_validation"
+    try:
+        with _supervisor_activity_lease():
+            budget.verify_stage1_package()
+            job_path = _inside_artifacts(job_path)
+            job = _read_json(job_path)
+            if job.get("schema_id") != WORKER_SCHEMA:
+                raise PermissionError("supervisor job schema differs from the locked executor")
+            unit_id, run_id = str(job.get("unit_id", "")), str(job.get("run_id", ""))
+            if job.get("phase") not in {"train", "evaluate", "update"}:
+                raise PermissionError("only formal owner/update jobs may use a supervisor process")
+            budget.verify_stage1_phase(str(job["phase"]))
+            if len(run_id) != len(unit_id) + 17 or not run_id.startswith(unit_id + "-"):
+                raise PermissionError("supervisor run ID is not unit scoped")
+            unit_dir = _unit_directory(unit_id)
+            if job_path != _inside_artifacts(unit_dir / f"worker-job-{run_id}.json"):
+                raise PermissionError("supervisor job path differs from its reserved unit")
+            ledger = budget.open_reserved_stage1_worker_ledger(
+                ARTIFACT_ROOT / "ledger", run_id=run_id, unit_id=unit_id,
+            )
+            reservation = ledger.require_open_reservation(run_id=run_id, unit_id=unit_id)
+            if (
+                job.get("package_commit") != ledger.binding.package_commit
+                or job.get("source_lock_sha256") != ledger.binding.source_lock_sha256
+                or reservation.get("unit_kind") not in {"owner_arm", "training_update"}
+                or job.get("previous_run_id") != reservation.get("previous_run_id")
+                or job.get("checkpoint_sha256") != reservation.get("checkpoint_sha256")
+            ):
+                raise PermissionError("supervisor job differs from its write-ahead reservation")
+            cap = float(reservation["reserved_cpu_seconds"])
+            if cap <= 0.5:
+                raise PermissionError("supervised unit reservation cannot fund supervisor startup")
+            runtime_root = _inside_artifacts(unit_dir / "runtime" / run_id)
+            if Path(str(job.get("runtime_root"))).resolve() != runtime_root:
+                raise PermissionError("supervisor runtime directory differs from its reserved unit")
+            worker_log = _inside_artifacts(unit_dir / f"worker-log-{run_id}.txt")
+            if Path(str(job.get("worker_log_path"))).resolve() != worker_log:
+                raise PermissionError("supervisor worker log path differs from its reserved unit")
+            if job["phase"] == "update":
+                block = int(job.get("block_index", -1))
+                expected_dir = _inside_artifacts(ARTIFACT_ROOT / "units" / f"UPDATE-{block}")
+                if unit_id != f"UPDATE:{block}" or reservation["unit_kind"] != "training_update":
+                    raise PermissionError("supervisor update differs from the registered block reservation")
+                expected_result = expected_dir / f"result-{run_id}.json"
+            else:
+                phase_name = {"train": "training", "evaluate": "heldout"}[str(job["phase"])]
+                row = job.get("row")
+                registered = next((item for item in _rows() if item["unit_id"] == unit_id), None)
+                if (
+                    not isinstance(row, dict) or registered is None or row != registered
+                    or registered["phase"] != phase_name or registered.get("formal") is not True
+                    or reservation["unit_kind"] != "owner_arm"
+                ):
+                    raise PermissionError("supervisor owner row differs from the formal seed table")
+                expected_result = unit_dir / "result.json"
+                if Path(str(job.get("output_dir"))).resolve() != unit_dir / "native":
+                    raise PermissionError("supervisor native output path differs from its registered unit")
+            if Path(str(job.get("result_path"))).resolve() != expected_result:
+                raise PermissionError("supervisor result path differs from its reserved unit")
+            child_env = os.environ.copy()
+            child_env.update({
+                "TMPDIR": str(runtime_root / "tmp"), "TMP": str(runtime_root / "tmp"),
+                "TEMP": str(runtime_root / "tmp"),
+                "XDG_CACHE_HOME": str(runtime_root / "cache"),
+                "TORCH_HOME": str(runtime_root / "cache" / "torch"),
+                "PYTHONPYCACHEPREFIX": str(runtime_root / "cache" / "pycache"),
+                "PYTHONDONTWRITEBYTECODE": "1",
+            })
+            before_run_cpu = time.process_time()
+            try:
+                process = budget.ProcessTreeWatchdog().run(
+                    [sys.executable, str(Path(__file__).resolve()), "--worker-job", str(job_path)],
+                    reserved_cpu_seconds=cap - 0.5, cwd=ROOT, env=child_env,
+                    stdout_path=worker_log,
+                )
+                measured = max(
+                    0.0,
+                    process.cpu_seconds - process.controller_cpu_seconds
+                    + time.process_time() - started_cpu,
+                )
+                status = "SUCCEEDED" if process.returncode == 0 else "WORKER_FAILED"
+                boundary = "worker_returned_nonzero" if process.returncode != 0 else "complete"
+            except budget.ProcessTreeBudgetExceeded as exc:
+                measured = max(
+                    0.0,
+                    exc.cpu_seconds - exc.controller_cpu_seconds
+                    + time.process_time() - started_cpu,
+                )
+                status, boundary = "PROCESS_TREE_CPU_LIMIT", "process_tree_cpu_cap"
+            except BaseException as exc:
+                measured = cap
+                status, boundary = "SUPERVISOR_FAILED", type(exc).__name__
+    except BaseException as exc:
+        if cap:
+            measured = max(measured, cap)
+        status, boundary = "SUPERVISOR_FAILED", type(exc).__name__
+    measured = max(measured, max(0.0, time.process_time() - started_cpu))
+    payload = {
+        "schema_id": SUPERVISOR_SCHEMA,
+        "unit_id": unit_id, "run_id": run_id, "status": status,
+        "measured_cpu_seconds": measured, "reserved_cpu_seconds": cap,
+        "boundary": boundary,
+    }
+    print(_canonical(payload).decode("utf-8"))
+    return 0 if status == "SUCCEEDED" and measured <= cap else 2
 
 
 def _worker_main(job_path: Path) -> int:
@@ -1923,6 +2360,15 @@ def _worker_main(job_path: Path) -> int:
     ):
         raise PermissionError("worker job is not bound to the active ledger reservation")
     reservation = ledger.require_open_reservation(run_id=run_id, unit_id=unit_id)
+    import torch
+    execution = _read_json(STAGE1 / "config.json")["execution"]
+    intraop = int(execution.get("torch_intraop_threads", 0))
+    interop = int(execution.get("torch_interop_threads", 0))
+    if intraop != 1 or interop != 1:
+        raise PermissionError("worker Torch thread counts differ from the locked bounded CPU profile")
+    torch.set_num_threads(intraop)
+    if torch.get_num_interop_threads() != interop:
+        torch.set_num_interop_threads(interop)
     if (
         job.get("previous_run_id") != reservation.get("previous_run_id")
         or job.get("checkpoint_sha256") != reservation.get("checkpoint_sha256")
@@ -2102,7 +2548,10 @@ def _build_evaluation_analysis(outcomes: Sequence[Mapping[str, Any]]) -> dict[st
     }
 
 
-def _run_report_analysis(ledger: Any, outcomes: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _run_report_analysis(
+    ledger: Any, outcomes: Sequence[Mapping[str, Any]], *,
+    accounting_sink: dict[str, float] | None = None,
+) -> dict[str, Any]:
     unit_id = "REPORT:HELDOUT"
     existing = _existing_unit_receipt(ledger, unit_id)
     if existing is not None:
@@ -2130,6 +2579,8 @@ def _run_report_analysis(ledger: Any, outcomes: Sequence[Mapping[str, Any]]) -> 
         }
         _write_once(result_path, result)
         measured = max(0.0, time.process_time() - started)
+        if accounting_sink is not None:
+            accounting_sink["cpu_seconds"] = measured
         _validate_success_result(
             ledger, unit_id=unit_id, run_id=run_id, reservation=reservation,
             result=result, result_path=result_path,
@@ -2195,13 +2646,32 @@ def _run_preflight(ledger: Any) -> dict[str, Any]:
 
 
 def _run_training(ledger: Any) -> dict[str, Any]:
+    phase_started_cpu = time.process_time()
+    report_path = ARTIFACT_ROOT / "training-report.json"
+    if report_path.is_file():
+        report = _read_json(report_path)
+        if (
+            report.get("status") != "TRAINING_COMPLETE"
+            or report.get("package_commit") != ledger.binding.package_commit
+            or report.get("source_lock_sha256") != ledger.binding.source_lock_sha256
+            or report.get("training_seed_ids") != [row["owner_seed"] for row in _unit_rows("train")]
+        ):
+            raise PermissionError("existing training report is not a complete receipt for this package")
+        _existing_scheduler_receipt(ledger, "SCHEDULER:TRAIN")
+        return report
     gate = _formal_forecast(ledger)
     estimates, _ = _forecast_estimates(ledger)
+    scheduler_reservation = _run_scheduler_reservation(ledger, "SCHEDULER:TRAIN", estimates)
+    concurrency = _formal_concurrency()
     for block in range(4):
-        rows = [row for row in _rows() if row["phase"] == "training" and int(row["block_index"]) == block]
-        for row in rows:
-            if _existing_unit_receipt(ledger, str(row["unit_id"])) is None:
-                _run_unit(ledger, row, phase="train", estimates=estimates)
+        rows = [
+            row for row in _rows()
+            if row["phase"] == "training" and int(row["block_index"]) == block
+        ]
+        for offset in range(0, len(rows), concurrency):
+            _run_owner_batch(
+                ledger, rows[offset:offset + concurrency], phase="train", estimates=estimates,
+            )
         if not _all_units_succeeded(ledger, rows):
             raise budget.ResourceBlocked(f"registered 128-owner block {block} is not complete")
         _run_update_unit(ledger, block, estimates=estimates)
@@ -2233,11 +2703,16 @@ def _run_training(ledger: Any) -> dict[str, Any]:
     }
     if len(report["training_seed_ids"]) != 512:
         raise AssertionError("formal training report omitted registered owners")
-    _write_once(ARTIFACT_ROOT / "training-report.json", report)
+    _write_once(report_path, report)
+    _finish_scheduler_reservation(
+        ledger, scheduler_reservation, phase_started_cpu=phase_started_cpu,
+    )
     return report
 
 
 def _run_evaluation(ledger: Any) -> dict[str, Any]:
+    phase_started_cpu = time.process_time()
+    _existing_scheduler_receipt(ledger, "SCHEDULER:TRAIN")
     report_path = _inside_artifacts(ARTIFACT_ROOT / "evaluation-report.json")
     if report_path.is_file():
         report = _read_json(report_path)
@@ -2248,23 +2723,33 @@ def _run_evaluation(ledger: Any) -> dict[str, Any]:
             or report.get("status") != "EVALUATION_COMPLETE_PENDING_INDEPENDENT_REVIEW"
         ):
             raise PermissionError("existing heldout report is not a successful receipt for this exact package")
+        _existing_scheduler_receipt(ledger, "SCHEDULER:EVALUATE")
         return report
     gate = _formal_forecast(ledger)
     training_path = ARTIFACT_ROOT / "training-report.json"
     if not training_path.is_file():
-        raise PermissionError("heldout evaluation requires a completed four-block π4 training report")
+        raise PermissionError("heldout evaluation requires a completed four-block pi4 training report")
     training = _read_json(training_path)
-    if training.get("status") != "TRAINING_COMPLETE" or training.get("p1_formal_model_source") != "pi4":
-        raise PermissionError("heldout evaluation requires the actual 512-owner π4 checkpoint")
+    if (
+        training.get("status") != "TRAINING_COMPLETE"
+        or training.get("p1_formal_model_source") != "pi4"
+        or training.get("package_commit") != ledger.binding.package_commit
+        or training.get("source_lock_sha256") != ledger.binding.source_lock_sha256
+        or training.get("training_seed_ids") != [row["owner_seed"] for row in _unit_rows("train")]
+    ):
+        raise PermissionError("heldout evaluation requires the actual 512-owner pi4 checkpoint")
     if not _model_path("pi4").is_file():
-        raise FileNotFoundError("formal π4 checkpoint is absent")
+        raise FileNotFoundError("formal pi4 checkpoint is absent")
     estimates, _ = _forecast_estimates(ledger)
-    for row in _unit_rows("evaluate"):
-        if _existing_unit_receipt(ledger, str(row["unit_id"])) is None:
-            _run_unit(ledger, row, phase="evaluate", estimates=estimates)
+    scheduler_reservation = _run_scheduler_reservation(ledger, "SCHEDULER:EVALUATE", estimates)
+    concurrency = _formal_concurrency()
     rows = _unit_rows("evaluate")
+    for offset in range(0, len(rows), concurrency):
+        _run_owner_batch(
+            ledger, rows[offset:offset + concurrency], phase="evaluate", estimates=estimates,
+        )
     if not _all_units_succeeded(ledger, rows):
-        raise budget.ResourceBlocked("the registered 96-owner × five-arm evaluation is incomplete")
+        raise budget.ResourceBlocked("the registered 96-owner by five-arm evaluation is incomplete")
     run_events, units = _event_state(ledger)
     outcomes = []
     for row in rows:
@@ -2300,7 +2785,8 @@ def _run_evaluation(ledger: Any) -> dict[str, Any]:
         }
         for arm in ARMS
     }
-    analysis_unit = _run_report_analysis(ledger, outcomes)
+    analysis_accounting: dict[str, float] = {}
+    analysis_unit = _run_report_analysis(ledger, outcomes, accounting_sink=analysis_accounting)
     analysis = analysis_unit["analysis"]
     report = {
         "schema_id": "issue75-stage1-heldout-report-v1",
@@ -2327,6 +2813,10 @@ def _run_evaluation(ledger: Any) -> dict[str, Any]:
         "completed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     _write_once(report_path, report)
+    _finish_scheduler_reservation(
+        ledger, scheduler_reservation, phase_started_cpu=phase_started_cpu,
+        separately_accounted_cpu_seconds=analysis_accounting.get("cpu_seconds", 0.0),
+    )
     return report
 
 
@@ -2342,6 +2832,7 @@ def run_phase(phase: str, *, output_dir: Path) -> dict[str, Any]:
     ledger = budget.open_stage1_ledger(ARTIFACT_ROOT / "ledger")
     with _lock_context(ARTIFACT_ROOT / "executor.lock"):
         ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
+        _assert_no_active_supervisors()
         if phase == "preflight":
             return _run_preflight(ledger)
         if phase == "train":
@@ -2354,6 +2845,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--phase", choices=("preflight", "train", "evaluate"))
     mode.add_argument("--worker-job", type=Path)
+    mode.add_argument("--supervisor-job", type=Path)
     mode.add_argument("--reconcile-preflight", action="store_true")
     args = parser.parse_args(argv)
     if args.reconcile_preflight:
@@ -2374,6 +2866,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
         print(json.dumps(result, sort_keys=True))
         return 0
+    if args.supervisor_job is not None:
+        return _supervisor_main(_inside_artifacts(args.supervisor_job))
     if args.worker_job is not None:
         try:
             return _worker_main(_inside_artifacts(args.worker_job))

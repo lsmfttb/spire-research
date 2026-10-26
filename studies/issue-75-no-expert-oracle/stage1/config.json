@@ -20,7 +20,7 @@
         "epsilon": 1e-08,
         "formal_batch_owners": 32,
         "formal_block_count": 4,
-        "formal_execution_enabled": false,
+        "formal_execution_enabled": true,
         "formal_owner_count_per_block": 128,
         "formal_steps_per_block": 64,
         "gradient_norm_clip": 1.0,
@@ -89,14 +89,19 @@
   },
   "execution": {
     "authorized_phases": [
-      "preflight"
+      "preflight",
+      "train",
+      "evaluate"
     ],
-    "formal_evaluation_enabled": false,
-    "formal_training_enabled": false,
+    "formal_evaluation_enabled": true,
+    "formal_training_enabled": true,
     "native_sampling_enabled": true,
     "nonformal_preflight_enabled": true,
-    "package_status": "PREFLIGHT_ONLY_ENABLED",
-    "stage1_execution_authorized": true
+    "package_status": "FORMAL_EXECUTION_ENABLED",
+    "stage1_execution_authorized": true,
+    "max_concurrent_owner_process_trees": 1,
+    "torch_intraop_threads": 1,
+    "torch_interop_threads": 1
   },
   "population": {
     "heldout_arms": [
@@ -138,7 +143,19 @@
     "no_outcome_conditioned_replacement_or_subset": true,
     "owner_seeds_are_the_eight_rows_marked_preflight": true,
     "recompute_full_remaining_cohort_forecast_before_formal_owner_seed": true,
-    "runs_after_one_focused_independent_review_of_the_revised_executable_path": true
+    "runs_after_one_focused_independent_review_of_the_revised_executable_path": true,
+    "accepted_evidence": {
+      "planner_decision_comment_id": 6423390920,
+      "scope": "nonformal-feasibility-only-with-prospective-hard-caps",
+      "preflight_report_path": "stage1/artifacts/preflight-report-review-repair.json",
+      "preflight_report_sha256_lf": "30453842d951a0fbbcd49935ae22a47fce413aafcbd017e61c34a2fa3417e81f",
+      "cost_forecast_path": "stage1/artifacts/cost-forecast-review-repair.json",
+      "cost_forecast_sha256_lf": "8933d20699955f5a128eba4ea373df1d0b89f27eb0b4613902c483245ed46c36",
+      "reported_over_cap_search_invocations": 82,
+      "reported_search_invocation_count": 112,
+      "reported_aggregate_search_cpu_excess_seconds": 11.5538,
+      "reported_maximum_search_cpu_seconds": 32.503407
+    }
   },
   "preparation_base_commit": "a8410ff48ecf168f904726c79da302d10f921984",
   "provenance": {

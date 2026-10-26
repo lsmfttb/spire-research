@@ -1,5 +1,5 @@
 {
-  "budget_config_sha256": "1181b662abf618829ae3dc1e55cf217606355295c1e348fa113b1bdc0a14f5ad",
+  "budget_config_sha256": "b2f8f9c6d790d8f4ec540121ae1bb1f30d7a68c5e2e16a4c1a5d9b4e34bf238c",
   "execution_authorized": true,
   "final_package_commit_binding": "all execution receipts bind the exact package commit and source-lock digest",
   "formal_seeds_or_games_consumed": 0,
@@ -15,15 +15,15 @@
     "preflight.py": "30ac715d8ffef7507a9020afcb7fdb211e708f4f3ab7083b1f87133c7ed2d6f8",
     "runtime.py": "5f73f640f802a80eeee71d0bcd9120e2153d04b204569125205cec97e8ace8e9",
     "stage0.py": "3ab0860b235d2ca32749bde5b1e691fee4f68e07be591acd84d266e2d0587b17",
-    "stage1/budget.json": "1181b662abf618829ae3dc1e55cf217606355295c1e348fa113b1bdc0a14f5ad",
-    "stage1/config.json": "73ae924c82c6ab7a32cc068a33308b088d7cb59b79ceb6acebf182cc6c189d1f",
-    "stage1/executor.py": "6703831eac62bb178870a88ff6f17ff8dfabd721c9349519d0104e33dadf9736",
+    "stage1/budget.json": "b2f8f9c6d790d8f4ec540121ae1bb1f30d7a68c5e2e16a4c1a5d9b4e34bf238c",
+    "stage1/config.json": "dedba8f4b11de92286c7e687c1afebc3330e073ba4d608a20c960ea7be467c5d",
+    "stage1/executor.py": "0e0f6aba24a7757c891238bffca157925f3c89dbd66e324f8fef9778aba78aac",
     "stage1/preflight-proxy.json": "f60612234cbaf35ae18430efe778cf17db0838a6c54b8869242a27969c7de533",
     "stage1/prepare.py": "adb6b46b72790151ca3317a7cdad6b3f7ac774859f4ee29db6850a1d562f4efd",
     "stage1/seed-table.json": "b61b08cb757ce07eb3a20734ea6bf46decd97437ad30cf4a6d1ce0a90a74d6dd",
-    "stage1/test_activation.py": "8238eb0a7458a0e00d3be68eeca7bd78a0106379742057024455ad141f90ebbf",
-    "stage1/test_executor.py": "5a6f0686f964b37ea1effe2179c39e43e109dec8620a71a7ad4a5cc56abf074c",
-    "stage1_budget.py": "06d23499903846ad1b7151087b6a6b9f1629d63965e81f580c4911569057dce7",
+    "stage1/test_activation.py": "364ceca3bd17bed5a03f8ba5d00baafe1be62655de83867f11b165f8bb2aff2c",
+    "stage1/test_executor.py": "c6aa8f39940b9bd8f7268ea2c50e1e8f5866e32bb5e3e55fa661dc802a4f6acf",
+    "stage1_budget.py": "8beefd255799bcd45da32c4ce1fa2a68dfc72e45f5d3c1d7a4de9ab0861df9cd",
     "test_issue75_contract.py": "9c989a249d93a7837330925d85ea1545c0006eacd6f4ae577a625c8e18700462"
   },
   "locked_repository_dependencies_sha256_lf": {
@@ -32,7 +32,7 @@
   },
   "model_training_performed": false,
   "native_sampling_performed": false,
-  "package_status": "PREFLIGHT_ONLY_ENABLED",
+  "package_status": "FORMAL_EXECUTION_ENABLED",
   "prepared_from_commit": "a8410ff48ecf168f904726c79da302d10f921984",
   "runtime": {
     "native_import_only_negative_test": {
@@ -98,6 +98,6 @@
     "source_commit": "c77d64243320639bf156330760d511d2a13eee85",
     "source_lock_sha256_lf": "b3ce3d33c27ec392f6d88151bce3c86a8fdce8c9dc0152d417069441f7140d38"
   },
-  "stage1_config_sha256": "73ae924c82c6ab7a32cc068a33308b088d7cb59b79ceb6acebf182cc6c189d1f",
+  "stage1_config_sha256": "dedba8f4b11de92286c7e687c1afebc3330e073ba4d608a20c960ea7be467c5d",
   "study_id": "issue-75-no-expert-oracle"
 }

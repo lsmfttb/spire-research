@@ -14,6 +14,7 @@ sys.path.insert(0, str(STUDY))
 import model
 import prepare
 import stage1_budget as budget
+import executor
 
 
 PACKAGE_COMMIT, LOCK_DIGEST = chr(97) * 40, chr(98) * 64
@@ -98,23 +99,25 @@ class SeedTableTests(unittest.TestCase):
 
 
 class PackageBindingTests(unittest.TestCase):
-    def test_registered_preflight_is_the_only_enabled_phase(self):
+    def test_accepted_prospective_package_enables_only_registered_phases(self):
         config = prepare.preflight.load_json(STUDY / "stage1" / "config.json")
         execution = config["execution"]
         self.assertTrue(execution["stage1_execution_authorized"])
         self.assertTrue(execution["nonformal_preflight_enabled"])
         self.assertTrue(execution["native_sampling_enabled"])
-        self.assertFalse(execution["formal_training_enabled"])
-        self.assertFalse(execution["formal_evaluation_enabled"])
-        self.assertEqual(execution["authorized_phases"], ["preflight"])
+        self.assertTrue(execution["formal_training_enabled"])
+        self.assertTrue(execution["formal_evaluation_enabled"])
+        self.assertEqual(execution["authorized_phases"], ["preflight", "train", "evaluate"])
+        self.assertEqual(execution["max_concurrent_owner_process_trees"], 1)
+        self.assertEqual(execution["torch_intraop_threads"], 1)
+        self.assertEqual(execution["torch_interop_threads"], 1)
         self.assertNotIn("activation_gate", config)
         lock = prepare.verify_stage1_package()
-        self.assertEqual(lock["package_status"], "PREFLIGHT_ONLY_ENABLED")
+        self.assertEqual(lock["package_status"], "FORMAL_EXECUTION_ENABLED")
         self.assertEqual(lock["final_package_commit_binding"], "all execution receipts bind the exact package commit and source-lock digest")
-        budget.verify_stage1_phase("preflight")
-        for phase in ("train", "evaluate", "update"):
-            with self.assertRaises(PermissionError):
-                budget.verify_stage1_phase(phase)
+        for phase in ("preflight", "train", "evaluate", "update"):
+            budget.verify_stage1_phase(phase)
+        self.assertEqual(executor._formal_concurrency(), 1)
 
     def test_worker_ledger_uses_current_package_binding_without_comment_receipt(self):
         with tempfile.TemporaryDirectory(dir=STUDY) as temp:
@@ -258,6 +261,23 @@ class LedgerTests(unittest.TestCase):
             self.ledger.forecast(expected_unit_ids=list(estimates),
                                  future_builder_cpu_seconds={"TRAIN:7500001": 100})
 
+    def test_batch_reservations_validate_all_rows_before_appending_any(self):
+        first = {
+            "run_id": "batch-first", "unit_id": "TRAIN:7500001", "role": "builder",
+            "reserved_cpu_seconds": 5.0, "unit_kind": "training_owner",
+        }
+        with self.assertRaises(budget.DuplicateRun):
+            self.ledger.reserve_many([first, {**first, "unit_id": "TRAIN:7500002"}])
+        self.assertEqual(self.ledger.read_events(), [])
+
+        second = {**first, "run_id": "batch-second", "unit_id": "TRAIN:7500002"}
+        reserved = self.ledger.reserve_many([first, second])
+        self.assertEqual([event["run_id"] for event in reserved], ["batch-first", "batch-second"])
+        self.assertEqual(
+            [event["run_id"] for event in self.ledger.read_events() if event.get("event") == "reserve"],
+            ["batch-first", "batch-second"],
+        )
+
     def test_overrun_is_durably_charged_before_exception(self):
         self.reserve("overrun", "SEARCH:1", cap=1.0, attempts=1)
         with self.assertRaises(budget.BudgetOverrun):
@@ -275,16 +295,17 @@ class WatchdogTests(unittest.TestCase):
     def test_counts_reaped_grandchild_cpu_and_keeps_task_output_inside_worktree(self):
         child = "import time; x=time.process_time(); exec('while time.process_time()-x < 0.12: pass')"
         parent = "import subprocess,sys; subprocess.run([sys.executable,'-c',sys.argv[1]],check=True)"
-        output = REPO / ".task-tmp" / f"watchdog-{os.getpid()}.log"
-        output.unlink(missing_ok=True)
-        result = self.watchdog().run([sys.executable, "-c", parent, child],
-                                     reserved_cpu_seconds=2, cwd=STUDY, stdout_path=output)
-        self.assertEqual(result.returncode, 0)
-        self.assertGreaterEqual(result.cpu_seconds, 0.08)
-        self.assertTrue(output.is_file())
-        with self.assertRaises(ValueError):
-            self.watchdog().run([sys.executable, "-c", "pass"], reserved_cpu_seconds=2,
-                                cwd=STUDY, stdout_path=Path("/outside-issue75-watchdog-must-not-create.log"))
+        with tempfile.TemporaryDirectory(dir=STUDY) as temporary:
+            output = Path(temporary) / "watchdog.log"
+            result = self.watchdog().run([sys.executable, "-c", parent, child],
+                                         reserved_cpu_seconds=2, cwd=STUDY, stdout_path=output)
+            self.assertEqual(result.returncode, 0)
+            self.assertGreaterEqual(result.cpu_seconds, 0.08)
+            self.assertGreaterEqual(result.controller_cpu_seconds, 0.0)
+            self.assertTrue(output.is_file())
+            with self.assertRaises(ValueError):
+                self.watchdog().run([sys.executable, "-c", "pass"], reserved_cpu_seconds=2,
+                                    cwd=STUDY, stdout_path=Path("/outside-issue75-watchdog-must-not-create.log"))
 
     def test_watchdog_accounts_for_a_worker_adopted_after_its_parent_exits(self):
         code = "import os,time; pid=os.fork(); (os._exit(0) if pid else None); x=time.process_time(); exec('while time.process_time()-x < 0.12: pass'); os._exit(0)"

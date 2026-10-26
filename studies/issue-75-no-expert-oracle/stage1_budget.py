@@ -162,13 +162,18 @@ def verify_stage1_package() -> dict[str, Any]:
     budget = json.loads((STAGE1 / "budget.json").read_text(encoding="utf-8"))
     if (
         budget.get("stage1_execution_authorized") is not True
-        or budget.get("ledger_status") != "PREFLIGHT_AUTHORIZED_ZERO_CHARGES"
+        or budget.get("ledger_status") != "PREFLIGHT_COMPLETE_ACCEPTED_FORMAL_PROSPECTIVE"
         or budget.get("limits_cpu_seconds") != {
             "builder": BUILDER_LIMIT, "reviewer_protected": REVIEWER_LIMIT, "all_in": ALL_IN_LIMIT,
         }
         or budget.get("reviewer_reserve_transferable_to_builder") is not False
         or budget.get("search_call_cpu_cap_seconds") != SEARCH_CPU_CAP_SECONDS
         or budget.get("search_call_started_attempt_cap") != SEARCH_ATTEMPT_CAP
+        or type(budget.get("concurrent_stage1_process_trees")) is not int
+        or budget.get("concurrent_stage1_process_trees") != 1
+        or execution.get("max_concurrent_owner_process_trees") != 1
+        or execution.get("torch_intraop_threads") != 1
+        or execution.get("torch_interop_threads") != 1
     ):
         raise PermissionError("Stage 1 budget does not match the registered hard limits")
     sidecar = (STAGE1 / "source-lock.sha256").read_text(encoding="ascii").split()
@@ -323,7 +328,8 @@ class Stage1Ledger:
                 rows = _events(self.events_path)
                 result, event = operation(rows)
                 if event is not None:
-                    data = canonical(event) + b"\n"
+                    events = event if isinstance(event, list) else [event]
+                    data = b"".join(canonical(item) + b"\n" for item in events)
                     out = os.open(self.events_path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
                     try:
                         if os.write(out, data) != len(data):
@@ -362,11 +368,11 @@ class Stage1Ledger:
             result[role] += _charge(run)
         return result
 
-    def reserve(
-        self, *, run_id: str, unit_id: str, role: str, reserved_cpu_seconds: float,
-        unit_kind: str, attempt_cap: int | None = None, previous_run_id: str | None = None,
-        checkpoint_sha256: str | None = None,
-    ) -> dict[str, Any]:
+    def _reservation_event(self, rows, *, run_id: str, unit_id: str, role: str,
+                           reserved_cpu_seconds: float, unit_kind: str,
+                           attempt_cap: int | None = None,
+                           previous_run_id: str | None = None,
+                           checkpoint_sha256: str | None = None):
         cap = float(reserved_cpu_seconds)
         if role not in {"builder", "reviewer"} or not run_id or not unit_id or not math.isfinite(cap) or cap <= 0:
             raise ValueError("invalid run, unit, role, or CPU reservation")
@@ -379,52 +385,74 @@ class Stage1Ledger:
             len(checkpoint_sha256) != 64 or any(c not in "0123456789abcdef" for c in checkpoint_sha256)
         ):
             raise ValueError("invalid checkpoint digest")
+        runs, units = _state(rows)
+        if run_id in runs:
+            raise DuplicateRun(run_id)
+        history = units.get(unit_id, [])
+        if history:
+            last = runs[history[-1]]
+            done = last["finish"]
+            if done is None:
+                raise ResourceBlocked(f"unresolved reservation remains charged at full cap: {unit_id}")
+            if done.get("status") != "incomplete":
+                raise DuplicateRun(f"terminal unit cannot be replayed: {unit_id}")
+            if float(done.get("measured_cpu_seconds", 0.0)) > float(done.get("reserved_cpu_seconds", 0.0)):
+                raise ResourceBlocked("an incomplete unit exceeded its immutable reservation and cannot be resumed")
+            if (previous_run_id != history[-1] or not done.get("checkpoint_sha256")
+                    or checkpoint_sha256 != done["checkpoint_sha256"]
+                    or role != last["reservation"]["role"]):
+                raise CheckpointMismatch("resume needs the exact prior incomplete run and checkpoint digest")
+        elif previous_run_id is not None or checkpoint_sha256 is not None:
+            raise CheckpointMismatch("resume metadata supplied for a new unit")
+        charges = self._charges(runs)
+        if role == "builder":
+            if charges["builder"] + cap > BUILDER_LIMIT:
+                raise ResourceBlocked("Builder CPU cap would be exceeded")
+            if charges["builder"] + cap + max(REVIEWER_LIMIT, charges["reviewer"]) > ALL_IN_LIMIT:
+                raise ResourceBlocked("all-in cap or protected Reviewer reserve would be breached")
+        else:
+            if charges["reviewer"] + cap > REVIEWER_LIMIT:
+                raise ResourceBlocked("protected Reviewer CPU reserve would be exceeded")
+            if charges["builder"] + charges["reviewer"] + cap > ALL_IN_LIMIT:
+                raise ResourceBlocked("all-in CPU cap would be exceeded")
+        return {
+            "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
+            "run_id": run_id, "unit_id": unit_id, "role": role, "unit_kind": unit_kind,
+            "reserved_cpu_seconds": cap, "attempt_cap": attempt_cap,
+            "previous_run_id": previous_run_id, "checkpoint_sha256": checkpoint_sha256,
+            "package_commit": self.binding.package_commit,
+            "source_lock_sha256": self.binding.source_lock_sha256,
+            "created_at_ns": time.time_ns(),
+        }
+
+    def reserve_many(self, reservations: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+        """Append a batch of write-ahead reservations under one ledger lock."""
+        specs = [dict(spec) for spec in reservations]
+        if not specs:
+            raise ValueError("reserve_many requires at least one reservation")
 
         def operation(rows):
-            runs, units = _state(rows)
-            if run_id in runs:
-                raise DuplicateRun(run_id)
-            history = units.get(unit_id, [])
-            if history:
-                last = runs[history[-1]]
-                done = last["finish"]
-                if done is None:
-                    raise ResourceBlocked(f"unresolved reservation remains charged at full cap: {unit_id}")
-                if done.get("status") != "incomplete":
-                    raise DuplicateRun(f"terminal unit cannot be replayed: {unit_id}")
-                if float(done.get("measured_cpu_seconds", 0.0)) > float(done.get("reserved_cpu_seconds", 0.0)):
-                    raise ResourceBlocked("an incomplete unit exceeded its immutable reservation and cannot be resumed")
-                if (
-                    previous_run_id != history[-1] or
-                    not done.get("checkpoint_sha256") or checkpoint_sha256 != done["checkpoint_sha256"] or
-                    role != last["reservation"]["role"]
-                ):
-                    raise CheckpointMismatch("resume needs the exact prior incomplete run and checkpoint digest")
-            elif previous_run_id is not None or checkpoint_sha256 is not None:
-                raise CheckpointMismatch("resume metadata supplied for a new unit")
+            projected = list(rows)
+            events = []
+            for spec in specs:
+                event = self._reservation_event(projected, **spec)
+                events.append(event)
+                projected.append(event)
+            return events, events
 
-            charges = self._charges(runs)
-            if role == "builder":
-                if charges["builder"] + cap > BUILDER_LIMIT:
-                    raise ResourceBlocked("Builder CPU cap would be exceeded")
-                if charges["builder"] + cap + max(REVIEWER_LIMIT, charges["reviewer"]) > ALL_IN_LIMIT:
-                    raise ResourceBlocked("all-in cap or protected Reviewer reserve would be breached")
-            else:
-                if charges["reviewer"] + cap > REVIEWER_LIMIT:
-                    raise ResourceBlocked("protected Reviewer CPU reserve would be exceeded")
-                if charges["builder"] + charges["reviewer"] + cap > ALL_IN_LIMIT:
-                    raise ResourceBlocked("all-in CPU cap would be exceeded")
-            event = {
-                "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
-                "run_id": run_id, "unit_id": unit_id, "role": role, "unit_kind": unit_kind,
-                "reserved_cpu_seconds": cap, "attempt_cap": attempt_cap,
-                "previous_run_id": previous_run_id, "checkpoint_sha256": checkpoint_sha256,
-                "package_commit": self.binding.package_commit,
-                "source_lock_sha256": self.binding.source_lock_sha256,
-                "created_at_ns": time.time_ns(),
-            }
-            return event, event
         return self._tx(operation)
+
+    def reserve(self, *, run_id: str, unit_id: str, role: str,
+                reserved_cpu_seconds: float, unit_kind: str,
+                attempt_cap: int | None = None,
+                previous_run_id: str | None = None,
+                checkpoint_sha256: str | None = None) -> dict[str, Any]:
+        return self.reserve_many([{
+            "run_id": run_id, "unit_id": unit_id, "role": role,
+            "reserved_cpu_seconds": reserved_cpu_seconds, "unit_kind": unit_kind,
+            "attempt_cap": attempt_cap, "previous_run_id": previous_run_id,
+            "checkpoint_sha256": checkpoint_sha256,
+        }])[0]
 
     def finish(
         self, *, run_id: str, measured_cpu_seconds: float, status: str,
@@ -558,9 +586,11 @@ class ProcessTreeTimeout(TimeoutError):
 
 
 class ProcessTreeBudgetExceeded(RuntimeError):
-    def __init__(self, cpu_seconds: float, cap_seconds: float, returncode: int | None):
+    def __init__(self, cpu_seconds: float, cap_seconds: float, returncode: int | None,
+                 controller_cpu_seconds: float = 0.0):
         super().__init__(f"process tree stopped at {cpu_seconds:.6f}s under {cap_seconds:.6f}s cap")
         self.cpu_seconds, self.cap_seconds, self.returncode = cpu_seconds, cap_seconds, returncode
+        self.controller_cpu_seconds = controller_cpu_seconds
 
 
 @dataclass(frozen=True)
@@ -570,6 +600,7 @@ class ProcessRun:
     cpu_seconds: float
     wall_seconds: float
     stdout_path: str | None
+    controller_cpu_seconds: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -785,7 +816,7 @@ class ProcessTreeWatchdog:
                     self._stop(proc, root_start, controller, baseline, identities)
                     actual = max(maximum_cpu, max(0.0, _children_cpu() - children_before))
                     actual += max(0.0, _self_cpu() - self_before)
-                    raise ProcessTreeBudgetExceeded(actual, cap, proc.returncode)
+                    raise ProcessTreeBudgetExceeded(actual, cap, proc.returncode, max(0.0, _self_cpu() - self_before))
                 if wall_timeout_seconds is not None and now - started >= wall_timeout_seconds:
                     self._stop(proc, root_start, controller, baseline, identities)
                     actual = max(maximum_cpu, max(0.0, _children_cpu() - children_before))
@@ -811,9 +842,10 @@ class ProcessTreeWatchdog:
             actual = max(maximum_cpu, max(0.0, _children_cpu() - children_before))
             actual += max(0.0, _self_cpu() - self_before)
             if actual > cap:
-                raise ProcessTreeBudgetExceeded(actual, cap, proc.returncode)
+                raise ProcessTreeBudgetExceeded(actual, cap, proc.returncode, max(0.0, _self_cpu() - self_before))
             return ProcessRun(tuple(map(str, argv)), int(proc.returncode or 0), actual,
-                              time.monotonic() - started, str(output) if output else None)
+                              time.monotonic() - started, str(output) if output else None,
+                              max(0.0, _self_cpu() - self_before))
         finally:
             try:
                 if proc is not None and proc.poll() is None:

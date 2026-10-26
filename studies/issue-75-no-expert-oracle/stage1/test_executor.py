@@ -427,16 +427,26 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertEqual(result["expert_decisions"], 1)
         self.assertEqual(result["policy_source"]["formal_use"], True)
 
-    def test_cli_refuses_disabled_formal_phase_before_creating_artifacts(self):
+    def test_cli_dispatches_authorized_formal_phase_without_running_it_in_the_test(self):
         import contextlib
         import io
 
+        report = {
+            "status": "TRAINING_COMPLETE",
+            "package_commit": "a" * 40,
+            "source_lock_sha256": "b" * 64,
+        }
         stdout, stderr = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        with (
+            mock.patch.object(executor, "run_phase", return_value=report) as run_phase,
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
             status = executor.main(["--phase", "train"])
-        self.assertEqual(status, 2)
-        self.assertIn("STAGE1_EXECUTOR_FAILED", stderr.getvalue())
-        self.assertIn("PermissionError", stderr.getvalue())
+        self.assertEqual(status, 0)
+        run_phase.assert_called_once_with("train", output_dir=executor.ARTIFACT_ROOT)
+        self.assertEqual(json.loads(stdout.getvalue())["status"], "TRAINING_COMPLETE")
+        self.assertEqual(stderr.getvalue(), "")
         self.assertFalse(executor.ARTIFACT_ROOT.exists())
 
     def test_preflight_resume_propagates_blocked_forecast_and_cli_exit(self):
@@ -491,10 +501,12 @@ class Stage1ExecutorTests(unittest.TestCase):
         ledger = FakeLedger(unit_kind="owner_arm")
         update_receipts = {}
 
-        def run_owner(_ledger, row, *, phase, estimates):
+        def run_owner_batch(_ledger, rows, *, phase, estimates):
             self.assertEqual(phase, "train")
+            self.assertEqual(len(rows), 1)
+            row = rows[0]
             order.append(("owner", int(row["block_index"]), int(row["owner_seed"])))
-            return {"status": "SUCCEEDED", "unit_id": row["unit_id"]}
+            return [{"status": "SUCCEEDED", "unit_id": row["unit_id"]}]
 
         def update(_ledger, block, *, estimates):
             order.append(("update", block, None))
@@ -515,8 +527,14 @@ class Stage1ExecutorTests(unittest.TestCase):
                 "preflight_report_sha256": "1" * 64, "cost_forecast_sha256": "2" * 64,
             }),
             mock.patch.object(executor, "_forecast_estimates", return_value=({}, {})),
+            mock.patch.object(executor, "_formal_concurrency", return_value=1),
+            mock.patch.object(executor, "_run_scheduler_reservation", return_value={
+                "run_id": "scheduler-test", "unit_id": "SCHEDULER:TRAIN",
+                "cap": executor.FORMAL_SCHEDULER_RESERVATION,
+            }) as scheduler_reservation,
+            mock.patch.object(executor, "_finish_scheduler_reservation") as finish_scheduler,
             mock.patch.object(executor, "_existing_unit_receipt", side_effect=existing_receipt),
-            mock.patch.object(executor, "_run_unit", side_effect=run_owner),
+            mock.patch.object(executor, "_run_owner_batch", side_effect=run_owner_batch),
             mock.patch.object(executor, "_all_units_succeeded", return_value=True),
             mock.patch.object(executor, "_run_update_unit", side_effect=update),
             mock.patch.object(executor, "_load_model", return_value=(None, "3" * 64, {"source": "pi4"})),
@@ -525,6 +543,8 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertEqual(report["status"], "TRAINING_COMPLETE")
         self.assertEqual(report["formal_owner_count"], 512)
         self.assertEqual(len(report["training_seed_ids"]), 512)
+        scheduler_reservation.assert_called_once()
+        finish_scheduler.assert_called_once()
         self.assertEqual([event for event in order if event[0] == "update"], [
             ("update", 0, None), ("update", 1, None),
             ("update", 2, None), ("update", 3, None),
@@ -534,6 +554,64 @@ class Stage1ExecutorTests(unittest.TestCase):
             block_events = order[start:start + 129]
             self.assertEqual(len([event for event in block_events if event[0] == "owner"]), 128)
             self.assertEqual(block_events[-1], ("update", block, None))
+
+    def test_scheduler_reservations_preserve_the_accepted_full_cohort_forecast(self):
+        runs = {
+            "preflight": {
+                "reservation": {"unit_id": "PREFLIGHT:7520001:P0", "role": "builder"},
+                "finish": {"status": "succeeded", "measured_cpu_seconds": 8077.011297},
+            },
+        }
+        with (
+            mock.patch.object(executor, "_event_state", return_value=(runs, {})),
+            mock.patch.object(executor.budget, "_charge", return_value=8077.011297),
+        ):
+            estimates, summary = executor._forecast_estimates(None)
+        self.assertEqual(len(estimates), 999)
+        self.assertEqual(summary["formal_unit_count"], 996)
+        self.assertEqual(summary["scheduler_unit_count"], 2)
+        self.assertEqual(estimates["SCHEDULER:TRAIN"], 120.0)
+        self.assertEqual(estimates["SCHEDULER:EVALUATE"], 120.0)
+        self.assertAlmostEqual(sum(estimates.values()), 161896.17019694686, places=6)
+        self.assertAlmostEqual(summary["projected_total_builder_cpu_seconds"], 169973.18149394685, places=6)
+        self.assertEqual(summary["builder_hard_cap_cpu_seconds"], 170000)
+        self.assertEqual(summary["reviewer_protected_cpu_seconds"], 10000)
+        self.assertEqual(summary["aggregate_hard_cap_cpu_seconds"], 180000)
+
+    def test_heldout_phase_requires_a_successful_training_scheduler_receipt(self):
+        ledger = FakeLedger(unit_kind="owner_arm")
+        with (
+            mock.patch.object(
+                executor, "_existing_scheduler_receipt",
+                side_effect=executor.budget.ResourceBlocked("training scheduler receipt missing"),
+            ) as scheduler_receipt,
+            mock.patch.object(executor, "_formal_forecast") as formal_forecast,
+        ):
+            with self.assertRaises(executor.budget.ResourceBlocked):
+                executor._run_evaluation(ledger)
+        scheduler_receipt.assert_called_once_with(ledger, "SCHEDULER:TRAIN")
+        formal_forecast.assert_not_called()
+        self.assertFalse((executor.ARTIFACT_ROOT / "evaluation-report.json").exists())
+
+    def test_supervisor_validation_failures_still_account_controller_cpu(self):
+        import contextlib
+        import io
+
+        stdout = io.StringIO()
+        job_path = executor.ARTIFACT_ROOT / "invalid-supervisor-job.json"
+        with (
+            mock.patch.object(executor, "_supervisor_activity_lease", return_value=contextlib.nullcontext()),
+            mock.patch.object(executor.budget, "verify_stage1_package"),
+            mock.patch.object(executor, "_read_json", return_value={"schema_id": "wrong"}),
+            mock.patch.object(executor.time, "process_time", side_effect=[5.0, 5.25]),
+            contextlib.redirect_stdout(stdout),
+        ):
+            status = executor._supervisor_main(job_path)
+        self.assertEqual(status, 2)
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(report["status"], "SUPERVISOR_FAILED")
+        self.assertEqual(report["measured_cpu_seconds"], 0.25)
+        self.assertEqual(report["boundary"], "PermissionError")
 
     @unittest.skipIf(sys.platform == "win32", "the Stage 1 watchdog intentionally uses Linux /proc")
     def test_watchdog_accounts_for_nested_child_cpu(self):
@@ -558,6 +636,7 @@ class Stage1ExecutorTests(unittest.TestCase):
         )
         self.assertEqual(run.returncode, 0)
         self.assertGreater(run.cpu_seconds, 0.05)
+        self.assertGreaterEqual(run.controller_cpu_seconds, 0.0)
 
     @unittest.skipIf(sys.platform == "win32", "the Stage 1 ledger uses Linux file locks")
     def test_real_ledger_enforces_budget_and_exact_checkpoint_resume(self):
