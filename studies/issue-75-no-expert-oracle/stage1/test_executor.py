@@ -309,6 +309,117 @@ class Stage1ExecutorTests(unittest.TestCase):
                 or "ledger append is malformed" in rewritten_ledger.stderr
             )
 
+    def test_symlinked_ledger_parent_is_rejected_by_parent_and_spawned_child(self):
+        with tempfile.TemporaryDirectory(dir=STAGE1) as temp_dir:
+            repository = self._source_bound_child_fixture(Path(temp_dir))
+            study = repository / "studies" / "issue-75-no-expert-oracle"
+            stage1 = study / "stage1"
+            parent_code = textwrap.dedent(r"""
+                import json, os, shutil, subprocess, sys
+                from pathlib import Path
+                stage1 = Path(sys.argv[1])
+                study = stage1.parent
+                repository = stage1.parents[2]
+                sys.path[:0] = [str(stage1), str(study)]
+                import executor
+                import stage1_budget as budget
+                ledger_dir = executor.ARTIFACT_ROOT / "ledger"
+                ledger = budget.open_stage1_ledger(ledger_dir)
+                ledger_path = ledger_dir / "events.jsonl"
+                baseline = subprocess.run(
+                    ["git", "show", "HEAD:studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl"],
+                    cwd=repository, check=True, stdout=subprocess.PIPE,
+                ).stdout
+                unit_id = "VALIDATION:SYMLINK"
+                run_id = unit_id + "-" + "d" * 16
+                reservation = ledger.reserve(
+                    run_id=run_id, unit_id=unit_id, role="builder",
+                    reserved_cpu_seconds=1.0, unit_kind="validation_probe",
+                )
+                if budget._current_package_binding() != (
+                    ledger.binding.package_commit, ledger.binding.source_lock_sha256,
+                ):
+                    raise AssertionError("the legitimate in-place ledger append was rejected")
+                unit_dir = executor._unit_directory(unit_id)
+                job_path = unit_dir / ("worker-job-" + run_id + ".json")
+                job = {
+                    "schema_id": executor.WORKER_SCHEMA,
+                    "package_commit": ledger.binding.package_commit,
+                    "source_lock_sha256": ledger.binding.source_lock_sha256,
+                    "unit_id": unit_id, "run_id": run_id, "phase": "validation_probe",
+                    "row": {"unit_id": unit_id, "formal": False, "kind": "nonformal_validation"},
+                    "output_dir": str(unit_dir / "native"),
+                    "result_path": str(unit_dir / "result.json"),
+                    "previous_run_id": None, "checkpoint_sha256": None,
+                    "retry_reason": reservation.get("retry_reason"),
+                    "pre_game_start_proof": reservation.get("pre_game_start_proof"),
+                    "pre_game_start_proof_sha256": reservation.get("pre_game_start_proof_sha256"),
+                }
+                executor._write_once(job_path, job)
+                child_code = (
+                    "import sys; from pathlib import Path; "
+                    "sys.path[:0]=[sys.argv[2],str(Path(sys.argv[2]).parent)]; "
+                    "import executor; executor._validate_worker_job(Path(sys.argv[1]),allow_synthetic=True)"
+                )
+                copied_ledger = repository / "untracked-ledger-copy"
+                copied_ledger.mkdir()
+                shutil.copy2(ledger_path, copied_ledger / "events.jsonl")
+                shutil.rmtree(ledger_dir)
+                ledger_dir.symlink_to(copied_ledger, target_is_directory=True)
+
+                def assert_parent_and_child_reject(label):
+                    try:
+                        budget.open_stage1_ledger(ledger_dir)
+                    except PermissionError as exc:
+                        if "symlink" not in str(exc).lower():
+                            raise AssertionError(f"{label}: wrong parent rejection: {exc}")
+                    else:
+                        raise AssertionError(f"{label}: parent accepted a symlinked ledger directory")
+                    child = subprocess.run(
+                        [sys.executable, "-c", child_code, str(job_path), str(stage1)],
+                        cwd=repository, env=os.environ.copy(), text=True,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    )
+                    if child.returncode == 0 or "symlink" not in child.stderr.lower():
+                        raise AssertionError(f"{label}: child did not reject symlinked ledger parent: {child.stderr}")
+
+                assert_parent_and_child_reject("append copy")
+                (copied_ledger / "events.jsonl").write_bytes(baseline)
+                unchanged_diff = subprocess.run(
+                    ["git", "diff", "--no-ext-diff", "--no-renames", "--name-status", "HEAD", "--",
+                     "studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl"],
+                    cwd=repository, check=True, text=True, stdout=subprocess.PIPE,
+                ).stdout
+                diff_rows = [line.split("\t", 1) for line in unchanged_diff.splitlines()]
+                if len(diff_rows) != 1 or len(diff_rows[0]) != 2 or diff_rows[0][1] != (
+                    "studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl"
+                ) or diff_rows[0][0] not in {"D", "M"}:
+                    raise AssertionError(f"test setup expected only the ledger path to differ, got {unchanged_diff!r}")
+                assert_parent_and_child_reject("copy matching committed bytes")
+                print(json.dumps({"status": "SYMLINK_REJECTED", "ledger_diff_when_copy_matches_head": unchanged_diff}))
+            """)
+            env = os.environ.copy()
+            env.update({
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONPYCACHEPREFIX": str(Path(temp_dir) / ".python-cache"),
+                "TMPDIR": str(Path(temp_dir) / ".tmp"),
+                "TEMP": str(Path(temp_dir) / ".tmp"),
+                "TMP": str(Path(temp_dir) / ".tmp"),
+                "HOME": str(Path(temp_dir) / ".home"),
+            })
+            parent = subprocess.run(
+                [sys.executable, "-c", parent_code, str(stage1)], cwd=repository,
+                env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            self.assertEqual(parent.returncode, 0, parent.stderr + parent.stdout)
+            result = json.loads(parent.stdout)
+            self.assertEqual(result["status"], "SYMLINK_REJECTED")
+            diff_rows = result["ledger_diff_when_copy_matches_head"].splitlines()
+            self.assertEqual(len(diff_rows), 1)
+            status, changed_path = diff_rows[0].split("\t", 1)
+            self.assertIn(status, {"D", "M"})
+            self.assertEqual(changed_path, "studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl")
+
     def test_pre_game_start_retry_is_single_exact_row_and_rejects_game_artifacts(self):
         ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
         events = ledger.read_events()

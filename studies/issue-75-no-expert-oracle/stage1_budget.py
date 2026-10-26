@@ -204,25 +204,65 @@ def _current_package_binding() -> tuple[str, str]:
     """Lock executable inputs while permitting only append-only tracked ledger events."""
     verify_stage1_package()
     ledger_relative = "studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl"
+    repository_root = STUDY.parents[1].resolve(strict=True)
+    ledger_path = repository_root
+    parts = Path(ledger_relative).parts
+    for index, part in enumerate(parts):
+        ledger_path = ledger_path / part
+        if ledger_path.is_symlink():
+            raise PermissionError("tracked Stage 1 ledger path contains a symlink")
+        if index < len(parts) - 1 and not ledger_path.is_dir():
+            raise PermissionError("tracked Stage 1 ledger parent directory is missing or replaced")
+    if not ledger_path.is_file():
+        raise PermissionError("tracked Stage 1 ledger file is missing or replaced")
+    try:
+        resolved_ledger_path = ledger_path.resolve(strict=True)
+    except OSError as exc:
+        raise PermissionError("tracked Stage 1 ledger file cannot be resolved") from exc
+    if resolved_ledger_path != ledger_path or not resolved_ledger_path.is_relative_to(repository_root):
+        raise PermissionError("tracked Stage 1 ledger resolves outside its exact repository path")
+
+    tracked_index = subprocess.run(
+        ["git", "ls-files", "--stage", "--", ledger_relative],
+        cwd=repository_root, check=False, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True,
+    )
+    index_rows = [line for line in tracked_index.stdout.splitlines() if line]
+    if tracked_index.returncode != 0 or len(index_rows) != 1:
+        raise PermissionError("Stage 1 ledger is not one exact tracked repository file")
+    index_metadata, separator, index_path = index_rows[0].partition("\t")
+    index_fields = index_metadata.split()
+    if (
+        not separator or index_path.replace("\\", "/") != ledger_relative
+        or len(index_fields) != 3 or index_fields[0] != "100644" or index_fields[2] != "0"
+    ):
+        raise PermissionError("Stage 1 ledger is missing, replaced, or not a regular tracked file")
+
     working_tree = subprocess.run(
-        ["git", "diff", "--no-ext-diff", "--no-renames", "--name-only", "HEAD", "--", "."],
-        cwd=STUDY.parents[1], check=False, stdout=subprocess.PIPE,
+        ["git", "diff", "--no-ext-diff", "--no-renames", "--name-status", "HEAD", "--", "."],
+        cwd=repository_root, check=False, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True,
     )
     if working_tree.returncode != 0:
-        raise PermissionError("cannot verify tracked Stage 1 source immutability")
-    changed = [line.replace("\\", "/") for line in working_tree.stdout.splitlines() if line]
-    if changed:
-        ledger_path = STAGE1 / "artifacts" / "ledger" / "events.jsonl"
-        if changed != [ledger_relative] or ledger_path.is_symlink() or not ledger_path.is_file():
+        raise PermissionError("cannot verify Stage 1 source immutability")
+    changes = []
+    for line in working_tree.stdout.splitlines():
+        status, separator, path = line.partition("\t")
+        if not separator:
+            raise PermissionError("cannot parse tracked Stage 1 working-tree changes")
+        changes.append((status, path.replace("\\", "/")))
+    if changes:
+        if changes != [("M", ledger_relative)]:
             raise PermissionError("Stage 1 tracked changes include immutable code/config or non-ledger artifacts")
         baseline = subprocess.run(
-            ["git", "show", f"HEAD:{ledger_relative}"], cwd=STUDY.parents[1],
+            ["git", "show", f"HEAD:{ledger_relative}"], cwd=repository_root,
             check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
+        if baseline.returncode != 0:
+            raise PermissionError("cannot read the committed Stage 1 ledger baseline")
         current_ledger = ledger_path.read_bytes().replace(b"\r\n", b"\n")
         baseline_ledger = baseline.stdout.replace(b"\r\n", b"\n")
-        if baseline.returncode != 0 or not current_ledger.startswith(baseline_ledger):
+        if not current_ledger.startswith(baseline_ledger):
             raise PermissionError("tracked Stage 1 ledger history was changed or truncated")
         try:
             _events(ledger_path)
