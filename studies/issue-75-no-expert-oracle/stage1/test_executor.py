@@ -1,6 +1,7 @@
 """Pure source-bound executor checks; these tests never construct a simulator."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import json
 import sys
@@ -66,6 +67,27 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.original_artifact_root = executor.ARTIFACT_ROOT
         executor.ARTIFACT_ROOT = Path(self.temporary.name) / "artifacts"
         self.addCleanup(setattr, executor, "ARTIFACT_ROOT", self.original_artifact_root)
+
+    def _test_ledger(self, name="ledger"):
+        activation = executor.budget.ActivationReceipt(
+            package_commit="a" * 40,
+            source_lock_sha256="b" * 64,
+            reviewer_comment_id=101,
+            planner_comment_id=102,
+            authorized_at="2026-01-01T00:00:00+00:00",
+        )
+        with mock.patch.object(executor.budget, "_live_activation_receipt", return_value=activation):
+            return executor.budget.Stage1Ledger(executor.ARTIFACT_ROOT / name)
+
+    def _reserve_test_unit(self, ledger, *, unit_id, run_id, cap=2.0, unit_kind="owner_arm", **metadata):
+        return ledger.reserve(
+            run_id=run_id,
+            unit_id=unit_id,
+            role="builder",
+            reserved_cpu_seconds=cap,
+            unit_kind=unit_kind,
+            **metadata,
+        )
 
     def test_paired_owner_differences_bind_all_96_owner_pairs(self):
         rows = []
@@ -141,6 +163,199 @@ class Stage1ExecutorTests(unittest.TestCase):
             20_000,
         )
         self.assertEqual(first["analysis"]["search_coverage_and_resource_summary"]["P0"]["owner_rows"], 96)
+
+    def test_registered_rows_are_disjoint_and_bind_the_five_arm_policy_sources(self):
+        rows = executor._rows()
+        by_phase = {
+            phase: [row for row in rows if row["phase"] == phase]
+            for phase in ("preflight", "training", "heldout")
+        }
+        self.assertEqual(tuple(map(len, by_phase.values())), (40, 512, 480))
+        seed_sets = {
+            phase: {int(row["owner_seed"]) for row in phase_rows}
+            for phase, phase_rows in by_phase.items()
+        }
+        self.assertTrue(seed_sets["preflight"].isdisjoint(seed_sets["training"]))
+        self.assertTrue(seed_sets["preflight"].isdisjoint(seed_sets["heldout"]))
+        self.assertTrue(seed_sets["training"].isdisjoint(seed_sets["heldout"]))
+        preflight = {row["arm"]: row for row in by_phase["preflight"] if row["owner_seed"] == 7520001}
+        self.assertEqual(set(preflight), set(executor.ARMS))
+        self.assertEqual(executor._arm_policy("preflight", "P0", preflight["P0"]), ("pi0", False))
+        for arm in ("P1", "R", "J"):
+            self.assertEqual(executor._arm_policy("preflight", arm, preflight[arm]), ("pi-stage0-proxy", True))
+        self.assertEqual(executor._arm_policy("preflight", "E", preflight["E"]), ("pi0", False))
+        formal = {row["arm"]: row for row in by_phase["heldout"] if row["owner_seed"] == 7510001}
+        self.assertEqual(executor._arm_policy("heldout", "P0", formal["P0"]), ("pi0", False))
+        for arm in ("P1", "R", "J"):
+            self.assertEqual(executor._arm_policy("heldout", arm, formal[arm]), ("pi4", False))
+        for block in range(4):
+            row = next(row for row in by_phase["training"] if row["block_index"] == block)
+            self.assertEqual(executor._arm_policy("training", "TRAIN", row), (f"pi{block}", False))
+
+    def test_preflight_proxy_load_checks_both_artifact_and_model_digest(self):
+        try:
+            model, digest, source = executor._load_model("pi-stage0-proxy", proxy=True)
+        except ModuleNotFoundError as exc:
+            if exc.name in {"numpy", "torch"}:
+                self.skipTest(f"pinned policy runtime dependency unavailable: {exc.name}")
+            raise
+        self.assertIsNotNone(model)
+        self.assertEqual(digest, "5d93c1c52582f9c493edda874764f14d8558d718088d3ca5886231a5c5b6688a")
+        self.assertEqual(source["source"], "P1_PREFLIGHT_PROXY_ONLY")
+        self.assertEqual(source["artifact_sha256"], "e4eea4fa34131dab2e697dbf59897734ce81dc4713a08c3a55cd89dec10c1416")
+        self.assertFalse(source["formal_use"])
+        proxy_path = STAGE1 / "preflight-proxy.json"
+        original_read_json = executor._read_json
+
+        def altered_proxy(path):
+            value = original_read_json(path)
+            if Path(path) == proxy_path:
+                value["policy_model_digest"] = "0" * 64
+            return value
+
+        with mock.patch.object(executor, "_read_json", side_effect=altered_proxy):
+            with self.assertRaises(PermissionError):
+                executor._load_model("pi-stage0-proxy", proxy=True)
+
+    def test_expert_is_constructed_only_for_the_isolated_e_arm(self):
+        row = next(row for row in executor._rows() if row["phase"] == "preflight" and row["arm"] == "E")
+        output_dir = executor.ARTIFACT_ROOT / "expert-output"
+        config = executor._read_json(STUDY / "config.json")
+
+        class ExpertOnlyRunner:
+            def _run_one(self, **kwargs):
+                self_test = kwargs
+                if self_test["arm"] != "E" or self_test["model"] is not None:
+                    raise AssertionError("Expert must be isolated from learned-policy actions")
+                return {
+                    "terminal": {
+                        "outcome": "heart_win", "terminal_floor": 4, "terminal_act": 4,
+                        "heart_victory": True, "act2_plus": True, "act3_plus": True, "act4_reached": True,
+                    },
+                    "completed_transitions": 12,
+                    "expert_decisions": 1,
+                    "cpu_seconds": 0.0,
+                    "wall_seconds": 0.0,
+                }
+
+        fake_runtime = types.SimpleNamespace(
+            initialize_native_runtime=lambda *args, **kwargs: (config, ExpertOnlyRunner(), object(), object()),
+        )
+        job = {"row": row, "phase": "preflight", "output_dir": str(output_dir), "run_id": row["unit_id"] + "-" + "f" * 16}
+        with mock.patch.dict(sys.modules, {"runtime": fake_runtime}):
+            result = executor._worker_owner(job, FakeLedger(unit_kind="owner_arm"))
+        self.assertEqual(result["policy_source"]["source"], "isolated_expert_reference")
+        self.assertEqual(result["expert_decisions"], 1)
+        self.assertEqual(result["policy_source"]["formal_use"], True)
+
+    def test_phase_rejects_a_missing_live_gate_before_creating_artifacts(self):
+        with (
+            mock.patch.object(executor.budget, "verify_stage1_package"),
+            mock.patch.object(
+                executor.budget,
+                "open_activated_stage1_ledger",
+                side_effect=PermissionError("no exact-source live activation"),
+            ) as open_ledger,
+        ):
+            with self.assertRaises(PermissionError):
+                executor.run_phase("preflight", output_dir=executor.ARTIFACT_ROOT)
+        open_ledger.assert_called_once()
+        self.assertFalse(executor.ARTIFACT_ROOT.exists())
+
+    def test_training_runs_all_128_owner_rows_before_each_block_update(self):
+        order = []
+        ledger = FakeLedger(unit_kind="owner_arm")
+
+        def run_owner(_ledger, row, *, phase, estimates):
+            self.assertEqual(phase, "train")
+            order.append(("owner", int(row["block_index"]), int(row["owner_seed"])))
+            return {"status": "SUCCEEDED", "unit_id": row["unit_id"]}
+
+        def update(_ledger, block, *, estimates):
+            order.append(("update", block, None))
+            path = executor.ARTIFACT_ROOT / "units" / f"UPDATE-{block}" / "result.json"
+            executor._write_once(path, {"model_checkpoint": {"block_index": block}})
+            return {"status": "SUCCEEDED", "unit_id": f"UPDATE:{block}"}
+
+        with (
+            mock.patch.object(executor, "_formal_forecast", return_value={
+                "preflight_report_sha256": "1" * 64, "cost_forecast_sha256": "2" * 64,
+            }),
+            mock.patch.object(executor, "_forecast_estimates", return_value=({}, {})),
+            mock.patch.object(executor, "_existing_unit_receipt", return_value=None),
+            mock.patch.object(executor, "_run_unit", side_effect=run_owner),
+            mock.patch.object(executor, "_all_units_succeeded", return_value=True),
+            mock.patch.object(executor, "_run_update_unit", side_effect=update),
+            mock.patch.object(executor, "_load_model", return_value=(None, "3" * 64, {"source": "pi4"})),
+        ):
+            report = executor._run_training(ledger)
+        self.assertEqual(report["status"], "TRAINING_COMPLETE")
+        self.assertEqual(report["formal_owner_count"], 512)
+        self.assertEqual(len(report["training_seed_ids"]), 512)
+        self.assertEqual([event for event in order if event[0] == "update"], [
+            ("update", 0, None), ("update", 1, None),
+            ("update", 2, None), ("update", 3, None),
+        ])
+        for block in range(4):
+            start = block * 129
+            block_events = order[start:start + 129]
+            self.assertEqual(len([event for event in block_events if event[0] == "owner"]), 128)
+            self.assertEqual(block_events[-1], ("update", block, None))
+
+    @unittest.skipIf(sys.platform == "win32", "the Stage 1 watchdog intentionally uses Linux /proc")
+    def test_watchdog_accounts_for_nested_child_cpu(self):
+        grandchild = "sum(i * i for i in range(8000000))"
+        child = f"import subprocess,sys; subprocess.run([sys.executable,'-B','-c',{grandchild!r}],check=True)"
+        temporary_paths = [executor.ARTIFACT_ROOT / name for name in ("tmp", "cache", "pycache")]
+        for path in temporary_paths:
+            path.mkdir(parents=True, exist_ok=True)
+        env = os.environ.copy()
+        env.update({
+            "TMPDIR": str(temporary_paths[0]), "TMP": str(temporary_paths[0]),
+            "TEMP": str(temporary_paths[0]), "XDG_CACHE_HOME": str(temporary_paths[1]),
+            "PYTHONPYCACHEPREFIX": str(temporary_paths[2]),
+        })
+        output = executor.ARTIFACT_ROOT / "nested-watchdog.log"
+        run = executor.budget.ProcessTreeWatchdog(poll_seconds=0.002).run(
+            [sys.executable, "-B", "-c", child],
+            reserved_cpu_seconds=5.0,
+            cwd=STUDY,
+            env=env,
+            stdout_path=output,
+        )
+        self.assertEqual(run.returncode, 0)
+        self.assertGreater(run.cpu_seconds, 0.05)
+
+    @unittest.skipIf(sys.platform == "win32", "the Stage 1 ledger uses Linux file locks")
+    def test_real_ledger_enforces_budget_and_exact_checkpoint_resume(self):
+        ledger = self._test_ledger()
+        first = "TRAIN:7500001-" + "a" * 16
+        digest = "c" * 64
+        self._reserve_test_unit(ledger, unit_id="TRAIN:7500001", run_id=first, cap=2.0, unit_kind="training_update")
+        ledger.finish(
+            run_id=first, measured_cpu_seconds=0.5, status="incomplete", checkpoint_sha256=digest,
+        )
+        with self.assertRaises(executor.budget.CheckpointMismatch):
+            self._reserve_test_unit(
+                ledger, unit_id="TRAIN:7500001", run_id="TRAIN:7500001-" + "b" * 16,
+                cap=2.0, unit_kind="training_update", previous_run_id="wrong", checkpoint_sha256=digest,
+            )
+        resumed = "TRAIN:7500001-" + "b" * 16
+        self._reserve_test_unit(
+            ledger, unit_id="TRAIN:7500001", run_id=resumed, cap=2.0,
+            unit_kind="training_update", previous_run_id=first, checkpoint_sha256=digest,
+        )
+        ledger.finish(run_id=resumed, measured_cpu_seconds=0.25, status="succeeded")
+        with self.assertRaises(executor.budget.DuplicateRun):
+            self._reserve_test_unit(ledger, unit_id="TRAIN:7500001", run_id="TRAIN:7500001-" + "d" * 16)
+
+        capped = self._test_ledger("capped-ledger")
+        self._reserve_test_unit(
+            capped, unit_id="CAP:1", run_id="CAP:1-" + "e" * 16,
+            cap=executor.budget.BUILDER_LIMIT,
+        )
+        with self.assertRaises(executor.budget.ResourceBlocked):
+            self._reserve_test_unit(capped, unit_id="CAP:2", run_id="CAP:2-" + "f" * 16, cap=0.1)
 
     def test_worker_accepts_only_the_exact_registered_owner_row(self):
         row = next(item for item in executor._rows() if item["phase"] == "preflight")

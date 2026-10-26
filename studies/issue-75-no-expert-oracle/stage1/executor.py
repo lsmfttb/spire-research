@@ -1137,7 +1137,15 @@ def _worker_owner(job: Mapping[str, Any], ledger: Any) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=True)
     model_label, proxy = _arm_policy(phase, arm, row)
     if arm == "E":
-        source_commit = str(_read_json(STAGE1 / "config.json")["source"]["stsr_source_commit"])
+        stage1_source = _read_json(STAGE1 / "config.json")["source"]
+        registered_source = stage1_source.get("registered_stage0_config")
+        if not isinstance(registered_source, Mapping):
+            raise PermissionError("isolated Expert reference lacks its locked Stage 0 source provenance")
+        source_commit = registered_source.get("stsr_source_commit")
+        if not isinstance(source_commit, str) or len(source_commit) != 40 or any(
+            char not in "0123456789abcdef" for char in source_commit
+        ):
+            raise PermissionError("isolated Expert reference has an invalid locked STSRL source commit")
         digest = _sha256(_canonical({"expert": "expert_non_combat_v1", "source": source_commit}))
         policy = None
         policy_source = {
