@@ -38,6 +38,9 @@ class FakeLedger:
             "checkpoint_sha256": None,
         }
 
+    def read_events(self):
+        return []
+
 
 class FakeReportLedger:
     def __init__(self):
@@ -420,6 +423,112 @@ class Stage1ExecutorTests(unittest.TestCase):
             self.assertIn(status, {"D", "M"})
             self.assertEqual(changed_path, "studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl")
 
+    def test_block0_phase_replacement_is_manifest_bound_and_append_only(self):
+        source_events = STAGE1 / "artifacts" / "ledger" / "events.jsonl"
+        with tempfile.TemporaryDirectory(dir=STAGE1) as temp:
+            root = Path(temp) / "artifacts"
+            ledger_dir = root / "ledger"
+            ledger_dir.mkdir(parents=True)
+            shutil.copy2(source_events, ledger_dir / "events.jsonl")
+            manifest = json.loads((STAGE1 / "block0-repair-lineage.json").read_text())
+            for item in manifest["owners"]:
+                source = STAGE1 / "artifacts" / "units" / item["unit_id"].replace(":", "-") / "result.json"
+                target = root / "units" / item["unit_id"].replace(":", "-") / "result.json"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            binding = ("c" * 40, "d" * 64)
+            with mock.patch.object(executor.budget, "_current_package_binding", return_value=binding):
+                ledger = executor.budget.Stage1Ledger(ledger_dir)
+                owner = manifest["owners"][0]
+                info = ledger.block0_phase_repair_info(unit_id=owner["unit_id"])
+                self.assertEqual(info["repair_predecessor_run_id"], owner["replacement_predecessor_run_id"])
+                run_id = owner["unit_id"] + "-" + "9" * 16
+                reservation = ledger.reserve(
+                    run_id=run_id, unit_id=owner["unit_id"], role="builder",
+                    reserved_cpu_seconds=info["reserved_cpu_seconds"], unit_kind="owner_arm",
+                    repair_reason=info["repair_reason"],
+                    repair_manifest_sha256=info["repair_manifest_sha256"],
+                    repair_predecessor_run_id=info["repair_predecessor_run_id"],
+                    repair_predecessor_receipt_sha256=info["repair_predecessor_receipt_sha256"],
+                )
+                self.assertEqual(reservation["repair_reason"], executor.budget.BLOCK0_PHASE_REPAIR_REASON)
+                ledger.require_open_reservation(run_id=run_id, unit_id=owner["unit_id"])
+                with self.assertRaises(executor.budget.ResourceBlocked):
+                    ledger.block0_phase_repair_info(unit_id=owner["unit_id"])
+                with self.assertRaises(executor.budget.ResourceBlocked):
+                    ledger.reserve(
+                        run_id=owner["unit_id"] + "-" + "8" * 16,
+                        unit_id=owner["unit_id"], role="builder",
+                        reserved_cpu_seconds=info["reserved_cpu_seconds"], unit_kind="owner_arm",
+                        repair_reason=info["repair_reason"],
+                        repair_manifest_sha256=info["repair_manifest_sha256"],
+                        repair_predecessor_run_id=info["repair_predecessor_run_id"],
+                        repair_predecessor_receipt_sha256=info["repair_predecessor_receipt_sha256"],
+                    )
+
+    def test_next_training_reservation_advances_past_completed_block0_replacement(self):
+        rows = [row for row in executor._unit_rows("train") if row["block_index"] == 0]
+        first, second = rows[:2]
+        first_history_length = executor._block0_manifest_history_length(first["unit_id"])
+        second_history_length = executor._block0_manifest_history_length(second["unit_id"])
+        replacement_run_id = first["unit_id"] + "-" + "9" * 16
+        units = {
+            first["unit_id"]: [f"old-{index}" for index in range(first_history_length)] + [replacement_run_id],
+            second["unit_id"]: [f"old-{index}" for index in range(second_history_length)],
+        }
+        runs = {replacement_run_id: {"finish": {"status": "succeeded"}}}
+        ledger = mock.Mock()
+        estimates = {first["unit_id"]: 1.0, second["unit_id"]: 2.0}
+        with mock.patch.object(executor, "_event_state", return_value=(runs, units)):
+            next_unit, next_cap = executor._next_training_reservation(ledger, estimates)
+        self.assertEqual((next_unit, next_cap), (second["unit_id"], 2.0))
+        ledger.validate_block0_phase_repair_state.assert_called_once_with()
+        ledger.block0_phase_repair_info.assert_called_once_with(unit_id=second["unit_id"])
+
+    def test_update0_retry_requires_completed_replacements_and_preserves_single_use(self):
+        source_events = STAGE1 / "artifacts" / "ledger" / "events.jsonl"
+        events = executor.budget._events(source_events)
+        runs, units = executor.budget._state(events)
+        with self.assertRaises(executor.budget.ResourceBlocked):
+            executor.budget._validate_update0_retry_state(
+                STAGE1 / "artifacts", runs, units, ("a" * 40, "b" * 64),
+            )
+
+        manifest_path = STAGE1 / "block0-repair-lineage.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        update = manifest["update_retry"]
+        predecessor = update["failed_predecessor_run_id"]
+        retry_unit = update["unit_id"]
+        cap = float(update["replacement_reservation_cpu_seconds"])
+        info = {
+            "repair_reason": executor.budget.UPDATE0_RETRY_REASON,
+            "repair_manifest_sha256": executor.budget.sha256_bytes(manifest_path.read_bytes()),
+            "repair_predecessor_run_id": predecessor,
+            "repair_predecessor_receipt_sha256": update["failure_receipt_sha256"],
+            "reserved_cpu_seconds": cap,
+        }
+        ledger = self._test_ledger("update-retry-ledger")
+        ledger.directory.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_events, ledger.events_path)
+        self.assertEqual(executor.budget._state(ledger.read_events())[1][retry_unit], [predecessor])
+        run_id = retry_unit + "-" + "a" * 16
+        with mock.patch.object(ledger, "update0_retry_info", return_value=info):
+            reservation = ledger.reserve(
+                run_id=run_id, unit_id=retry_unit, role="builder",
+                reserved_cpu_seconds=cap, unit_kind="training_update",
+                previous_run_id=predecessor, checkpoint_sha256=None,
+                repair_reason=info["repair_reason"],
+                repair_manifest_sha256=info["repair_manifest_sha256"],
+                repair_predecessor_run_id=info["repair_predecessor_run_id"],
+                repair_predecessor_receipt_sha256=info["repair_predecessor_receipt_sha256"],
+            )
+        self.assertEqual(reservation["repair_reason"], info["repair_reason"])
+        self.assertEqual(reservation["previous_run_id"], predecessor)
+        self.assertEqual(reservation["checkpoint_sha256"], None)
+        ledger.finish(run_id=run_id, measured_cpu_seconds=0.1, status="failed")
+        with mock.patch.object(ledger, "validate_update0_retry_state", return_value=info):
+            with self.assertRaises(executor.budget.ResourceBlocked):
+                ledger.update0_retry_info()
     def test_pre_game_start_retry_is_single_exact_row_and_rejects_game_artifacts(self):
         ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
         events = ledger.read_events()
@@ -1106,6 +1215,111 @@ class Stage1ExecutorTests(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 executor._worker_main(job_path)
             worker.assert_not_called()
+
+    def test_training_batch_dispatches_canonical_phase_and_run_scoped_paths(self):
+        row = next(item for item in executor._unit_rows("train") if item["block_index"] == 0)
+        binding = types.SimpleNamespace(package_commit="a" * 40, source_lock_sha256="b" * 64)
+        ledger = mock.Mock()
+        ledger.binding = binding
+        reservations = {}
+
+        def reserve_many(specs):
+            result = []
+            for spec in specs:
+                event = {
+                    **spec,
+                    "event": "reserve",
+                    "schema_id": "issue75-stage1-budget-event-v2",
+                    "role": "builder",
+                    "unit_kind": "owner_arm",
+                    "retry_reason": None,
+                    "pre_game_start_proof": None,
+                    "pre_game_start_proof_sha256": None,
+                    "package_commit": binding.package_commit,
+                    "source_lock_sha256": binding.source_lock_sha256,
+                }
+                reservations[event["run_id"]] = event
+                result.append(event)
+            return result
+
+        ledger.reserve_many.side_effect = reserve_many
+        ledger.require_open_reservation.side_effect = lambda *, run_id, unit_id: reservations[run_id]
+        captured = []
+
+        def validate_then_stop(items):
+            for item in items:
+                raw_job = executor._read_json(item["job_path"])
+                try:
+                    job, child_ledger, reservation = executor._validate_worker_job(item["job_path"])
+                except Exception as exc:
+                    raise AssertionError(f"job validation failed for {raw_job!r}: {exc}") from exc
+                self.assertIs(child_ledger, ledger)
+                self.assertEqual(reservation, reservations[item["run_id"]])
+                captured.append(job)
+            return {
+                item["run_id"]: {
+                    "status": "SUPERVISOR_FAILED", "measured_cpu_seconds": 0.1,
+                    "boundary": "focused_test_stop_before_native_game",
+                }
+                for item in items
+            }
+
+        with (
+            mock.patch.object(executor, "_existing_unit_receipt", return_value=None),
+            mock.patch.object(executor, "_existing_unit", return_value=(None, None, None)),
+            mock.patch.object(executor.budget, "verify_stage1_package"),
+            mock.patch.object(executor.budget, "open_reserved_stage1_worker_ledger", return_value=ledger),
+            mock.patch.object(executor, "_finish_failed_unit"),
+            mock.patch.object(executor, "_supervise_batch", side_effect=validate_then_stop),
+        ):
+            with self.assertRaises(executor.budget.ResourceBlocked):
+                executor._run_owner_batch(
+                    ledger, [row], phase="train", estimates={row["unit_id"]: 2.0},
+                )
+        self.assertEqual(len(captured), 1)
+        job = captured[0]
+        self.assertEqual(job["phase"], "training")
+        self.assertEqual(job["row"], row)
+        run_directory = executor._run_artifact_directory(row["unit_id"], job["run_id"])
+        self.assertEqual(Path(job["output_dir"]), run_directory / "native")
+        self.assertEqual(Path(job["result_path"]), run_directory / "result.json")
+        self.assertFalse((run_directory / "native").exists())
+
+    def test_formal_worker_phase_is_canonical_and_matches_registered_row(self):
+        row = next(item for item in executor._unit_rows("train") if item["block_index"] == 0)
+        self.assertEqual(executor._worker_phase("train", row), "training")
+        unit_id = row["unit_id"]
+        run_id = unit_id + "-" + "f" * 16
+        ledger = FakeLedger(unit_kind="owner_arm")
+        unit_directory = executor._unit_directory(unit_id)
+        run_directory = executor._run_artifact_directory(unit_id, run_id)
+        job_path = unit_directory / f"worker-job-{run_id}.json"
+        job_path.parent.mkdir(parents=True, exist_ok=True)
+        job = {
+            "schema_id": executor.WORKER_SCHEMA,
+            "package_commit": ledger.binding.package_commit,
+            "source_lock_sha256": ledger.binding.source_lock_sha256,
+            "run_id": run_id,
+            "unit_id": unit_id,
+            "phase": "training",
+            "row": row,
+            "output_dir": str(run_directory / "native"),
+            "result_path": str(run_directory / "result.json"),
+            "previous_run_id": None,
+            "checkpoint_sha256": None,
+        }
+        job_path.write_text(json.dumps(job), encoding="utf-8")
+        with (
+            mock.patch.object(executor.budget, "verify_stage1_package"),
+            mock.patch.object(executor.budget, "open_reserved_stage1_worker_ledger", return_value=ledger),
+        ):
+            self.assertEqual(executor._validate_worker_job(job_path)[0]["phase"], "training")
+            job["phase"] = "train"
+            job_path.write_text(json.dumps(job), encoding="utf-8")
+            with self.assertRaises(PermissionError):
+                executor._validate_worker_job(job_path)
+        with self.assertRaises(PermissionError):
+            executor._worker_phase("evaluate", row)
 
     def test_update_worker_is_bound_to_its_exact_block_and_result_path(self):
         unit_id = "UPDATE:0"

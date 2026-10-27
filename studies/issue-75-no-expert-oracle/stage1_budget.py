@@ -47,6 +47,7 @@ LOCKED_PACKAGE_FILES = (
     "stage1/executor.py",
     "stage1/test_activation.py",
     "stage1/test_executor.py",
+    "stage1/block0-repair-lineage.json",
 )
 LOCKED_REPOSITORY_DEPENDENCIES = (
     "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
@@ -184,7 +185,13 @@ def verify_stage1_package() -> dict[str, Any]:
 
 
 def verify_stage1_phase(phase: str) -> None:
-    """Refuse any phase not explicitly enabled by the locked Stage 1 package."""
+    """Refuse any phase not explicitly enabled by the locked Stage 1 package.
+
+    Owner jobs use canonical seed-table phases internally. CLI phase names remain
+    the registered short aliases so launcher behavior and the scientific roster
+    are unchanged.
+    """
+    phase = {"training": "train", "heldout": "evaluate"}.get(phase, phase)
     if phase not in {"preflight", "train", "evaluate", "update"}:
         raise ValueError(f"unknown Stage 1 phase: {phase}")
     config = json.loads((STAGE1 / "config.json").read_text(encoding="utf-8"))
@@ -377,6 +384,248 @@ SCHEDULER_TRAIN_RECOVERY_RUN_ID = "SCHEDULER:TRAIN-3e416101548944b3"
 SCHEDULER_TRAIN_RECOVERY_RESERVED_AT_NS = 1793049822021316152
 SCHEDULER_TRAIN_RECOVERY_CAP = 120.0
 SCHEDULER_RECOVERY_EXIT_MARGIN_SECONDS = 1.0
+BLOCK0_PHASE_REPAIR_REASON = "BLOCK0_PHASE_MISMATCH_INTERVENTION_NOT_DELIVERED"
+UPDATE0_RETRY_REASON = "UPDATE0_FAILED_BEFORE_OPTIMIZER"
+BLOCK0_ORIGINAL_PACKAGE_COMMIT = "482c5b3b87e38066c8738d6f102906f965b9d0ae"
+BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256 = "ed54abb587d28661968544cbca31eabfb4dc8fad77696bcf726911b06fc01735"
+BLOCK0_REPAIR_OWNER_RANGE = (7_500_001, 7_500_128)
+
+
+def _load_block0_repair_manifest(artifacts_root: Path) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
+    path = STAGE1 / "block0-repair-lineage.json"
+    raw = path.read_bytes()
+    manifest = json.loads(raw)
+    owners = manifest.get("owners")
+    expected_seeds = list(range(*BLOCK0_REPAIR_OWNER_RANGE[:1], BLOCK0_REPAIR_OWNER_RANGE[1] + 1))
+    if (
+        manifest.get("schema_id") != "issue75-block0-intervention-repair-lineage-v1"
+        or manifest.get("study_id") != "issue-75-no-expert-oracle"
+        or manifest.get("scope") != "STUDY_ONLY"
+        or manifest.get("block_index") != 0
+        or manifest.get("registered_training_phase") != "training"
+        or manifest.get("original_dispatched_worker_phase") != "train"
+        or manifest.get("cause") != "UNIFORM_PHASE_MISMATCH_INTERVENTION_NOT_DELIVERED"
+        or manifest.get("planner_disposition_comment_id") != 6431275271
+        or manifest.get("owner_seed_range") != list(BLOCK0_REPAIR_OWNER_RANGE)
+        or manifest.get("registered_owner_count") != 128
+        or manifest.get("replace_every_registered_owner_once") is not True
+        or manifest.get("required_treatment") != "J search with captured training features; old results remain immutable and excluded from training"
+        or not isinstance(owners, list) or len(owners) != 128
+        or [item.get("owner_seed") for item in owners] != expected_seeds
+    ):
+        raise ResourceBlocked("the locked block-0 lineage manifest does not match the single authorized repair")
+    by_unit = {}
+    for item in owners:
+        seed = int(item["owner_seed"])
+        unit_id = f"TRAIN:{seed}"
+        history = item.get("history")
+        if (
+            item.get("unit_id") != unit_id
+            or not isinstance(history, list) or not history
+            or item.get("replacement_predecessor_run_id") != history[-1].get("run_id")
+            or item.get("replacement_predecessor_result_sha256") != history[-1].get("result_sha256")
+            or not isinstance(item.get("replacement_reservation_cpu_seconds"), (int, float))
+            or not 0 < float(item["replacement_reservation_cpu_seconds"]) <= BUILDER_LIMIT
+        ):
+            raise ResourceBlocked("the block-0 lineage row is malformed")
+        by_unit[unit_id] = item
+    return manifest, sha256_bytes(raw), by_unit
+
+
+def _validate_block0_originals(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]],
+) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
+    manifest, manifest_sha, by_unit = _load_block0_repair_manifest(artifacts_root)
+    common_model_digest = None
+    for unit_id, item in by_unit.items():
+        expected_history = item["history"]
+        actual_history = list(units.get(unit_id, ()))
+        expected_ids = [record["run_id"] for record in expected_history]
+        if actual_history[:len(expected_ids)] != expected_ids or len(actual_history) not in {
+            len(expected_ids), len(expected_ids) + 1,
+        }:
+            raise ResourceBlocked(f"original block-0 lineage changed or has more than one replacement: {unit_id}")
+        for expected in expected_history:
+            run = runs.get(expected["run_id"])
+            if not isinstance(run, Mapping):
+                raise ResourceBlocked(f"original block-0 owner reservation is missing: {unit_id}")
+            reservation, finish = run.get("reservation"), run.get("finish")
+            if (
+                not isinstance(reservation, Mapping)
+                or reservation.get("unit_id") != unit_id
+                or reservation.get("unit_kind") != "owner_arm"
+                or reservation.get("role") != "builder"
+                or reservation.get("package_commit") != expected.get("package_commit")
+                or reservation.get("source_lock_sha256") != expected.get("source_lock_sha256")
+                or not isinstance(finish, Mapping)
+                or finish.get("status") != expected.get("status")
+                or finish.get("result_sha256") != expected.get("result_sha256")
+            ):
+                raise ResourceBlocked(f"original block-0 owner receipt changed: {unit_id}")
+        final = expected_history[-1]
+        if (
+            final.get("status") != "succeeded"
+            or final.get("package_commit") != BLOCK0_ORIGINAL_PACKAGE_COMMIT
+            or final.get("source_lock_sha256") != BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256
+            or not isinstance(final.get("result_sha256"), str)
+        ):
+            raise ResourceBlocked(f"original block-0 owner lacks the reviewed successful source binding: {unit_id}")
+        result_path = Path(artifacts_root) / "units" / unit_id.replace(":", "-") / "result.json"
+        try:
+            result_bytes = result_path.read_bytes()
+            result = json.loads(result_bytes)
+        except (OSError, ValueError) as exc:
+            raise ResourceBlocked(f"original immutable block-0 result is unavailable: {unit_id}") from exc
+        if (
+            sha256_bytes(result_bytes) != final["result_sha256"]
+            or result.get("status") != "SUCCEEDED"
+            or result.get("unit_id") != unit_id
+            or result.get("phase") != "train"
+            or result.get("formal") is not True
+            or result.get("arm") != "TRAIN"
+            or result.get("owner_seed") != item["owner_seed"]
+            or result.get("package_commit") != BLOCK0_ORIGINAL_PACKAGE_COMMIT
+            or result.get("source_lock_sha256") != BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256
+            or result.get("search") != []
+            or result.get("training_features") is not None
+            or result.get("expert_decisions") != 0
+        ):
+            raise ResourceBlocked(f"original block-0 row does not show the uniform missing intervention: {unit_id}")
+        model_digest = result.get("model_digest")
+        if not isinstance(model_digest, str) or (common_model_digest is not None and model_digest != common_model_digest):
+            raise ResourceBlocked("block-0 original receipts do not share the same initial model digest")
+        common_model_digest = model_digest
+        added = actual_history[len(expected_ids):]
+        if added:
+            run_id = added[0]
+            run = runs.get(run_id)
+            reservation = None if not isinstance(run, Mapping) else run.get("reservation")
+            if (
+                not isinstance(reservation, Mapping)
+                or reservation.get("repair_reason") != BLOCK0_PHASE_REPAIR_REASON
+                or reservation.get("repair_manifest_sha256") != manifest_sha
+                or reservation.get("repair_predecessor_run_id") != expected_ids[-1]
+                or reservation.get("repair_predecessor_receipt_sha256") != final["result_sha256"]
+                or reservation.get("package_commit") is None
+                or reservation.get("source_lock_sha256") is None
+            ):
+                raise ResourceBlocked(f"block-0 replacement is not the single manifest-bound attempt: {unit_id}")
+    update = manifest.get("update_retry")
+    if (
+        not isinstance(update, Mapping)
+        or update.get("unit_id") != "UPDATE:0"
+        or update.get("failed_predecessor_run_id") != "UPDATE:0-8c7ee939e4924cc6"
+        or update.get("retry_once_after_all_replacements") is not True
+        or update.get("failed_before_optimizer") is not True
+        or update.get("no_model_checkpoint") is not True
+    ):
+        raise ResourceBlocked("the block-0 optimizer retry record is malformed")
+    return manifest, manifest_sha, by_unit
+
+
+def _validate_update0_retry_state(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]], current_binding: tuple[str, str],
+) -> tuple[dict[str, Any], str]:
+    manifest, manifest_sha, by_unit = _validate_block0_originals(artifacts_root, runs, units)
+    update = manifest["update_retry"]
+    for unit_id, owner in by_unit.items():
+        expected = [entry["run_id"] for entry in owner["history"]]
+        history = list(units.get(unit_id, ()))
+        if len(history) != len(expected) + 1 or history[:len(expected)] != expected:
+            raise ResourceBlocked(f"all original block-0 owners must have exactly one replacement before UPDATE:0: {unit_id}")
+        replacement = runs[history[-1]]
+        reservation, finish = replacement["reservation"], replacement["finish"]
+        if (
+            reservation.get("repair_reason") != BLOCK0_PHASE_REPAIR_REASON
+            or reservation.get("repair_manifest_sha256") != manifest_sha
+            or finish is None or finish.get("status") != "succeeded"
+        ):
+            raise ResourceBlocked(f"UPDATE:0 retry requires completed block-0 replacements: {unit_id}")
+
+    unit_id = str(update["unit_id"])
+    predecessor = str(update["failed_predecessor_run_id"])
+    history = list(units.get(unit_id, ()))
+    if not history or history[0] != predecessor:
+        raise ResourceBlocked("UPDATE:0 no longer has its exact reviewed failed predecessor")
+    original = runs[predecessor]
+    reservation, finish = original["reservation"], original["finish"]
+    expected_reserved = float(update["failed_predecessor_reservation_cpu_seconds"])
+    expected_measured = float(update["failed_predecessor_measured_cpu_seconds"])
+    if (
+        reservation.get("unit_id") != unit_id
+        or reservation.get("unit_kind") != "training_update"
+        or reservation.get("role") != "builder"
+        or reservation.get("package_commit") != BLOCK0_ORIGINAL_PACKAGE_COMMIT
+        or reservation.get("source_lock_sha256") != BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256
+        or reservation.get("reserved_cpu_seconds") != expected_reserved
+        or finish is None or finish.get("status") != "failed"
+        or finish.get("measured_cpu_seconds") != expected_measured
+        or finish.get("checkpoint_sha256") is not None or finish.get("result_sha256") is not None
+    ):
+        raise ResourceBlocked("original UPDATE:0 failure differs from the immutable pre-optimizer record")
+    for relative, digest_key in (
+        (update["failure_receipt_path"], "failure_receipt_sha256"),
+        (update["worker_job_path"], "worker_job_sha256"),
+        (update["worker_log_path"], "worker_log_sha256"),
+    ):
+        try:
+            digest = sha256_bytes((Path(artifacts_root) / relative).read_bytes())
+        except OSError as exc:
+            raise ResourceBlocked("original UPDATE:0 failure evidence is unavailable") from exc
+        if digest != update[digest_key]:
+            raise ResourceBlocked("original UPDATE:0 failure evidence changed after registration")
+    failure = json.loads((Path(artifacts_root) / update["failure_receipt_path"]).read_text())
+    job = json.loads((Path(artifacts_root) / update["worker_job_path"]).read_text())
+    if (
+        failure.get("unit_id") != unit_id or failure.get("run_id") != predecessor
+        or failure.get("status") != "FAILED" or failure.get("checkpoint_sha256") is not None
+        or failure.get("measured_cpu_seconds") != expected_measured
+        or failure.get("reserved_cpu_seconds") != expected_reserved
+        or job.get("unit_id") != unit_id or job.get("run_id") != predecessor
+        or job.get("phase") != "update"
+        or job.get("package_commit") != BLOCK0_ORIGINAL_PACKAGE_COMMIT
+        or job.get("source_lock_sha256") != BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256
+        or job.get("previous_run_id") is not None or job.get("checkpoint_sha256") is not None
+    ):
+        raise ResourceBlocked("original UPDATE:0 artifacts do not prove a pre-optimizer failure")
+    for name in ("pi1.pt", "block-0-step.pt"):
+        if (Path(artifacts_root) / "models" / name).exists():
+            raise ResourceBlocked("UPDATE:0 now has a checkpoint and is not eligible for the single retry")
+    info = {
+        "repair_reason": UPDATE0_RETRY_REASON,
+        "repair_manifest_sha256": manifest_sha,
+        "repair_predecessor_run_id": predecessor,
+        "repair_predecessor_receipt_sha256": str(update["failure_receipt_sha256"]),
+        "reserved_cpu_seconds": float(update["replacement_reservation_cpu_seconds"]),
+    }
+    previous = predecessor
+    for index, run_id in enumerate(history[1:]):
+        run = runs[run_id]
+        retry, terminal = run["reservation"], run["finish"]
+        first = index == 0
+        if (
+            retry.get("repair_reason") != info["repair_reason"]
+            or retry.get("repair_manifest_sha256") != manifest_sha
+            or retry.get("repair_predecessor_run_id") != predecessor
+            or retry.get("repair_predecessor_receipt_sha256") != info["repair_predecessor_receipt_sha256"]
+            or retry.get("package_commit") != current_binding[0]
+            or retry.get("source_lock_sha256") != current_binding[1]
+            or retry.get("unit_kind") != "training_update" or retry.get("role") != "builder"
+            or float(retry.get("reserved_cpu_seconds", info["reserved_cpu_seconds"] + 1)) > info["reserved_cpu_seconds"]
+            or retry.get("previous_run_id") != previous
+            or (first and retry.get("checkpoint_sha256") is not None)
+            or (not first and (
+                runs[previous]["finish"] is None
+                or runs[previous]["finish"].get("status") != "incomplete"
+                or retry.get("checkpoint_sha256") != runs[previous]["finish"].get("checkpoint_sha256")
+            ))
+            or (terminal is not None and terminal.get("status") not in {"succeeded", "incomplete", "failed"})
+        ):
+            raise ResourceBlocked("UPDATE:0 retry/resume chain differs from its exact repair lineage")
+        previous = run_id
+    return info, manifest_sha
 
 
 def _pre_game_start_failure_proof(
@@ -621,8 +870,35 @@ class Stage1Ledger:
             _validate_pre_game_start_retry_reservation(
                 reservation, runs, units, self.directory.parent, require_pristine=True,
             )
+        elif reservation.get("repair_reason") == BLOCK0_PHASE_REPAIR_REASON:
+            manifest, manifest_sha, by_unit = _validate_block0_originals(
+                self.directory.parent, runs, units,
+            )
+            owner = by_unit.get(str(unit_id))
+            original_ids = [] if owner is None else [entry["run_id"] for entry in owner["history"]]
+            if (
+                owner is None or list(units.get(str(unit_id), ())) != original_ids + [str(run_id)]
+                or reservation.get("repair_manifest_sha256") != manifest_sha
+                or reservation.get("repair_predecessor_run_id") != original_ids[-1]
+                or reservation.get("repair_predecessor_receipt_sha256") != owner["replacement_predecessor_result_sha256"]
+                or reservation.get("package_commit") != self.binding.package_commit
+                or reservation.get("source_lock_sha256") != self.binding.source_lock_sha256
+                or reservation.get("unit_kind") != "owner_arm" or reservation.get("role") != "builder"
+                or reservation.get("previous_run_id") is not None
+                or reservation.get("checkpoint_sha256") is not None
+            ):
+                raise PermissionError("owner worker reservation differs from its authorized block-0 replacement")
+        elif reservation.get("repair_reason") == UPDATE0_RETRY_REASON:
+            info = self.validate_update0_retry_state()
+            if any(reservation.get(key) != info.get(key) for key in (
+                "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
+                "repair_predecessor_receipt_sha256",
+            )) or reservation.get("package_commit") != self.binding.package_commit or reservation.get("source_lock_sha256") != self.binding.source_lock_sha256:
+                raise PermissionError("UPDATE:0 worker reservation differs from the one-time failure-repair lineage")
         elif any(reservation.get(key) is not None for key in (
             "retry_reason", "pre_game_start_proof", "pre_game_start_proof_sha256",
+            "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
+            "repair_predecessor_receipt_sha256",
         )):
             raise PermissionError("worker reservation contains an unrecognized retry claim")
         return dict(reservation)
@@ -638,6 +914,47 @@ class Stage1Ledger:
             self.directory.parent, runs, units, predecessor_run_id=predecessor_run_id,
             require_pristine=True,
         )
+
+    def validate_block0_phase_repair_state(self) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
+        """Validate all original and any single append-only replacement receipts."""
+        runs, units = _state(_events(self.events_path))
+        return _validate_block0_originals(self.directory.parent, runs, units)
+
+    def block0_phase_repair_info(self, *, unit_id: str) -> dict[str, Any]:
+        """Return the exact one-time replacement lineage for a missing block-0 intervention."""
+        runs, units = _state(_events(self.events_path))
+        manifest, manifest_sha, by_unit = _validate_block0_originals(
+            self.directory.parent, runs, units,
+        )
+        owner = by_unit.get(unit_id)
+        if owner is None:
+            raise ResourceBlocked("no block-0 intervention replacement is registered for this owner")
+        original_ids = [entry["run_id"] for entry in owner["history"]]
+        if list(units.get(unit_id, ())) != original_ids:
+            raise ResourceBlocked("this registered block-0 owner already has its one replacement reservation")
+        return {
+            "repair_reason": BLOCK0_PHASE_REPAIR_REASON,
+            "repair_manifest_sha256": manifest_sha,
+            "repair_predecessor_run_id": original_ids[-1],
+            "repair_predecessor_receipt_sha256": owner["replacement_predecessor_result_sha256"],
+            "reserved_cpu_seconds": float(owner["replacement_reservation_cpu_seconds"]),
+            "scope": manifest["scope"],
+        }
+
+    def validate_update0_retry_state(self) -> dict[str, Any]:
+        runs, units = _state(_events(self.events_path))
+        info, manifest_sha = _validate_update0_retry_state(
+            self.directory.parent, runs, units,
+            (self.binding.package_commit, self.binding.source_lock_sha256),
+        )
+        return {**info, "repair_manifest_sha256": manifest_sha}
+
+    def update0_retry_info(self) -> dict[str, Any]:
+        info = self.validate_update0_retry_state()
+        runs, units = _state(_events(self.events_path))
+        if list(units.get("UPDATE:0", ())) != [info["repair_predecessor_run_id"]]:
+            raise ResourceBlocked("the single UPDATE:0 retry has already been reserved")
+        return info
 
     def recover_open_training_scheduler(self) -> dict[str, Any]:
         """Mark and reuse the exact original 120 CPU-s allocation once, without a second reserve."""
@@ -675,7 +992,11 @@ class Stage1Ledger:
                            previous_run_id: str | None = None,
                            checkpoint_sha256: str | None = None,
                            retry_reason: str | None = None,
-                           pre_game_start_proof: Mapping[str, Any] | None = None):
+                           pre_game_start_proof: Mapping[str, Any] | None = None,
+                           repair_reason: str | None = None,
+                           repair_manifest_sha256: str | None = None,
+                           repair_predecessor_run_id: str | None = None,
+                           repair_predecessor_receipt_sha256: str | None = None):
         cap = float(reserved_cpu_seconds)
         if role not in {"builder", "reviewer"} or not run_id or not unit_id or not math.isfinite(cap) or cap <= 0:
             raise ValueError("invalid run, unit, role, or CPU reservation")
@@ -688,6 +1009,12 @@ class Stage1Ledger:
             len(checkpoint_sha256) != 64 or any(c not in "0123456789abcdef" for c in checkpoint_sha256)
         ):
             raise ValueError("invalid checkpoint digest")
+        repair_fields = {
+            "repair_reason": repair_reason,
+            "repair_manifest_sha256": repair_manifest_sha256,
+            "repair_predecessor_run_id": repair_predecessor_run_id,
+            "repair_predecessor_receipt_sha256": repair_predecessor_receipt_sha256,
+        }
         runs, units = _state(rows)
         if run_id in runs:
             raise DuplicateRun(run_id)
@@ -700,6 +1027,27 @@ class Stage1Ledger:
             if done.get("status") == "incomplete":
                 if retry_reason is not None or pre_game_start_proof is not None:
                     raise CheckpointMismatch("checkpoint resume cannot claim the pre-game-start exception")
+                if last["reservation"].get("repair_reason") == UPDATE0_RETRY_REASON:
+                    info = self.validate_update0_retry_state()
+                    if any(
+                        last["reservation"].get(key) != info.get(key)
+                        for key in (
+                            "repair_reason", "repair_manifest_sha256",
+                            "repair_predecessor_run_id", "repair_predecessor_receipt_sha256",
+                        )
+                    ) or any(
+                        repair_fields.get(key) != info.get(key)
+                        for key in (
+                            "repair_reason", "repair_manifest_sha256",
+                            "repair_predecessor_run_id", "repair_predecessor_receipt_sha256",
+                        )
+                    ):
+                        raise CheckpointMismatch("UPDATE:0 checkpoint resume changed its original failure lineage")
+                elif any(value is not None for value in (
+                    repair_reason, repair_manifest_sha256, repair_predecessor_run_id,
+                    repair_predecessor_receipt_sha256,
+                )):
+                    raise CheckpointMismatch("checkpoint resume carries unregistered repair metadata")
                 if float(done.get("measured_cpu_seconds", 0.0)) > float(done.get("reserved_cpu_seconds", 0.0)):
                     raise ResourceBlocked("an incomplete unit exceeded its immutable reservation and cannot be resumed")
                 if (previous_run_id != history[-1] or not done.get("checkpoint_sha256")
@@ -707,24 +1055,61 @@ class Stage1Ledger:
                         or role != last["reservation"]["role"]):
                     raise CheckpointMismatch("resume needs the exact prior incomplete run and checkpoint digest")
             elif done.get("status") == "failed":
-                if history != [PRE_GAME_START_RETRY_RUN_ID] or unit_id != PRE_GAME_START_RETRY_UNIT_ID:
+                if unit_id == "UPDATE:0" and repair_reason == UPDATE0_RETRY_REASON:
+                    info = self.update0_retry_info()
+                    if (
+                        previous_run_id != info["repair_predecessor_run_id"]
+                        or checkpoint_sha256 is not None
+                        or repair_manifest_sha256 != info["repair_manifest_sha256"]
+                        or repair_predecessor_run_id != info["repair_predecessor_run_id"]
+                        or repair_predecessor_receipt_sha256 != info["repair_predecessor_receipt_sha256"]
+                        or retry_reason is not None or pre_game_start_proof is not None
+                        or unit_kind != "training_update" or role != "builder"
+                        or cap > info["reserved_cpu_seconds"]
+                    ):
+                        raise ResourceBlocked("UPDATE:0 retry differs from its exact registered repair cap/lineage")
+                elif history == [PRE_GAME_START_RETRY_RUN_ID] and unit_id == PRE_GAME_START_RETRY_UNIT_ID:
+                    if previous_run_id != PRE_GAME_START_RETRY_RUN_ID or checkpoint_sha256 is not None:
+                        raise ResourceBlocked("the one-row exception must link its exact failed predecessor")
+                    if retry_reason != PRE_GAME_START_RETRY_REASON:
+                        raise ResourceBlocked("failed owner row lacks the explicit pre-game-start failure reason")
+                    proof = _pre_game_start_failure_proof(
+                        self.directory.parent, runs, units, predecessor_run_id=previous_run_id,
+                        require_pristine=True,
+                    )
+                    if pre_game_start_proof != proof:
+                        raise ResourceBlocked("retry proof differs from the verified original failure evidence")
+                    if unit_kind != "owner_arm" or role != "builder" or cap > PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS:
+                        raise ResourceBlocked("pre-game-start retry changed the registered owner row or CPU ceiling")
+                else:
                     raise ResourceBlocked(f"failed unit is immutable and cannot be replayed: {unit_id}")
-                if previous_run_id != PRE_GAME_START_RETRY_RUN_ID or checkpoint_sha256 is not None:
-                    raise ResourceBlocked("the one-row exception must link its exact failed predecessor")
-                if retry_reason != PRE_GAME_START_RETRY_REASON:
-                    raise ResourceBlocked("failed owner row lacks the explicit pre-game-start failure reason")
-                proof = _pre_game_start_failure_proof(
-                    self.directory.parent, runs, units, predecessor_run_id=previous_run_id,
-                    require_pristine=True,
+            elif done.get("status") == "succeeded":
+                if not unit_id.startswith("TRAIN:") or repair_reason != BLOCK0_PHASE_REPAIR_REASON:
+                    raise DuplicateRun(f"terminal unit cannot be replayed: {unit_id}")
+                manifest, manifest_sha, by_unit = _validate_block0_originals(
+                    self.directory.parent, runs, units,
                 )
-                if pre_game_start_proof != proof:
-                    raise ResourceBlocked("retry proof differs from the verified original failure evidence")
-                if unit_kind != "owner_arm" or role != "builder" or cap > PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS:
-                    raise ResourceBlocked("pre-game-start retry changed the registered owner row or CPU ceiling")
+                owner = by_unit.get(unit_id)
+                if owner is None:
+                    raise ResourceBlocked("replacement is outside the one registered block-0 owner cohort")
+                original_ids = [entry["run_id"] for entry in owner["history"]]
+                if (
+                    history != original_ids
+                    or previous_run_id is not None or checkpoint_sha256 is not None
+                    or retry_reason is not None or pre_game_start_proof is not None
+                    or repair_manifest_sha256 != manifest_sha
+                    or repair_predecessor_run_id != original_ids[-1]
+                    or repair_predecessor_receipt_sha256 != owner["replacement_predecessor_result_sha256"]
+                    or unit_kind != "owner_arm" or role != "builder"
+                    or cap > float(owner["replacement_reservation_cpu_seconds"])
+                ):
+                    raise ResourceBlocked("block-0 replacement differs from its exact immutable lineage and cap")
             else:
                 raise DuplicateRun(f"terminal unit cannot be replayed: {unit_id}")
         elif (previous_run_id is not None or checkpoint_sha256 is not None
-              or retry_reason is not None or pre_game_start_proof is not None):
+              or retry_reason is not None or pre_game_start_proof is not None
+              or repair_reason is not None or repair_manifest_sha256 is not None
+              or repair_predecessor_run_id is not None or repair_predecessor_receipt_sha256 is not None):
             raise CheckpointMismatch("resume/retry metadata supplied for a new unit")
         charges = self._charges(runs)
         if role == "builder":
@@ -743,6 +1128,10 @@ class Stage1Ledger:
             "reserved_cpu_seconds": cap, "attempt_cap": attempt_cap,
             "previous_run_id": previous_run_id, "checkpoint_sha256": checkpoint_sha256,
             "retry_reason": retry_reason,
+            "repair_reason": repair_reason,
+            "repair_manifest_sha256": repair_manifest_sha256,
+            "repair_predecessor_run_id": repair_predecessor_run_id,
+            "repair_predecessor_receipt_sha256": repair_predecessor_receipt_sha256,
             "pre_game_start_proof": None if pre_game_start_proof is None else dict(pre_game_start_proof),
             "pre_game_start_proof_sha256": None if pre_game_start_proof is None else sha256_bytes(canonical(pre_game_start_proof)),
             "package_commit": self.binding.package_commit,
@@ -773,13 +1162,21 @@ class Stage1Ledger:
                 previous_run_id: str | None = None,
                 checkpoint_sha256: str | None = None,
                 retry_reason: str | None = None,
-                pre_game_start_proof: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                pre_game_start_proof: Mapping[str, Any] | None = None,
+                repair_reason: str | None = None,
+                repair_manifest_sha256: str | None = None,
+                repair_predecessor_run_id: str | None = None,
+                repair_predecessor_receipt_sha256: str | None = None) -> dict[str, Any]:
         return self.reserve_many([{
             "run_id": run_id, "unit_id": unit_id, "role": role,
             "reserved_cpu_seconds": reserved_cpu_seconds, "unit_kind": unit_kind,
             "attempt_cap": attempt_cap, "previous_run_id": previous_run_id,
             "checkpoint_sha256": checkpoint_sha256, "retry_reason": retry_reason,
             "pre_game_start_proof": pre_game_start_proof,
+            "repair_reason": repair_reason,
+            "repair_manifest_sha256": repair_manifest_sha256,
+            "repair_predecessor_run_id": repair_predecessor_run_id,
+            "repair_predecessor_receipt_sha256": repair_predecessor_receipt_sha256,
         }])[0]
 
     def finish(

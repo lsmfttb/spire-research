@@ -623,11 +623,15 @@ def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[st
     ):
         raise ValueError("refusing to refresh a source lock outside the registered Stage 1 package")
 
-    added_repair_files = {"stage1/executor.py", "stage1/test_executor.py", "stage1/preflight-proxy.json"}
+    added_repair_files = {
+        "stage1/executor.py", "stage1/test_executor.py", "stage1/preflight-proxy.json",
+        "stage1/block0-repair-lineage.json",
+    }
     legacy_self_lock_files = {"source-lock.json", "source-lock.sha256"}
     existing_file_set = frozenset(lock.get("locked_files_sha256_lf", {}))
     accepted_file_sets = {
         frozenset(SOURCE_FILES),
+        frozenset(set(SOURCE_FILES) - {"stage1/block0-repair-lineage.json"}),
         frozenset(set(SOURCE_FILES) | {"stage1/test_activation_gate.py"}),
         frozenset((set(SOURCE_FILES) - added_repair_files) | legacy_self_lock_files),
     }
@@ -658,6 +662,7 @@ def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[st
     repairable = {
         "stage1_budget.py", "stage1/prepare.py", "stage1/executor.py",
         "stage1/test_activation.py", "stage1/test_executor.py", "stage1/preflight-proxy.json",
+        "stage1/block0-repair-lineage.json",
         "algorithm.py", "learning.py", "runtime.py",
     }
     if preflight_transition:
