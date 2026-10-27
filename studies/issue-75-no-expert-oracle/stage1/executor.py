@@ -47,6 +47,8 @@ MAX_TRIAL_DECISIONS = 20_000
 BOOTSTRAP_REPLICATES = 20_000
 ANALYSIS_REPORT_RESERVATION = 120.0
 FORMAL_SCHEDULER_RESERVATION = 120.0
+TRAINING_SCHEDULER_CONTINUATION_RESERVATION = 20.0
+TRAINING_SCHEDULER_CONTINUATION_PREFIX = "SCHEDULER:TRAIN:CONTINUATION:"
 SUPERVISOR_SCHEMA = "issue75-stage1-supervisor-v1"
 ACCEPTED_PREFLIGHT_REPORT_SHA256 = "30453842d951a0fbbcd49935ae22a47fce413aafcbd017e61c34a2fa3417e81f"
 ACCEPTED_COST_FORECAST_SHA256 = "8933d20699955f5a128eba4ea373df1d0b89f27eb0b4613902c483245ed46c36"
@@ -772,9 +774,14 @@ def _formal_forecast(ledger: Any, *, phase: str) -> dict[str, Any]:
     report, forecast, report_sha, forecast_sha = _accepted_preflight_evidence()
     estimates, dynamic = _forecast_estimates(ledger)
     next_unit, next_cap = _next_training_reservation(ledger, estimates)
+    scheduler_plan = _training_scheduler_plan(ledger, estimates) if phase == "training" else None
+    scheduler_new_cap = (
+        float(scheduler_plan["cap"])
+        if scheduler_plan is not None and scheduler_plan["action"] == "reserve" else 0.0
+    )
     runs, _ = _event_state(ledger)
     charges = ledger._charges(runs)
-    builder_after_next = float(charges["builder"]) + next_cap
+    builder_after_next = float(charges["builder"]) + next_cap + scheduler_new_cap
     all_in_after_next = builder_after_next + max(budget.REVIEWER_LIMIT, float(charges["reviewer"]))
     if builder_after_next > budget.BUILDER_LIMIT or all_in_after_next > budget.ALL_IN_LIMIT:
         raise budget.ResourceBlocked("the next bounded operation cannot fit within the unchanged live hard caps")
@@ -794,8 +801,13 @@ def _formal_forecast(ledger: Any, *, phase: str) -> dict[str, Any]:
         "accepted_planner_decision_comment_id": ACCEPTED_PREFLIGHT_DECISION_ID,
         "accepted_static_forecast_status": forecast["status"],
         "static_projection_cpu_seconds_advisory_only": dynamic["projected_total_builder_cpu_seconds"],
+        "static_projection_with_scheduler_continuation_cpu_seconds_advisory_only": (
+            float(dynamic["projected_total_builder_cpu_seconds"]) + scheduler_new_cap
+        ),
         "next_unit_id": next_unit,
         "next_unit_reservation_cpu_seconds": next_cap,
+        "training_scheduler_plan": scheduler_plan,
+        "training_scheduler_new_reservation_cpu_seconds": scheduler_new_cap,
         "builder_cpu_charged_including_open_reservations": float(charges["builder"]),
         "reviewer_cpu_charged_including_open_reservations": float(charges["reviewer"]),
         "builder_after_next_cpu_seconds": builder_after_next,
@@ -1894,7 +1906,11 @@ def _run_scheduler_reservation(ledger: Any, unit_id: str, estimates: Mapping[str
             "reservation": reservation, "recovery": recovery,
         }
     run_id = f"{unit_id}-{uuid.uuid4().hex[:16]}"
-    cap = float(estimates[unit_id])
+    cap = (
+        TRAINING_SCHEDULER_CONTINUATION_RESERVATION
+        if unit_id.startswith(TRAINING_SCHEDULER_CONTINUATION_PREFIX)
+        else float(estimates[unit_id])
+    )
     reservation = ledger.reserve(
         run_id=run_id, unit_id=unit_id, role="builder",
         reserved_cpu_seconds=cap, unit_kind="scheduler",
@@ -1903,6 +1919,16 @@ def _run_scheduler_reservation(ledger: Any, unit_id: str, estimates: Mapping[str
         "run_id": run_id, "unit_id": unit_id, "cap": cap,
         "reservation": reservation, "recovery": None,
     }
+
+
+def _require_scheduler_cpu_headroom(reservation: Mapping[str, Any], phase_started_cpu: float) -> None:
+    cap = float(reservation["cap"])
+    margin = min(1.0, cap * 0.05)
+    used = max(0.0, time.process_time() - phase_started_cpu)
+    if used >= cap - margin:
+        raise budget.ResourceBlocked(
+            "formal scheduler reached its controller CPU stop margin; preserve receipts and stop"
+        )
 
 
 def _finish_scheduler_reservation(
@@ -1931,17 +1957,89 @@ def _finish_scheduler_reservation(
     }
     result_path = _unit_directory(unit_id) / "result.json"
     _write_once(result_path, result)
+    receipt_sha256 = _file_sha256(result_path) if success else None
     try:
         ledger.finish(
             run_id=run_id, measured_cpu_seconds=measured,
             status="succeeded" if success else "failed",
-            result_sha256=_file_sha256(result_path) if success else None,
+            result_sha256=receipt_sha256,
         )
     except budget.BudgetOverrun as exc:
         raise budget.ResourceBlocked("formal scheduler exceeded its reserved CPU allowance; preserve and stop") from exc
     if not success:
         raise budget.ResourceBlocked("formal scheduler exceeded its reserved CPU allowance; preserve and stop")
-    return result
+    return {**result, "receipt_sha256": receipt_sha256}
+
+
+def _training_scheduler_plan(ledger: Any, estimates: Mapping[str, float]) -> dict[str, Any]:
+    """Select a fresh, ledger-bounded controller reservation without reusing uncertain CPU."""
+    runs, units = _event_state(ledger)
+    base_history = units.get("SCHEDULER:TRAIN", [])
+    if len(base_history) > 1:
+        raise budget.ResourceBlocked("training scheduler has duplicate base reservations")
+    base_run = None if not base_history else runs[base_history[-1]]
+    continuation_units: list[tuple[int, str, dict[str, Any]]] = []
+    for candidate, history in units.items():
+        if not candidate.startswith(TRAINING_SCHEDULER_CONTINUATION_PREFIX):
+            continue
+        suffix = candidate[len(TRAINING_SCHEDULER_CONTINUATION_PREFIX):]
+        if not suffix.isdecimal() or str(int(suffix)) != suffix or len(history) != 1:
+            raise budget.ResourceBlocked("training scheduler continuation lineage is malformed")
+        run = runs[history[0]]
+        reservation = run["reservation"]
+        if (
+            reservation.get("role") != "builder"
+            or reservation.get("unit_kind") != "scheduler"
+            or reservation.get("reserved_cpu_seconds") != TRAINING_SCHEDULER_CONTINUATION_RESERVATION
+        ):
+            raise budget.ResourceBlocked("training scheduler continuation changed its fixed CPU allocation")
+        continuation_units.append((int(suffix), candidate, run))
+    continuation_units.sort()
+    if [item[0] for item in continuation_units] != list(range(1, len(continuation_units) + 1)):
+        raise budget.ResourceBlocked("training scheduler continuation sequence has a gap")
+    if base_run is None and continuation_units:
+        raise budget.ResourceBlocked("training scheduler continuation has no original reservation lineage")
+    scheduler_cap = float(estimates.get("SCHEDULER:TRAIN", FORMAL_SCHEDULER_RESERVATION))
+    if base_run is not None:
+        base_reservation = base_run["reservation"]
+        if (
+            base_reservation.get("role") != "builder"
+            or base_reservation.get("unit_kind") != "scheduler"
+            or base_reservation.get("reserved_cpu_seconds") != scheduler_cap
+        ):
+            raise budget.ResourceBlocked("original training scheduler reservation differs from its immutable cap")
+    if base_run is not None and base_run["finish"] is not None and base_run["finish"].get("status") == "succeeded":
+        if continuation_units:
+            raise budget.ResourceBlocked("completed base scheduler has an unexpected continuation lineage")
+        receipt = _existing_scheduler_receipt(ledger, "SCHEDULER:TRAIN")
+        return {"action": "reuse_receipt", "unit_id": "SCHEDULER:TRAIN", "cap": 0.0, "receipt": receipt}
+    if continuation_units:
+        _, latest_unit, latest = continuation_units[-1]
+        finish = latest["finish"]
+        if finish is not None and finish.get("status") == "succeeded":
+            receipt = _existing_scheduler_receipt(ledger, latest_unit)
+            return {"action": "reuse_receipt", "unit_id": latest_unit, "cap": 0.0, "receipt": receipt}
+    elif base_run is None:
+        return {
+            "action": "reserve", "unit_id": "SCHEDULER:TRAIN",
+            "cap": scheduler_cap, "receipt": None,
+        }
+    elif base_run["finish"] is None and not base_run.get("scheduler_recoveries"):
+        try:
+            budget._scheduler_train_recovery_cpu_upper_bound(runs, units, ledger.directory.parent)
+            return {
+                "action": "recover", "unit_id": "SCHEDULER:TRAIN",
+                "cap": scheduler_cap, "receipt": None,
+            }
+        except budget.ResourceBlocked:
+            pass
+    next_index = 1 if not continuation_units else continuation_units[-1][0] + 1
+    unit_id = f"{TRAINING_SCHEDULER_CONTINUATION_PREFIX}{next_index}"
+    return {
+        "action": "reserve", "unit_id": unit_id,
+        "cap": TRAINING_SCHEDULER_CONTINUATION_RESERVATION,
+        "receipt": None,
+    }
 
 
 def _existing_scheduler_receipt(ledger: Any, unit_id: str) -> dict[str, Any]:
@@ -1984,7 +2082,7 @@ def _existing_scheduler_receipt(ledger: Any, unit_id: str) -> dict[str, Any]:
         or _file_sha256(path) != finish.get("result_sha256")
     ):
         raise PermissionError(f"formal scheduler receipt differs from its locked ledger: {unit_id}")
-    return result
+    return {**result, "receipt_sha256": finish.get("result_sha256")}
 
 
 def _load_or_make_initial_model() -> tuple[Any, str]:
@@ -3006,7 +3104,14 @@ def _run_training(ledger: Any) -> dict[str, Any]:
             or report.get("training_seed_ids") != [row["owner_seed"] for row in _unit_rows("train")]
         ):
             raise PermissionError("existing training report is not a complete receipt for this package")
-        _existing_scheduler_receipt(ledger, "SCHEDULER:TRAIN")
+        scheduler_reference = report.get("training_scheduler_receipt", {})
+        scheduler_unit = scheduler_reference.get("unit_id", "SCHEDULER:TRAIN")
+        scheduler_receipt = _existing_scheduler_receipt(ledger, scheduler_unit)
+        if scheduler_reference and (
+            scheduler_reference.get("run_id") != scheduler_receipt.get("run_id")
+            or scheduler_reference.get("receipt_sha256") != scheduler_receipt.get("receipt_sha256")
+        ):
+            raise PermissionError("training report differs from its source-bound scheduler receipt")
         return report
     gate = _formal_forecast(ledger, phase="training")
     event_state_sha = _sha256(_canonical(ledger.read_events()))
@@ -3016,20 +3121,47 @@ def _run_training(ledger: Any) -> dict[str, Any]:
     )
     _write_once(forecast_path, gate)
     estimates, _ = _forecast_estimates(ledger)
-    scheduler_reservation = _run_scheduler_reservation(ledger, "SCHEDULER:TRAIN", estimates)
-    concurrency = _formal_concurrency()
-    for block in range(4):
-        rows = [
-            row for row in _rows()
-            if row["phase"] == "training" and int(row["block_index"]) == block
-        ]
-        for offset in range(0, len(rows), concurrency):
-            _run_owner_batch(
-                ledger, rows[offset:offset + concurrency], phase="train", estimates=estimates,
+    scheduler_plan = gate.get("training_scheduler_plan") or _training_scheduler_plan(ledger, estimates)
+    scheduler_reservation = None
+    scheduler_receipt = scheduler_plan.get("receipt")
+    if scheduler_plan["action"] in {"reserve", "recover"}:
+        scheduler_reservation = _run_scheduler_reservation(
+            ledger, str(scheduler_plan["unit_id"]), estimates,
+        )
+    if scheduler_receipt is None:
+        concurrency = _formal_concurrency()
+        for block in range(4):
+            rows = [
+                row for row in _rows()
+                if row["phase"] == "training" and int(row["block_index"]) == block
+            ]
+            for offset in range(0, len(rows), concurrency):
+                if scheduler_reservation is not None:
+                    _require_scheduler_cpu_headroom(scheduler_reservation, phase_started_cpu)
+                _run_owner_batch(
+                    ledger, rows[offset:offset + concurrency], phase="train", estimates=estimates,
+                )
+            if not _all_units_succeeded(ledger, rows):
+                raise budget.ResourceBlocked(f"registered 128-owner block {block} is not complete")
+            if scheduler_reservation is not None:
+                _require_scheduler_cpu_headroom(scheduler_reservation, phase_started_cpu)
+            _run_update_unit(ledger, block, estimates=estimates)
+        if scheduler_reservation is not None:
+            scheduler_receipt = _finish_scheduler_reservation(
+                ledger, scheduler_reservation, phase_started_cpu=phase_started_cpu,
             )
-        if not _all_units_succeeded(ledger, rows):
-            raise budget.ResourceBlocked(f"registered 128-owner block {block} is not complete")
-        _run_update_unit(ledger, block, estimates=estimates)
+        if scheduler_receipt is None:
+            scheduler_receipt = _existing_scheduler_receipt(ledger, str(scheduler_plan["unit_id"]))
+    else:
+        for block in range(4):
+            rows = [
+                row for row in _rows()
+                if row["phase"] == "training" and int(row["block_index"]) == block
+            ]
+            if not _all_units_succeeded(ledger, rows):
+                raise budget.ResourceBlocked("successful scheduler receipt exists before all registered owner rows completed")
+            if _existing_unit_receipt(ledger, f"UPDATE:{block}") is None:
+                raise budget.ResourceBlocked("successful scheduler receipt exists before its optimizer update completed")
     checkpoints = []
     for block in range(4):
         receipt = _existing_unit_receipt(ledger, f"UPDATE:{block}")
@@ -3054,20 +3186,41 @@ def _run_training(ledger: Any) -> dict[str, Any]:
         "cost_forecast_sha256": gate["cost_forecast_sha256"],
         "expert_decisions": 0,
         "training_seed_ids": [row["owner_seed"] for row in _unit_rows("train")],
+        "training_scheduler_receipt": {
+            "unit_id": scheduler_receipt.get("unit_id"),
+            "run_id": scheduler_receipt.get("run_id"),
+            "receipt_sha256": scheduler_receipt.get("receipt_sha256"),
+        },
         "completed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     if len(report["training_seed_ids"]) != 512:
         raise AssertionError("formal training report omitted registered owners")
     _write_once(report_path, report)
-    _finish_scheduler_reservation(
-        ledger, scheduler_reservation, phase_started_cpu=phase_started_cpu,
-    )
     return report
 
 
 def _run_evaluation(ledger: Any) -> dict[str, Any]:
     phase_started_cpu = time.process_time()
-    _existing_scheduler_receipt(ledger, "SCHEDULER:TRAIN")
+    training_report_path = _inside_artifacts(ARTIFACT_ROOT / "training-report.json")
+    if training_report_path.is_file():
+        training_report = _read_json(training_report_path)
+        if (
+            training_report.get("status") != "TRAINING_COMPLETE"
+            or training_report.get("package_commit") != ledger.binding.package_commit
+            or training_report.get("source_lock_sha256") != ledger.binding.source_lock_sha256
+            or training_report.get("training_seed_ids") != [row["owner_seed"] for row in _unit_rows("train")]
+        ):
+            raise PermissionError("held-out phase requires the complete source-bound training report")
+        training_scheduler = training_report.get("training_scheduler_receipt", {})
+        training_scheduler_unit = training_scheduler.get("unit_id", "SCHEDULER:TRAIN")
+        training_scheduler_receipt = _existing_scheduler_receipt(ledger, training_scheduler_unit)
+        if training_scheduler and (
+            training_scheduler.get("run_id") != training_scheduler_receipt.get("run_id")
+            or training_scheduler.get("receipt_sha256") != training_scheduler_receipt.get("receipt_sha256")
+        ):
+            raise PermissionError("held-out phase is not bound to the completed training scheduler receipt")
+    else:
+        _existing_scheduler_receipt(ledger, "SCHEDULER:TRAIN")
     report_path = _inside_artifacts(ARTIFACT_ROOT / "evaluation-report.json")
     if report_path.is_file():
         report = _read_json(report_path)

@@ -616,6 +616,13 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertEqual(result["next_unit_id"], "TRAIN:7500001")
         self.assertEqual(result["next_unit_reservation_cpu_seconds"], estimates["TRAIN:7500001"])
         self.assertTrue(result["full_cohort_projection_is_not_a_resource_exhaustion_finding"])
+        self.assertEqual(result["training_scheduler_plan"]["action"], "reserve")
+        self.assertEqual(result["training_scheduler_plan"]["unit_id"], "SCHEDULER:TRAIN:CONTINUATION:1")
+        self.assertEqual(result["training_scheduler_new_reservation_cpu_seconds"], 20.0)
+        self.assertAlmostEqual(
+            result["static_projection_with_scheduler_continuation_cpu_seconds_advisory_only"],
+            169993.18149394685,
+        )
         self.assertLessEqual(result["builder_after_next_cpu_seconds"], executor.budget.BUILDER_LIMIT)
         self.assertLessEqual(result["all_in_after_next_cpu_seconds"], executor.budget.ALL_IN_LIMIT)
         self.assertEqual(ledger.read_events(), before)
@@ -1017,7 +1024,10 @@ class Stage1ExecutorTests(unittest.TestCase):
                 "run_id": "scheduler-test", "unit_id": "SCHEDULER:TRAIN",
                 "cap": executor.FORMAL_SCHEDULER_RESERVATION,
             }) as scheduler_reservation,
-            mock.patch.object(executor, "_finish_scheduler_reservation") as finish_scheduler,
+            mock.patch.object(executor, "_finish_scheduler_reservation", return_value={
+                "unit_id": "SCHEDULER:TRAIN", "run_id": "scheduler-test",
+                "receipt_sha256": "4" * 64,
+            }) as finish_scheduler,
             mock.patch.object(executor, "_existing_unit_receipt", side_effect=existing_receipt),
             mock.patch.object(executor, "_run_owner_batch", side_effect=run_owner_batch),
             mock.patch.object(executor, "_all_units_succeeded", return_value=True),
@@ -1039,6 +1049,29 @@ class Stage1ExecutorTests(unittest.TestCase):
             block_events = order[start:start + 129]
             self.assertEqual(len([event for event in block_events if event[0] == "owner"]), 128)
             self.assertEqual(block_events[-1], ("update", block, None))
+
+    def test_scheduler_recovery_continuation_is_separately_capped_and_sequenced(self):
+        ledger = FakeReportLedger()
+        ledger.reserve(
+            run_id="base-run", unit_id="SCHEDULER:TRAIN", role="builder",
+            reserved_cpu_seconds=executor.FORMAL_SCHEDULER_RESERVATION,
+            unit_kind="scheduler",
+        )
+        first = executor._run_scheduler_reservation(
+            ledger, "SCHEDULER:TRAIN:CONTINUATION:1", {},
+        )
+        self.assertEqual(first["cap"], executor.TRAINING_SCHEDULER_CONTINUATION_RESERVATION)
+        runs, units = executor.budget._state(ledger.read_events())
+        self.assertEqual(
+            runs[units["SCHEDULER:TRAIN:CONTINUATION:1"][0]]["reservation"]["reserved_cpu_seconds"],
+            20.0,
+        )
+        plan = executor._training_scheduler_plan(
+            ledger, {"SCHEDULER:TRAIN": executor.FORMAL_SCHEDULER_RESERVATION},
+        )
+        self.assertEqual(plan["action"], "reserve")
+        self.assertEqual(plan["unit_id"], "SCHEDULER:TRAIN:CONTINUATION:2")
+        self.assertEqual(plan["cap"], 20.0)
 
     def test_scheduler_reservations_preserve_the_accepted_full_cohort_forecast(self):
         runs = {
