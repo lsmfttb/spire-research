@@ -714,24 +714,27 @@ def _next_training_reservation(
 ) -> tuple[str, float]:
     runs, units = _event_state(ledger)
     ledger.validate_block0_phase_repair_state()
-    for row in _unit_rows("train"):
-        unit_id = str(row["unit_id"])
-        if int(row["block_index"]) == 0:
-            history = units.get(unit_id, [])
-            expected_history_length = _block0_manifest_history_length(unit_id)
-            if len(history) == expected_history_length:
-                ledger.block0_phase_repair_info(unit_id=unit_id)
-                return unit_id, float(estimates[unit_id])
-            if len(history) != expected_history_length + 1:
-                raise budget.ResourceBlocked(f"block-0 repair lineage is malformed: {unit_id}")
-            last = runs[history[-1]]
-            if last["finish"] is None or last["finish"].get("status") != "succeeded":
-                raise budget.ResourceBlocked(f"block-0 replacement is unresolved or failed: {unit_id}")
-            continue
-        history = units.get(unit_id, [])
-        if not history or runs[history[-1]]["finish"] is None or runs[history[-1]]["finish"].get("status") != "succeeded":
-            return unit_id, float(estimates[unit_id])
+    training_rows = _unit_rows("train")
     for block in range(4):
+        for row in training_rows:
+            if int(row["block_index"]) != block:
+                continue
+            unit_id = str(row["unit_id"])
+            if block == 0:
+                history = units.get(unit_id, [])
+                expected_history_length = _block0_manifest_history_length(unit_id)
+                if len(history) == expected_history_length:
+                    ledger.block0_phase_repair_info(unit_id=unit_id)
+                    return unit_id, float(estimates[unit_id])
+                if len(history) != expected_history_length + 1:
+                    raise budget.ResourceBlocked(f"block-0 repair lineage is malformed: {unit_id}")
+                last = runs[history[-1]]
+                if last["finish"] is None or last["finish"].get("status") != "succeeded":
+                    raise budget.ResourceBlocked(f"block-0 replacement is unresolved or failed: {unit_id}")
+                continue
+            history = units.get(unit_id, [])
+            if not history or runs[history[-1]]["finish"] is None or runs[history[-1]]["finish"].get("status") != "succeeded":
+                return unit_id, float(estimates[unit_id])
         unit_id = f"UPDATE:{block}"
         history = units.get(unit_id, [])
         if not history:
@@ -1770,9 +1773,10 @@ def _run_owner_batch(
         cap = float(estimates[unit_id])
         if retry_proof is not None and cap > budget.PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS:
             raise budget.ResourceBlocked("the one-row retry estimate exceeds its immutable original CPU ceiling")
+        reservation_previous_run_id = None if repair_info is not None else previous_run_id
         pending.append({
             "row": dict(row), "unit_id": unit_id, "run_id": run_id, "cap": cap,
-            "previous_run_id": previous_run_id, "checkpoint_sha256": resume_digest,
+            "previous_run_id": reservation_previous_run_id, "checkpoint_sha256": resume_digest,
             "retry_reason": retry_reason, "pre_game_start_proof": retry_proof,
             "repair_info": repair_info,
         })

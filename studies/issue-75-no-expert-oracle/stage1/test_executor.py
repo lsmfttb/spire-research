@@ -485,6 +485,85 @@ class Stage1ExecutorTests(unittest.TestCase):
         ledger.validate_block0_phase_repair_state.assert_called_once_with()
         ledger.block0_phase_repair_info.assert_called_once_with(unit_id=second["unit_id"])
 
+    def test_block0_replacement_reservation_uses_dedicated_predecessor_lineage(self):
+        manifest = json.loads((STAGE1 / "block0-repair-lineage.json").read_text(encoding="utf-8"))
+        owner = manifest["owners"][0]
+        row = next(item for item in executor._unit_rows("train") if item["unit_id"] == owner["unit_id"])
+        source_artifacts = STAGE1 / "artifacts"
+        ledger = self._test_ledger("replacement-ledger")
+        ledger.directory.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_artifacts / "ledger" / "events.jsonl", ledger.events_path)
+        for item in manifest["owners"]:
+            source = source_artifacts / "units" / item["unit_id"].replace(":", "-") / "result.json"
+            target = executor.ARTIFACT_ROOT / "units" / item["unit_id"].replace(":", "-") / "result.json"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
+        cap = float(owner["replacement_reservation_cpu_seconds"])
+        with (
+            mock.patch.object(executor, "_existing_unit_receipt", return_value=None),
+            mock.patch.object(executor, "_supervise_batch", side_effect=RuntimeError("test stops before worker")),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "stops before worker"):
+                executor._run_owner_batch(
+                    ledger, [row], phase="train", estimates={owner["unit_id"]: cap},
+                )
+
+        runs, units = executor.budget._state(ledger.read_events())
+        replacement_run_id = units[owner["unit_id"]][-1]
+        reservation = runs[replacement_run_id]["reservation"]
+        self.assertIsNone(reservation["previous_run_id"])
+        self.assertIsNone(reservation["checkpoint_sha256"])
+        self.assertEqual(reservation["repair_reason"], executor.budget.BLOCK0_PHASE_REPAIR_REASON)
+        self.assertEqual(reservation["repair_manifest_sha256"], executor.budget.sha256_bytes(
+            (STAGE1 / "block0-repair-lineage.json").read_bytes()
+        ))
+        self.assertEqual(reservation["repair_predecessor_run_id"], owner["replacement_predecessor_run_id"])
+        self.assertEqual(
+            reservation["repair_predecessor_receipt_sha256"],
+            owner["replacement_predecessor_result_sha256"],
+        )
+
+    def test_next_training_reservation_checks_update_before_later_block(self):
+        block0_rows = [row for row in executor._unit_rows("train") if row["block_index"] == 0]
+        manifest = json.loads((STAGE1 / "block0-repair-lineage.json").read_text(encoding="utf-8"))
+        history_lengths = {
+            row["unit_id"]: executor._block0_manifest_history_length(row["unit_id"])
+            for row in block0_rows
+        }
+        runs = {}
+        units = {}
+        for row in block0_rows:
+            unit_id = row["unit_id"]
+            replacement_run_id = unit_id + "-" + "c" * 16
+            units[unit_id] = [
+                f"old-{index}" for index in range(history_lengths[unit_id])
+            ] + [replacement_run_id]
+            runs[replacement_run_id] = {"finish": {"status": "succeeded"}}
+
+        update0 = manifest["update_retry"]
+        predecessor = update0["failed_predecessor_run_id"]
+        units["UPDATE:0"] = [predecessor]
+        runs[predecessor] = {"finish": {"status": "failed"}}
+        next_block_row = next(row for row in executor._unit_rows("train") if row["block_index"] == 1)
+        estimates = {"UPDATE:0": 3.0, next_block_row["unit_id"]: 4.0}
+        ledger = mock.Mock()
+        with (
+            mock.patch.object(executor, "_event_state", return_value=(runs, units)),
+            mock.patch.object(ledger, "validate_block0_phase_repair_state"),
+            mock.patch.object(
+                executor, "_block0_manifest_history_length", side_effect=lambda unit_id: history_lengths[unit_id],
+            ),
+        ):
+            self.assertEqual(executor._next_training_reservation(ledger, estimates), ("UPDATE:0", 3.0))
+            retry_run_id = "UPDATE:0-" + "d" * 16
+            units["UPDATE:0"] = [predecessor, retry_run_id]
+            runs[retry_run_id] = {"finish": {"status": "succeeded"}}
+            self.assertEqual(
+                executor._next_training_reservation(ledger, estimates),
+                (next_block_row["unit_id"], 4.0),
+            )
+
     def test_update0_retry_requires_completed_replacements_and_preserves_single_use(self):
         source_events = STAGE1 / "artifacts" / "ledger" / "events.jsonl"
         events = executor.budget._events(source_events)
