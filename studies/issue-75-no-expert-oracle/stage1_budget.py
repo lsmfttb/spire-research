@@ -234,8 +234,10 @@ def _current_package_binding() -> tuple[str, str]:
         cwd=repository_root, check=False, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True,
     )
+    if tracked_index.returncode != 0 or not isinstance(tracked_index.stdout, str):
+        raise PermissionError("Stage 1 ledger is not one exact tracked repository file")
     index_rows = [line for line in tracked_index.stdout.splitlines() if line]
-    if tracked_index.returncode != 0 or len(index_rows) != 1:
+    if len(index_rows) != 1:
         raise PermissionError("Stage 1 ledger is not one exact tracked repository file")
     index_metadata, separator, index_path = index_rows[0].partition("\t")
     index_fields = index_metadata.split()
@@ -250,7 +252,7 @@ def _current_package_binding() -> tuple[str, str]:
         cwd=repository_root, check=False, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True,
     )
-    if working_tree.returncode != 0:
+    if working_tree.returncode != 0 or not isinstance(working_tree.stdout, str):
         raise PermissionError("cannot verify Stage 1 source immutability")
     changes = []
     for line in working_tree.stdout.splitlines():

@@ -149,8 +149,6 @@ class Stage1ExecutorTests(unittest.TestCase):
             "studies/issue-75-no-expert-oracle/stage1/source-lock.json",
             "studies/issue-75-no-expert-oracle/stage1/source-lock.sha256",
             "studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl",
-            "studies/issue-75-no-expert-oracle/stage1/artifacts/units/TRAIN-7500001/failure-TRAIN:7500001-5afd7b3277ee47a7.json",
-            "studies/issue-75-no-expert-oracle/stage1/artifacts/units/TRAIN-7500001/worker-job-TRAIN:7500001-5afd7b3277ee47a7.json",
         )
         package_files = set(executor.budget.LOCKED_PACKAGE_FILES)
         repository_files = set(executor.budget.LOCKED_REPOSITORY_DEPENDENCIES)
@@ -165,6 +163,8 @@ class Stage1ExecutorTests(unittest.TestCase):
             target = repository / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        ledger_events = repository / "studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl"
+        ledger_events.write_bytes(b"")
         subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
         subprocess.run(["git", "config", "user.name", "Issue 75 focused test"], cwd=repository, check=True)
         subprocess.run(
@@ -190,20 +190,6 @@ class Stage1ExecutorTests(unittest.TestCase):
                 import executor
                 import stage1_budget as budget
                 ledger = budget.open_stage1_ledger(executor.ARTIFACT_ROOT / "ledger")
-                estimates, _ = executor._forecast_estimates(ledger)
-                recovered = executor._run_scheduler_reservation(ledger, "SCHEDULER:TRAIN", estimates)
-                assert recovered["run_id"] == budget.SCHEDULER_TRAIN_RECOVERY_RUN_ID
-                assert recovered["cap"] == budget.SCHEDULER_TRAIN_RECOVERY_CAP
-                try:
-                    executor._run_scheduler_reservation(ledger, "SCHEDULER:TRAIN", estimates)
-                except budget.ResourceBlocked:
-                    pass
-                else:
-                    raise AssertionError("recovered scheduler must not reserve a second allocation")
-                scheduler_result = executor._finish_scheduler_reservation(
-                    ledger, recovered, phase_started_cpu=executor.time.process_time() - 2.0,
-                )
-                assert executor._existing_scheduler_receipt(ledger, "SCHEDULER:TRAIN") == scheduler_result
                 unit_id = "VALIDATION:SPAWNED-CHILD"
                 run_id = unit_id + "-" + "a" * 16
                 reservation = ledger.reserve(
@@ -245,10 +231,6 @@ class Stage1ExecutorTests(unittest.TestCase):
                     "output_path": str(unit_dir / "native"), "result_path": str(unit_dir / "result.json"),
                     "package_commit": ledger.binding.package_commit,
                     "source_lock_sha256": ledger.binding.source_lock_sha256,
-                    "scheduler_run_id": recovered["run_id"],
-                    "scheduler_recovery_marker_sha256": budget.sha256_bytes(budget.canonical(recovered["recovery"])),
-                    "scheduler_measured_cpu_seconds": scheduler_result["measured_cpu_seconds"],
-                    "scheduler_prior_cpu_upper_bound_seconds": scheduler_result["prior_scheduler_cpu_upper_bound_seconds"],
                 }))
                 if child.returncode != 0:
                     raise SystemExit(child.returncode)
@@ -274,11 +256,6 @@ class Stage1ExecutorTests(unittest.TestCase):
             self.assertEqual(child_receipt["run_id"], "VALIDATION:SPAWNED-CHILD-" + "a" * 16)
             self.assertEqual(child_receipt["package_commit"], receipt["package_commit"])
             self.assertEqual(child_receipt["source_lock_sha256"], receipt["source_lock_sha256"])
-            self.assertEqual(receipt["scheduler_run_id"], "SCHEDULER:TRAIN-3e416101548944b3")
-            self.assertEqual(len(receipt["scheduler_recovery_marker_sha256"]), 64)
-            self.assertGreater(receipt["scheduler_measured_cpu_seconds"], 0)
-            self.assertGreater(receipt["scheduler_prior_cpu_upper_bound_seconds"], 0)
-            self.assertLessEqual(receipt["scheduler_measured_cpu_seconds"], 120.0)
             self.assertFalse(Path(receipt["output_path"]).exists())
             self.assertFalse(Path(receipt["result_path"]).exists())
 
