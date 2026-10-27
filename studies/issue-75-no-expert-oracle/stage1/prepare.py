@@ -87,6 +87,15 @@ def derive_seed(domain: str, owner_seed: int, arm: str) -> int:
     return int.from_bytes(hashlib.sha256(payload).digest()[:8], "big") & 0x7FFFFFFF
 
 
+BLOCK_ORDER_SEED_OWNER = 75_000_000
+
+
+def derive_block_order_seed(block: int) -> int:
+    if not isinstance(block, int) or isinstance(block, bool) or not 0 <= block < 4:
+        raise ValueError("training block index must be in the registered 0..3 range")
+    return derive_seed("block-order", BLOCK_ORDER_SEED_OWNER, f"BLOCK-{block}")
+
+
 def derive_search_attempt_seed(invocation_seed: int, attempt_index: int) -> int:
     if not 0 <= attempt_index < 16:
         raise ValueError("search attempt index must be inside the registered 0..15 cap")
@@ -286,9 +295,7 @@ def _make_stage1_config(
     stage0: Mapping[str, Any], runtime_lock: Mapping[str, Any],
 ) -> dict[str, Any]:
     learning_config = copy.deepcopy(config["learning"])
-    training_block_order_seeds = [
-        derive_seed("block-order", 75_000_000, f"BLOCK-{block}") for block in range(4)
-    ]
+    training_block_order_seeds = [derive_block_order_seed(block) for block in range(4)]
     return {
         "schema_id": "issue75-stage1-preparation-config-v1",
         "study_id": "issue-75-no-expert-oracle",

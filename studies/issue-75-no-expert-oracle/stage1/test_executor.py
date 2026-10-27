@@ -186,6 +186,17 @@ class PreflightTreatmentSemanticsTests(unittest.TestCase):
         self.assertEqual(root_gaps, [])
 
 
+class ExecutorTests(unittest.TestCase):
+    def test_registered_block_order_seed_schedule_uses_prepare_derivation(self):
+        import prepare
+
+        config = executor._read_json(executor.STAGE1 / "config.json")
+        self.assertEqual(
+            [prepare.derive_block_order_seed(block) for block in range(4)],
+            config["seeds"]["block_order_seeds"],
+        )
+
+
 class Stage1ExecutorTests(unittest.TestCase):
 
     def _source_bound_child_fixture(self, root: Path) -> Path:
@@ -1546,7 +1557,13 @@ class Stage1ExecutorTests(unittest.TestCase):
         model_stub = types.ModuleType("model")
         model_stub.model_digest = lambda _model: "d" * 40
         prepare_stub = types.ModuleType("prepare")
-        prepare_stub.derive_seed = lambda *_args: block_seed
+        derived_blocks = []
+
+        def derive_block_order_seed(block):
+            derived_blocks.append(block)
+            return block_seed
+
+        prepare_stub.derive_block_order_seed = derive_block_order_seed
         owner_rows = [
             row for row in executor._rows()
             if row["phase"] == "training" and int(row["block_index"]) == 0
@@ -1603,6 +1620,7 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertEqual(len(train_calls), 1)
         self.assertEqual(train_calls[0]["owner_count"], 128)
         self.assertEqual(train_calls[0]["block_order_seed"], block_seed)
+        self.assertEqual(derived_blocks, [0])
         self.assertEqual(train_calls[0]["resume_state"], resume_state)
         runs, units = executor._event_state(ledger)
         latest_run_id = units[unit_id][-1]

@@ -2187,14 +2187,13 @@ def _update_block(
         }
         _atomic_torch_save(checkpoint_path, value)
 
-    first_owner = min(int(row["owner_seed"]) for row in _rows() if row["phase"] == "training" and int(row["block_index"]) == block)
     import prepare
     stage1_config = _read_json(STAGE1 / "config.json")
     registered_seeds = stage1_config.get("seeds", {}).get("block_order_seeds", ())
     if len(registered_seeds) != 4:
         raise PermissionError("the locked four-block owner-order seed schedule is incomplete")
     block_seed = int(registered_seeds[block])
-    if block_seed != prepare.derive_seed("block-order", first_owner, f"TRAIN-BLOCK-{block}"):
+    if block_seed != prepare.derive_block_order_seed(block):
         raise PermissionError("derived block-order seed differs from the registered Stage 1 seed schedule")
     owner_seed_sha = hashlib.sha256(",".join(str(item.owner_seed) for item in examples).encode("ascii")).hexdigest()
     result = learning.train_policy_iteration_block(
