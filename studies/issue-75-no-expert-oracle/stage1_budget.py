@@ -48,6 +48,7 @@ LOCKED_PACKAGE_FILES = (
     "stage1/test_activation.py",
     "stage1/test_executor.py",
     "stage1/block0-repair-lineage.json",
+    "stage1/block0-decoder-compatibility.json",
 )
 LOCKED_REPOSITORY_DEPENDENCIES = (
     "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
@@ -387,6 +388,7 @@ SCHEDULER_TRAIN_RECOVERY_RESERVED_AT_NS = 1793049822021316152
 SCHEDULER_TRAIN_RECOVERY_CAP = 120.0
 SCHEDULER_RECOVERY_EXIT_MARGIN_SECONDS = 1.0
 BLOCK0_PHASE_REPAIR_REASON = "BLOCK0_PHASE_MISMATCH_INTERVENTION_NOT_DELIVERED"
+BLOCK0_DECODER_REPAIR_REASON = "COMPRESSED_FEATURE_DECODE_ORDER_ONLY"
 UPDATE0_RETRY_REASON = "UPDATE0_FAILED_BEFORE_OPTIMIZER"
 BLOCK0_ORIGINAL_PACKAGE_COMMIT = "482c5b3b87e38066c8738d6f102906f965b9d0ae"
 BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256 = "ed54abb587d28661968544cbca31eabfb4dc8fad77696bcf726911b06fc01735"
@@ -526,31 +528,215 @@ def _validate_block0_originals(
     return manifest, manifest_sha, by_unit
 
 
+def _load_block0_decoder_compatibility(
+    artifacts_root: Path,
+) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    path = STAGE1 / "block0-decoder-compatibility.json"
+    try:
+        raw = path.read_bytes()
+        manifest = json.loads(raw)
+        _, repair_sha, original_by_unit = _load_block0_repair_manifest(artifacts_root)
+    except (OSError, ValueError) as exc:
+        raise ResourceBlocked("the source-locked block-0 decoder compatibility manifest is unavailable") from exc
+    expected_seeds = list(range(BLOCK0_REPAIR_OWNER_RANGE[0], BLOCK0_REPAIR_OWNER_RANGE[1] + 1))
+    owners = manifest.get("owners")
+    if (
+        manifest.get("schema_id") != "issue75-block0-decoder-compatibility-v1"
+        or manifest.get("study_id") != "issue-75-no-expert-oracle"
+        or manifest.get("scope") != "STUDY_ONLY"
+        or manifest.get("block_index") != 0
+        or manifest.get("owner_count") != 128
+        or manifest.get("owner_seed_range") != list(BLOCK0_REPAIR_OWNER_RANGE)
+        or manifest.get("repair_reason") != BLOCK0_DECODER_REPAIR_REASON
+        or manifest.get("semantics") != "decompress the serialized f32le matrix, then check its registered byte size and SHA-256; preserve exact matrix bytes"
+        or manifest.get("block0_repair_manifest_sha256") != repair_sha
+        or not isinstance(owners, list) or len(owners) != 128
+        or [item.get("owner_seed") for item in owners] != expected_seeds
+        or manifest.get("predecessor_package_commit") != "6b8f3970333f8c0e0bb6aaa4832e7719f0634f24"
+        or manifest.get("predecessor_source_lock_sha256") != "7498cbef87a5c23907a58c6c1099f7b08258ee4241eb428a3424373673b854fa"
+    ):
+        raise ResourceBlocked("the decoder compatibility manifest differs from the reviewed source and exact 128-owner scope")
+
+    by_compatibility = {}
+    for seed, item in zip(expected_seeds, owners):
+        unit_id = f"TRAIN:{seed}"
+        original = original_by_unit[unit_id]["history"][-1]
+        run_id = item.get("run_id")
+        expected_feature_path = f"units/{unit_id.replace(':', '-')}/runs/{run_id}/training-features.json"
+        if (
+            item.get("unit_id") != unit_id
+            or not isinstance(run_id, str) or not run_id.startswith(unit_id + "-")
+            or not isinstance(item.get("result_sha256"), str) or len(item["result_sha256"]) != 64
+            or item.get("training_features_path") != expected_feature_path
+            or not isinstance(item.get("training_features_sha256"), str)
+            or len(item["training_features_sha256"]) != 64
+            or unit_id in by_compatibility
+            or not isinstance(original.get("result_sha256"), str)
+        ):
+            raise ResourceBlocked(f"the decoder compatibility owner row is malformed: {unit_id}")
+        by_compatibility[unit_id] = item
+
+    update = manifest.get("update0_preoptimizer_failure")
+    old_update = json.loads((STAGE1 / "block0-repair-lineage.json").read_text(encoding="utf-8")).get("update_retry")
+    if (
+        not isinstance(update, Mapping) or not isinstance(old_update, Mapping)
+        or update.get("schema_id") != "issue75-update0-decoder-retry-failure-v1"
+        or update.get("unit_id") != "UPDATE:0"
+        or update.get("intermediate_failed_run_id") != "UPDATE:0-86e384596b684093"
+        or update.get("original_predecessor_run_id") != old_update.get("failed_predecessor_run_id")
+        or update.get("previous_run_id") != old_update.get("failed_predecessor_run_id")
+        or update.get("repair_reason") != UPDATE0_RETRY_REASON
+        or update.get("repair_manifest_sha256") != repair_sha
+        or update.get("repair_predecessor_run_id") != old_update.get("failed_predecessor_run_id")
+        or update.get("repair_predecessor_receipt_sha256") != old_update.get("failure_receipt_sha256")
+        or update.get("package_commit") != manifest.get("predecessor_package_commit")
+        or update.get("source_lock_sha256") != manifest.get("predecessor_source_lock_sha256")
+        or update.get("finish_status") != "failed"
+        or update.get("no_model_checkpoint") is not True
+        or update.get("boundary") != "worker_returned_nonzero"
+        or update.get("error_type") != "ValueError"
+        or update.get("measured_cpu_seconds") != 3.7899244960000003
+        or update.get("reserved_cpu_seconds") != old_update.get("replacement_reservation_cpu_seconds")
+    ):
+        raise ResourceBlocked("the intermediate UPDATE:0 decoder failure is not bound to its exact source and original failure")
+    return manifest, sha256_bytes(raw), original_by_unit, by_compatibility
+
+
+def _compatibility_artifact_bytes(
+    artifacts_root: Path, relative: Any, expected_sha256: Any,
+) -> bytes:
+    if not isinstance(relative, str) or Path(relative).is_absolute() or ".." in Path(relative).parts:
+        raise ResourceBlocked("the decoder compatibility artifact path is unsafe")
+    root = Path(artifacts_root).resolve(strict=True)
+    try:
+        path = (root / relative).resolve(strict=True)
+        if not path.is_relative_to(root) or not path.is_file():
+            raise ResourceBlocked("a decoder compatibility artifact is outside the locked study evidence")
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise ResourceBlocked("a decoder compatibility artifact is unavailable") from exc
+    if not isinstance(expected_sha256, str) or sha256_bytes(raw) != expected_sha256:
+        raise ResourceBlocked("a decoder compatibility artifact changed after source registration")
+    return raw
+
+
+def _validate_block0_decoder_compatibility_owner(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]], original_by_unit: Mapping[str, Mapping[str, Any]],
+    compatibility: Mapping[str, Any], compatibility_by_unit: Mapping[str, Mapping[str, Any]],
+    unit_id: str,
+) -> dict[str, Any] | None:
+    item = original_by_unit.get(unit_id)
+    replacement = compatibility_by_unit.get(unit_id)
+    if not isinstance(item, Mapping) or not isinstance(replacement, Mapping):
+        raise ResourceBlocked(f"the decoder compatibility manifest lacks its registered owner: {unit_id}")
+    expected_history = [row["run_id"] for row in item["history"]]
+    history = list(units.get(unit_id, ()))
+    if history == expected_history:
+        return None
+    if (
+        history != expected_history + [replacement["run_id"]]
+        or replacement.get("owner_seed") != item.get("owner_seed")
+    ):
+        raise ResourceBlocked(f"the block-0 replacement history differs from its exact decoder compatibility row: {unit_id}")
+    run_id = str(replacement["run_id"])
+    run = runs.get(run_id)
+    reservation = None if not isinstance(run, Mapping) else run.get("reservation")
+    finish = None if not isinstance(run, Mapping) else run.get("finish")
+    manifest_sha = str(compatibility["block0_repair_manifest_sha256"])
+    package_commit = str(compatibility["predecessor_package_commit"])
+    lock_sha = str(compatibility["predecessor_source_lock_sha256"])
+    if (
+        not isinstance(reservation, Mapping) or reservation.get("run_id") != run_id
+        or reservation.get("unit_id") != unit_id or reservation.get("unit_kind") != "owner_arm"
+        or reservation.get("role") != "builder"
+        or reservation.get("repair_reason") != BLOCK0_PHASE_REPAIR_REASON
+        or reservation.get("repair_manifest_sha256") != manifest_sha
+        or reservation.get("repair_predecessor_run_id") != expected_history[-1]
+        or reservation.get("repair_predecessor_receipt_sha256") != item["history"][-1]["result_sha256"]
+        or reservation.get("package_commit") != package_commit
+        or reservation.get("source_lock_sha256") != lock_sha
+        or reservation.get("previous_run_id") is not None
+        or reservation.get("checkpoint_sha256") is not None
+        or not isinstance(finish, Mapping) or finish.get("status") != "succeeded"
+        or finish.get("unit_id") != unit_id or finish.get("result_sha256") != replacement["result_sha256"]
+        or finish.get("package_commit") != package_commit or finish.get("source_lock_sha256") != lock_sha
+    ):
+        raise ResourceBlocked(f"the block-0 replacement reservation or finish differs from its compatibility lineage: {unit_id}")
+
+    result_rel = f"units/{unit_id.replace(':', '-')}/runs/{run_id}/result.json"
+    result_bytes = _compatibility_artifact_bytes(artifacts_root, result_rel, replacement["result_sha256"])
+    try:
+        result = json.loads(result_bytes)
+    except ValueError as exc:
+        raise ResourceBlocked(f"the block-0 replacement result is malformed: {unit_id}") from exc
+    feature_path = replacement["training_features_path"]
+    feature_sha = replacement["training_features_sha256"]
+    pointer = result.get("training_features")
+    if (
+        result.get("schema_id") != "issue75-stage1-unit-result-v1"
+        or result.get("status") != "SUCCEEDED" or result.get("study_id") != "issue-75-no-expert-oracle"
+        or result.get("unit_id") != unit_id or result.get("phase") != "training"
+        or result.get("formal") is not True or result.get("arm") != "TRAIN"
+        or result.get("owner_seed") != item["owner_seed"] or result.get("game_seed") != item["owner_seed"]
+        or result.get("paired_owner_key") != f"train-{item['owner_seed']}"
+        or result.get("package_commit") != package_commit or result.get("source_lock_sha256") != lock_sha
+        or not isinstance(pointer, Mapping) or pointer.get("path") != feature_path
+        or pointer.get("sha256") != feature_sha
+        or not isinstance(result.get("resource"), Mapping)
+        or result["resource"].get("ledger_run_id") != run_id
+    ):
+        raise ResourceBlocked(f"the block-0 replacement result does not match its exact registered owner and feature row: {unit_id}")
+    feature_bytes = _compatibility_artifact_bytes(artifacts_root, feature_path, feature_sha)
+    try:
+        features = json.loads(feature_bytes)
+    except ValueError as exc:
+        raise ResourceBlocked(f"the block-0 replacement training features are malformed: {unit_id}") from exc
+    if (
+        features.get("schema_id") != "issue75-stage1-training-features-v1"
+        or features.get("unit_id") != unit_id or features.get("owner_seed") != item["owner_seed"]
+        or features.get("package_commit") != package_commit or features.get("source_lock_sha256") != lock_sha
+    ):
+        raise ResourceBlocked(f"the block-0 replacement feature artifact differs from its compatibility binding: {unit_id}")
+    return {
+        **dict(replacement),
+        "package_commit": package_commit,
+        "source_lock_sha256": lock_sha,
+        "result_path": result_rel,
+    }
+
+
 def _validate_update0_retry_state(
     artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
     units: Mapping[str, Sequence[str]], current_binding: tuple[str, str],
 ) -> tuple[dict[str, Any], str]:
-    manifest, manifest_sha, by_unit = _validate_block0_originals(artifacts_root, runs, units)
-    update = manifest["update_retry"]
-    for unit_id, owner in by_unit.items():
+    try:
+        actual_binding = _current_package_binding()
+    except (PermissionError, ValueError, OSError) as exc:
+        raise ResourceBlocked("the current locked Stage 1 package is not verified") from exc
+    if current_binding != actual_binding:
+        raise ResourceBlocked("UPDATE:0 repair cannot use a caller-supplied package binding")
+
+    manifest, manifest_sha, original_by_unit = _load_block0_repair_manifest(artifacts_root)
+    compatibility, _, _, compatibility_by_unit = _load_block0_decoder_compatibility(artifacts_root)
+    for unit_id, owner in original_by_unit.items():
         expected = [entry["run_id"] for entry in owner["history"]]
         history = list(units.get(unit_id, ()))
-        if len(history) != len(expected) + 1 or history[:len(expected)] != expected:
-            raise ResourceBlocked(f"all original block-0 owners must have exactly one replacement before UPDATE:0: {unit_id}")
-        replacement = runs[history[-1]]
-        reservation, finish = replacement["reservation"], replacement["finish"]
-        if (
-            reservation.get("repair_reason") != BLOCK0_PHASE_REPAIR_REASON
-            or reservation.get("repair_manifest_sha256") != manifest_sha
-            or finish is None or finish.get("status") != "succeeded"
-        ):
-            raise ResourceBlocked(f"UPDATE:0 retry requires completed block-0 replacements: {unit_id}")
+        if history != expected + [compatibility_by_unit[unit_id]["run_id"]]:
+            raise ResourceBlocked(f"UPDATE:0 requires all 128 exact decoder-compatible replacements: {unit_id}")
+        _validate_block0_decoder_compatibility_owner(
+            artifacts_root, runs, units, original_by_unit,
+            compatibility, compatibility_by_unit, unit_id,
+        )
 
+    update = manifest["update_retry"]
     unit_id = str(update["unit_id"])
     predecessor = str(update["failed_predecessor_run_id"])
     history = list(units.get(unit_id, ()))
-    if not history or history[0] != predecessor:
-        raise ResourceBlocked("UPDATE:0 no longer has its exact reviewed failed predecessor")
+    prior = compatibility["update0_preoptimizer_failure"]
+    intermediate_run_id = str(prior["intermediate_failed_run_id"])
+    if not history or history[0] != predecessor or len(history) < 2 or history[1] != intermediate_run_id:
+        raise ResourceBlocked("UPDATE:0 history differs from its original and decoder-failure lineage")
     original = runs[predecessor]
     reservation, finish = original["reservation"], original["finish"]
     expected_reserved = float(update["failed_predecessor_reservation_cpu_seconds"])
@@ -563,6 +749,7 @@ def _validate_update0_retry_state(
         or reservation.get("source_lock_sha256") != BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256
         or reservation.get("reserved_cpu_seconds") != expected_reserved
         or finish is None or finish.get("status") != "failed"
+        or finish.get("started_attempts") != 0
         or finish.get("measured_cpu_seconds") != expected_measured
         or finish.get("checkpoint_sha256") is not None or finish.get("result_sha256") is not None
     ):
@@ -572,12 +759,7 @@ def _validate_update0_retry_state(
         (update["worker_job_path"], "worker_job_sha256"),
         (update["worker_log_path"], "worker_log_sha256"),
     ):
-        try:
-            digest = sha256_bytes((Path(artifacts_root) / relative).read_bytes())
-        except OSError as exc:
-            raise ResourceBlocked("original UPDATE:0 failure evidence is unavailable") from exc
-        if digest != update[digest_key]:
-            raise ResourceBlocked("original UPDATE:0 failure evidence changed after registration")
+        _compatibility_artifact_bytes(artifacts_root, relative, update[digest_key])
     failure = json.loads((Path(artifacts_root) / update["failure_receipt_path"]).read_text())
     job = json.loads((Path(artifacts_root) / update["worker_job_path"]).read_text())
     if (
@@ -592,20 +774,91 @@ def _validate_update0_retry_state(
         or job.get("previous_run_id") is not None or job.get("checkpoint_sha256") is not None
     ):
         raise ResourceBlocked("original UPDATE:0 artifacts do not prove a pre-optimizer failure")
-    for name in ("pi1.pt", "block-0-step.pt"):
-        if (Path(artifacts_root) / "models" / name).exists():
-            raise ResourceBlocked("UPDATE:0 now has a checkpoint and is not eligible for the single retry")
+
+    run = runs.get(intermediate_run_id)
+    retry = None if not isinstance(run, Mapping) else run.get("reservation")
+    terminal = None if not isinstance(run, Mapping) else run.get("finish")
+    if (
+        not isinstance(retry, Mapping) or retry.get("run_id") != intermediate_run_id
+        or retry.get("unit_id") != unit_id or retry.get("unit_kind") != "training_update"
+        or retry.get("role") != "builder" or retry.get("previous_run_id") != predecessor
+        or retry.get("repair_reason") != UPDATE0_RETRY_REASON
+        or retry.get("repair_manifest_sha256") != manifest_sha
+        or retry.get("repair_predecessor_run_id") != predecessor
+        or retry.get("repair_predecessor_receipt_sha256") != update["failure_receipt_sha256"]
+        or retry.get("package_commit") != prior["package_commit"]
+        or retry.get("source_lock_sha256") != prior["source_lock_sha256"]
+        or retry.get("reserved_cpu_seconds") != prior["reserved_cpu_seconds"]
+        or retry.get("attempt_cap") is not None
+        or retry.get("checkpoint_sha256") is not None
+        or retry.get("retry_reason") is not None
+        or retry.get("pre_game_start_proof") is not None
+        or retry.get("pre_game_start_proof_sha256") is not None
+        or sha256_bytes(canonical(retry)) != prior["reservation_sha256"]
+        or not isinstance(terminal, Mapping) or terminal.get("status") != "failed"
+        or terminal.get("measured_cpu_seconds") != prior["measured_cpu_seconds"]
+        or terminal.get("started_attempts") != 0
+        or terminal.get("checkpoint_sha256") is not None or terminal.get("result_sha256") is not None
+        or terminal.get("package_commit") != prior["package_commit"]
+        or terminal.get("source_lock_sha256") != prior["source_lock_sha256"]
+        or sha256_bytes(canonical(terminal)) != prior["finish_sha256"]
+    ):
+        raise ResourceBlocked("the intermediate UPDATE:0 serialization failure differs from its locked evidence")
+    failure_bytes = _compatibility_artifact_bytes(
+        artifacts_root, prior["failure_receipt_path"], prior["failure_receipt_sha256"],
+    )
+    job_bytes = _compatibility_artifact_bytes(
+        artifacts_root, prior["worker_job_path"], prior["worker_job_sha256"],
+    )
+    log_bytes = _compatibility_artifact_bytes(
+        artifacts_root, prior["worker_log_path"], prior["worker_log_sha256"],
+    )
+    failure = json.loads(failure_bytes)
+    job = json.loads(job_bytes)
+    log = json.loads(log_bytes)
+    if (
+        failure.get("unit_id") != unit_id or failure.get("run_id") != intermediate_run_id
+        or failure.get("status") != "FAILED" or failure.get("boundary") != prior["boundary"]
+        or failure.get("checkpoint_sha256") is not None
+        or failure.get("measured_cpu_seconds") != prior["measured_cpu_seconds"]
+        or failure.get("reserved_cpu_seconds") != prior["reserved_cpu_seconds"]
+        or job.get("unit_id") != unit_id or job.get("run_id") != intermediate_run_id
+        or job.get("phase") != "update" or job.get("previous_run_id") != predecessor
+        or job.get("package_commit") != prior["package_commit"]
+        or job.get("source_lock_sha256") != prior["source_lock_sha256"]
+        or job.get("repair_reason") != prior["repair_reason"]
+        or job.get("repair_manifest_sha256") != prior["repair_manifest_sha256"]
+        or job.get("repair_predecessor_run_id") != prior["repair_predecessor_run_id"]
+        or job.get("repair_predecessor_receipt_sha256") != prior["repair_predecessor_receipt_sha256"]
+        or job.get("checkpoint_sha256") is not None
+        or log.get("error_type") != prior["error_type"]
+        or log.get("status") != "STAGE1_WORKER_FAILED"
+    ):
+        raise ResourceBlocked("the intermediate UPDATE:0 failure artifacts differ from their exact locked receipt")
+
     info = {
         "repair_reason": UPDATE0_RETRY_REASON,
         "repair_manifest_sha256": manifest_sha,
         "repair_predecessor_run_id": predecessor,
         "repair_predecessor_receipt_sha256": str(update["failure_receipt_sha256"]),
         "reserved_cpu_seconds": float(update["replacement_reservation_cpu_seconds"]),
+        "retry_previous_run_id": intermediate_run_id,
+        "retry_available": len(history) == 2,
     }
-    previous = predecessor
-    for index, run_id in enumerate(history[1:]):
-        run = runs[run_id]
-        retry, terminal = run["reservation"], run["finish"]
+    if len(history) == 2:
+        if runs[history[-1]]["finish"].get("status") != "failed":
+            raise ResourceBlocked("the corrected UPDATE:0 attempt is no longer available")
+        for name in ("pi1.pt", "block-0-step.pt"):
+            if (Path(artifacts_root) / "models" / name).exists():
+                raise ResourceBlocked("UPDATE:0 has an optimizer checkpoint and cannot start a fresh retry")
+        return info, manifest_sha
+
+    previous = intermediate_run_id
+    for index, run_id in enumerate(history[2:]):
+        current = runs.get(run_id)
+        if not isinstance(current, Mapping):
+            raise ResourceBlocked("a corrected UPDATE:0 attempt is missing from the ledger")
+        retry, terminal = current["reservation"], current["finish"]
         first = index == 0
         if (
             retry.get("repair_reason") != info["repair_reason"]
@@ -625,10 +878,11 @@ def _validate_update0_retry_state(
             ))
             or (terminal is not None and terminal.get("status") not in {"succeeded", "incomplete", "failed"})
         ):
-            raise ResourceBlocked("UPDATE:0 retry/resume chain differs from its exact repair lineage")
+            raise ResourceBlocked("corrected UPDATE:0 attempt/resume chain differs from its exact repair lineage")
+        if terminal is not None and terminal.get("status") in {"succeeded", "failed"} and index != len(history[2:]) - 1:
+            raise ResourceBlocked("UPDATE:0 has work after a terminal corrected attempt")
         previous = run_id
     return info, manifest_sha
-
 
 def _pre_game_start_failure_proof(
     artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]], units: Mapping[str, Sequence[str]],
@@ -951,11 +1205,39 @@ class Stage1Ledger:
         )
         return {**info, "repair_manifest_sha256": manifest_sha}
 
+    def block0_decoder_compatibility_records(self) -> dict[str, dict[str, Any]]:
+        """Validate the exact registered replacement receipts once before loading block 0."""
+        runs, units = _state(_events(self.events_path))
+        _, _, original_by_unit = _validate_block0_originals(self.directory.parent, runs, units)
+        compatibility, _, _, compatibility_by_unit = _load_block0_decoder_compatibility(self.directory.parent)
+        records = {}
+        for unit_id in original_by_unit:
+            record = _validate_block0_decoder_compatibility_owner(
+                self.directory.parent, runs, units, original_by_unit,
+                compatibility, compatibility_by_unit, unit_id,
+            )
+            if record is None:
+                raise ResourceBlocked(f"the registered block-0 replacement is missing: {unit_id}")
+            records[unit_id] = record
+        return records
+
+    def block0_decoder_compatibility_record(self, unit_id: str, run_id: str) -> dict[str, Any] | None:
+        """Validate and return one exact prior block-0 replacement receipt under its old package."""
+        record = self.block0_decoder_compatibility_records().get(unit_id)
+        if record is not None and record.get("run_id") != run_id:
+            raise ResourceBlocked("the requested block-0 receipt is not the source-locked compatibility run")
+        return record
+
     def update0_retry_info(self) -> dict[str, Any]:
         info = self.validate_update0_retry_state()
         runs, units = _state(_events(self.events_path))
-        if list(units.get("UPDATE:0", ())) != [info["repair_predecessor_run_id"]]:
-            raise ResourceBlocked("the single UPDATE:0 retry has already been reserved")
+        history = list(units.get("UPDATE:0", ()))
+        if (
+            info.get("retry_available") is not True
+            or len(history) != 2
+            or history[-1] != info.get("retry_previous_run_id")
+        ):
+            raise ResourceBlocked("the one corrected UPDATE:0 attempt is unavailable or already consumed")
         return info
 
     def recover_open_training_scheduler(self) -> dict[str, Any]:
@@ -1060,7 +1342,7 @@ class Stage1Ledger:
                 if unit_id == "UPDATE:0" and repair_reason == UPDATE0_RETRY_REASON:
                     info = self.update0_retry_info()
                     if (
-                        previous_run_id != info["repair_predecessor_run_id"]
+                        previous_run_id != info["retry_previous_run_id"]
                         or checkpoint_sha256 is not None
                         or repair_manifest_sha256 != info["repair_manifest_sha256"]
                         or repair_predecessor_run_id != info["repair_predecessor_run_id"]

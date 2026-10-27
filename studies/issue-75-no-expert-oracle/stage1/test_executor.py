@@ -101,6 +101,51 @@ class FakeReceiptLedger:
         ]
 
 
+class TrainingFeatureDecodingTests(unittest.TestCase):
+    def test_validates_uncompressed_bytes_after_decompression(self):
+        import base64
+        import hashlib
+        import zlib
+
+        matrix_bytes = b"\x00" * (2048 * 4)
+        payload = {
+            "attempt_index": 1,
+            "complete": True,
+            "heart_win": False,
+            "terminal_floor": 0.0,
+            "root_identity_sha256": "c" * 64,
+            "decisions": [{
+                "step_index": 0,
+                "state_fingerprint": "b" * 64,
+                "candidate_features_shape": [1, 2048],
+                "candidate_features_f32le_zlib_base64": base64.b64encode(zlib.compress(matrix_bytes)).decode("ascii"),
+                "candidate_features_sha256": hashlib.sha256(matrix_bytes).hexdigest(),
+                "legal_identity_sha256": ["a" * 64],
+                "chosen_index": 0,
+            }],
+        }
+
+        decoded = executor._decode_trial(payload)
+
+        self.assertEqual(decoded.decisions[0].candidate_features.shape, (1, 2048))
+        self.assertEqual(decoded.decisions[0].candidate_features.tobytes(), matrix_bytes)
+
+
+class Block0DecoderCompatibilityTests(unittest.TestCase):
+    def test_registered_replacements_load_without_new_ledger_events(self):
+        ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
+        before = ledger.read_events()
+
+        examples = executor._load_training_examples(0, ledger=ledger)
+        info = ledger.update0_retry_info()
+
+        self.assertEqual(len(examples), 128)
+        self.assertEqual({example.owner_seed for example in examples}, set(range(7500001, 7500129)))
+        self.assertTrue(info["retry_available"])
+        self.assertEqual(info["retry_previous_run_id"], "UPDATE:0-86e384596b684093")
+        self.assertEqual(ledger.read_events(), before)
+
+
 class PreflightTreatmentSemanticsTests(unittest.TestCase):
     def test_root_gap_does_not_fail_episode_with_a_valid_later_mutation(self):
         searches = [
@@ -549,6 +594,11 @@ class Stage1ExecutorTests(unittest.TestCase):
             executor.budget._validate_update0_retry_state(
                 STAGE1 / "artifacts", runs, units, ("a" * 40, "b" * 64),
             )
+        validated, _ = executor.budget._validate_update0_retry_state(
+            STAGE1 / "artifacts", runs, units, executor.budget._current_package_binding(),
+        )
+        self.assertTrue(validated["retry_available"])
+        self.assertEqual(validated["retry_previous_run_id"], "UPDATE:0-86e384596b684093")
 
         manifest_path = STAGE1 / "block0-repair-lineage.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -562,24 +612,29 @@ class Stage1ExecutorTests(unittest.TestCase):
             "repair_predecessor_run_id": predecessor,
             "repair_predecessor_receipt_sha256": update["failure_receipt_sha256"],
             "reserved_cpu_seconds": cap,
+            "retry_previous_run_id": "UPDATE:0-86e384596b684093",
+            "retry_available": True,
         }
         ledger = self._test_ledger("update-retry-ledger")
         ledger.directory.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_events, ledger.events_path)
-        self.assertEqual(executor.budget._state(ledger.read_events())[1][retry_unit], [predecessor])
+        self.assertEqual(
+            executor.budget._state(ledger.read_events())[1][retry_unit],
+            [predecessor, info["retry_previous_run_id"]],
+        )
         run_id = retry_unit + "-" + "a" * 16
         with mock.patch.object(ledger, "update0_retry_info", return_value=info):
             reservation = ledger.reserve(
                 run_id=run_id, unit_id=retry_unit, role="builder",
                 reserved_cpu_seconds=cap, unit_kind="training_update",
-                previous_run_id=predecessor, checkpoint_sha256=None,
+                previous_run_id=info["retry_previous_run_id"], checkpoint_sha256=None,
                 repair_reason=info["repair_reason"],
                 repair_manifest_sha256=info["repair_manifest_sha256"],
                 repair_predecessor_run_id=info["repair_predecessor_run_id"],
                 repair_predecessor_receipt_sha256=info["repair_predecessor_receipt_sha256"],
             )
         self.assertEqual(reservation["repair_reason"], info["repair_reason"])
-        self.assertEqual(reservation["previous_run_id"], predecessor)
+        self.assertEqual(reservation["previous_run_id"], info["retry_previous_run_id"])
         self.assertEqual(reservation["checkpoint_sha256"], None)
         ledger.finish(run_id=run_id, measured_cpu_seconds=0.1, status="failed")
         with mock.patch.object(ledger, "validate_update0_retry_state", return_value=info):

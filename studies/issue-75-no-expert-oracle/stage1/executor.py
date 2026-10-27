@@ -386,11 +386,12 @@ def _decode_trial(payload: Mapping[str, Any]) -> Any:
         shape = row.get("candidate_features_shape")
         if not isinstance(shape, list) or len(shape) != 2 or not 1 <= int(shape[0]) <= MAX_FEATURE_ROWS or int(shape[1]) != POLICY_DIMENSION:
             raise ValueError("stored training feature shape differs from the locked model input")
-        raw = base64.b64decode(row["candidate_features_f32le_zlib_base64"], validate=True)
+        compressed = base64.b64decode(row["candidate_features_f32le_zlib_base64"], validate=True)
+        matrix_bytes = zlib.decompress(compressed)
         expected_size = int(shape[0]) * POLICY_DIMENSION * 4
-        if len(raw) != expected_size or _sha256(raw) != row.get("candidate_features_sha256"):
+        if len(matrix_bytes) != expected_size or _sha256(matrix_bytes) != row.get("candidate_features_sha256"):
             raise ValueError("stored compressed training features fail their size/hash check")
-        matrix = np.frombuffer(zlib.decompress(raw), dtype="<f4").reshape(tuple(map(int, shape))).copy()
+        matrix = np.frombuffer(matrix_bytes, dtype="<f4").reshape(tuple(map(int, shape))).copy()
         if not np.isfinite(matrix).all():
             raise ValueError("stored training feature matrix contains non-finite values")
         hashes = row.get("legal_identity_sha256", ())
@@ -480,15 +481,17 @@ def _current_update_reservation(
     if (
         unit_id == "UPDATE:0"
         and reservation.get("repair_reason") == budget.UPDATE0_RETRY_REASON
-        and previous_run_id == "UPDATE:0-8c7ee939e4924cc6"
         and reservation.get("checkpoint_sha256") is None
     ):
         info = ledger.validate_update0_retry_state()
-        if any(reservation.get(key) != info.get(key) for key in (
-            "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
-            "repair_predecessor_receipt_sha256",
-        )):
-            raise PermissionError("UPDATE:0 retry does not match the original failed receipt")
+        if (
+            previous_run_id != info.get("retry_previous_run_id")
+            or any(reservation.get(key) != info.get(key) for key in (
+                "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
+                "repair_predecessor_receipt_sha256",
+            ))
+        ):
+            raise PermissionError("UPDATE:0 retry does not match the exact failed predecessor chain")
         return None, None
     if previous_run_id is None:
         if len(history) != 1 or reservation.get("checkpoint_sha256") is not None:
@@ -1138,26 +1141,42 @@ def _reconcile_preflight_receipts() -> dict[str, Any]:
 def _load_training_examples(block: int, *, ledger: Any) -> list[Any]:
     rows = [row for row in _rows() if row["phase"] == "training" and int(row["block_index"]) == block]
     expected_seeds = {int(row["owner_seed"]) for row in rows}
+    compatibility_records = (
+        ledger.block0_decoder_compatibility_records() if block == 0 else {}
+    )
     examples = []
     for row in rows:
         unit_id = str(row["unit_id"])
-        receipt = _existing_unit_receipt(ledger, unit_id)
+        receipt = _existing_unit_receipt(
+            ledger, unit_id, decoder_compatibility=compatibility_records,
+        )
         if receipt is None:
             raise PermissionError("training block has an owner without a successful ledger receipt")
+        run_id = str(receipt["resource"]["ledger_run_id"])
+        compatibility = compatibility_records.get(unit_id)
+        expected_binding = (
+            ledger.binding.package_commit, ledger.binding.source_lock_sha256,
+        )
+        if compatibility is not None:
+            if compatibility.get("run_id") != run_id:
+                raise PermissionError("training owner receipt differs from its exact decoder compatibility run")
+            expected_binding = (
+                str(compatibility["package_commit"]),
+                str(compatibility["source_lock_sha256"]),
+            )
         if (
             receipt.get("phase") != "training" or receipt.get("formal") is not True
             or receipt.get("arm") != "TRAIN" or receipt.get("owner_seed") != int(row["owner_seed"])
-            or receipt.get("package_commit") != ledger.binding.package_commit
-            or receipt.get("source_lock_sha256") != ledger.binding.source_lock_sha256
+            or receipt.get("package_commit") != expected_binding[0]
+            or receipt.get("source_lock_sha256") != expected_binding[1]
         ):
-            raise PermissionError("training owner receipt differs from its locked row or active package")
+            raise PermissionError("training owner receipt differs from its locked row or active compatibility binding")
         directory = _unit_directory(row["unit_id"])
         result = receipt
         if result.get("status") != "SUCCEEDED" or result.get("training_features") is None:
             raise PermissionError("training block lacks a complete natural owner and auxiliary J evidence")
         pointer = result["training_features"]
         path = _inside_artifacts(ARTIFACT_ROOT / pointer["path"])
-        run_id = str(result["resource"]["ledger_run_id"])
         expected_path = _inside_artifacts(
             _run_artifact_directory(unit_id, run_id) / "training-features.json"
         )
@@ -1170,8 +1189,8 @@ def _load_training_examples(block: int, *, ledger: Any) -> list[Any]:
             features.get("schema_id") != FEATURE_SCHEMA
             or int(features.get("owner_seed", -1)) != int(row["owner_seed"])
             or features.get("unit_id") != unit_id
-            or features.get("package_commit") != ledger.binding.package_commit
-            or features.get("source_lock_sha256") != ledger.binding.source_lock_sha256
+            or features.get("package_commit") != expected_binding[0]
+            or features.get("source_lock_sha256") != expected_binding[1]
         ):
             raise PermissionError("training feature receipt is not for the registered owner")
         example = _training_example_from_payload(features)
@@ -1338,18 +1357,21 @@ def _expected_policy_binding(
 def _validate_success_result(
     ledger: Any, *, unit_id: str, run_id: str, reservation: Mapping[str, Any],
     result: Mapping[str, Any], result_path: Path, finish: Mapping[str, Any] | None = None,
+    source_binding: tuple[str, str] | None = None,
 ) -> dict[str, Any]:
-    binding = ledger.binding
+    package_commit, source_lock_sha256 = source_binding or (
+        ledger.binding.package_commit, ledger.binding.source_lock_sha256,
+    )
     if (
         reservation.get("unit_id") != unit_id
         or reservation.get("role") != "builder"
-        or reservation.get("package_commit") != binding.package_commit
-        or reservation.get("source_lock_sha256") != binding.source_lock_sha256
+        or reservation.get("package_commit") != package_commit
+        or reservation.get("source_lock_sha256") != source_lock_sha256
         or result.get("schema_id") != UNIT_SCHEMA
         or result.get("status") != "SUCCEEDED"
         or result.get("unit_id") != unit_id
-        or result.get("package_commit") != binding.package_commit
-        or result.get("source_lock_sha256") != binding.source_lock_sha256
+        or result.get("package_commit") != package_commit
+        or result.get("source_lock_sha256") != source_lock_sha256
     ):
         raise PermissionError(f"successful unit receipt is not bound to its reservation and package binding: {unit_id}")
     if finish is not None:
@@ -1357,8 +1379,8 @@ def _validate_success_result(
         if (
             finish.get("status") != "succeeded"
             or finish.get("unit_id") != unit_id
-            or finish.get("package_commit") != binding.package_commit
-            or finish.get("source_lock_sha256") != binding.source_lock_sha256
+            or finish.get("package_commit") != package_commit
+            or finish.get("source_lock_sha256") != source_lock_sha256
             or finish.get("result_sha256") != actual_digest
         ):
             raise PermissionError(f"successful unit result bytes differ from their immutable ledger finish: {unit_id}")
@@ -1410,7 +1432,7 @@ def _validate_success_result(
         path = _model_path(f"pi{block + 1}")
         if (
             result.get("ledger_run_id") != run_id
-            or result.get("source_commit") != binding.package_commit
+            or result.get("source_commit") != package_commit
             or result.get("block_index") != block
             or result.get("owner_count") != 128
             or result.get("completed_steps") != 64
@@ -1436,6 +1458,7 @@ def _validate_success_result(
 
 def _existing_unit_receipt(
     ledger: Any, unit_id: str, *, allow_pre_game_start_retry: bool = False,
+    decoder_compatibility: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     run_id, reservation, finish = _existing_unit(ledger, unit_id)
     if run_id is None:
@@ -1454,16 +1477,31 @@ def _existing_unit_receipt(
             return None
         raise budget.ResourceBlocked(f"failed unit is immutable and cannot be replayed: {unit_id}")
     registered = next((row for row in _rows() if row["unit_id"] == unit_id), None)
+    source_binding = (ledger.binding.package_commit, ledger.binding.source_lock_sha256)
+    compatibility = None
     if (
         registered is not None and registered["phase"] == "training"
         and int(registered.get("block_index", -1)) == 0
         and reservation.get("package_commit") != ledger.binding.package_commit
     ):
-        # The original run remains charged and immutable. The narrow whole-block
-        # correction uses a new run ID/artifact directory under the same owner.
-        ledger.block0_phase_repair_info(unit_id=unit_id)
-        return None
-    if unit_id.startswith("UPDATE:"):
+        if decoder_compatibility is None:
+            compatibility = ledger.block0_decoder_compatibility_record(unit_id, run_id)
+        else:
+            compatibility = decoder_compatibility.get(unit_id)
+        if compatibility is None:
+            # The original run remains charged and immutable. The narrow whole-block
+            # correction uses a new run ID/artifact directory under the same owner.
+            ledger.block0_phase_repair_info(unit_id=unit_id)
+            return None
+        if compatibility.get("run_id") != run_id:
+            raise PermissionError("block-0 receipt is not the exact source-locked decoder compatibility run")
+        source_binding = (
+            str(compatibility["package_commit"]),
+            str(compatibility["source_lock_sha256"]),
+        )
+    if compatibility is not None:
+        result_path = _inside_artifacts(ARTIFACT_ROOT / str(compatibility["result_path"]))
+    elif unit_id.startswith("UPDATE:"):
         result_path = _unit_directory(unit_id) / f"result-{run_id}.json"
     else:
         registered = next((row for row in _rows() if row["unit_id"] == unit_id), None)
@@ -1477,6 +1515,7 @@ def _existing_unit_receipt(
     return _validate_success_result(
         ledger, unit_id=unit_id, run_id=run_id, reservation=reservation or {},
         result=result, result_path=result_path, finish=finish,
+        source_binding=source_binding,
     )
 
 
@@ -2212,8 +2251,8 @@ def _run_update_unit(ledger: Any, block: int, *, estimates: Mapping[str, float])
             if unit_id != "UPDATE:0":
                 raise budget.ResourceBlocked(f"failed optimizer update is immutable and cannot be replayed: {unit_id}")
             repair_info = ledger.update0_retry_info()
-            if previous_run_id != repair_info["repair_predecessor_run_id"]:
-                raise budget.ResourceBlocked("UPDATE:0 retry no longer names its exact original failure")
+            if previous_run_id != repair_info["retry_previous_run_id"]:
+                raise budget.ResourceBlocked("UPDATE:0 retry no longer names its exact failed predecessor")
         elif previous_finish.get("status") == "incomplete":
             if (
                 previous_reservation is None
