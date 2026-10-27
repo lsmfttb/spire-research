@@ -749,6 +749,7 @@ def _next_training_reservation(
             return unit_id, float(estimates[unit_id])
         if finish.get("status") == "failed":
             if block == 0:
+                ledger.update0_retry_info()
                 return unit_id, float(estimates[unit_id])
             raise budget.ResourceBlocked(f"failed optimizer update is immutable: {unit_id}")
     for row in _unit_rows("evaluate"):
@@ -784,6 +785,25 @@ def _formal_forecast(ledger: Any, *, phase: str) -> dict[str, Any]:
     )
     runs, _ = _event_state(ledger)
     charges = ledger._charges(runs)
+    builder_terminal_measured = sum(
+        float(run["finish"]["measured_cpu_seconds"])
+        for run in runs.values()
+        if run["reservation"].get("role") == "builder" and run["finish"] is not None
+    )
+    builder_open_reservations = sorted(
+        (
+            {
+                "run_id": run["reservation"]["run_id"],
+                "unit_id": run["reservation"]["unit_id"],
+                "reserved_cpu_seconds": float(run["reservation"]["reserved_cpu_seconds"]),
+            }
+            for run in runs.values()
+            if run["reservation"].get("role") == "builder" and run["finish"] is None
+        ),
+        key=lambda item: item["run_id"],
+    )
+    builder_open_reserved = sum(item["reserved_cpu_seconds"] for item in builder_open_reservations)
+    builder_conservative_adjustment = float(charges["builder"]) - builder_terminal_measured - builder_open_reserved
     builder_after_next = float(charges["builder"]) + next_cap + scheduler_new_cap
     all_in_after_next = builder_after_next + max(budget.REVIEWER_LIMIT, float(charges["reviewer"]))
     if builder_after_next > budget.BUILDER_LIMIT or all_in_after_next > budget.ALL_IN_LIMIT:
@@ -812,6 +832,10 @@ def _formal_forecast(ledger: Any, *, phase: str) -> dict[str, Any]:
         "training_scheduler_plan": scheduler_plan,
         "training_scheduler_new_reservation_cpu_seconds": scheduler_new_cap,
         "builder_cpu_charged_including_open_reservations": float(charges["builder"]),
+        "builder_terminal_measured_cpu_seconds": builder_terminal_measured,
+        "builder_conservative_failed_reservation_adjustment_cpu_seconds": builder_conservative_adjustment,
+        "builder_open_reservation_cpu_seconds": builder_open_reserved,
+        "builder_open_reservations": builder_open_reservations,
         "reviewer_cpu_charged_including_open_reservations": float(charges["reviewer"]),
         "builder_after_next_cpu_seconds": builder_after_next,
         "all_in_after_next_cpu_seconds": all_in_after_next,

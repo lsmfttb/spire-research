@@ -1,0 +1,49 @@
+{
+  "attempt_history": [
+    "UPDATE:0-8c7ee939e4924cc6",
+    "UPDATE:0-86e384596b684093",
+    "UPDATE:0-25e99c84541b4dac"
+  ],
+  "authorized_retry": {
+    "block_index": 0,
+    "one_fresh_attempt_only": true,
+    "owner_seed": 7500001,
+    "repair_predecessor_receipt_sha256": "201f6a148be945dfb5123e8723c7170155e12dea8a4190dfe8802679717119b5",
+    "repair_predecessor_run_id": "UPDATE:0-25e99c84541b4dac",
+    "reserved_cpu_seconds": 3837.4562621977375,
+    "retry_previous_run_id": "UPDATE:0-25e99c84541b4dac",
+    "steps": 64
+  },
+  "block0_decoder_compatibility_manifest_sha256": "30025d12de38da023aa23d60a0b09f03790b41cbe80163a78225a9527ea010a3",
+  "block0_repair_manifest_sha256": "3c864646741682e900eb6352e0357b2650f28e3aec38519e0a2704b2ccdd542f",
+  "decoder_failure_run_id": "UPDATE:0-86e384596b684093",
+  "latest_failure": {
+    "checkpoint_sha256": null,
+    "failure_receipt_path": "units/UPDATE-0/failure-UPDATE:0-25e99c84541b4dac.json",
+    "failure_receipt_sha256": "201f6a148be945dfb5123e8723c7170155e12dea8a4190dfe8802679717119b5",
+    "finish_sha256": "a2c8d6a1b16d020adce67ce5ec24dfe4a704b753ffef134be1eaacbe7852a9cf",
+    "measured_cpu_seconds": 44.12528176000001,
+    "package_commit": "aa7d9db3824894d2e1ed87963db6abb618c7dd9d",
+    "previous_run_id": "UPDATE:0-86e384596b684093",
+    "repair_manifest_sha256": "3c864646741682e900eb6352e0357b2650f28e3aec38519e0a2704b2ccdd542f",
+    "repair_predecessor_receipt_sha256": "fe5b847ba808b394e65a96257992e2bdc88ad42ca1eff4d394f8220bd8601de0",
+    "repair_predecessor_run_id": "UPDATE:0-8c7ee939e4924cc6",
+    "repair_reason": "UPDATE0_FAILED_BEFORE_OPTIMIZER",
+    "reservation_sha256": "53353bff151b637262bbc4ec7c39a903028bde98be679d60264590ea2cddfd86",
+    "reserved_cpu_seconds": 3837.4562621977375,
+    "result_sha256": null,
+    "run_id": "UPDATE:0-25e99c84541b4dac",
+    "source_lock_sha256": "f4a8e2942dca010cdad32ce40d76e7f4c96a4c35ba1d92c4ebdd577e1fcc6f2a",
+    "started_attempts": 0,
+    "worker_job_path": "units/UPDATE-0/worker-job-UPDATE:0-25e99c84541b4dac.json",
+    "worker_job_sha256": "cc3d00772dfc31155c2c87a313a1046793637c1fa8dbecb9eea282c3eb74b746",
+    "worker_log_path": "units/UPDATE-0/worker-log-UPDATE:0-25e99c84541b4dac.txt",
+    "worker_log_sha256": "93e15acf26eec37df15ba9d5e44684946b6a597d6c6c1b42d6617e36af8fb411"
+  },
+  "latest_failure_run_id": "UPDATE:0-25e99c84541b4dac",
+  "original_failure_run_id": "UPDATE:0-8c7ee939e4924cc6",
+  "planner_decision_comment_id": 6444577814,
+  "schema_id": "issue75-update0-seed-failure-continuation-v1",
+  "scope": "STUDY_ONLY",
+  "study_id": "issue-75-no-expert-oracle"
+}

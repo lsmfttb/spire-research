@@ -633,6 +633,7 @@ def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[st
     added_repair_files = {
         "stage1/executor.py", "stage1/test_executor.py", "stage1/preflight-proxy.json",
         "stage1/block0-repair-lineage.json", "stage1/block0-decoder-compatibility.json",
+        "stage1/update0-seed-failure-continuation.json",
     }
     legacy_self_lock_files = {"source-lock.json", "source-lock.sha256"}
     existing_file_set = frozenset(lock.get("locked_files_sha256_lf", {}))
@@ -640,6 +641,7 @@ def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[st
         frozenset(SOURCE_FILES),
         frozenset(set(SOURCE_FILES) - {"stage1/block0-repair-lineage.json"}),
         frozenset(set(SOURCE_FILES) - {"stage1/block0-decoder-compatibility.json"}),
+        frozenset(set(SOURCE_FILES) - {"stage1/update0-seed-failure-continuation.json"}),
         frozenset(set(SOURCE_FILES) | {"stage1/test_activation_gate.py"}),
         frozenset((set(SOURCE_FILES) - added_repair_files) | legacy_self_lock_files),
     }
@@ -671,6 +673,7 @@ def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[st
         "stage1_budget.py", "stage1/prepare.py", "stage1/executor.py",
         "stage1/test_activation.py", "stage1/test_executor.py", "stage1/preflight-proxy.json",
         "stage1/block0-repair-lineage.json", "stage1/block0-decoder-compatibility.json",
+        "stage1/update0-seed-failure-continuation.json",
         "algorithm.py", "learning.py", "runtime.py",
     }
     if preflight_transition:

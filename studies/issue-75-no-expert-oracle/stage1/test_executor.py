@@ -142,7 +142,8 @@ class Block0DecoderCompatibilityTests(unittest.TestCase):
         self.assertEqual(len(examples), 128)
         self.assertEqual({example.owner_seed for example in examples}, set(range(7500001, 7500129)))
         self.assertTrue(info["retry_available"])
-        self.assertEqual(info["retry_previous_run_id"], "UPDATE:0-86e384596b684093")
+        self.assertEqual(info["retry_previous_run_id"], "UPDATE:0-25e99c84541b4dac")
+        self.assertEqual(info["repair_predecessor_run_id"], "UPDATE:0-25e99c84541b4dac")
         self.assertEqual(ledger.read_events(), before)
 
 
@@ -609,21 +610,27 @@ class Stage1ExecutorTests(unittest.TestCase):
             STAGE1 / "artifacts", runs, units, executor.budget._current_package_binding(),
         )
         self.assertTrue(validated["retry_available"])
-        self.assertEqual(validated["retry_previous_run_id"], "UPDATE:0-86e384596b684093")
+        self.assertEqual(validated["retry_previous_run_id"], "UPDATE:0-25e99c84541b4dac")
+        self.assertEqual(validated["repair_predecessor_run_id"], "UPDATE:0-25e99c84541b4dac")
 
-        manifest_path = STAGE1 / "block0-repair-lineage.json"
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        update = manifest["update_retry"]
-        predecessor = update["failed_predecessor_run_id"]
-        retry_unit = update["unit_id"]
-        cap = float(update["replacement_reservation_cpu_seconds"])
+        continuation_path = STAGE1 / "update0-seed-failure-continuation.json"
+        continuation = json.loads(continuation_path.read_text(encoding="utf-8"))
+        self.assertEqual(continuation["attempt_history"], [
+            "UPDATE:0-8c7ee939e4924cc6",
+            "UPDATE:0-86e384596b684093",
+            "UPDATE:0-25e99c84541b4dac",
+        ])
+        update = continuation["authorized_retry"]
+        predecessor = update["repair_predecessor_run_id"]
+        retry_unit = "UPDATE:0"
+        cap = float(update["reserved_cpu_seconds"])
         info = {
             "repair_reason": executor.budget.UPDATE0_RETRY_REASON,
-            "repair_manifest_sha256": executor.budget.sha256_bytes(manifest_path.read_bytes()),
+            "repair_manifest_sha256": executor.budget.sha256_bytes(continuation_path.read_bytes()),
             "repair_predecessor_run_id": predecessor,
-            "repair_predecessor_receipt_sha256": update["failure_receipt_sha256"],
+            "repair_predecessor_receipt_sha256": update["repair_predecessor_receipt_sha256"],
             "reserved_cpu_seconds": cap,
-            "retry_previous_run_id": "UPDATE:0-86e384596b684093",
+            "retry_previous_run_id": "UPDATE:0-25e99c84541b4dac",
             "retry_available": True,
         }
         ledger = self._test_ledger("update-retry-ledger")
@@ -631,7 +638,7 @@ class Stage1ExecutorTests(unittest.TestCase):
         shutil.copy2(source_events, ledger.events_path)
         self.assertEqual(
             executor.budget._state(ledger.read_events())[1][retry_unit],
-            [predecessor, info["retry_previous_run_id"]],
+            continuation["attempt_history"],
         )
         run_id = retry_unit + "-" + "a" * 16
         with mock.patch.object(ledger, "update0_retry_info", return_value=info):
@@ -644,6 +651,10 @@ class Stage1ExecutorTests(unittest.TestCase):
                 repair_predecessor_run_id=info["repair_predecessor_run_id"],
                 repair_predecessor_receipt_sha256=info["repair_predecessor_receipt_sha256"],
             )
+        self.assertEqual(
+            executor.budget._state(ledger.read_events())[1][retry_unit],
+            continuation["attempt_history"] + [run_id],
+        )
         self.assertEqual(reservation["repair_reason"], info["repair_reason"])
         self.assertEqual(reservation["previous_run_id"], info["retry_previous_run_id"])
         self.assertEqual(reservation["checkpoint_sha256"], None)
@@ -675,20 +686,37 @@ class Stage1ExecutorTests(unittest.TestCase):
     def test_formal_forecast_checks_next_repair_reservation_and_live_caps(self):
         ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
         before = ledger.read_events()
+        runs, _ = executor.budget._state(before)
         estimates, _ = executor._forecast_estimates(ledger)
         result = executor._formal_forecast(ledger, phase="training")
         self.assertEqual(result["status"], "NEXT_RESERVATION_FITS")
         self.assertEqual(result["phase"], "training")
-        self.assertEqual(result["next_unit_id"], "TRAIN:7500001")
-        self.assertEqual(result["next_unit_reservation_cpu_seconds"], estimates["TRAIN:7500001"])
-        self.assertTrue(result["full_cohort_projection_is_not_a_resource_exhaustion_finding"])
+        self.assertEqual(result["next_unit_id"], "UPDATE:0")
+        self.assertEqual(result["next_unit_reservation_cpu_seconds"], estimates["UPDATE:0"])
         self.assertEqual(result["training_scheduler_plan"]["action"], "reserve")
-        self.assertEqual(result["training_scheduler_plan"]["unit_id"], "SCHEDULER:TRAIN:CONTINUATION:1")
+        self.assertEqual(result["training_scheduler_plan"]["unit_id"], "SCHEDULER:TRAIN:CONTINUATION:6")
         self.assertEqual(result["training_scheduler_new_reservation_cpu_seconds"], 20.0)
-        self.assertAlmostEqual(
-            result["static_projection_with_scheduler_continuation_cpu_seconds_advisory_only"],
-            169993.18149394685,
+        charged_run = runs["UPDATE:0-25e99c84541b4dac"]
+        self.assertEqual(
+            executor.budget._charge(charged_run),
+            charged_run["reservation"]["reserved_cpu_seconds"],
         )
+        self.assertAlmostEqual(
+            result["builder_conservative_failed_reservation_adjustment_cpu_seconds"],
+            3837.4562621977375 - 44.12528176000001,
+        )
+        self.assertEqual(result["builder_open_reservation_cpu_seconds"], 220.0)
+        self.assertIn(
+            "SCHEDULER:TRAIN:CONTINUATION:5",
+            {item["unit_id"] for item in result["builder_open_reservations"]},
+        )
+        self.assertAlmostEqual(
+            result["builder_terminal_measured_cpu_seconds"]
+            + result["builder_conservative_failed_reservation_adjustment_cpu_seconds"]
+            + result["builder_open_reservation_cpu_seconds"],
+            result["builder_cpu_charged_including_open_reservations"],
+        )
+        self.assertTrue(result["full_cohort_projection_is_not_a_resource_exhaustion_finding"])
         self.assertLessEqual(result["builder_after_next_cpu_seconds"], executor.budget.BUILDER_LIMIT)
         self.assertLessEqual(result["all_in_after_next_cpu_seconds"], executor.budget.ALL_IN_LIMIT)
         self.assertEqual(ledger.read_events(), before)

@@ -49,6 +49,7 @@ LOCKED_PACKAGE_FILES = (
     "stage1/test_executor.py",
     "stage1/block0-repair-lineage.json",
     "stage1/block0-decoder-compatibility.json",
+    "stage1/update0-seed-failure-continuation.json",
 )
 LOCKED_REPOSITORY_DEPENDENCIES = (
     "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
@@ -393,6 +394,13 @@ UPDATE0_RETRY_REASON = "UPDATE0_FAILED_BEFORE_OPTIMIZER"
 BLOCK0_ORIGINAL_PACKAGE_COMMIT = "482c5b3b87e38066c8738d6f102906f965b9d0ae"
 BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256 = "ed54abb587d28661968544cbca31eabfb4dc8fad77696bcf726911b06fc01735"
 BLOCK0_REPAIR_OWNER_RANGE = (7_500_001, 7_500_128)
+UPDATE0_SEED_FAILURE_RUN_ID = "UPDATE:0-25e99c84541b4dac"
+UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID = "UPDATE:0-86e384596b684093"
+UPDATE0_SEED_FAILURE_PACKAGE_COMMIT = "aa7d9db3824894d2e1ed87963db6abb618c7dd9d"
+UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256 = "f4a8e2942dca010cdad32ce40d76e7f4c96a4c35ba1d92c4ebdd577e1fcc6f2a"
+UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS = 3837.4562621977375
+UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS = 44.12528176000001
+UPDATE0_SEED_FAILURE_MANIFEST = "update0-seed-failure-continuation.json"
 
 
 def _load_block0_repair_manifest(artifacts_root: Path) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
@@ -706,6 +714,170 @@ def _validate_block0_decoder_compatibility_owner(
     }
 
 
+def _load_update0_seed_failure_continuation(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
+) -> tuple[dict[str, Any], str]:
+    path = STAGE1 / UPDATE0_SEED_FAILURE_MANIFEST
+    try:
+        raw = path.read_bytes()
+        manifest = json.loads(raw)
+    except (OSError, ValueError) as exc:
+        raise ResourceBlocked("the source-locked UPDATE:0 seed-failure continuation is unavailable") from exc
+    if not isinstance(manifest, Mapping):
+        raise ResourceBlocked("the UPDATE:0 continuation manifest is malformed")
+    repair_path = STAGE1 / "block0-repair-lineage.json"
+    compatibility_path = STAGE1 / "block0-decoder-compatibility.json"
+    repair_sha = sha256_bytes(repair_path.read_bytes())
+    compatibility_sha = sha256_bytes(compatibility_path.read_bytes())
+    required = {
+        "schema_id": "issue75-update0-seed-failure-continuation-v1",
+        "study_id": "issue-75-no-expert-oracle",
+        "scope": "STUDY_ONLY",
+        "planner_decision_comment_id": 6444577814,
+        "block0_repair_manifest_sha256": repair_sha,
+        "block0_decoder_compatibility_manifest_sha256": compatibility_sha,
+        "original_failure_run_id": "UPDATE:0-8c7ee939e4924cc6",
+        "decoder_failure_run_id": UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID,
+        "latest_failure_run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "attempt_history": [
+            "UPDATE:0-8c7ee939e4924cc6",
+            UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID,
+            UPDATE0_SEED_FAILURE_RUN_ID,
+        ],
+    }
+    latest = manifest.get("latest_failure")
+    retry = manifest.get("authorized_retry")
+    if (
+        set(manifest) != set(required) | {"latest_failure", "authorized_retry"}
+        or any(manifest.get(key) != value for key, value in required.items())
+        or not isinstance(latest, Mapping)
+        or not isinstance(retry, Mapping)
+    ):
+        raise ResourceBlocked("the UPDATE:0 continuation manifest differs from the reviewed source lineage")
+    required_latest = {
+        "run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "package_commit": UPDATE0_SEED_FAILURE_PACKAGE_COMMIT,
+        "source_lock_sha256": UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256,
+        "reserved_cpu_seconds": UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS,
+        "measured_cpu_seconds": UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS,
+        "started_attempts": 0,
+        "checkpoint_sha256": None,
+        "result_sha256": None,
+        "previous_run_id": UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID,
+        "repair_reason": UPDATE0_RETRY_REASON,
+        "repair_manifest_sha256": "3c864646741682e900eb6352e0357b2650f28e3aec38519e0a2704b2ccdd542f",
+        "repair_predecessor_run_id": "UPDATE:0-8c7ee939e4924cc6",
+        "repair_predecessor_receipt_sha256": "fe5b847ba808b394e65a96257992e2bdc88ad42ca1eff4d394f8220bd8601de0",
+        "reservation_sha256": "53353bff151b637262bbc4ec7c39a903028bde98be679d60264590ea2cddfd86",
+        "finish_sha256": "a2c8d6a1b16d020adce67ce5ec24dfe4a704b753ffef134be1eaacbe7852a9cf",
+        "failure_receipt_path": "units/UPDATE-0/failure-UPDATE:0-25e99c84541b4dac.json",
+        "failure_receipt_sha256": "201f6a148be945dfb5123e8723c7170155e12dea8a4190dfe8802679717119b5",
+        "worker_job_path": "units/UPDATE-0/worker-job-UPDATE:0-25e99c84541b4dac.json",
+        "worker_job_sha256": "cc3d00772dfc31155c2c87a313a1046793637c1fa8dbecb9eea282c3eb74b746",
+        "worker_log_path": "units/UPDATE-0/worker-log-UPDATE:0-25e99c84541b4dac.txt",
+        "worker_log_sha256": "93e15acf26eec37df15ba9d5e44684946b6a597d6c6c1b42d6617e36af8fb411",
+    }
+    required_retry = {
+        "one_fresh_attempt_only": True,
+        "retry_previous_run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "repair_predecessor_run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "repair_predecessor_receipt_sha256": required_latest["failure_receipt_sha256"],
+        "reserved_cpu_seconds": UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS,
+        "block_index": 0,
+        "owner_seed": 7500001,
+        "steps": 64,
+    }
+    if (
+        set(latest) != set(required_latest)
+        or any(latest.get(key) != value for key, value in required_latest.items())
+        or set(retry) != set(required_retry)
+        or any(retry.get(key) != value for key, value in required_retry.items())
+    ):
+        raise ResourceBlocked("the UPDATE:0 seed-failure evidence or authorized retry limit changed")
+    run = runs.get(UPDATE0_SEED_FAILURE_RUN_ID)
+    reservation = None if not isinstance(run, Mapping) else run.get("reservation")
+    finish = None if not isinstance(run, Mapping) else run.get("finish")
+    if (
+        not isinstance(reservation, Mapping) or not isinstance(finish, Mapping)
+        or sha256_bytes(canonical(reservation)) != latest["reservation_sha256"]
+        or sha256_bytes(canonical(finish)) != latest["finish_sha256"]
+    ):
+        raise ResourceBlocked("the latest UPDATE:0 failure ledger events differ from the immutable continuation")
+    expected_reservation = {
+        "run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "unit_id": "UPDATE:0",
+        "unit_kind": "training_update",
+        "role": "builder",
+        "package_commit": UPDATE0_SEED_FAILURE_PACKAGE_COMMIT,
+        "source_lock_sha256": UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256,
+        "reserved_cpu_seconds": UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS,
+        "previous_run_id": UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID,
+        "repair_reason": UPDATE0_RETRY_REASON,
+        "repair_manifest_sha256": required_latest["repair_manifest_sha256"],
+        "repair_predecessor_run_id": required_latest["repair_predecessor_run_id"],
+        "repair_predecessor_receipt_sha256": required_latest["repair_predecessor_receipt_sha256"],
+        "attempt_cap": None,
+        "checkpoint_sha256": None,
+        "retry_reason": None,
+        "pre_game_start_proof": None,
+        "pre_game_start_proof_sha256": None,
+    }
+    expected_finish = {
+        "run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "unit_id": "UPDATE:0",
+        "status": "failed",
+        "package_commit": UPDATE0_SEED_FAILURE_PACKAGE_COMMIT,
+        "source_lock_sha256": UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256,
+        "reserved_cpu_seconds": UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS,
+        "measured_cpu_seconds": UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS,
+        "started_attempts": 0,
+        "checkpoint_sha256": None,
+        "result_sha256": None,
+    }
+    if (
+        any(reservation.get(key) != value for key, value in expected_reservation.items())
+        or any(finish.get(key) != value for key, value in expected_finish.items())
+    ):
+        raise ResourceBlocked("the latest UPDATE:0 failure is not the exact zero-start source-bound receipt")
+    failure = json.loads(_compatibility_artifact_bytes(
+        artifacts_root, latest["failure_receipt_path"], latest["failure_receipt_sha256"],
+    ))
+    job = json.loads(_compatibility_artifact_bytes(
+        artifacts_root, latest["worker_job_path"], latest["worker_job_sha256"],
+    ))
+    log = json.loads(_compatibility_artifact_bytes(
+        artifacts_root, latest["worker_log_path"], latest["worker_log_sha256"],
+    ))
+    if not all(isinstance(item, Mapping) for item in (failure, job, log)):
+        raise ResourceBlocked("the latest UPDATE:0 worker evidence is malformed")
+    if (
+        failure.get("schema_id") != "issue75-stage1-unit-result-v1"
+        or failure.get("unit_id") != "UPDATE:0"
+        or failure.get("run_id") != UPDATE0_SEED_FAILURE_RUN_ID
+        or failure.get("status") != "FAILED"
+        or failure.get("boundary") != "worker_returned_nonzero"
+        or failure.get("reserved_cpu_seconds") != UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS
+        or failure.get("measured_cpu_seconds") != UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS
+        or failure.get("checkpoint_sha256") is not None
+        or job.get("schema_id") != "issue75-stage1-worker-job-v1"
+        or job.get("unit_id") != "UPDATE:0"
+        or job.get("run_id") != UPDATE0_SEED_FAILURE_RUN_ID
+        or job.get("phase") != "update"
+        or job.get("package_commit") != UPDATE0_SEED_FAILURE_PACKAGE_COMMIT
+        or job.get("source_lock_sha256") != UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256
+        or job.get("previous_run_id") != UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID
+        or job.get("repair_reason") != UPDATE0_RETRY_REASON
+        or job.get("repair_manifest_sha256") != required_latest["repair_manifest_sha256"]
+        or job.get("repair_predecessor_run_id") != required_latest["repair_predecessor_run_id"]
+        or job.get("repair_predecessor_receipt_sha256") != required_latest["repair_predecessor_receipt_sha256"]
+        or job.get("checkpoint_sha256") is not None
+        or log.get("error_type") != "PermissionError"
+        or log.get("status") != "STAGE1_WORKER_FAILED"
+    ):
+        raise ResourceBlocked("the latest UPDATE:0 worker artifacts differ from the immutable failure")
+    return dict(manifest), sha256_bytes(raw)
+
+
 def _validate_update0_retry_state(
     artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
     units: Mapping[str, Sequence[str]], current_binding: tuple[str, str],
@@ -718,7 +890,7 @@ def _validate_update0_retry_state(
         raise ResourceBlocked("UPDATE:0 repair cannot use a caller-supplied package binding")
 
     manifest, manifest_sha, original_by_unit = _load_block0_repair_manifest(artifacts_root)
-    compatibility, _, _, compatibility_by_unit = _load_block0_decoder_compatibility(artifacts_root)
+    compatibility, compatibility_sha, _, compatibility_by_unit = _load_block0_decoder_compatibility(artifacts_root)
     for unit_id, owner in original_by_unit.items():
         expected = [entry["run_id"] for entry in owner["history"]]
         history = list(units.get(unit_id, ()))
@@ -836,53 +1008,59 @@ def _validate_update0_retry_state(
     ):
         raise ResourceBlocked("the intermediate UPDATE:0 failure artifacts differ from their exact locked receipt")
 
+    continuation, continuation_sha = _load_update0_seed_failure_continuation(artifacts_root, runs)
+    if continuation["block0_decoder_compatibility_manifest_sha256"] != compatibility_sha:
+        raise ResourceBlocked("the UPDATE:0 continuation is detached from its decoder-compatibility source")
+    latest = continuation["latest_failure"]
+    retry = continuation["authorized_retry"]
+    if len(history) < 3 or history[2] != latest["run_id"]:
+        raise ResourceBlocked("UPDATE:0 lineage does not include the exact latest seed-failure receipt")
     info = {
         "repair_reason": UPDATE0_RETRY_REASON,
-        "repair_manifest_sha256": manifest_sha,
-        "repair_predecessor_run_id": predecessor,
-        "repair_predecessor_receipt_sha256": str(update["failure_receipt_sha256"]),
-        "reserved_cpu_seconds": float(update["replacement_reservation_cpu_seconds"]),
-        "retry_previous_run_id": intermediate_run_id,
-        "retry_available": len(history) == 2,
+        "repair_manifest_sha256": continuation_sha,
+        "repair_predecessor_run_id": retry["repair_predecessor_run_id"],
+        "repair_predecessor_receipt_sha256": retry["repair_predecessor_receipt_sha256"],
+        "reserved_cpu_seconds": float(retry["reserved_cpu_seconds"]),
+        "retry_previous_run_id": retry["retry_previous_run_id"],
+        "retry_available": len(history) == 3,
     }
-    if len(history) == 2:
-        if runs[history[-1]]["finish"].get("status") != "failed":
-            raise ResourceBlocked("the corrected UPDATE:0 attempt is no longer available")
+    if len(history) == 3:
         for name in ("pi1.pt", "block-0-step.pt"):
             if (Path(artifacts_root) / "models" / name).exists():
                 raise ResourceBlocked("UPDATE:0 has an optimizer checkpoint and cannot start a fresh retry")
-        return info, manifest_sha
+        return info, continuation_sha
 
-    previous = intermediate_run_id
-    for index, run_id in enumerate(history[2:]):
+    previous = latest["run_id"]
+    for index, run_id in enumerate(history[3:]):
         current = runs.get(run_id)
         if not isinstance(current, Mapping):
             raise ResourceBlocked("a corrected UPDATE:0 attempt is missing from the ledger")
-        retry, terminal = current["reservation"], current["finish"]
+        retry_reservation, terminal = current["reservation"], current["finish"]
         first = index == 0
         if (
-            retry.get("repair_reason") != info["repair_reason"]
-            or retry.get("repair_manifest_sha256") != manifest_sha
-            or retry.get("repair_predecessor_run_id") != predecessor
-            or retry.get("repair_predecessor_receipt_sha256") != info["repair_predecessor_receipt_sha256"]
-            or retry.get("package_commit") != current_binding[0]
-            or retry.get("source_lock_sha256") != current_binding[1]
-            or retry.get("unit_kind") != "training_update" or retry.get("role") != "builder"
-            or float(retry.get("reserved_cpu_seconds", info["reserved_cpu_seconds"] + 1)) > info["reserved_cpu_seconds"]
-            or retry.get("previous_run_id") != previous
-            or (first and retry.get("checkpoint_sha256") is not None)
+            retry_reservation.get("repair_reason") != info["repair_reason"]
+            or retry_reservation.get("repair_manifest_sha256") != continuation_sha
+            or retry_reservation.get("repair_predecessor_run_id") != info["repair_predecessor_run_id"]
+            or retry_reservation.get("repair_predecessor_receipt_sha256") != info["repair_predecessor_receipt_sha256"]
+            or retry_reservation.get("package_commit") != current_binding[0]
+            or retry_reservation.get("source_lock_sha256") != current_binding[1]
+            or retry_reservation.get("unit_kind") != "training_update"
+            or retry_reservation.get("role") != "builder"
+            or float(retry_reservation.get("reserved_cpu_seconds", info["reserved_cpu_seconds"] + 1)) > info["reserved_cpu_seconds"]
+            or retry_reservation.get("previous_run_id") != previous
+            or (first and retry_reservation.get("checkpoint_sha256") is not None)
             or (not first and (
                 runs[previous]["finish"] is None
                 or runs[previous]["finish"].get("status") != "incomplete"
-                or retry.get("checkpoint_sha256") != runs[previous]["finish"].get("checkpoint_sha256")
+                or retry_reservation.get("checkpoint_sha256") != runs[previous]["finish"].get("checkpoint_sha256")
             ))
             or (terminal is not None and terminal.get("status") not in {"succeeded", "incomplete", "failed"})
         ):
             raise ResourceBlocked("corrected UPDATE:0 attempt/resume chain differs from its exact repair lineage")
-        if terminal is not None and terminal.get("status") in {"succeeded", "failed"} and index != len(history[2:]) - 1:
+        if terminal is not None and terminal.get("status") in {"succeeded", "failed"} and index != len(history[3:]) - 1:
             raise ResourceBlocked("UPDATE:0 has work after a terminal corrected attempt")
         previous = run_id
-    return info, manifest_sha
+    return info, continuation_sha
 
 def _pre_game_start_failure_proof(
     artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]], units: Mapping[str, Sequence[str]],
@@ -1046,8 +1224,24 @@ def _scheduler_train_recovery_cpu_upper_bound(
 
 
 def _charge(run: Mapping[str, Any]) -> float:
-    done = run["finish"]
-    return float(run["reservation"]["reserved_cpu_seconds"] if done is None else done["measured_cpu_seconds"])
+    reservation, done = run["reservation"], run["finish"]
+    if reservation.get("run_id") == UPDATE0_SEED_FAILURE_RUN_ID:
+        if (
+            reservation.get("unit_id") != "UPDATE:0"
+            or reservation.get("role") != "builder"
+            or reservation.get("package_commit") != UPDATE0_SEED_FAILURE_PACKAGE_COMMIT
+            or reservation.get("source_lock_sha256") != UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256
+            or reservation.get("reserved_cpu_seconds") != UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS
+            or not isinstance(done, Mapping)
+            or done.get("status") != "failed"
+            or done.get("measured_cpu_seconds") != UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS
+            or done.get("started_attempts") != 0
+            or done.get("checkpoint_sha256") is not None
+            or done.get("result_sha256") is not None
+        ):
+            raise LedgerCorrupt("the reviewed UPDATE:0 failure no longer matches its conservative reservation charge")
+        return UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS
+    return float(reservation["reserved_cpu_seconds"] if done is None else done["measured_cpu_seconds"])
 
 
 class Stage1Ledger:
@@ -1234,7 +1428,7 @@ class Stage1Ledger:
         history = list(units.get("UPDATE:0", ()))
         if (
             info.get("retry_available") is not True
-            or len(history) != 2
+            or len(history) != 3
             or history[-1] != info.get("retry_previous_run_id")
         ):
             raise ResourceBlocked("the one corrected UPDATE:0 attempt is unavailable or already consumed")
