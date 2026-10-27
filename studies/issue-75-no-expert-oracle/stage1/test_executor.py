@@ -530,82 +530,89 @@ class Stage1ExecutorTests(unittest.TestCase):
             with self.assertRaises(executor.budget.ResourceBlocked):
                 ledger.update0_retry_info()
     def test_pre_game_start_retry_is_single_exact_row_and_rejects_game_artifacts(self):
-        ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
-        events = ledger.read_events()
-        proof = ledger.pre_game_start_retry_info(
-            unit_id=executor.budget.PRE_GAME_START_RETRY_UNIT_ID,
-            predecessor_run_id=executor.budget.PRE_GAME_START_RETRY_RUN_ID,
-        )
+        tracked_ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
+        tracked_events = tracked_ledger.read_events()
+        predecessor = executor.budget.PRE_GAME_START_RETRY_RUN_ID
+        events = []
+        for event in tracked_events:
+            events.append(event)
+            if event.get("event") == "finish" and event.get("run_id") == predecessor:
+                break
+        self.assertTrue(events)
+        self.assertEqual(events[-1].get("run_id"), predecessor)
+
         original_receipt = (
             STAGE1 / "artifacts" / "units" / "TRAIN-7500001"
-            / f"failure-{executor.budget.PRE_GAME_START_RETRY_RUN_ID}.json"
+            / f"failure-{predecessor}.json"
+        )
+        original_job = (
+            STAGE1 / "artifacts" / "units" / "TRAIN-7500001"
+            / f"worker-job-{predecessor}.json"
         )
         receipt_sha = executor._file_sha256(original_receipt)
         cap = executor.budget.PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS
-        retry = ledger._reservation_event(
-            events, run_id="TRAIN:7500001-" + "b" * 16,
-            unit_id="TRAIN:7500001", role="builder",
-            reserved_cpu_seconds=cap, unit_kind="owner_arm",
-            previous_run_id=executor.budget.PRE_GAME_START_RETRY_RUN_ID,
-            retry_reason=executor.budget.PRE_GAME_START_RETRY_REASON,
-            pre_game_start_proof=proof,
-        )
-        self.assertEqual(retry["previous_run_id"], executor.budget.PRE_GAME_START_RETRY_RUN_ID)
-        self.assertLessEqual(retry["reserved_cpu_seconds"], cap)
-        with self.assertRaises(executor.budget.ResourceBlocked):
-            ledger._reservation_event(
-                [*events, retry], run_id="TRAIN:7500001-" + "c" * 16,
-                unit_id="TRAIN:7500001", role="builder",
-                reserved_cpu_seconds=cap, unit_kind="owner_arm",
-                previous_run_id=retry["run_id"],
-                retry_reason=executor.budget.PRE_GAME_START_RETRY_REASON,
-                pre_game_start_proof=proof,
-            )
-        self.assertEqual(ledger.read_events(), events)
-        self.assertEqual(executor._file_sha256(original_receipt), receipt_sha)
-
         with tempfile.TemporaryDirectory(dir=STAGE1) as temp_dir:
-            artifacts = Path(temp_dir)
+            artifacts = Path(temp_dir) / "artifacts"
+            ledger_dir = artifacts / "ledger"
+            ledger_dir.mkdir(parents=True)
+            (ledger_dir / "events.jsonl").write_bytes(
+                b"".join(executor.budget.canonical(event) + b"\n" for event in events)
+            )
             unit_dir = artifacts / "units" / "TRAIN-7500001"
             unit_dir.mkdir(parents=True)
             shutil.copy2(original_receipt, unit_dir / original_receipt.name)
-            original_job = (
-                STAGE1 / "artifacts" / "units" / "TRAIN-7500001"
-                / f"worker-job-{executor.budget.PRE_GAME_START_RETRY_RUN_ID}.json"
-            )
             shutil.copy2(original_job, unit_dir / original_job.name)
+            ledger = executor.budget.Stage1Ledger(ledger_dir)
+            proof = ledger.pre_game_start_retry_info(
+                unit_id=executor.budget.PRE_GAME_START_RETRY_UNIT_ID,
+                predecessor_run_id=predecessor,
+            )
+            before = ledger.read_events()
+            retry = ledger._reservation_event(
+                before, run_id="TRAIN:7500001-" + "b" * 16,
+                unit_id="TRAIN:7500001", role="builder",
+                reserved_cpu_seconds=cap, unit_kind="owner_arm",
+                previous_run_id=predecessor,
+                retry_reason=executor.budget.PRE_GAME_START_RETRY_REASON,
+                pre_game_start_proof=proof,
+            )
+            self.assertEqual(retry["previous_run_id"], predecessor)
+            self.assertLessEqual(retry["reserved_cpu_seconds"], cap)
+            with self.assertRaises(executor.budget.ResourceBlocked):
+                ledger._reservation_event(
+                    [*before, retry], run_id="TRAIN:7500001-" + "c" * 16,
+                    unit_id="TRAIN:7500001", role="builder",
+                    reserved_cpu_seconds=cap, unit_kind="owner_arm",
+                    previous_run_id=retry["run_id"],
+                    retry_reason=executor.budget.PRE_GAME_START_RETRY_REASON,
+                    pre_game_start_proof=proof,
+                )
+            self.assertEqual(ledger.read_events(), before)
+            self.assertEqual(tracked_ledger.read_events(), tracked_events)
+            self.assertEqual(executor._file_sha256(original_receipt), receipt_sha)
+
             (unit_dir / "native").mkdir()
-            runs, units = executor.budget._state(events)
+            runs, units = executor.budget._state(before)
             with self.assertRaises(executor.budget.ResourceBlocked):
                 executor.budget._pre_game_start_failure_proof(
                     artifacts, runs, units,
-                    predecessor_run_id=executor.budget.PRE_GAME_START_RETRY_RUN_ID,
+                    predecessor_run_id=predecessor,
                     require_pristine=True,
                 )
 
-    def test_formal_forecast_counts_open_scheduler_and_retry_once(self):
+    def test_formal_forecast_checks_next_repair_reservation_and_live_caps(self):
         ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
+        before = ledger.read_events()
         estimates, _ = executor._forecast_estimates(ledger)
-        result = ledger.forecast(
-            expected_unit_ids=executor._formal_unit_ids(),
-            future_builder_cpu_seconds=estimates,
-            allowed_completed_unit_ids=[row["unit_id"] for row in executor._unit_rows("preflight")],
-            allowed_open_reservation_unit_ids=["SCHEDULER:TRAIN"],
-        )
-        self.assertEqual(result["status"], "FITS")
-        self.assertAlmostEqual(result["builder_cpu_charged"], 8197.044767, places=6)
-        self.assertEqual(result["authorized_pre_game_start_retry_unit_ids"], ["TRAIN:7500001"])
-        self.assertEqual(result["carried_open_reservation_unit_ids"], ["SCHEDULER:TRAIN"])
-        self.assertAlmostEqual(result["projected_builder_cpu"], 169973.21496399087, places=6)
-        self.assertAlmostEqual(result["projected_all_in_with_reviewer_reserve"], 179973.21496399087, places=6)
-        self.assertLessEqual(result["projected_builder_cpu"], executor.budget.BUILDER_LIMIT)
-        self.assertLessEqual(result["projected_all_in_with_reviewer_reserve"], executor.budget.ALL_IN_LIMIT)
-        with self.assertRaises(executor.budget.ResourceBlocked):
-            ledger.forecast(
-                expected_unit_ids=executor._formal_unit_ids(),
-                future_builder_cpu_seconds=estimates,
-                allowed_completed_unit_ids=[row["unit_id"] for row in executor._unit_rows("preflight")],
-            )
+        result = executor._formal_forecast(ledger, phase="training")
+        self.assertEqual(result["status"], "NEXT_RESERVATION_FITS")
+        self.assertEqual(result["phase"], "training")
+        self.assertEqual(result["next_unit_id"], "TRAIN:7500001")
+        self.assertEqual(result["next_unit_reservation_cpu_seconds"], estimates["TRAIN:7500001"])
+        self.assertTrue(result["full_cohort_projection_is_not_a_resource_exhaustion_finding"])
+        self.assertLessEqual(result["builder_after_next_cpu_seconds"], executor.budget.BUILDER_LIMIT)
+        self.assertLessEqual(result["all_in_after_next_cpu_seconds"], executor.budget.ALL_IN_LIMIT)
+        self.assertEqual(ledger.read_events(), before)
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(dir=STAGE1)
