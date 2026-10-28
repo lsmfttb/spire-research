@@ -1187,8 +1187,10 @@ class Stage1ExecutorTests(unittest.TestCase):
         order = []
         ledger = FakeLedger(unit_kind="owner_arm")
         update_receipts = {}
+        compatibility = {"TRAIN:7500001": {"run_id": "prior-replacement"}}
 
-        def run_owner_batch(_ledger, rows, *, phase, estimates):
+        def run_owner_batch(_ledger, rows, *, phase, estimates, decoder_compatibility=None):
+            self.assertIs(decoder_compatibility, compatibility)
             self.assertEqual(phase, "train")
             self.assertEqual(len(rows), 1)
             row = rows[0]
@@ -1214,6 +1216,10 @@ class Stage1ExecutorTests(unittest.TestCase):
                 "preflight_report_sha256": "1" * 64, "cost_forecast_sha256": "2" * 64,
             }),
             mock.patch.object(executor, "_forecast_estimates", return_value=({}, {})),
+            mock.patch.object(
+                executor, "_training_block0_decoder_compatibility",
+                return_value=compatibility,
+            ) as validate_compatibility,
             mock.patch.object(executor, "_formal_concurrency", return_value=1),
             mock.patch.object(executor, "_run_scheduler_reservation", return_value={
                 "run_id": "scheduler-test", "unit_id": "SCHEDULER:TRAIN",
@@ -1225,6 +1231,7 @@ class Stage1ExecutorTests(unittest.TestCase):
             }) as finish_scheduler,
             mock.patch.object(executor, "_existing_unit_receipt", side_effect=existing_receipt),
             mock.patch.object(executor, "_run_owner_batch", side_effect=run_owner_batch),
+            mock.patch.object(executor, "_write_once"),
             mock.patch.object(executor, "_all_units_succeeded", return_value=True),
             mock.patch.object(executor, "_run_update_unit", side_effect=update),
             mock.patch.object(executor, "_load_model", return_value=(None, "3" * 64, {"source": "pi4"})),
@@ -1235,6 +1242,7 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertEqual(len(report["training_seed_ids"]), 512)
         scheduler_reservation.assert_called_once()
         finish_scheduler.assert_called_once()
+        validate_compatibility.assert_called_once_with(ledger)
         self.assertEqual([event for event in order if event[0] == "update"], [
             ("update", 0, None), ("update", 1, None),
             ("update", 2, None), ("update", 3, None),
@@ -1244,6 +1252,45 @@ class Stage1ExecutorTests(unittest.TestCase):
             block_events = order[start:start + 129]
             self.assertEqual(len([event for event in block_events if event[0] == "owner"]), 128)
             self.assertEqual(block_events[-1], ("update", block, None))
+
+    def test_training_block0_decoder_compatibility_is_loaded_once_for_legacy_rows(self):
+        row = next(
+            item for item in executor._unit_rows("train")
+            if item["phase"] == "training" and item["block_index"] == 0
+        )
+        ledger = FakeLedger(unit_kind="owner_arm")
+        records = {row["unit_id"]: {"run_id": "prior-replacement"}}
+        runs = {"prior-run": {"reservation": {"package_commit": "c" * 40}}}
+        units = {row["unit_id"]: ["prior-run"]}
+        with (
+            mock.patch.object(executor, "_event_state", return_value=(runs, units)),
+            mock.patch.object(executor, "_rows", return_value=[row]),
+            mock.patch.object(
+                ledger, "block0_decoder_compatibility_records",
+                return_value=records, create=True,
+            ) as validate_records,
+        ):
+            self.assertIs(executor._training_block0_decoder_compatibility(ledger), records)
+        validate_records.assert_called_once_with()
+
+    def test_run_owner_batch_reuses_prevalidated_block0_decoder_compatibility(self):
+        row = next(
+            item for item in executor._unit_rows("train")
+            if item["phase"] == "training" and item["block_index"] == 0
+        )
+        ledger = FakeLedger(unit_kind="owner_arm")
+        records = {row["unit_id"]: {"run_id": "prior-replacement"}}
+        expected = {"status": "SUCCEEDED", "unit_id": row["unit_id"]}
+        with mock.patch.object(executor, "_existing_unit_receipt", return_value=expected) as read_receipt:
+            result = executor._run_owner_batch(
+                ledger, [row], phase="train", estimates={},
+                decoder_compatibility=records,
+            )
+        self.assertEqual(result, [expected])
+        read_receipt.assert_called_once_with(
+            ledger, row["unit_id"], allow_pre_game_start_retry=True,
+            decoder_compatibility=records,
+        )
 
     def test_scheduler_recovery_continuation_is_separately_capped_and_sequenced(self):
         ledger = FakeReportLedger()
@@ -1513,6 +1560,7 @@ class Stage1ExecutorTests(unittest.TestCase):
 
         ledger.reserve_many.side_effect = reserve_many
         ledger.require_open_reservation.side_effect = lambda *, run_id, unit_id: reservations[run_id]
+        compatibility = {"TRAIN:7500001": {"run_id": "prior-replacement"}}
         captured = []
 
         def validate_then_stop(items):
@@ -1534,7 +1582,7 @@ class Stage1ExecutorTests(unittest.TestCase):
             }
 
         with (
-            mock.patch.object(executor, "_existing_unit_receipt", return_value=None),
+            mock.patch.object(executor, "_existing_unit_receipt", return_value=None) as existing_receipt,
             mock.patch.object(executor, "_existing_unit", return_value=(None, None, None)),
             mock.patch.object(executor.budget, "verify_stage1_package"),
             mock.patch.object(executor.budget, "open_reserved_stage1_worker_ledger", return_value=ledger),
@@ -1544,7 +1592,12 @@ class Stage1ExecutorTests(unittest.TestCase):
             with self.assertRaises(executor.budget.ResourceBlocked):
                 executor._run_owner_batch(
                     ledger, [row], phase="train", estimates={row["unit_id"]: 2.0},
+                    decoder_compatibility=compatibility,
                 )
+        existing_receipt.assert_called_once_with(
+            ledger, row["unit_id"], allow_pre_game_start_retry=False,
+            decoder_compatibility=compatibility,
+        )
         self.assertEqual(len(captured), 1)
         job = captured[0]
         self.assertEqual(job["phase"], "training")

@@ -1919,9 +1919,27 @@ def _supervise_batch(items: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, 
     return results
 
 
+def _training_block0_decoder_compatibility(
+    ledger: Any,
+) -> Mapping[str, Mapping[str, Any]] | None:
+    """Validate historical block-0 replacement bindings once per training phase."""
+    runs, units = _event_state(ledger)
+    for row in _rows():
+        if row["phase"] != "training" or int(row.get("block_index", -1)) != 0:
+            continue
+        history = units.get(str(row["unit_id"]), ())
+        if not history:
+            continue
+        reservation = runs[history[-1]]["reservation"]
+        if reservation.get("package_commit") != ledger.binding.package_commit:
+            return ledger.block0_decoder_compatibility_records()
+    return None
+
+
 def _run_owner_batch(
     ledger: Any, rows: Sequence[Mapping[str, Any]], *,
     phase: str, estimates: Mapping[str, float],
+    decoder_compatibility: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     pending = []
     completed = {}
@@ -1930,6 +1948,7 @@ def _run_owner_batch(
         existing = _existing_unit_receipt(
             ledger, unit_id,
             allow_pre_game_start_retry=(phase == "train" and unit_id == budget.PRE_GAME_START_RETRY_UNIT_ID),
+            decoder_compatibility=decoder_compatibility,
         )
         if existing is not None:
             completed[unit_id] = existing
@@ -3321,6 +3340,7 @@ def _run_training(ledger: Any) -> dict[str, Any]:
     )
     _write_once(forecast_path, gate)
     estimates, _ = _forecast_estimates(ledger)
+    decoder_compatibility = _training_block0_decoder_compatibility(ledger)
     scheduler_plan = gate.get("training_scheduler_plan") or _training_scheduler_plan(ledger, estimates)
     scheduler_reservation = None
     scheduler_receipt = scheduler_plan.get("receipt")
@@ -3340,6 +3360,7 @@ def _run_training(ledger: Any) -> dict[str, Any]:
                     _require_scheduler_cpu_headroom(scheduler_reservation, phase_started_cpu)
                 _run_owner_batch(
                     ledger, rows[offset:offset + concurrency], phase="train", estimates=estimates,
+                    decoder_compatibility=decoder_compatibility,
                 )
             if not _all_units_succeeded(ledger, rows):
                 raise budget.ResourceBlocked(f"registered 128-owner block {block} is not complete")
