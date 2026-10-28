@@ -1595,7 +1595,7 @@ class Stage1ExecutorTests(unittest.TestCase):
                     decoder_compatibility=compatibility,
                 )
         existing_receipt.assert_called_once_with(
-            ledger, row["unit_id"], allow_pre_game_start_retry=False,
+            ledger, row["unit_id"], allow_pre_game_start_retry=True,
             decoder_compatibility=compatibility,
         )
         self.assertEqual(len(captured), 1)
