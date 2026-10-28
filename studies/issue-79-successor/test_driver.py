@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import driver
 
@@ -61,6 +62,36 @@ class SuccessorDriverTests(unittest.TestCase):
         self.assertEqual(summary["later_mutations_started"], 3)
         self.assertEqual(summary["first_action_switches"], 1)
         self.assertEqual(summary["total_search_process_tree_cpu_seconds"], 4.5)
+
+    def test_completed_pilot_phase_repairs_progress_without_repeating_work(self):
+        with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:
+            artifacts = Path(temp)
+            commit = "a" * 40
+            receipt = {
+                "package_commit": commit, "status": "SUCCEEDED",
+                "elapsed_active_seconds": 12.5, "finished_utc": "2026-10-28T00:00:00Z",
+            }
+            with patch.object(driver, "ARTIFACTS", artifacts):
+                driver.write_json_once(artifacts / f"pilot-phase-{commit}-training.json", receipt)
+                progress_path = artifacts / f"pilot-phase-{commit}-training-progress.json"
+                driver.write_json_once(progress_path, {"status": "ACTIVE", "phase": "training"})
+                result = driver._pilot_phase(
+                    "training", object(), lambda: self.fail("completed phase was rerun"), commit,
+                )
+                self.assertEqual(result, receipt)
+                self.assertEqual(driver.read_json(progress_path)["status"], "COMPLETE")
+
+    def test_worker_concurrency_uses_completed_half_open_intervals(self):
+        rows = [{"unit_id": unit_id} for unit_id in ("TRAIN-A", "TRAIN-B", "TRAIN-C")]
+        with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:
+            root = Path(temp)
+            intervals = {"TRAIN-A": (1.0, 4.0), "TRAIN-B": (2.0, 4.0), "TRAIN-C": (4.0, 6.0)}
+            for unit_id, (start, finish) in intervals.items():
+                attempt = root / "units" / driver.unit_key(unit_id) / "attempt-0001"
+                attempt.mkdir(parents=True)
+                driver.write_json_once(attempt / "started.json", {"started_monotonic": start})
+                driver.write_json_once(attempt / "finished.json", {"finished_monotonic": finish})
+            self.assertEqual(driver._max_concurrent_workers(root, rows), 2)
 
     def test_immutable_writer_is_resumable_but_never_overwrites(self):
         with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:

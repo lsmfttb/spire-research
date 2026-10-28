@@ -618,18 +618,27 @@ def _pilot_phase(name: str, clock: ActiveClock, operation, package_commit: str) 
         receipt = read_json(receipt_path)
         if receipt.get("package_commit") != package_commit:
             raise RuntimeError("pilot phase receipt is bound to a different package commit")
+        progress = read_json(progress_path) if progress_path.exists() else {
+            "schema_id": "issue79-pilot-phase-progress-v1",
+            "phase": name, "phase_start_cumulative_seconds": 0.0,
+        }
+        progress["status"] = "COMPLETE"
+        progress["phase_elapsed_active_seconds"] = receipt["elapsed_active_seconds"]
+        progress["finished_utc"] = receipt["finished_utc"]
+        atomic_json(progress_path, progress)
         return receipt
     if progress_path.exists():
         progress = read_json(progress_path)
         started_at = float(progress["phase_start_cumulative_seconds"])
     else:
         started_at = clock.elapsed()
-        atomic_json(progress_path, {
+        progress = {
             "schema_id": "issue79-pilot-phase-progress-v1",
             "phase": name, "status": "ACTIVE",
             "phase_start_cumulative_seconds": started_at,
             "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        })
+        }
+        atomic_json(progress_path, progress)
     result = operation()
     if result.get("status") != "SUCCEEDED":
         raise RuntimeError(f"pilot phase {name} did not finish its registered workload")
@@ -1071,6 +1080,27 @@ def _rows_for(table: dict, *, phase: str, formal: bool, block: int | None = None
     ]
 
 
+def _max_concurrent_workers(root: Path, rows: list[dict]) -> int:
+    events = []
+    for row in rows:
+        directory = root / "units" / unit_key(row["unit_id"])
+        for started_path in directory.glob("attempt-*/started.json"):
+            finished_path = started_path.parent / "finished.json"
+            if not finished_path.is_file():
+                continue
+            started = read_json(started_path).get("started_monotonic")
+            finished = read_json(finished_path).get("finished_monotonic")
+            if not isinstance(started, (int, float)) or not isinstance(finished, (int, float)):
+                continue
+            if math.isfinite(float(started)) and math.isfinite(float(finished)) and finished >= started:
+                events.extend(((float(started), 1), (float(finished), -1)))
+    active = maximum = 0
+    for _, delta in sorted(events, key=lambda item: (item[0], item[1])):
+        active += delta
+        maximum = max(maximum, active)
+    return maximum
+
+
 def _attempt_wall_seconds(root: Path) -> list[float]:
     result = []
     for path in root.glob("units/*/attempt-*/native/search/**/*.json.zlib"):
@@ -1107,14 +1137,23 @@ def _distribution(values: list[float]) -> dict:
     }
 
 
-def pilot() -> dict:
-    package_commit = source_commit()
+def pilot(execution_commit: str | None = None) -> dict:
+    report_generator_commit = source_commit()
+    package_commit = execution_commit or report_generator_commit
     table = read_json(SEED_TABLE)
     root = ARTIFACTS / "pilot" / package_commit
     final_path = ARTIFACTS / f"pilot-report-{package_commit}.json"
     policy_path = ARTIFACTS / f"time-policy-{package_commit}.json"
     if final_path.exists():
         return read_json(final_path)
+    if package_commit != report_generator_commit:
+        for phase in ("training", "update", "evaluation"):
+            receipt_path = ARTIFACTS / f"pilot-phase-{package_commit}-{phase}.json"
+            if not receipt_path.is_file():
+                raise RuntimeError("cross-commit pilot recovery requires all old-package phase receipts")
+            receipt = read_json(receipt_path)
+            if receipt.get("package_commit") != package_commit or receipt.get("status") != "SUCCEEDED":
+                raise RuntimeError("cross-commit pilot recovery found an incompatible phase receipt")
     clock = ActiveClock(f"pilot-{package_commit[:12]}", None)
     try:
         inheritance = verify_inheritance(root / "verify")
@@ -1161,6 +1200,11 @@ def pilot() -> dict:
             for unit_id, duration in row_times.items()
         ]
         attempt_times = _attempt_wall_seconds(root)
+        training_concurrency = _max_concurrent_workers(root, training_rows)
+        evaluation_concurrency = _max_concurrent_workers(root, eval_rows)
+        observed_concurrency = max(training_concurrency, evaluation_concurrency)
+        if observed_concurrency > CONCURRENCY:
+            raise RuntimeError("observed pilot worker concurrency exceeded the configured launch width")
         training_retries = sum(max(0, n - 1) for n in training_summary.get("tries", {}).values())
         evaluation_retries = sum(max(0, n - 1) for n in eval_summary.get("tries", {}).values())
         if policy_path.exists():
@@ -1170,11 +1214,18 @@ def pilot() -> dict:
         else:
             policy = {
                 "schema_id": "issue79-single-global-wall-policy-v1",
+                "source_branch_sha": package_commit,
+                "report_generator_commit": report_generator_commit,
+                "source_lock_sha256": source_lock_sha(),
+                "seed_table_sha256": file_sha256(SEED_TABLE),
                 "projection_seconds": projected,
                 "allowance_factor": ALLOWANCE_FACTOR,
                 "allowance_seconds": math.ceil(projected * ALLOWANCE_FACTOR),
                 "pilot_active_seconds": measured,
-                "pilot_concurrency": CONCURRENCY,
+                "configured_concurrency": CONCURRENCY,
+                "actual_max_concurrent_training_workers": training_concurrency,
+                "actual_max_concurrent_evaluation_workers": evaluation_concurrency,
+                "actual_max_concurrent_pilot_workers": observed_concurrency,
                 "complete_task_projection_components_seconds": {
                     "384_training_owners": train_projection,
                     "three_64_step_policy_updates": update_projection,
@@ -1212,16 +1263,29 @@ def pilot() -> dict:
                 "per_owner_cpu_hard_limit": None,
                 "scheduler_cpu_reserve": None,
             }
-            write_json_once(policy_path, canonical(policy) + b"\n")
+            write_json_once(policy_path, policy)
+        if (
+            policy.get("source_branch_sha") != package_commit
+            or policy.get("source_lock_sha256") != source_lock_sha()
+            or policy.get("seed_table_sha256") != file_sha256(SEED_TABLE)
+        ):
+            raise RuntimeError("pilot time policy is bound to different source, contract, or seeds")
         report = {
             "schema_id": "issue79-representative-pilot-v1",
             "status": "PILOT_COMPLETE_NONFORMAL",
             "source_branch_sha": package_commit,
+            "report_generator_commit": report_generator_commit,
             "source_lock_sha256": source_lock_sha(),
             "verified_inheritance": inheritance,
-            "actual_concurrency": CONCURRENCY,
+            "configured_concurrency": CONCURRENCY,
+            "concurrency_measurement": (
+                "maximum overlap of persisted worker-attempt monotonic start/finish intervals; "
+                "training and evaluation phase maxima are reported separately because phases are sequential"
+            ),
+            "actual_max_concurrent_pilot_workers": observed_concurrency,
             "training_run": {
                 "elapsed_active_seconds": training_wall,
+                "actual_max_concurrent_workers": training_concurrency,
                 "registered_debug_owner_count": len(training_rows),
                 "rows": training_phase["result_summary"].get("row_wall_seconds", {}),
                 "tries": training_phase["result_summary"].get("tries", {}),
@@ -1235,12 +1299,18 @@ def pilot() -> dict:
             },
             "five_arm_evaluation_paths": {
                 "elapsed_active_seconds": eval_wall,
+                "actual_max_concurrent_workers": evaluation_concurrency,
                 "owner_arm_count": len(eval_rows),
                 "rows": eval_phase["result_summary"].get("row_wall_seconds", {}),
                 "tries": eval_phase["result_summary"].get("tries", {}),
             },
             "total_pilot_active_seconds": measured,
             "complete_task_projection_seconds": projected,
+            "projection_limitations": [
+                "one 16-training-owner and 20-heldout-owner-arm debug cohort; owner-count scaling assumes similar throughput at the same worker width",
+                "the 64-step update projection scales the 16-owner minibatch measurement linearly to 32 owners and three blocks",
+                "the pilot was resumed between phases; cumulative active wall includes executed restart overhead while phase projections use each completed phase duration",
+            ],
             "single_global_active_wall_allowance": policy["allowance_seconds"],
             "allowance_factor": ALLOWANCE_FACTOR,
             "time_policy_path": policy_path.relative_to(STUDY).as_posix(),
@@ -1408,15 +1478,28 @@ def analyze(root: Path) -> dict:
     return report
 
 
-def formal() -> dict:
+def formal(pilot_execution_commit: str | None = None) -> dict:
     package_commit = source_commit()
+    pilot_commit = pilot_execution_commit or package_commit
     final_path = ARTIFACTS / f"formal-analysis-{package_commit}.json"
     if final_path.exists():
         return read_json(final_path)
-    policy_path = ARTIFACTS / f"time-policy-{package_commit}.json"
+    policy_path = ARTIFACTS / f"time-policy-{pilot_commit}.json"
     if not policy_path.is_file():
         raise RuntimeError("formal study requires the matching package commit's pilot-derived time policy")
     policy = read_json(policy_path)
+    pilot_report_path = ARTIFACTS / f"pilot-report-{pilot_commit}.json"
+    if not pilot_report_path.is_file():
+        raise RuntimeError("formal study requires the completed report for its selected pilot package")
+    pilot_report = read_json(pilot_report_path)
+    if (
+        pilot_report.get("source_branch_sha") != pilot_commit
+        or pilot_report.get("report_generator_commit") != policy.get("report_generator_commit")
+        or policy.get("source_branch_sha") != pilot_commit
+        or policy.get("source_lock_sha256") != source_lock_sha()
+        or policy.get("seed_table_sha256") != file_sha256(SEED_TABLE)
+    ):
+        raise RuntimeError("formal time policy and completed pilot report have incompatible provenance")
     allowance = float(policy["allowance_seconds"])
     clock = ActiveClock(f"formal-{package_commit[:12]}", allowance)
     root = ARTIFACTS / "formal" / package_commit
@@ -1461,6 +1544,9 @@ def formal() -> dict:
         result = analyze(root)
         result["source_branch_sha"] = package_commit
         result["source_lock_sha256"] = source_lock_sha()
+        result["pilot_execution_commit"] = pilot_commit
+        result["pilot_report_sha256"] = file_sha256(pilot_report_path)
+        result["time_policy_sha256"] = file_sha256(policy_path)
         result["active_wall_seconds"] = clock.elapsed()
         result["active_wall_allowance_seconds"] = allowance
         write_json_once(final_path, result)
@@ -1472,6 +1558,7 @@ def formal() -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=("prepare", "verify", "pilot", "formal"))
+    parser.add_argument("--pilot-execution-commit", help="select a completed pilot with matching phase receipts")
     parser.add_argument("--worker", type=Path)
     args = parser.parse_args()
     if args.worker is not None:
@@ -1490,10 +1577,10 @@ def main() -> int:
         print(json.dumps(verify_inheritance(), sort_keys=True))
         return 0
     if args.mode == "pilot":
-        print(json.dumps(pilot(), sort_keys=True))
+        print(json.dumps(pilot(args.pilot_execution_commit), sort_keys=True))
         return 0
     if args.mode == "formal":
-        result = formal()
+        result = formal(args.pilot_execution_commit)
         print(json.dumps(result, sort_keys=True))
         return 0 if result.get("status") in {"COMPLETE", "BLOCK_COMPLETE"} else 2
     parser.error("select a mode or a worker job")
