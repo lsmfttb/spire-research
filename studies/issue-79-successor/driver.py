@@ -1538,7 +1538,8 @@ def formal(
     ):
         raise RuntimeError("formal time policy and completed pilot report have incompatible provenance")
     allowance = float(policy["allowance_seconds"])
-    clock = ActiveClock(f"formal-{package_commit[:12]}", allowance)
+    # Keep one clock across operational code revisions of this same registered study.
+    clock = ActiveClock("formal-issue79-global", allowance)
     root = ARTIFACTS / "formal" / package_commit
     progress_path = root / "progress.json"
     root.mkdir(parents=True, exist_ok=True)
