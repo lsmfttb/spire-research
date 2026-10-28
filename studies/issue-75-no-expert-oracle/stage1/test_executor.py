@@ -201,6 +201,18 @@ class ExecutorTests(unittest.TestCase):
 
 class Stage1ExecutorTests(unittest.TestCase):
 
+    def test_artifact_hash_normalizes_text_crlf_but_preserves_binary(self):
+        text = b'{"status":"ok"}\r\n'
+        self.assertEqual(
+            executor.budget.artifact_sha256(Path("receipt.json"), text),
+            executor.budget.sha256_bytes(b'{"status":"ok"}\n'),
+        )
+        binary = b"\x00\r\n\xff"
+        self.assertEqual(
+            executor.budget.artifact_sha256(Path("weights.pt"), binary),
+            executor.budget.sha256_bytes(binary),
+        )
+
     def _source_bound_child_fixture(self, root: Path) -> Path:
         repository = root / "source-bound-child-repo"
         extra_files = (

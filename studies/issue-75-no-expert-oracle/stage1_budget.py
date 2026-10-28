@@ -100,6 +100,25 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
+def artifact_bytes_for_hash(path: Path, value: bytes) -> bytes:
+    # Normalize text receipts to LF while preserving binary checkpoint bytes.
+    if Path(path).suffix.lower() in {".json", ".jsonl", ".txt"}:
+        return value.replace(b"\r\n", b"\n")
+    return value
+
+
+def artifact_sha256(path: Path, value: bytes | None = None) -> str:
+    path = Path(path)
+    if value is None and path.suffix.lower() not in {".json", ".jsonl", ".txt"}:
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+        return digest.hexdigest()
+    data = path.read_bytes() if value is None else value
+    return sha256_bytes(artifact_bytes_for_hash(path, data))
+
+
 def _normalized_file_sha256(path: Path) -> str:
     return sha256_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
 
@@ -564,7 +583,7 @@ def _load_block0_repair_manifest(artifacts_root: Path) -> tuple[dict[str, Any], 
         ):
             raise ResourceBlocked("the block-0 lineage row is malformed")
         by_unit[unit_id] = item
-    return manifest, sha256_bytes(raw), by_unit
+    return manifest, artifact_sha256(path, raw), by_unit
 
 
 def _validate_block0_originals(
@@ -613,7 +632,7 @@ def _validate_block0_originals(
         except (OSError, ValueError) as exc:
             raise ResourceBlocked(f"original immutable block-0 result is unavailable: {unit_id}") from exc
         if (
-            sha256_bytes(result_bytes) != final["result_sha256"]
+            artifact_sha256(result_path, result_bytes) != final["result_sha256"]
             or result.get("status") != "SUCCEEDED"
             or result.get("unit_id") != unit_id
             or result.get("phase") != "train"
@@ -730,7 +749,7 @@ def _load_block0_decoder_compatibility(
         or update.get("reserved_cpu_seconds") != old_update.get("replacement_reservation_cpu_seconds")
     ):
         raise ResourceBlocked("the intermediate UPDATE:0 decoder failure is not bound to its exact source and original failure")
-    return manifest, sha256_bytes(raw), original_by_unit, by_compatibility
+    return manifest, artifact_sha256(path, raw), original_by_unit, by_compatibility
 
 
 def _compatibility_artifact_bytes(
@@ -746,9 +765,10 @@ def _compatibility_artifact_bytes(
         raw = path.read_bytes()
     except OSError as exc:
         raise ResourceBlocked("a decoder compatibility artifact is unavailable") from exc
-    if not isinstance(expected_sha256, str) or sha256_bytes(raw) != expected_sha256:
+    normalized = artifact_bytes_for_hash(path, raw)
+    if not isinstance(expected_sha256, str) or sha256_bytes(normalized) != expected_sha256:
         raise ResourceBlocked("a decoder compatibility artifact changed after source registration")
-    return raw
+    return normalized
 
 
 def _validate_block0_decoder_compatibility_owner(
@@ -850,8 +870,8 @@ def _load_update0_seed_failure_continuation(
         raise ResourceBlocked("the UPDATE:0 continuation manifest is malformed")
     repair_path = STAGE1 / "block0-repair-lineage.json"
     compatibility_path = STAGE1 / "block0-decoder-compatibility.json"
-    repair_sha = sha256_bytes(repair_path.read_bytes())
-    compatibility_sha = sha256_bytes(compatibility_path.read_bytes())
+    repair_sha = artifact_sha256(repair_path)
+    compatibility_sha = artifact_sha256(compatibility_path)
     required = {
         "schema_id": "issue75-update0-seed-failure-continuation-v1",
         "study_id": "issue-75-no-expert-oracle",
@@ -998,7 +1018,7 @@ def _load_update0_seed_failure_continuation(
         or log.get("status") != "STAGE1_WORKER_FAILED"
     ):
         raise ResourceBlocked("the latest UPDATE:0 worker artifacts differ from the immutable failure")
-    return dict(manifest), sha256_bytes(raw)
+    return dict(manifest), artifact_sha256(path, raw)
 
 
 def _validate_update0_retry_state(

@@ -64,11 +64,7 @@ def _sha256(data: bytes) -> str:
 
 
 def _file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        while chunk := stream.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return budget.artifact_sha256(path)
 
 
 def _write_once(path: Path, value: Mapping[str, Any]) -> str:
