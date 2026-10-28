@@ -140,6 +140,82 @@ class SuccessorDriverTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     driver._completed_update_receipt(1, rows, root=root)
 
+    def test_formal_attempt_ledger_separates_unstarted_incomplete_failed_and_success(self):
+        with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:
+            root = Path(temp)
+            commit = "a" * 40
+            unit_id = "EVAL:7610001:P0"
+            row = {
+                "unit_id": unit_id, "owner_seed": 7_610_001,
+                "phase": "heldout", "arm": "P0", "formal": True,
+            }
+            unit = root / "units" / driver.unit_key(unit_id)
+            for number, state in enumerate(
+                ("unknown", "unstarted", "incomplete", "failed", "succeeded"), start=1,
+            ):
+                attempt = unit / f"attempt-{number:04d}"
+                attempt.mkdir(parents=True)
+                driver.write_json_once(attempt / "worker-job.json", {
+                    "row": row, "package_commit": commit,
+                    "run_id": f"{unit_id}-attempt-{number:04d}",
+                })
+                if state not in {"unstarted", "unknown"}:
+                    driver.write_json_once(attempt / "started.json", {
+                        "unit_id": unit_id, "owner_seed": row["owner_seed"],
+                        "started_monotonic": 10.0,
+                    })
+                if state in {"failed", "succeeded"}:
+                    outcome = "FAILED" if state == "failed" else "SUCCEEDED"
+                    driver.write_json_once(attempt / "finished.json", {
+                        "status": outcome, "finished_monotonic": 12.0,
+                    })
+                    driver.write_json_once(attempt / "result.json", {
+                        "status": outcome,
+                        "resource": {
+                            "worker_process_cpu_seconds": 2.0 if state == "failed" else 3.0,
+                            "worker_wall_seconds": 1.0 if state == "failed" else 4.0,
+                        },
+                    })
+            inventory = []
+            for path in sorted(item for item in root.rglob("*") if item.is_file()):
+                inventory.append({
+                    "path": path.relative_to(root).as_posix(),
+                    "bytes": path.stat().st_size,
+                    "sha256": driver.file_sha256(path),
+                })
+            ledger = driver._build_attempt_ledger(root, commit, inventory)
+            attempts = ledger["attempts"]
+            self.assertEqual(
+                [item["state"] for item in attempts],
+                ["START_STATE_UNKNOWN", "UNSTARTED", "STARTED_INCOMPLETE",
+                 "FINISHED_FAILED", "SUCCEEDED"],
+            )
+            self.assertTrue(all(item["artifact_files"] for item in attempts))
+            self.assertTrue(attempts[0]["incomplete"])
+            self.assertEqual(attempts[0]["state_reason"],
+                             "first attempt has no start receipt; actual launch state is unknown")
+            self.assertEqual(attempts[1]["state"], "UNSTARTED")
+            self.assertIsNone(attempts[0]["resource_telemetry"]["worker_process_cpu_seconds"])
+            self.assertIsNone(attempts[2]["resource_telemetry"]["worker_wall_seconds"])
+            self.assertEqual(attempts[3]["resource_telemetry"]["elapsed_monotonic_seconds"], 2.0)
+            summary = driver._attempt_resource_summary(attempts)
+            self.assertEqual(summary["state_counts"]["START_STATE_UNKNOWN"], 1)
+            self.assertEqual(summary["state_counts"]["UNSTARTED"], 1)
+            self.assertEqual(summary["state_counts"]["STARTED_INCOMPLETE"], 1)
+            self.assertEqual(summary["state_counts"]["FINISHED_FAILED"], 1)
+            self.assertEqual(summary["state_counts"]["SUCCEEDED"], 1)
+            self.assertEqual(
+                summary["successful_attempt_resource_telemetry"]["worker_process_cpu_seconds"]
+                ["observed_total_seconds"],
+                3.0,
+            )
+            failed_cpu = summary["non_success_attempt_resource_telemetry"]
+            self.assertEqual(failed_cpu["worker_process_cpu_seconds"]["unknown_attempt_count"], 3)
+            self.assertEqual(
+                failed_cpu["worker_process_cpu_seconds"]["observed_total_seconds"],
+                2.0,
+            )
+
     def test_search_wall_distribution_reads_pilot_search_artifact_layout(self):
         with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:
             root = Path(temp)

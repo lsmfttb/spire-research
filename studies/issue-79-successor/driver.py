@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 import fcntl
+import gzip
 import gc
 import hashlib
 import json
@@ -13,6 +14,7 @@ import shutil
 import signal
 import statistics
 import subprocess
+import tarfile
 import sys
 import tempfile
 import threading
@@ -711,6 +713,326 @@ def existing_success(
     record = existing_success_record(root, row, package_commit)
     return None if record is None else record[0]
 
+
+
+def _raw_file_inventory(root: Path, package_commit: str) -> tuple[list[dict], dict]:
+    """Hash every unit and search artifact into a deterministic compressed index."""
+    records = []
+    by_scope = {}
+    for scope in ("units", "search"):
+        digest = hashlib.sha256()
+        count = total_bytes = 0
+        for path in sorted(item for item in (root / scope).rglob("*") if item.is_file()):
+            relative = path.relative_to(root).as_posix()
+            size = path.stat().st_size
+            file_digest = file_sha256(path)
+            record = {"path": relative, "bytes": size, "sha256": file_digest}
+            records.append(record)
+            digest.update(f"{relative}\0{size}\0{file_digest}\n".encode("utf-8"))
+            count += 1
+            total_bytes += size
+        by_scope[scope] = {
+            "files": count, "bytes": total_bytes, "manifest_sha256": digest.hexdigest(),
+        }
+
+    inventory_path = ARTIFACTS / f"formal-raw-file-inventory-{package_commit}.jsonl.gz"
+    inventory_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{inventory_path.name}.", dir=inventory_path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "wb") as raw:
+            with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:
+                for record in records:
+                    compressed.write(canonical(record) + b"\n")
+            raw.flush()
+            os.fsync(raw.fileno())
+        if inventory_path.exists():
+            if file_sha256(inventory_path) != file_sha256(temporary):
+                raise FileExistsError(f"immutable raw inventory differs: {inventory_path}")
+        else:
+            try:
+                os.link(temporary, inventory_path)
+            except FileExistsError:
+                if file_sha256(inventory_path) != file_sha256(temporary):
+                    raise FileExistsError(f"immutable raw inventory differs: {inventory_path}")
+    finally:
+        temporary.unlink(missing_ok=True)
+    return records, {
+        "path": inventory_path.name,
+        "bytes": inventory_path.stat().st_size,
+        "sha256": file_sha256(inventory_path),
+        "entry_count": len(records),
+        "by_scope": by_scope,
+        "encoding": "gzip-compressed canonical JSON Lines; one path, byte count, and SHA-256 per file",
+    }
+
+
+def _build_attempt_ledger(root: Path, package_commit: str, inventory: list[dict]) -> dict:
+    files_by_attempt = {}
+    for record in inventory:
+        parts = record["path"].split("/")
+        if len(parts) >= 4 and parts[0] == "units" and parts[2].startswith("attempt-"):
+            files_by_attempt.setdefault("/".join(parts[:3]), []).append(record)
+    attempts = []
+    for unit_directory in sorted((root / "units").glob("*")):
+        if not unit_directory.is_dir():
+            continue
+        for attempt in sorted(unit_directory.glob("attempt-*")):
+            if not attempt.is_dir():
+                continue
+            relative_attempt = attempt.relative_to(root).as_posix()
+            job_path = attempt / "worker-job.json"
+            if not job_path.is_file():
+                raise RuntimeError(f"attempt lacks its registered worker job: {attempt}")
+            job = read_json(job_path)
+            row = job.get("row") or {}
+            if job.get("package_commit") != package_commit or not row.get("unit_id"):
+                raise RuntimeError(f"attempt is not bound to the registered formal package: {attempt}")
+            if unit_key(row["unit_id"]) != unit_directory.name:
+                raise RuntimeError(f"attempt worker job does not bind to its unit directory: {attempt}")
+            started_path = attempt / "started.json"
+            finished_path = attempt / "finished.json"
+            result_path = attempt / "result.json"
+            started = read_json(started_path) if started_path.is_file() else {}
+            finished = read_json(finished_path) if finished_path.is_file() else {}
+            result = read_json(result_path) if result_path.is_file() else {}
+            result_status = result.get("status")
+            has_started = started_path.is_file()
+            has_finished = finished_path.is_file() or result_path.is_file()
+            succeeded = result_status == "SUCCEEDED"
+            attempt_number = int(attempt.name.rsplit("-", 1)[-1])
+            if succeeded:
+                state = "SUCCEEDED"
+            elif has_started and has_finished:
+                state = "FINISHED_FAILED"
+            elif has_started:
+                state = "STARTED_INCOMPLETE"
+            elif attempt_number > 1:
+                state = "UNSTARTED"
+            else:
+                state = "START_STATE_UNKNOWN"
+
+            resource = result.get("resource") or {}
+            cpu = resource.get("worker_process_cpu_seconds")
+            wall = resource.get("worker_wall_seconds")
+            if cpu is None:
+                cpu = finished.get("worker_process_cpu_seconds")
+            if wall is None:
+                wall = finished.get("worker_wall_seconds")
+            started_mono = started.get("started_monotonic")
+            finished_mono = finished.get("finished_monotonic")
+            elapsed = (
+                float(finished_mono) - float(started_mono)
+                if started_mono is not None and finished_mono is not None else None
+            )
+            files = sorted(files_by_attempt.get(relative_attempt, []), key=lambda item: item["path"])
+            attempts.append({
+                "unit_id": row.get("unit_id") or started.get("unit_id"),
+                "owner_seed": row.get("owner_seed") or started.get("owner_seed"),
+                "phase": row.get("phase"),
+                "arm": row.get("arm"),
+                "formal": row.get("formal"),
+                "package_commit": job.get("package_commit") or started.get("package_commit"),
+                "attempt": attempt.name,
+                "attempt_number": attempt_number,
+                "attempt_path": relative_attempt,
+                "state": state,
+                "state_reason": (
+                    "started.json receipt exists" if has_started else
+                    "retry attempt has no start receipt" if attempt_number > 1 else
+                    "first attempt has no start receipt; actual launch state is unknown"
+                ),
+                "started": has_started,
+                "started_receipt_present": has_started,
+                "finished": has_finished,
+                "succeeded": succeeded,
+                "failed": state == "FINISHED_FAILED",
+                "incomplete": state in {"UNSTARTED", "START_STATE_UNKNOWN", "STARTED_INCOMPLETE"},
+                "run_id": started.get("run_id") or job.get("run_id"),
+                "artifact_files": files,
+                "artifact_manifest_sha256": sha256(canonical(files)),
+                "resource_telemetry": {
+                    "worker_process_cpu_seconds": cpu,
+                    "worker_wall_seconds": wall,
+                    "elapsed_monotonic_seconds": elapsed,
+                    "missing_values_are_unknown": True,
+                },
+            })
+    return {
+        "schema_id": "issue79-formal-attempt-ledger-v1",
+        "formal_source_package_commit": package_commit,
+        "source_lock_sha256": source_lock_sha(),
+        "unit_directory_count": len({entry["unit_id"] for entry in attempts}),
+        "attempt_directory_count": len(attempts),
+        "attempts": attempts,
+    }
+
+
+def _attempt_resource_summary(attempts: list[dict]) -> dict:
+    states = ("UNSTARTED", "START_STATE_UNKNOWN", "STARTED_INCOMPLETE", "FINISHED_FAILED", "SUCCEEDED")
+    counts = {state: sum(item["state"] == state for item in attempts) for state in states}
+    resource_summary = {}
+    successful_resources = {}
+    for field in ("worker_process_cpu_seconds", "worker_wall_seconds"):
+        values = [
+            item["resource_telemetry"][field] for item in attempts
+            if item["state"] != "SUCCEEDED"
+        ]
+        known = [float(value) for value in values if isinstance(value, (int, float))]
+        resource_summary[field] = {
+            "known_attempt_count": len(known),
+            "unknown_attempt_count": len(values) - len(known),
+            "observed_total_seconds": sum(known) if known else None,
+        }
+        successes = [
+            item["resource_telemetry"][field] for item in attempts
+            if item["state"] == "SUCCEEDED"
+        ]
+        successful_known = [float(value) for value in successes if isinstance(value, (int, float))]
+        successful_resources[field] = {
+            "known_attempt_count": len(successful_known),
+            "unknown_attempt_count": len(successes) - len(successful_known),
+            "observed_total_seconds": sum(successful_known) if successful_known else None,
+        }
+    return {
+        "attempt_directory_count": len(attempts),
+        "state_counts": counts,
+        "successful_attempt_resource_telemetry": successful_resources,
+        "non_success_attempt_resource_telemetry": resource_summary,
+        "resource_accounting_note": (
+            "Existing per-arm resource totals use successful result.json rows only. "
+            "Failed/incomplete attempts are reported separately; missing telemetry is null/unknown "
+            "and is not imputed into successful totals or treated as zero. The global active-wall "
+            "clock is session-level and is not assigned to individual incomplete attempts."
+        ),
+    }
+
+
+def formal_evidence_audit(
+    root: Path, package_commit: str, durable_raw_root: Path, durable_repo_root: Path,
+) -> dict:
+    """Publish retry/resource lineage without rerunning any registered study unit."""
+    inventory, inventory_summary = _raw_file_inventory(root, package_commit)
+    if not durable_raw_root.is_file():
+        raise FileNotFoundError(f"durable owner raw archive is missing: {durable_raw_root}")
+    durable_repo_root = durable_repo_root.resolve()
+    durable_raw_root = durable_raw_root.resolve()
+    storage_relative = durable_raw_root.relative_to(durable_repo_root).as_posix()
+    expected = {record["path"]: record for record in inventory}
+    verified_bytes = 0
+    verified_paths = set()
+    with tarfile.open(durable_raw_root, mode="r:") as raw_archive:
+        for member in raw_archive:
+            if not member.isfile():
+                continue
+            relative = member.name
+            record = expected.get(relative)
+            if record is None or relative in verified_paths:
+                raise RuntimeError(f"durable raw archive has an unexpected or duplicate file: {relative}")
+            if member.size != record["bytes"]:
+                raise RuntimeError(f"durable archive entry has a different size: {relative}")
+            stream = raw_archive.extractfile(member)
+            if stream is None:
+                raise RuntimeError(f"durable archive entry cannot be read: {relative}")
+            digest = hashlib.sha256()
+            with stream:
+                while chunk := stream.read(1024 * 1024):
+                    digest.update(chunk)
+            if digest.hexdigest() != record["sha256"]:
+                raise RuntimeError(f"durable archive entry SHA-256 differs from the inventory: {relative}")
+            verified_paths.add(relative)
+            verified_bytes += record["bytes"]
+    if verified_paths != set(expected):
+        raise RuntimeError("durable raw archive paths differ from the file-level inventory")
+    archive_sha = file_sha256(durable_raw_root)
+    durable_inventory = durable_raw_root.parent / inventory_summary["path"]
+    source_inventory = ARTIFACTS / inventory_summary["path"]
+    if durable_inventory.exists():
+        if file_sha256(durable_inventory) != inventory_summary["sha256"]:
+            raise FileExistsError(f"durable file inventory differs: {durable_inventory}")
+    else:
+        shutil.copyfile(source_inventory, durable_inventory)
+    if file_sha256(durable_inventory) != inventory_summary["sha256"]:
+        raise RuntimeError(f"durable file inventory SHA-256 differs: {durable_inventory}")
+    inventory_summary["owner_storage_path"] = (
+        f"{durable_raw_root.parent.relative_to(durable_repo_root).as_posix()}/"
+        f"{inventory_summary['path']}"
+    )
+    inventory_summary["verified_raw_archive_path"] = storage_relative
+    inventory_summary["verified_raw_archive_sha256"] = archive_sha
+    inventory_summary["verified_raw_archive_bytes"] = durable_raw_root.stat().st_size
+    inventory_summary["verified_raw_bytes"] = verified_bytes
+    inventory_summary["verified_raw_file_count"] = len(inventory)
+    ledger = _build_attempt_ledger(root, package_commit, inventory)
+    ledger_path = ARTIFACTS / f"formal-attempt-ledger-review-v2-{package_commit}.json"
+    ledger_sha = write_json_once(ledger_path, ledger)
+    ledger_summary = _attempt_resource_summary(ledger["attempts"])
+    ledger_summary.update({
+        "path": ledger_path.name,
+        "bytes": ledger_path.stat().st_size,
+        "sha256": ledger_sha,
+    })
+    by_phase_arm = {}
+    for phase, arm in sorted({
+        (item.get("phase"), item.get("arm")) for item in ledger["attempts"]
+    }):
+        rows = [
+            item for item in ledger["attempts"]
+            if item.get("phase") == phase and item.get("arm") == arm
+        ]
+        by_phase_arm[f"{phase}:{arm}"] = _attempt_resource_summary(rows)
+
+    analysis_path = ARTIFACTS / f"formal-analysis-{package_commit}.json"
+    analysis = read_json(analysis_path)
+    analysis["attempt_accounting"] = {
+        **ledger_summary,
+        "unit_directory_count": ledger["unit_directory_count"],
+        "per_phase_arm": by_phase_arm,
+        "raw_file_inventory": inventory_summary,
+        "durable_raw_storage_path": storage_relative,
+        "durable_raw_storage_sha256": archive_sha,
+        "durable_raw_storage_verified_file_count": len(inventory),
+        "durable_raw_storage_verified_bytes": verified_bytes,
+    }
+    for arm in ARMS:
+        if arm in analysis.get("per_arm", {}):
+            analysis["per_arm"][arm]["attempt_accounting"] = by_phase_arm.get(
+                f"heldout:{arm}"
+            )
+    atomic_json(analysis_path, analysis)
+
+    manifest_path = ARTIFACTS / f"issue79-formal-review-bundle-manifest-{package_commit}.json"
+    manifest = read_json(manifest_path)
+    manifest["analysis_report"] = {
+        "path": analysis_path.name,
+        "bytes": analysis_path.stat().st_size,
+        "sha256": file_sha256(analysis_path),
+    }
+    manifest["formal_attempt_ledger"] = ledger_summary
+    manifest["raw_file_inventory"] = inventory_summary
+    manifest["raw_storage"] = {
+        "archive_path_relative_to_repository_root": storage_relative,
+        "archive_bytes": durable_raw_root.stat().st_size,
+        "archive_sha256": archive_sha,
+        "status": "owner-primary-checkout tar archive verified against every file in the inventory; not added to Git",
+        "verified_file_count": len(inventory),
+        "verified_bytes": verified_bytes,
+        "archive_entries": ["units/", "search/"],
+        "verification": "every archive member path, byte count, and SHA-256 matches the file-level inventory",
+    }
+    manifest.pop("raw_run_data_retained_in_worktree_not_bundle", None)
+    atomic_json(manifest_path, manifest)
+    return {
+        "analysis_path": str(analysis_path),
+        "analysis_sha256": file_sha256(analysis_path),
+        "manifest_path": str(manifest_path),
+        "ledger_path": str(ledger_path),
+        "ledger_sha256": ledger_sha,
+        "inventory_path": str(ARTIFACTS / inventory_summary["path"]),
+        "inventory_sha256": inventory_summary["sha256"],
+        "attempt_directory_count": ledger["attempt_directory_count"],
+        "state_counts": ledger_summary["state_counts"],
+    }
 
 def worker_main(job_path: Path) -> int:
     job = read_json(job_path)
@@ -1675,10 +1997,12 @@ def formal(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=("prepare", "verify", "pilot", "formal"))
+    parser.add_argument("--mode", choices=("prepare", "verify", "pilot", "formal", "audit"))
     parser.add_argument("--pilot-execution-commit", help="select a completed pilot with matching phase receipts")
     parser.add_argument("--pilot-report-generator-commit", help="select the immutable report revision for the pilot")
     parser.add_argument("--resume-package-commit", help="resume a compatible formal artifact root after an operational runner fix")
+    parser.add_argument("--durable-raw-root", type=Path, help="owner-accessible raw tar archive for offline evidence audit")
+    parser.add_argument("--durable-repo-root", type=Path, help="repository root containing the durable raw artifact copy")
     parser.add_argument("--worker", type=Path)
     args = parser.parse_args()
     if args.worker is not None:
@@ -1698,6 +2022,15 @@ def main() -> int:
         return 0
     if args.mode == "pilot":
         print(json.dumps(pilot(args.pilot_execution_commit), sort_keys=True))
+        return 0
+    if args.mode == "audit":
+        if not args.resume_package_commit or not args.durable_raw_root or not args.durable_repo_root:
+            parser.error("--mode audit requires the package, durable raw archive, and durable repository root")
+        result = formal_evidence_audit(
+            ARTIFACTS / "formal" / args.resume_package_commit,
+            args.resume_package_commit, args.durable_raw_root, args.durable_repo_root,
+        )
+        print(json.dumps(result, sort_keys=True))
         return 0
     if args.mode == "formal":
         result = formal(
