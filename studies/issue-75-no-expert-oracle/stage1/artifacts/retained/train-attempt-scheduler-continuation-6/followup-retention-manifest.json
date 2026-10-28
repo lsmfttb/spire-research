@@ -1,0 +1,23 @@
+{
+  "authorization_comment_id": 6459123910,
+  "consumer": "Issue 75 independent Reviewer: verify retained UPDATE0 model and inspect the bounded training stop without rerunning training",
+  "files": {
+    "ledger-events-after-stop.jsonl": {
+      "sha256": "fb424a08feed4b4f2a34d456178a6b69bd5f3f6ee7d0ebbeaa39f5795d090120",
+      "size_bytes": 375539
+    },
+    "training-attempt-outcome.json": {
+      "sha256": "2c95642a3a2f0a6c3759d42be530bf67e87754cbda8da7f78f222fc465eec229",
+      "size_bytes": 1619
+    },
+    "training-forecast-before-stop.json": {
+      "sha256": "3f7b244bead3204aed9dfed278ff9f5a2620df145cd46dd72817e89f1249c0ad",
+      "size_bytes": 2638
+    }
+  },
+  "review_comment_id": 6461022137,
+  "schema_id": "issue75-retained-training-stop-followup-v1",
+  "source_commit": "00d6405ba9090878d3016400706aeaa645446689",
+  "source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+  "status": "VERIFIED_AND_PRESERVED"
+}

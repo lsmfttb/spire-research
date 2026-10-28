@@ -1,0 +1,35 @@
+{
+  "command": "python3.13 executor.py --phase train",
+  "ledger_state": {
+    "finish_event": null,
+    "first_remaining_train_reservation": null,
+    "first_remaining_train_unit_id": "TRAIN:7500129",
+    "open_scheduler_run_id": "SCHEDULER:TRAIN:CONTINUATION:6-2265b4e399924434",
+    "reserved_cpu_seconds": 20.0,
+    "unit_id": "SCHEDULER:TRAIN:CONTINUATION:6"
+  },
+  "limitations": [
+    "The CLI redacts the ResourceBlocked message; source-level failure boundary is not proven by this observation.",
+    "A read-only receipt-validation diagnostic was stopped after 18 seconds elapsed at approximately 99% CPU, before exact process_time could be printed; estimate is approximately 18 CPU-seconds, it is outside the formal ledger, and it made no artifact writes."
+  ],
+  "observed_stdout": {
+    "error_type": "ResourceBlocked",
+    "phase": "train",
+    "status": "STAGE1_EXECUTOR_FAILED"
+  },
+  "package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+  "post_stop_forecast": {
+    "next_scheduler_reservation": {
+      "cap_cpu_seconds": 20.0,
+      "unit_id": "SCHEDULER:TRAIN:CONTINUATION:7"
+    },
+    "next_unit_id": "TRAIN:7500129",
+    "next_unit_reservation_cpu_seconds": 165.9459124477378,
+    "status": "NEXT_RESERVATION_FITS"
+  },
+  "process_check": "no Python 3.13 training process active after failure",
+  "retained_update0_directory": "/home/lsmft/stsrl-data/issue75/update0-00d6405b-UPDATE-0-4db46e9573a4405a",
+  "schema_id": "issue75-formal-training-attempt-observation-v1",
+  "scope": "STUDY_ONLY",
+  "source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665"
+}
