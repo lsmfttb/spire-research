@@ -39,6 +39,21 @@ RESOURCE_BUDGET_AMENDMENT = {
 BUILDER_LIMIT = RESOURCE_BUDGET_AMENDMENT["limits_cpu_seconds"]["builder"]
 REVIEWER_LIMIT = RESOURCE_BUDGET_AMENDMENT["limits_cpu_seconds"]["reviewer_protected"]
 ALL_IN_LIMIT = RESOURCE_BUDGET_AMENDMENT["limits_cpu_seconds"]["all_in"]
+PRIOR_USE_CPU_ACCOUNTING = {
+    "observed_unledgered_builder_cpu_seconds_approx": 18.0,
+    "conservative_allowance_cpu_seconds": 20.0,
+    "ledger_event_added": False,
+}
+PRIOR_USE_CPU_ALLOWANCE_SECONDS = float(
+    PRIOR_USE_CPU_ACCOUNTING["conservative_allowance_cpu_seconds"]
+)
+PRIOR_USE_CPU_ACCOUNTING_AMENDMENT = {
+    "schema_id": "issue75-prior-use-cpu-accounting-v1",
+    "review_comment_id": 6462545745,
+    "base_package_commit": "217eb80567c88460b6ce5d6c02fd7a4d262a5d19",
+    "base_source_lock_sha256": "315913d54f0dec754b24dec4e45194dfcbd751250df497ff03a447dc66e1450e",
+    "accounting": PRIOR_USE_CPU_ACCOUNTING,
+}
 SEARCH_CPU_CAP_SECONDS = 32.0
 SEARCH_ATTEMPT_CAP = 16
 PR_SET_CHILD_SUBREAPER = 36
@@ -112,6 +127,8 @@ def verify_stage1_package() -> dict[str, Any]:
         raise PermissionError("Stage 1 source lock is not a valid registered executable package")
     if lock.get("resource_budget_amendment") != RESOURCE_BUDGET_AMENDMENT:
         raise PermissionError("Stage 1 source lock does not bind the approved one-time resource-cap amendment")
+    if lock.get("prior_use_cpu_accounting_amendment") != PRIOR_USE_CPU_ACCOUNTING_AMENDMENT:
+        raise PermissionError("Stage 1 source lock does not bind the reviewed prior-use CPU allowance")
 
     files = lock.get("locked_files_sha256_lf")
     if not isinstance(files, dict) or set(files) != set(LOCKED_PACKAGE_FILES):
@@ -135,6 +152,9 @@ def verify_stage1_package() -> dict[str, Any]:
             raise PermissionError(f"Stage 1 repository dependency source-lock mismatch: {relative}")
 
     config = json.loads((STAGE1 / "config.json").read_text(encoding="utf-8"))
+    budget_config = json.loads((STAGE1 / "budget.json").read_text(encoding="utf-8"))
+    if budget_config.get("prior_unledgered_builder_cpu_use") != PRIOR_USE_CPU_ACCOUNTING:
+        raise PermissionError("Stage 1 budget config does not match its reviewed prior-use CPU allowance")
     execution = config.get("execution")
     resources = config.get("resources")
     if not isinstance(resources, dict) or {
@@ -1877,16 +1897,17 @@ class Stage1Ledger:
               or repair_predecessor_run_id is not None or repair_predecessor_receipt_sha256 is not None):
             raise CheckpointMismatch("resume/retry metadata supplied for a new unit")
         charges = self._charges(runs)
+        builder_with_prior_use = charges["builder"] + PRIOR_USE_CPU_ALLOWANCE_SECONDS
         if role == "builder":
-            if charges["builder"] + cap > BUILDER_LIMIT:
-                raise ResourceBlocked("Builder CPU cap would be exceeded")
-            if charges["builder"] + cap + max(REVIEWER_LIMIT, charges["reviewer"]) > ALL_IN_LIMIT:
+            if builder_with_prior_use + cap > BUILDER_LIMIT:
+                raise ResourceBlocked("Builder CPU cap including unledgered prior use would be exceeded")
+            if builder_with_prior_use + cap + max(REVIEWER_LIMIT, charges["reviewer"]) > ALL_IN_LIMIT:
                 raise ResourceBlocked("all-in cap or protected Reviewer reserve would be breached")
         else:
             if charges["reviewer"] + cap > REVIEWER_LIMIT:
                 raise ResourceBlocked("protected Reviewer CPU reserve would be exceeded")
-            if charges["builder"] + charges["reviewer"] + cap > ALL_IN_LIMIT:
-                raise ResourceBlocked("all-in CPU cap would be exceeded")
+            if builder_with_prior_use + charges["reviewer"] + cap > ALL_IN_LIMIT:
+                raise ResourceBlocked("all-in CPU cap including unledgered prior use would be exceeded")
         return {
             "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
             "run_id": run_id, "unit_id": unit_id, "role": role, "unit_kind": unit_kind,
@@ -2062,7 +2083,7 @@ class Stage1Ledger:
                     future += estimates[unit]
             if blocked:
                 raise ResourceBlocked("forecast stops on unresolved/failed units: " + ", ".join(blocked[:8]))
-            builder = charges["builder"] + future
+            builder = charges["builder"] + PRIOR_USE_CPU_ALLOWANCE_SECONDS + future
             all_in = builder + max(REVIEWER_LIMIT, charges["reviewer"])
             result = {
                 "status": "FITS" if builder <= BUILDER_LIMIT and all_in <= ALL_IN_LIMIT else "RESOURCE_BLOCKED",
@@ -2071,7 +2092,10 @@ class Stage1Ledger:
                     bool(units.get(unit)) and runs[units[unit][-1]]["finish"] is not None
                     and runs[units[unit][-1]]["finish"]["status"] == "succeeded" for unit in expected
                 ),
-                "builder_cpu_charged": charges["builder"], "reviewer_cpu_charged": charges["reviewer"],
+                "builder_cpu_charged": charges["builder"],
+                "unledgered_prior_builder_cpu_allowance_seconds": PRIOR_USE_CPU_ALLOWANCE_SECONDS,
+                "builder_cpu_counted_including_prior_use": builder - future,
+                "reviewer_cpu_charged": charges["reviewer"],
                 "future_builder_cpu_forecast": future, "projected_builder_cpu": builder,
                 "projected_all_in_with_reviewer_reserve": all_in,
                 "carried_open_reservation_unit_ids": carried_open,

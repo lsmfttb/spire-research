@@ -8,6 +8,11 @@
     "builder": 180000,
     "reviewer_protected": 10000
   },
+  "prior_unledgered_builder_cpu_use": {
+    "conservative_allowance_cpu_seconds": 20.0,
+    "ledger_event_added": false,
+    "observed_unledgered_builder_cpu_seconds_approx": 18.0
+  },
   "reservation_policy": "write-ahead unique run ID; unresolved reservation is charged at its full cap; finished receipt charges measured process-tree CPU",
   "resume_policy": "completed unit IDs cannot run again; incomplete units require exact previous checkpoint digest and new process-run ID; lost unreceipted processes remain fully reserved",
   "reviewer_reserve_transferable_to_builder": false,

@@ -676,8 +676,14 @@ def _forecast_estimates(ledger: Any) -> tuple[dict[str, float], dict[str, Any]]:
         "scheduler_reservation_per_phase_cpu_seconds": FORMAL_SCHEDULER_RESERVATION,
         "heldout_report_analysis_reservation_cpu_seconds": ANALYSIS_REPORT_RESERVATION,
         "forecast_builder_cpu_seconds": sum(estimates.values()),
-        "projected_total_builder_cpu_seconds": preflight_charge + sum(estimates.values()),
+        "projected_total_builder_cpu_seconds": (
+            preflight_charge + sum(estimates.values()) + budget.PRIOR_USE_CPU_ALLOWANCE_SECONDS
+        ),
         "builder_hard_cap_cpu_seconds": budget.BUILDER_LIMIT,
+        "unledgered_prior_builder_cpu_observed_approx_seconds": budget.PRIOR_USE_CPU_ACCOUNTING[
+            "observed_unledgered_builder_cpu_seconds_approx"
+        ],
+        "unledgered_prior_builder_cpu_allowance_seconds": budget.PRIOR_USE_CPU_ALLOWANCE_SECONDS,
         "reviewer_protected_cpu_seconds": budget.REVIEWER_LIMIT,
         "aggregate_hard_cap_cpu_seconds": budget.ALL_IN_LIMIT,
         "accepted_cost_model_builder_hard_cap_cpu_seconds": budget.COST_MODEL_BUILDER_LIMIT,

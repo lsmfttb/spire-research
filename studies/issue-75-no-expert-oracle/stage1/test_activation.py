@@ -244,6 +244,31 @@ class LedgerTests(unittest.TestCase):
             self.reserve("builder-over", "TRAIN:1", cap=budget.BUILDER_LIMIT + 1, kind="training_owner",
                          attempts=None)
 
+    def test_prior_unledgered_builder_cpu_reduces_headroom_without_ledger_event(self):
+        used_cpu = budget.BUILDER_LIMIT - budget.PRIOR_USE_CPU_ALLOWANCE_SECONDS
+        run_id = "TRAIN:7500001-prior-use-fixture"
+        self.reserve(run_id, "TRAIN:7500001", cap=used_cpu,
+                     kind="training_owner", attempts=None)
+        self.ledger.finish(
+            run_id=run_id, measured_cpu_seconds=used_cpu, status="succeeded",
+            started_attempts=0, result_sha256="e" * 64,
+        )
+        historical_events = self.ledger.read_events()
+        forecast = self.ledger.forecast(
+            expected_unit_ids=["TRAIN:7500002"],
+            future_builder_cpu_seconds={"TRAIN:7500002": 0.0},
+            allowed_completed_unit_ids=["TRAIN:7500001"],
+        )
+        self.assertEqual(self.ledger.read_events(), historical_events)
+        self.assertEqual(forecast["builder_cpu_charged"], used_cpu)
+        self.assertEqual(forecast["unledgered_prior_builder_cpu_allowance_seconds"], 20.0)
+        self.assertEqual(forecast["builder_cpu_counted_including_prior_use"], budget.BUILDER_LIMIT)
+        self.assertEqual(forecast["builder_cpu_remaining"], 0.0)
+        with self.assertRaises(budget.ResourceBlocked):
+            self.reserve("TRAIN:7500002-one-more", "TRAIN:7500002", cap=0.01,
+                         kind="training_owner", attempts=None)
+        self.assertEqual(self.ledger.read_events(), historical_events)
+
     def test_incomplete_and_failed_units_are_not_silently_omitted_from_forecast(self):
         self.reserve("partial", "TRAIN:7500001", cap=20, kind="training_owner", attempts=None)
         self.ledger.finish(run_id="partial", measured_cpu_seconds=12, status="incomplete",
