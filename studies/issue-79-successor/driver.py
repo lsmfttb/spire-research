@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 import fcntl
+import gc
 import hashlib
 import json
 import math
@@ -737,6 +738,7 @@ def worker_main(job_path: Path) -> int:
     ledger = type("StudyContext", (), {"binding": binding})()
     try:
         report = executor._worker_owner(job, ledger)
+        report["runner_code_commit"] = job.get("runner_code_commit", job["package_commit"])
         for receipt in report.get("search", []):
             receipt.pop("registered_cpu_cap_seconds", None)
             receipt.pop("operational_stop_margin_cpu_seconds", None)
@@ -778,6 +780,7 @@ def worker_main(job_path: Path) -> int:
 
 def run_units(
     rows: list[dict], *, root: Path, pilot: bool, clock: ActiveClock | None,
+    package_commit: str | None = None,
 ) -> dict:
     started = time.monotonic()
     pending = list(rows)
@@ -785,6 +788,7 @@ def run_units(
     complete: dict[str, dict] = {}
     durations: dict[str, float] = {}
     tries: dict[str, int] = {}
+    registered_package_commit = package_commit or source_commit()
     python = str(PINNED_PYTHON)
     env = os.environ.copy()
     for name in ("STS_LIGHTSPEED_SOURCE_DIR", "STSRL_SOURCE_DIR"):
@@ -822,7 +826,7 @@ def run_units(
             }
         while pending and len(active) < CONCURRENCY:
             row = pending.pop(0)
-            done = existing_success(root, row)
+            done = existing_success(root, row, registered_package_commit)
             if done is not None:
                 complete[row["unit_id"]] = done
                 continue
@@ -840,7 +844,8 @@ def run_units(
                 "output_dir": str(attempt / "native"),
                 "run_id": run_id, "unit_id": row["unit_id"],
                 "phase": row["phase"], "row": row, "pilot": pilot,
-                "package_commit": source_commit(),
+                "package_commit": registered_package_commit,
+                "runner_code_commit": source_commit(),
                 "source_lock_sha256": source_lock_sha(),
             }
             job_path = attempt / "worker-job.json"
@@ -908,10 +913,12 @@ def run_units(
     }
 
 
-def _training_examples(rows: list[dict], *, root: Path, executor) -> list:
+def _training_examples(
+    rows: list[dict], *, root: Path, executor, package_commit: str | None = None,
+) -> list:
     examples = []
     for row in sorted(rows, key=lambda item: int(item["owner_seed"])):
-        report = existing_success(root, row)
+        report = existing_success(root, row, package_commit)
         if report is None or report.get("phase") != "training" or report.get("arm") != "TRAIN":
             raise RuntimeError(f"training block lacks its registered natural owner: {row['unit_id']}")
         if report.get("expert_decisions") != 0 or report.get("terminal_outcome") is None:
@@ -1023,6 +1030,49 @@ def train_update(block: int, examples: list, *, root: Path, pilot: bool, clock: 
         "pilot_nonformal": bool(pilot),
     }
     write_json_once(receipt_path, receipt)
+    return receipt
+
+
+def _completed_update_receipt(block: int, rows: list[dict], *, root: Path) -> dict | None:
+    """Verify a durable update before loading its large training-feature batch."""
+    receipt_path = root / "models" / f"update-{block}.json"
+    if not receipt_path.is_file():
+        return None
+    receipt = read_json(receipt_path)
+    expected_owner_seed_sha = hashlib.sha256(
+        ",".join(
+            str(int(row["owner_seed"]))
+            for row in sorted(rows, key=lambda item: int(item["owner_seed"]))
+        ).encode("ascii")
+    ).hexdigest()
+    expected_order_seed = derive_seed("formal-block-order", block)
+    if (
+        receipt.get("schema_id") != "issue79-policy-update-v1"
+        or receipt.get("status") != "SUCCEEDED"
+        or receipt.get("block_index") != block
+        or receipt.get("owner_count") != 128
+        or receipt.get("completed_steps") != 64
+        or receipt.get("owner_seed_sha256") != expected_owner_seed_sha
+        or receipt.get("block_order_seed") != expected_order_seed
+    ):
+        raise RuntimeError(f"completed update {block} receipt does not match its registered training block")
+    algorithm, runtime, model, learning, executor = load_modules(root, pilot=False)
+    _, source_digest, _ = executor._load_model(f"pi{block}")
+    _, result_digest, _ = executor._load_model(f"pi{block + 1}")
+    if (
+        receipt.get("source_model_digest") != source_digest
+        or receipt.get("result_model_digest") != result_digest
+    ):
+        raise RuntimeError(f"completed update {block} receipt does not match its saved policy bytes")
+    checkpoint = receipt.get("optimizer_checkpoint")
+    if not isinstance(checkpoint, dict) or not isinstance(checkpoint.get("path"), str):
+        raise RuntimeError(f"completed update {block} lacks its optimizer checkpoint receipt")
+    checkpoint_relative = Path(checkpoint["path"])
+    if checkpoint_relative.is_absolute() or ".." in checkpoint_relative.parts:
+        raise RuntimeError(f"completed update {block} has an invalid optimizer checkpoint path")
+    checkpoint_path = root / checkpoint_relative
+    if not checkpoint_path.is_file() or file_sha256(checkpoint_path) != checkpoint.get("sha256"):
+        raise RuntimeError(f"completed update {block} optimizer checkpoint failed SHA-256 validation")
     return receipt
 
 
@@ -1428,13 +1478,13 @@ def _search_coverage(reports: list[dict]) -> dict:
     }
 
 
-def analyze(root: Path) -> dict:
+def analyze(root: Path, package_commit: str | None = None) -> dict:
     outcomes = []
     eval_reports = []
     for owner in FORMAL_EVALUATION:
         for arm in ARMS:
             row = _row(owner, phase="heldout", arm=arm, formal=True, block=None)
-            record = existing_success_record(root, row)
+            record = existing_success_record(root, row, package_commit)
             if record is None:
                 continue
             report, result_path = record
@@ -1483,7 +1533,7 @@ def analyze(root: Path) -> dict:
                     root, _row(
                         owner, phase="training", arm="TRAIN", formal=True,
                         block=1 + index // 128,
-                    ),
+                    ), package_commit,
                 )) is not None
             ]),
             "heldout_R": _search_coverage([value for value in eval_reports if value.get("arm") == "R"]),
@@ -1526,8 +1576,10 @@ def analyze(root: Path) -> dict:
 def formal(
     pilot_execution_commit: str | None = None,
     pilot_report_generator_commit: str | None = None,
+    resume_package_commit: str | None = None,
 ) -> dict:
-    package_commit = source_commit()
+    runner_code_commit = source_commit()
+    package_commit = resume_package_commit or runner_code_commit
     pilot_commit = pilot_execution_commit or package_commit
     report_generator_commit = pilot_report_generator_commit or package_commit
     final_path = ARTIFACTS / f"formal-analysis-{package_commit}.json"
@@ -1559,39 +1611,56 @@ def formal(
         verify_inheritance(root / "verify")
         for block in (1, 2, 3):
             rows = _rows_for(table, phase="training", formal=True, block=block)
-            phase = run_units(rows, root=root, pilot=False, clock=clock)
+            phase = run_units(
+                rows, root=root, pilot=False, clock=clock, package_commit=package_commit,
+            )
             if phase["status"] != "SUCCEEDED":
                 return {
                     "schema_id": "issue79-formal-progress-v1",
                     "status": phase["status"], "block_index": block,
+                    "runner_code_commit": runner_code_commit,
                     "active_seconds": clock.elapsed(), "allowance_seconds": allowance,
                 }
-            algorithm, runtime, model, learning, executor = load_modules(root, pilot=False)
-            examples = _training_examples(rows, root=root, executor=executor)
-            update = train_update(block, examples, root=root, pilot=False, clock=clock)
+            update = _completed_update_receipt(block, rows, root=root)
+            if update is None:
+                algorithm, runtime, model, learning, executor = load_modules(root, pilot=False)
+                examples = _training_examples(
+                    rows, root=root, executor=executor, package_commit=package_commit,
+                )
+                try:
+                    update = train_update(block, examples, root=root, pilot=False, clock=clock)
+                finally:
+                    del examples
+                    gc.collect()
             atomic_json(progress_path, {
                 "schema_id": "issue79-formal-progress-v1",
                 "status": "BLOCK_COMPLETE", "block_index": block,
-                "owner_count": len(examples), "completed_steps": update["completed_steps"],
+                "owner_count": update["owner_count"], "completed_steps": update["completed_steps"],
                 "result_model_digest": update["result_model_digest"],
+                "runner_code_commit": runner_code_commit,
                 "active_seconds": clock.elapsed(), "allowance_seconds": allowance,
             })
         eval_rows = _rows_for(table, phase="heldout", formal=True)
-        evaluation = run_units(eval_rows, root=root, pilot=False, clock=clock)
+        evaluation = run_units(
+            eval_rows, root=root, pilot=False, clock=clock, package_commit=package_commit,
+        )
         if evaluation["status"] != "SUCCEEDED":
             return {
                 "schema_id": "issue79-formal-progress-v1",
                 "status": evaluation["status"], "phase": "heldout",
+                "runner_code_commit": runner_code_commit,
                 "active_seconds": clock.elapsed(), "allowance_seconds": allowance,
             }
         if clock.expired():
             return {
                 "schema_id": "issue79-formal-progress-v1",
                 "status": "GLOBAL_ACTIVE_WALL_ALLOWANCE_EXCEEDED",
+                "runner_code_commit": runner_code_commit,
                 "active_seconds": clock.elapsed(), "allowance_seconds": allowance,
             }
-        result = analyze(root)
+        result = analyze(root, package_commit)
         result["source_branch_sha"] = package_commit
+        result["formal_runner_code_commit"] = runner_code_commit
         result["source_lock_sha256"] = source_lock_sha()
         result["pilot_execution_commit"] = pilot_commit
         result["pilot_report_sha256"] = file_sha256(pilot_report_path)
@@ -1609,6 +1678,7 @@ def main() -> int:
     parser.add_argument("--mode", choices=("prepare", "verify", "pilot", "formal"))
     parser.add_argument("--pilot-execution-commit", help="select a completed pilot with matching phase receipts")
     parser.add_argument("--pilot-report-generator-commit", help="select the immutable report revision for the pilot")
+    parser.add_argument("--resume-package-commit", help="resume a compatible formal artifact root after an operational runner fix")
     parser.add_argument("--worker", type=Path)
     args = parser.parse_args()
     if args.worker is not None:
@@ -1630,7 +1700,10 @@ def main() -> int:
         print(json.dumps(pilot(args.pilot_execution_commit), sort_keys=True))
         return 0
     if args.mode == "formal":
-        result = formal(args.pilot_execution_commit, args.pilot_report_generator_commit)
+        result = formal(
+            args.pilot_execution_commit, args.pilot_report_generator_commit,
+            args.resume_package_commit,
+        )
         print(json.dumps(result, sort_keys=True))
         return 0 if result.get("status") in {"COMPLETE", "BLOCK_COMPLETE"} else 2
     parser.error("select a mode or a worker job")

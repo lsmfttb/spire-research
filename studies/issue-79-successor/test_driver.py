@@ -100,6 +100,46 @@ class SuccessorDriverTests(unittest.TestCase):
                 self.assertIsNone(driver.existing_success(root, row))
                 self.assertEqual(driver.existing_success(root, row, commit), result)
 
+    def test_completed_formal_update_reuses_verified_receipt_without_training_data(self):
+        class FakeExecutor:
+            def _load_model(self, label):
+                digest = {"pi1": "source-digest", "pi2": "result-digest"}[label]
+                return None, digest, None
+
+        rows = [{"owner_seed": seed} for seed in range(7_600_001, 7_600_129)]
+        owner_seed_sha = driver.hashlib.sha256(
+            ",".join(str(row["owner_seed"]) for row in rows).encode("ascii")
+        ).hexdigest()
+        with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:
+            root = Path(temp)
+            checkpoint = root / "models" / "block-1-step.pt"
+            checkpoint.parent.mkdir(parents=True)
+            checkpoint.write_bytes(b"durable optimizer checkpoint")
+            receipt = {
+                "schema_id": "issue79-policy-update-v1", "status": "SUCCEEDED",
+                "block_index": 1, "owner_count": 128, "completed_steps": 64,
+                "owner_seed_sha256": owner_seed_sha,
+                "block_order_seed": driver.derive_seed("formal-block-order", 1),
+                "source_model_digest": "source-digest", "result_model_digest": "result-digest",
+                "optimizer_checkpoint": {
+                    "path": "models/block-1-step.pt",
+                    "sha256": driver.file_sha256(checkpoint),
+                },
+            }
+            driver.write_json_once(root / "models" / "update-1.json", receipt)
+            with patch.object(
+                driver, "load_modules", return_value=(None, None, None, None, FakeExecutor()),
+            ):
+                self.assertEqual(driver._completed_update_receipt(1, rows, root=root), receipt)
+
+            receipt["owner_count"] = 127
+            driver.atomic_json(root / "models" / "update-1.json", receipt)
+            with patch.object(
+                driver, "load_modules", return_value=(None, None, None, None, FakeExecutor()),
+            ):
+                with self.assertRaises(RuntimeError):
+                    driver._completed_update_receipt(1, rows, root=root)
+
     def test_search_wall_distribution_reads_pilot_search_artifact_layout(self):
         with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:
             root = Path(temp)
