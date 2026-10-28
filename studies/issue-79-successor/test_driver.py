@@ -81,6 +81,25 @@ class SuccessorDriverTests(unittest.TestCase):
                 self.assertEqual(result, receipt)
                 self.assertEqual(driver.read_json(progress_path)["status"], "COMPLETE")
 
+    def test_recovery_can_load_success_from_its_original_execution_commit(self):
+        with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:
+            root = Path(temp)
+            row = {
+                "unit_id": "TRAIN:7620001", "owner_seed": 7620001,
+                "phase": "training", "arm": "TRAIN", "formal": False,
+            }
+            commit = "a" * 40
+            attempt = root / "units" / driver.unit_key(row["unit_id"]) / "attempt-0001"
+            attempt.mkdir(parents=True)
+            result = {
+                **row, "status": "SUCCEEDED", "package_commit": commit,
+                "source_lock_sha256": driver.source_lock_sha(),
+            }
+            driver.write_json_once(attempt / "result.json", result)
+            with patch.object(driver, "source_commit", return_value="b" * 40):
+                self.assertIsNone(driver.existing_success(root, row))
+                self.assertEqual(driver.existing_success(root, row, commit), result)
+
     def test_search_wall_distribution_reads_pilot_search_artifact_layout(self):
         with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:
             root = Path(temp)

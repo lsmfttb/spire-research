@@ -679,7 +679,10 @@ def unit_key(unit_id: str) -> str:
     return "".join(char if char.isalnum() or char in "-_" else "-" for char in unit_id)
 
 
-def existing_success_record(root: Path, row: dict) -> tuple[dict, Path] | None:
+def existing_success_record(
+    root: Path, row: dict, package_commit: str | None = None,
+) -> tuple[dict, Path] | None:
+    expected_package_commit = package_commit or source_commit()
     directory = root / "units" / unit_key(row["unit_id"])
     if not directory.exists():
         return None
@@ -690,7 +693,7 @@ def existing_success_record(root: Path, row: dict) -> tuple[dict, Path] | None:
         if value.get("unit_id") != row["unit_id"] or value.get("owner_seed") != row["owner_seed"]:
             raise RuntimeError(f"success receipt is bound to a different registered owner: {result}")
         if (
-            value.get("package_commit") != source_commit()
+            value.get("package_commit") != expected_package_commit
             or value.get("source_lock_sha256") != source_lock_sha()
             or value.get("phase") != row["phase"]
             or value.get("arm") != row["arm"]
@@ -701,8 +704,10 @@ def existing_success_record(root: Path, row: dict) -> tuple[dict, Path] | None:
     return None
 
 
-def existing_success(root: Path, row: dict) -> dict | None:
-    record = existing_success_record(root, row)
+def existing_success(
+    root: Path, row: dict, package_commit: str | None = None,
+) -> dict | None:
+    record = existing_success_record(root, row, package_commit)
     return None if record is None else record[0]
 
 
@@ -1186,8 +1191,8 @@ def pilot(execution_commit: str | None = None) -> dict:
             eval_rows, root=root, pilot=True, clock=clock,
         ), package_commit)
         eval_wall = float(eval_phase["elapsed_active_seconds"])
-        training_reports = [existing_success(root, row) for row in training_rows]
-        evaluation_reports = [existing_success(root, row) for row in eval_rows]
+        training_reports = [existing_success(root, row, package_commit) for row in training_rows]
+        evaluation_reports = [existing_success(root, row, package_commit) for row in eval_rows]
         if any(report is None for report in (*training_reports, *evaluation_reports)):
             raise RuntimeError("successful pilot phase receipt lacks an immutable owner result")
         measured = clock.elapsed()
