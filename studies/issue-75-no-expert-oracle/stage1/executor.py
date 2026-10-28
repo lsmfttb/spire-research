@@ -842,7 +842,10 @@ def _formal_forecast(ledger: Any, *, phase: str) -> dict[str, Any]:
     )
     builder_open_reserved = sum(item["reserved_cpu_seconds"] for item in builder_open_reservations)
     builder_conservative_adjustment = float(charges["builder"]) - builder_terminal_measured - builder_open_reserved
-    builder_after_next = float(charges["builder"]) + next_cap + scheduler_new_cap
+    prior_use_allowance = budget.PRIOR_USE_CPU_ALLOWANCE_SECONDS
+    builder_after_next = (
+        float(charges["builder"]) + prior_use_allowance + next_cap + scheduler_new_cap
+    )
     all_in_after_next = builder_after_next + max(budget.REVIEWER_LIMIT, float(charges["reviewer"]))
     if builder_after_next > budget.BUILDER_LIMIT or all_in_after_next > budget.ALL_IN_LIMIT:
         raise budget.ResourceBlocked("the next bounded operation cannot fit within the unchanged live hard caps")
@@ -870,6 +873,10 @@ def _formal_forecast(ledger: Any, *, phase: str) -> dict[str, Any]:
         "training_scheduler_plan": scheduler_plan,
         "training_scheduler_new_reservation_cpu_seconds": scheduler_new_cap,
         "builder_cpu_charged_including_open_reservations": float(charges["builder"]),
+        "unledgered_prior_builder_cpu_observed_approx_seconds": budget.PRIOR_USE_CPU_ACCOUNTING[
+            "observed_unledgered_builder_cpu_seconds_approx"
+        ],
+        "unledgered_prior_builder_cpu_allowance_seconds": prior_use_allowance,
         "builder_terminal_measured_cpu_seconds": builder_terminal_measured,
         "builder_conservative_failed_reservation_adjustment_cpu_seconds": builder_conservative_adjustment,
         "builder_open_reservation_cpu_seconds": builder_open_reserved,

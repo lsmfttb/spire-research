@@ -664,6 +664,69 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertEqual(executor._file_sha256(receipt), receipt_sha)
         self.assertEqual(executor._file_sha256(worker_job), worker_job_sha)
 
+    def test_formal_forecast_applies_prior_use_to_live_next_reservation_boundary(self):
+        estimates = {"TRAIN:7500002": 5.0}
+        dynamic = {"projected_total_builder_cpu_seconds": 169_993.18149394685}
+
+        def prepared_ledger(name, charged_cpu):
+            ledger = self._test_ledger(name)
+            run_id = f"{name}-charged"
+            ledger.reserve(
+                run_id=run_id, unit_id="TRAIN:7500001", role="builder",
+                reserved_cpu_seconds=charged_cpu, unit_kind="training_owner",
+            )
+            ledger.finish(
+                run_id=run_id, measured_cpu_seconds=charged_cpu, status="succeeded",
+                started_attempts=0, result_sha256="e" * 64,
+            )
+            return ledger, ledger.read_events()
+
+        def run_forecast(ledger):
+            with (
+                mock.patch.object(executor, "_preflight_complete", return_value=True),
+                mock.patch.object(
+                    executor, "_accepted_preflight_evidence",
+                    return_value=({}, {"status": "FITS"}, "a" * 64, "b" * 64),
+                ),
+                mock.patch.object(
+                    executor, "_forecast_estimates", return_value=(estimates, dynamic),
+                ),
+                mock.patch.object(
+                    executor, "_next_training_reservation",
+                    return_value=("TRAIN:7500002", estimates["TRAIN:7500002"]),
+                ),
+                mock.patch.object(
+                    executor, "_training_scheduler_plan",
+                    return_value={
+                        "action": "reserve",
+                        "unit_id": "SCHEDULER:TRAIN:CONTINUATION:6",
+                        "cap": 5.0,
+                    },
+                ),
+            ):
+                return executor._formal_forecast(ledger, phase="training")
+
+        allowance = executor.budget.PRIOR_USE_CPU_ALLOWANCE_SECONDS
+        next_cap = estimates["TRAIN:7500002"]
+        scheduler_cap = 5.0
+        exact_headroom_charge = (
+            executor.budget.BUILDER_LIMIT - allowance - next_cap - scheduler_cap
+        )
+        fits_ledger, fits_history = prepared_ledger("live-boundary-fits", exact_headroom_charge)
+        fits = run_forecast(fits_ledger)
+        self.assertEqual(fits["builder_after_next_cpu_seconds"], executor.budget.BUILDER_LIMIT)
+        self.assertEqual(fits["all_in_after_next_cpu_seconds"], executor.budget.ALL_IN_LIMIT)
+        self.assertEqual(fits["unledgered_prior_builder_cpu_observed_approx_seconds"], 18.0)
+        self.assertEqual(fits["unledgered_prior_builder_cpu_allowance_seconds"], 20.0)
+        self.assertEqual(fits_ledger.read_events(), fits_history)
+
+        blocked_ledger, blocked_history = prepared_ledger(
+            "live-boundary-blocked", exact_headroom_charge + 0.01,
+        )
+        with self.assertRaises(executor.budget.ResourceBlocked):
+            run_forecast(blocked_ledger)
+        self.assertEqual(blocked_ledger.read_events(), blocked_history)
+
     def test_formal_forecast_checks_next_repair_reservation_and_live_caps(self):
         ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
         before = ledger.read_events()
