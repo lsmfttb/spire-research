@@ -1,0 +1,290 @@
+{
+  "algorithm": {
+    "learning": {
+      "elite": {
+        "incomplete_or_tied_labels": false,
+        "loss": "per-owner mean cross-entropy over actual elite legal decisions; zero if no superior completed J trajectory",
+        "rank": [
+          "heart_victory_desc",
+          "native_terminal_floor_desc"
+        ],
+        "source": "best strictly superior completed J trajectory per original owner/root"
+      },
+      "loss": "L_pg + L_elite - 0.01*H",
+      "optimizer": {
+        "betas": [
+          0.9,
+          0.999
+        ],
+        "block_standard_deviation_ddof": 0,
+        "epsilon": 1e-08,
+        "formal_batch_owners": 32,
+        "formal_block_count": 4,
+        "formal_execution_enabled": true,
+        "formal_owner_count_per_block": 128,
+        "formal_steps_per_block": 64,
+        "gradient_norm_clip": 1.0,
+        "learning_rate": 0.0003,
+        "name": "AdamW",
+        "stage0_diagnostic_batch_size": 8,
+        "stage0_diagnostic_steps": 1,
+        "weight_decay": 0.0
+      },
+      "policy_gradient": {
+        "advantage_clip": [
+          -3.0,
+          3.0
+        ],
+        "block_centered": true,
+        "owner_log_probability_normalization": "sum_over_genuine_multichoice_decisions / decision_count",
+        "reward_shaping": false,
+        "scale_denominator": "max(block_standard_deviation,1)",
+        "utility_for_normalization": "100*heart_win + native_terminal_floor"
+      }
+    },
+    "policy": {
+      "activation": "tanh",
+      "actor_final_bias": 0.0,
+      "actor_final_weight_std": 0.01,
+      "actor_layers": [
+        2048,
+        128,
+        64,
+        1
+      ],
+      "battle_search": {
+        "api": "native_battle_search_v2",
+        "include_potions": true,
+        "learned_leaf_value": null,
+        "policy_prior": null,
+        "root_selection_rule": "highest_mean",
+        "simulations": 400
+      },
+      "candidate_identity_is_not_a_model_feature": true,
+      "encoder_source": "Issue 73 SemanticHashEncoder exact reviewed source",
+      "information_regime": "full_native_training_oracle_only",
+      "initial_model_seed": 73507501,
+      "model_input": "native_privileged_projection_and_native_ordered_candidate_semantics",
+      "no_expert_calls_in_algorithm_paths": true
+    },
+    "search": {
+      "evaluation_rj_root_opportunity_cap": 7,
+      "j_completed_trajectory_portfolio_cap": 4,
+      "j_later_mutation_trial_cap": 8,
+      "j_root_trial_cap": 8,
+      "later_mutation_schedule": "highest-ranked completed parent with an unused later multi-choice mutation occurrence; earliest reached eligible later state; seed-derived alternative occurrence",
+      "native_future_rng": "same restored native RNG state/path; only policy RNG varies; no claim of new hidden-world draw",
+      "no_complete_trajectory_fallback": "current frozen pi_k",
+      "r_root_trial_cap": 16,
+      "root_action_schedule": "deterministic seed-derived rotation of locked native legal occurrence order; then cyclic",
+      "search_invocation_cpu_cap_seconds": 32,
+      "search_invocation_started_attempt_cap": 16,
+      "terminal_rank": [
+        "heart_victory_desc",
+        "native_terminal_floor_desc",
+        "attempt_index_asc"
+      ],
+      "training_base_game_root_opportunity_cap": 4
+    }
+  },
+  "execution": {
+    "authorized_phases": [
+      "preflight",
+      "train",
+      "evaluate"
+    ],
+    "formal_evaluation_enabled": true,
+    "formal_training_enabled": true,
+    "native_sampling_enabled": true,
+    "nonformal_preflight_enabled": true,
+    "package_status": "FORMAL_EXECUTION_ENABLED",
+    "stage1_execution_authorized": true,
+    "max_concurrent_owner_process_trees": 1,
+    "torch_intraop_threads": 1,
+    "torch_interop_threads": 1
+  },
+  "population": {
+    "heldout_arms": [
+      "P0",
+      "P1",
+      "R",
+      "J",
+      "E"
+    ],
+    "heldout_owners": {
+      "count": 96,
+      "first_owner_seed": 7510001,
+      "last_owner_seed": 7510096
+    },
+    "preflight_arm_schedule": [
+      "P0",
+      "P1",
+      "R",
+      "J",
+      "E"
+    ],
+    "preflight_arm_schedule_basis": "all five registered arms are included for operational qualification only; schedule requires independent package review and is not efficacy evidence",
+    "preflight_owners": {
+      "count": 8,
+      "first_owner_seed": 7520001,
+      "last_owner_seed": 7520008
+    },
+    "preflight_results_are_not_formal_or_efficacy_evidence": true,
+    "training_blocks": 4,
+    "training_owners": {
+      "count": 512,
+      "first_owner_seed": 7500001,
+      "last_owner_seed": 7500512
+    },
+    "training_owners_per_block": 128
+  },
+  "preflight_protocol": {
+    "arms_are_all_five_registered_heldout_arms": true,
+    "no_outcome_conditioned_replacement_or_subset": true,
+    "owner_seeds_are_the_eight_rows_marked_preflight": true,
+    "recompute_full_remaining_cohort_forecast_before_formal_owner_seed": true,
+    "runs_after_one_focused_independent_review_of_the_revised_executable_path": true,
+    "accepted_evidence": {
+      "planner_decision_comment_id": 6423390920,
+      "scope": "nonformal-feasibility-only-with-prospective-hard-caps",
+      "preflight_report_path": "stage1/artifacts/preflight-report-review-repair.json",
+      "preflight_report_sha256_lf": "30453842d951a0fbbcd49935ae22a47fce413aafcbd017e61c34a2fa3417e81f",
+      "cost_forecast_path": "stage1/artifacts/cost-forecast-review-repair.json",
+      "cost_forecast_sha256_lf": "8933d20699955f5a128eba4ea373df1d0b89f27eb0b4613902c483245ed46c36",
+      "reported_over_cap_search_invocations": 82,
+      "reported_search_invocation_count": 112,
+      "reported_aggregate_search_cpu_excess_seconds": 11.5538,
+      "reported_maximum_search_cpu_seconds": 32.503407
+    }
+  },
+  "preparation_base_commit": "a8410ff48ecf168f904726c79da302d10f921984",
+  "provenance": {
+    "cost_model_commit": "a8410ff48ecf168f904726c79da302d10f921984",
+    "cost_model_json_sha256": "1e4722784cbe0b9f1d7754440de38d1a0c1791531d4fbc057ccae62c8f1e5f38",
+    "cost_model_review_comment_id": 6403856784,
+    "planner_budget_decision_comment_id": 6403907358,
+    "runtime": {
+      "native_import_only_negative_test": {
+        "checkpoints_loaded_or_created": 0,
+        "expert_instances_created_or_called": 0,
+        "formal_seeds_consumed": 0,
+        "games_started": 0,
+        "import_only": true,
+        "native_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+        "native_source_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+        "numpy_version": "2.4.6",
+        "privileged_projections_read": 0,
+        "python_version": "3.13.13",
+        "simulator_instances_created": 0,
+        "status": "PINNED_NATIVE_IMPORT_API_NEGATIVE_PASS",
+        "torch_version": "2.12.0+cpu"
+      },
+      "native_module_path": "/home/lsmft/stsrl-spikes/build-issue71-8ded-py313/slaythespire.cpython-313-x86_64-linux-gnu.so",
+      "native_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+      "numpy_version": "2.4.6",
+      "optimizer_initial_state": {
+        "class": "torch.optim.adamw.AdamW",
+        "param_groups": [
+          {
+            "options": {
+              "amsgrad": false,
+              "betas": [
+                0.9,
+                0.999
+              ],
+              "capturable": false,
+              "decoupled_weight_decay": true,
+              "differentiable": false,
+              "eps": 1e-08,
+              "foreach": null,
+              "fused": null,
+              "lr": 0.0003,
+              "maximize": false,
+              "weight_decay": 0.0
+            },
+            "parameter_count": 6
+          }
+        ],
+        "state_is_empty_before_first_step": true
+      },
+      "optimizer_initial_state_sha256": "399a419a28f1c7ea44981bd02bbbca1b3d17fbfb6238afdb053e767b36f06870",
+      "pi0_model_digest": "38fe80665067f4ba931f825c882985e73dda1dd95fe19105754d55e8308dfeaf",
+      "pi0_model_seed": 73507501,
+      "python_version": "3.13.13",
+      "sts_lightspeed_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+      "stsr_source_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+      "torch_version": "2.12.0+cpu"
+    },
+    "stage0": {
+      "cumulative_builder_cpu_seconds": 1564.3003299999998,
+      "cumulative_native_cpu_seconds": 349.414085,
+      "evidence_commit": "7f7538a706710626740cdb635d3711e69eac900f",
+      "evidence_report_sha256": "f35bab535d850668ecb556ac121eccd75848223b3409b6563abb12063a28ffaf",
+      "review_comment_id": 6403333026,
+      "source_commit": "c77d64243320639bf156330760d511d2a13eee85",
+      "source_lock_sha256_lf": "b3ce3d33c27ec392f6d88151bce3c86a8fdce8c9dc0152d417069441f7140d38"
+    }
+  },
+  "resources": {
+    "all_in_cpu_hard_seconds": 190000,
+    "builder_process_tree_cpu_hard_seconds": 180000,
+    "ledger_name": "one cumulative Stage 1 ledger; starts at zero before the registered preflight",
+    "reviewer_cpu_protected_seconds": 10000,
+    "reviewer_reserve_is_not_transferable": true,
+    "search_invocation_cpu_limit_seconds": 32,
+    "search_invocation_started_attempt_limit": 16,
+    "stage0_all_in_hard_seconds": 60000,
+    "stage0_and_stage1_ledgers_do_not_carry_over": true,
+    "stage0_builder_hard_seconds": 50000,
+    "stage0_cumulative_builder_at_completed_attempt_seconds": 1564.3003299999998,
+    "stage0_cumulative_native_at_completed_attempt_seconds": 349.414085,
+    "stage0_native_hard_seconds": 30000
+  },
+  "schema_id": "issue75-stage1-preparation-config-v1",
+  "scope": "STUDY_ONLY",
+  "seeds": {
+    "block_order_seed_domain": "issue75-stage1-seed-table-v1|block-order",
+    "block_order_seeds": [
+      948217156,
+      1092266399,
+      2088533108,
+      893131901
+    ],
+    "game_seed_is_never_reused_from_issue71_73_74": true,
+    "policy_rng_seed_derivation": "domain-separated SHA-256 owner/arm values in seed-table.json",
+    "search_attempt_seed_derivation": "derive_search_attempt_seed(invocation_seed, attempt_index), fixed attempt index 0..15",
+    "search_invocation_seed_derivation": "domain-separated SHA-256 seed per locked arm and root opportunity in seed-table.json",
+    "table_path": "seed-table.json",
+    "table_sha256": "b61b08cb757ce07eb3a20734ea6bf46decd97437ad30cf4a6d1ce0a90a74d6dd"
+  },
+  "source": {
+    "algorithm_sha256_lf": "481ee659910c0f1ef9f7418eb9ad58f9409a87b95fa65deca8b7adc79f26abd2",
+    "initial_model_digest": "38fe80665067f4ba931f825c882985e73dda1dd95fe19105754d55e8308dfeaf",
+    "initial_optimizer_state_sha256": "399a419a28f1c7ea44981bd02bbbca1b3d17fbfb6238afdb053e767b36f06870",
+    "learning_sha256_lf": "9004a70eb7c58990a5b9c0ccb68d1b36b40479a713a070e02f3c6037e4ef467a",
+    "model_sha256_lf": "a13ad1e1094b795bf87548fea42a7aaf22c8867550b30a3523484318bc6825e6",
+    "registered_stage0_config": {
+      "issue73_pi_init_sha256": "185382c7764535b409e8b096e262f2ea655fb0c07abebfabef078c22bbdd8f61",
+      "issue73_root_source_lock_sha256_lf": "cb88b92f3e207329d5986b340c82fc356fc55d6ac6d628966bee1829bf47af22",
+      "issue73_root_tree_git_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
+      "issue73_stage1_source_commit": "40191f365d9b64390dab0025c77ea9c1c2915175",
+      "issue74_selection_lock_sha256_lf": "e55149de194820308450b45eb6f25cb3bf50bf2c4816a67226e821ef9d154025",
+      "issue74_selection_lock_source_commit": "a5ea866b55422167454cb45c8070c7dc5ba937df",
+      "issue74_selection_lock_source_path": "studies/issue-74-oracle-feasibility/selection-lock.json",
+      "issue74_selection_source_code_commit": "fae49ddc727665898d426a98c7d2f4c43baa2526",
+      "native_module_path": "/home/lsmft/stsrl-spikes/build-issue71-8ded-py313/slaythespire.cpython-313-x86_64-linux-gnu.so",
+      "native_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+      "numpy_version": "2.4.6",
+      "pinned_executor": "sts_combat_rl.sim.controlled_run.execute_controlled_run",
+      "python_version": "3.13.13",
+      "spire_reviewed_branch": "codex/issue-73-review-repair-20261025",
+      "spire_reviewed_commit": "40191f365d9b64390dab0025c77ea9c1c2915175",
+      "sts_lightspeed_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+      "stsr_source_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+      "torch_version": "2.12.0+cpu"
+    },
+    "runtime_sha256_lf": "aaa99c6316edb628e34161b733a92f7a0937d853b3761aa08165bc7536905407",
+    "source_and_binary_lock_is_required_before_any_registered_phase": true
+  },
+  "study_id": "issue-75-no-expert-oracle"
+}

@@ -1,0 +1,93 @@
+{
+  "authorization_comment_id": 6459123910,
+  "downstream_consumer": "Issue 75 remaining registered 384 TRAIN owners and 96 heldout owners x 5 arms, after pi1 preservation and verification",
+  "files": {
+    "budget.json": {
+      "sha256": "b2f8f9c6d790d8f4ec540121ae1bb1f30d7a68c5e2e16a4c1a5d9b4e34bf238c",
+      "size_bytes": 1095
+    },
+    "config.json": {
+      "sha256": "dedba8f4b11de92286c7e687c1afebc3330e073ba4d608a20c960ea7be467c5d",
+      "size_bytes": 12474
+    },
+    "ledger/events.jsonl": {
+      "sha256": "061ad689dd446aba0fcf08753b0b6bc89ab7bd3298d73b43304b0e182cde9f4d",
+      "size_bytes": 374844
+    },
+    "models/block-0-step.pt": {
+      "sha256": "7bdff6bdd14d8bf5bdcd1cf286e687b5a6df4ef6c11f80bad1ee18787e40f514",
+      "size_bytes": 3266715
+    },
+    "models/pi1.pt": {
+      "sha256": "d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21978",
+      "size_bytes": 1085141
+    },
+    "policy-probe-features.json": {
+      "sha256": "67ff80625288bbada9089fcf758a286cb2e7c132b0138975fd92fc4192b9094f",
+      "size_bytes": 144966
+    },
+    "seed-table.json": {
+      "sha256": "b61b08cb757ce07eb3a20734ea6bf46decd97437ad30cf4a6d1ce0a90a74d6dd",
+      "size_bytes": 400083
+    },
+    "source-lock.json": {
+      "sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+      "size_bytes": 5949
+    },
+    "source-lock.sha256": {
+      "sha256": "f943c8603961eedb6717b35896005c542ddd14d7b56a3c2c3ae6744fd0f382b4",
+      "size_bytes": 83
+    },
+    "training-forecast.json": {
+      "sha256": "7ea02de2016f0a69ab2b0edfa2fdacc968b6cded89c3a2e8bcbf5230c7738910",
+      "size_bytes": 2634
+    },
+    "units/UPDATE-0/result-UPDATE:0-4db46e9573a4405a.json": {
+      "sha256": "71e79487df8a28c6759dca42ea4df080293d25b4e41b55e569065891dc1e7cef",
+      "size_bytes": 26214
+    },
+    "units/UPDATE-0/worker-job-UPDATE:0-4db46e9573a4405a.json": {
+      "sha256": "63ca3bd6365f2059e0fb3438d8c6d50b81feab3dbb415b1ebed997f08926ec1b",
+      "size_bytes": 1177
+    },
+    "units/UPDATE-0/worker-log-UPDATE:0-4db46e9573a4405a.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    }
+  },
+  "issue_number": 75,
+  "producer_commit": "00d6405ba9090878d3016400706aeaa645446689",
+  "result": {
+    "block_order_seed": 948217156,
+    "checkpoint_model_state_matches_pi1": true,
+    "completed_steps": 64,
+    "expert_decisions": 0,
+    "measured_cpu_seconds": 298.957140816,
+    "optimizer_checkpoint_sha256": "7bdff6bdd14d8bf5bdcd1cf286e687b5a6df4ef6c11f80bad1ee18787e40f514",
+    "optimizer_parameter_steps": [
+      64
+    ],
+    "owner_count": 128,
+    "pi1_file_sha256": "d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21978",
+    "pi1_state_digest": "33b3d3d891e53b7434919318ccb1c8411a0bebe1e2e48616ef040206261db557",
+    "probe_diagnostics": {
+      "argmax_rank_changes": 40,
+      "post_action_top_two_logit_margin_mean": 0.19256629585288465,
+      "pre_action_top_two_logit_margin_mean": 0.0007556343480246142,
+      "pre_post_distribution_total_variation_max": 0.2500285506248474,
+      "pre_post_distribution_total_variation_mean": 0.17979733395623043,
+      "probe_state_count": 128,
+      "synthetic_probe_used": false
+    },
+    "probe_features_sha256": "67ff80625288bbada9089fcf758a286cb2e7c132b0138975fd92fc4192b9094f",
+    "probe_state_count": 128,
+    "reserved_cpu_seconds": 3837.4562621977375,
+    "status": "succeeded"
+  },
+  "retained_at_utc": "2026-10-28T05:16:56.370269+00:00",
+  "review_comment_id": 6461022137,
+  "run_id": "UPDATE:0-4db46e9573a4405a",
+  "schema_id": "issue75-durable-update0-reconstruction-v1",
+  "scope": "STUDY_ONLY; exactly one fixed-input UPDATE:0, 64 AdamW steps; no games, searches, or heldout in this run",
+  "source_lock_sha256_lf": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665"
+}

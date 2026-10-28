@@ -1,0 +1,58 @@
+{
+  "schema_id": "issue79-successor-contract-v1",
+  "issue": 79,
+  "status": "STUDY_ONLY",
+  "question": "Whether three blocks of self-generated training-time privileged joint non-combat trajectory search and policy learning, continued from the independently retained no-Expert pi1, improve natural complete-game outcomes and online privileged-oracle outcomes.",
+  "training": {
+    "source_policy": "verified inherited pi1",
+    "owners": 384,
+    "owner_seeds": [7600001, 7600384],
+    "blocks": 3,
+    "owners_per_block": 128,
+    "policy_updates_per_block": 64,
+    "search_proposals_per_root": 16,
+    "training_roots_per_owner": 4,
+    "expert_training_decisions": 0
+  },
+  "heldout": {
+    "owners": 96,
+    "owner_seeds": [7610001, 7610096],
+    "arms": ["P0", "P1", "R", "J", "E"],
+    "P0": "inherited pi1 without online Oracle",
+    "P1": "successor pi4 without online Oracle",
+    "R": "successor pi4 with root-only privileged proposals",
+    "J": "successor pi4 with root proposals and later-choice mutations",
+    "E": "isolated historical Expert comparator",
+    "oracle_roots_per_owner": 7,
+    "search_proposals_per_root": 16
+  },
+  "pilot": {
+    "training_owner_seeds": [7620001, 7620016],
+    "heldout_debug_owner_seeds": [7630001, 7630004],
+    "nonformal": true,
+    "concurrency": 8,
+    "policy_update_steps": 64,
+    "outcomes_do_not_select_policy_or_formal_seeds": true
+  },
+  "primary_contrasts": ["J-P1", "J-E"],
+  "secondary_contrasts": ["P1-P0", "J-R"],
+  "bootstrap": {
+    "unit": "evaluation owner",
+    "replicates": 20000,
+    "confidence_level": 0.95
+  },
+  "resources": {
+    "per_search_cpu_limit": null,
+    "per_owner_cpu_limit": null,
+    "worker_cpu_limit": null,
+    "scheduler_cpu_reserve": null,
+    "one_total_active_program_wall_allowance": "Derived after one representative pilot at 175 percent of projected complete-task active time.",
+    "idle_gaps_counted": false
+  },
+  "interpretation_limits": [
+    "R and J are proposal-count matched, not equal-compute.",
+    "The study continues from pi1; it is not learning from scratch.",
+    "All claims are privileged native-surrogate claims, not normal-public deployment claims.",
+    "A single realized best continuation is not an unbiased expected-public-information action value."
+  ]
+}
