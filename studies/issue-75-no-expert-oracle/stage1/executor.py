@@ -224,6 +224,7 @@ def _save_model_once(model: Any, path: Path, digest_fn: Any) -> dict[str, str]:
     return {"path": path.relative_to(ARTIFACT_ROOT).as_posix(), "sha256": _file_sha256(path), "model_digest": digest_fn(model)}
 
 
+
 def _load_model(label: str, *, proxy: bool = False) -> tuple[Any, str, dict[str, Any]]:
     import torch
     from model import ActionConditionedPolicy, model_digest
@@ -480,6 +481,19 @@ def _current_update_reservation(
     previous_run_id = reservation.get("previous_run_id")
     if (
         unit_id == "UPDATE:0"
+        and reservation.get("repair_reason") == budget.UPDATE0_RECONSTRUCTION_REASON
+        and previous_run_id == budget.UPDATE0_RECONSTRUCTION_LOST_RUN_ID
+        and reservation.get("checkpoint_sha256") is None
+    ):
+        info = ledger.update0_reconstruction_info(run_id=run_id)
+        if info.get("state") != "OPEN" or any(reservation.get(key) != info.get(key) for key in (
+            "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
+            "repair_predecessor_receipt_sha256",
+        )):
+            raise PermissionError("UPDATE:0 reconstruction reservation differs from its exact lost-checkpoint lineage")
+        return None, None
+    if (
+        unit_id == "UPDATE:0"
         and reservation.get("repair_reason") == budget.UPDATE0_RETRY_REASON
         and reservation.get("checkpoint_sha256") is None
     ):
@@ -517,6 +531,15 @@ def _current_update_reservation(
         or reservation.get("checkpoint_sha256") != checkpoint_sha256
     ):
         raise budget.CheckpointMismatch("current update reservation differs from its predecessor checkpoint")
+    if reservation.get("repair_reason") == budget.UPDATE0_RECONSTRUCTION_REASON:
+        info = ledger.update0_reconstruction_info(run_id=run_id)
+        if info.get("state") != "OPEN" or info.get("latest_run_id") != run_id or any(
+            reservation.get(key) != info.get(key) for key in (
+                "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
+                "repair_predecessor_receipt_sha256",
+            )
+        ):
+            raise PermissionError("UPDATE:0 checkpoint resume differs from its exact reconstruction lineage")
     return previous_run_id, previous_finish
 
 
@@ -748,6 +771,12 @@ def _next_training_reservation(
         if finish is None or finish.get("status") == "incomplete":
             return unit_id, float(estimates[unit_id])
         if finish.get("status") == "failed":
+            last = runs[history[-1]]
+            if (
+                block == 0
+                and last["reservation"].get("repair_reason") == budget.UPDATE0_RECONSTRUCTION_REASON
+            ):
+                raise budget.ResourceBlocked("the one authorized UPDATE:0 reconstruction failed terminally")
             if block == 0:
                 ledger.update0_retry_info()
                 return unit_id, float(estimates[unit_id])
@@ -1354,12 +1383,19 @@ def _expected_policy_binding(
     if (
         checkpoint.get("path") != expected_relative
         or not _valid_digest(checkpoint_sha, 64)
-        or not _valid_digest(digest, 40)
+        or not _valid_digest(digest, 64)
         or update.get("result_model_digest") != digest
         or not path.is_file()
         or _file_sha256(path) != checkpoint_sha
     ):
         raise PermissionError("registered policy checkpoint no longer matches its completed update receipt")
+    _, loaded_digest, loaded_source = _load_model(model_label)
+    if (
+        loaded_digest != digest
+        or loaded_source.get("checkpoint_sha256") != checkpoint_sha
+        or not _valid_digest(loaded_digest, 64)
+    ):
+        raise PermissionError("registered policy checkpoint weights do not match their model-state digest")
     if model_label == "pi4":
         report_path = ARTIFACT_ROOT / "training-report.json"
         if not report_path.is_file():
@@ -1460,17 +1496,45 @@ def _validate_success_result(
             or result.get("block_index") != block
             or result.get("owner_count") != 128
             or result.get("completed_steps") != 64
+            or result.get("block_order_seed") != _read_json(STAGE1 / "config.json")["seeds"]["block_order_seeds"][block]
             or result.get("expert_decisions") != 0
             or result.get("source_model_digest") != _expected_source_model(ledger, block)
             or not isinstance(checkpoint, Mapping)
             or checkpoint.get("path") != path.relative_to(ARTIFACT_ROOT).as_posix()
             or checkpoint.get("model_digest") != result.get("result_model_digest")
-            or not _valid_digest(checkpoint.get("model_digest"), 40)
+            or not _valid_digest(checkpoint.get("model_digest"), 64)
             or not _valid_digest(checkpoint.get("sha256"), 64)
             or not path.is_file()
             or _file_sha256(path) != checkpoint.get("sha256")
         ):
             raise PermissionError(f"successful update receipt differs from its registered block/model: {unit_id}")
+        if block == 0 and reservation.get("repair_reason") == budget.UPDATE0_RECONSTRUCTION_REASON:
+            lineage = ledger.update0_reconstruction_info(run_id=run_id)
+            optimizer = result.get("optimizer_checkpoint")
+            optimizer_path = _inside_artifacts(ARTIFACT_ROOT / "models" / "block-0-step.pt")
+            probe_path = _inside_artifacts(ARTIFACT_ROOT / "policy-probe-features.json")
+            if (
+                lineage.get("state") not in {"OPEN", "SUCCEEDED"}
+                or lineage.get("latest_run_id") != run_id
+                or not isinstance(optimizer, Mapping)
+                or optimizer.get("path") != optimizer_path.relative_to(ARTIFACT_ROOT).as_posix()
+                or optimizer.get("completed_steps") != 64
+                or not _valid_digest(optimizer.get("sha256"), 64)
+                or not optimizer_path.is_file()
+                or _file_sha256(optimizer_path) != optimizer.get("sha256")
+                or result.get("probe_state_count") != 128
+                or not _valid_digest(result.get("probe_features_sha256"), 64)
+                or not probe_path.is_file()
+                or _file_sha256(probe_path) != result.get("probe_features_sha256")
+            ):
+                raise PermissionError("reconstructed UPDATE:0 lacks its exact optimizer checkpoint/probe evidence")
+            _, loaded_digest, loaded_source = _load_model(f"pi{block + 1}")
+            if (
+                not _valid_digest(loaded_digest, 64)
+                or loaded_digest != result.get("result_model_digest")
+                or loaded_source.get("checkpoint_sha256") != checkpoint.get("sha256")
+            ):
+                raise PermissionError(f"saved pi{block + 1} bytes do not reproduce the recorded model state: {unit_id}")
     elif unit_id == "REPORT:HELDOUT":
         resource = result.get("resource")
         if not isinstance(resource, Mapping) or resource.get("ledger_run_id") != run_id or not isinstance(result.get("analysis"), Mapping):
@@ -2244,6 +2308,13 @@ def _update_block(
         "source_model_digest": result.source_model_digest,
         "result_model_digest": result.result_model_digest,
         "model_checkpoint": model_record,
+        "optimizer_checkpoint": {
+            "path": checkpoint_path.relative_to(ARTIFACT_ROOT).as_posix(),
+            "sha256": _file_sha256(checkpoint_path),
+            "schema_id": RESUME_SCHEMA,
+            "block_index": block,
+            "completed_steps": len(result.diagnostics),
+        },
         "diagnostics": [vars(item) for item in result.diagnostics],
         "probe_features_sha256": probes_sha256,
         "probe_state_count": len(probes),
@@ -2264,18 +2335,26 @@ def _run_update_unit(ledger: Any, block: int, *, estimates: Mapping[str, float])
     repair_info = None
     if previous_run_id is not None:
         if previous_finish is None:
-            raise budget.ResourceBlocked(f"optimizer update reservation remains unresolved: {unit_id}")
-        if previous_finish.get("status") == "succeeded":
+            if block == 0:
+                repair_info = ledger.update0_reconstruction_info()
+                if not repair_info.get("can_start") or previous_run_id != repair_info.get("retry_previous_run_id"):
+                    raise budget.ResourceBlocked("UPDATE:0 has no eligible exact fixed-input reconstruction")
+            else:
+                raise budget.ResourceBlocked(f"optimizer update reservation remains unresolved: {unit_id}")
+        elif previous_finish.get("status") == "succeeded":
             existing = _existing_unit_receipt(ledger, unit_id)
             if existing is None:
                 raise PermissionError(f"succeeded update has no immutable receipt: {unit_id}")
             return existing
-        if previous_finish.get("status") == "failed":
-            if unit_id != "UPDATE:0":
-                raise budget.ResourceBlocked(f"failed optimizer update is immutable and cannot be replayed: {unit_id}")
-            repair_info = ledger.update0_retry_info()
-            if previous_run_id != repair_info["retry_previous_run_id"]:
-                raise budget.ResourceBlocked("UPDATE:0 retry no longer names its exact failed predecessor")
+        elif previous_finish.get("status") == "failed":
+            if block == 0 and previous_reservation.get("repair_reason") == budget.UPDATE0_RECONSTRUCTION_REASON:
+                raise budget.ResourceBlocked("the one authorized UPDATE:0 reconstruction failed terminally")
+            if block == 0:
+                repair_info = ledger.update0_retry_info()
+                if previous_run_id != repair_info["retry_previous_run_id"]:
+                    raise budget.ResourceBlocked("UPDATE:0 retry no longer names its exact failed predecessor")
+            else:
+                raise budget.ResourceBlocked(f"failed optimizer update is immutable: {unit_id}")
         elif previous_finish.get("status") == "incomplete":
             if (
                 previous_reservation is None
@@ -2289,7 +2368,9 @@ def _run_update_unit(ledger: Any, block: int, *, estimates: Mapping[str, float])
             checkpoint = _inside_artifacts(ARTIFACT_ROOT / "models" / f"block-{block}-step.pt")
             if not checkpoint.is_file() or _file_sha256(checkpoint) != resume_digest:
                 raise budget.CheckpointMismatch("incomplete optimizer update checkpoint does not match its ledger receipt")
-            if previous_reservation.get("repair_reason") == budget.UPDATE0_RETRY_REASON:
+            if previous_reservation.get("repair_reason") == budget.UPDATE0_RECONSTRUCTION_REASON:
+                repair_info = ledger.update0_reconstruction_info()
+            elif previous_reservation.get("repair_reason") == budget.UPDATE0_RETRY_REASON:
                 repair_info = ledger.validate_update0_retry_state()
         else:
             raise budget.ResourceBlocked(f"failed optimizer update is immutable and cannot be replayed: {unit_id}")

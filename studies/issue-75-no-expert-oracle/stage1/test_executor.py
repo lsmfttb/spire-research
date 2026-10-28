@@ -137,13 +137,14 @@ class Block0DecoderCompatibilityTests(unittest.TestCase):
         before = ledger.read_events()
 
         examples = executor._load_training_examples(0, ledger=ledger)
-        info = ledger.update0_retry_info()
+        info = ledger.update0_reconstruction_info()
 
         self.assertEqual(len(examples), 128)
         self.assertEqual({example.owner_seed for example in examples}, set(range(7500001, 7500129)))
-        self.assertTrue(info["retry_available"])
-        self.assertEqual(info["retry_previous_run_id"], "UPDATE:0-25e99c84541b4dac")
-        self.assertEqual(info["repair_predecessor_run_id"], "UPDATE:0-25e99c84541b4dac")
+        self.assertTrue(info["can_start"])
+        self.assertEqual(info["state"], "READY")
+        self.assertEqual(info["retry_previous_run_id"], "UPDATE:0-e3aa5e8338044be1")
+        self.assertEqual(info["repair_predecessor_run_id"], "UPDATE:0-e3aa5e8338044be1")
         self.assertEqual(ledger.read_events(), before)
 
 
@@ -598,70 +599,50 @@ class Stage1ExecutorTests(unittest.TestCase):
                 (next_block_row["unit_id"], 4.0),
             )
 
-    def test_update0_retry_requires_completed_replacements_and_preserves_single_use(self):
+    def test_update0_reconstruction_preserves_lost_run_and_is_single_use(self):
         source_events = STAGE1 / "artifacts" / "ledger" / "events.jsonl"
-        events = executor.budget._events(source_events)
-        runs, units = executor.budget._state(events)
-        with self.assertRaises(executor.budget.ResourceBlocked):
-            executor.budget._validate_update0_retry_state(
-                STAGE1 / "artifacts", runs, units, ("a" * 40, "b" * 64),
-            )
-        validated, _ = executor.budget._validate_update0_retry_state(
+        source_rows = executor.budget._events(source_events)
+        runs, units = executor.budget._state(source_rows)
+        info = executor.budget._validate_update0_reconstruction_state(
             STAGE1 / "artifacts", runs, units, executor.budget._current_package_binding(),
         )
-        self.assertTrue(validated["retry_available"])
-        self.assertEqual(validated["retry_previous_run_id"], "UPDATE:0-25e99c84541b4dac")
-        self.assertEqual(validated["repair_predecessor_run_id"], "UPDATE:0-25e99c84541b4dac")
+        self.assertTrue(info["can_start"])
+        self.assertEqual(info["state"], "READY")
+        self.assertEqual(info["retry_previous_run_id"], "UPDATE:0-e3aa5e8338044be1")
+        self.assertEqual(runs[info["retry_previous_run_id"]]["finish"], None)
+        with self.assertRaises(executor.budget.ResourceBlocked):
+            executor.budget._validate_update0_reconstruction_state(
+                STAGE1 / "artifacts", runs, units, ("a" * 40, "b" * 64),
+            )
 
-        continuation_path = STAGE1 / "update0-seed-failure-continuation.json"
-        continuation = json.loads(continuation_path.read_text(encoding="utf-8"))
-        self.assertEqual(continuation["attempt_history"], [
-            "UPDATE:0-8c7ee939e4924cc6",
-            "UPDATE:0-86e384596b684093",
-            "UPDATE:0-25e99c84541b4dac",
-        ])
-        update = continuation["authorized_retry"]
-        predecessor = update["repair_predecessor_run_id"]
-        retry_unit = "UPDATE:0"
-        cap = float(update["reserved_cpu_seconds"])
-        info = {
-            "repair_reason": executor.budget.UPDATE0_RETRY_REASON,
-            "repair_manifest_sha256": executor.budget.sha256_bytes(continuation_path.read_bytes()),
-            "repair_predecessor_run_id": predecessor,
-            "repair_predecessor_receipt_sha256": update["repair_predecessor_receipt_sha256"],
-            "reserved_cpu_seconds": cap,
-            "retry_previous_run_id": "UPDATE:0-25e99c84541b4dac",
-            "retry_available": True,
-        }
-        ledger = self._test_ledger("update-retry-ledger")
+        ledger = self._test_ledger("update-reconstruction-ledger")
         ledger.directory.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_events, ledger.events_path)
-        self.assertEqual(
-            executor.budget._state(ledger.read_events())[1][retry_unit],
-            continuation["attempt_history"],
-        )
-        run_id = retry_unit + "-" + "a" * 16
-        with mock.patch.object(ledger, "update0_retry_info", return_value=info):
+        run_id = "UPDATE:0-" + "a" * 16
+        with (
+            mock.patch.object(ledger, "update0_reconstruction_info", return_value=info),
+            mock.patch.object(ledger, "_charges", return_value={"builder": 0.0, "reviewer": 0.0}),
+        ):
             reservation = ledger.reserve(
-                run_id=run_id, unit_id=retry_unit, role="builder",
-                reserved_cpu_seconds=cap, unit_kind="training_update",
-                previous_run_id=info["retry_previous_run_id"], checkpoint_sha256=None,
+                run_id=run_id, unit_id="UPDATE:0", role="builder",
+                reserved_cpu_seconds=1.0, unit_kind="training_update",
+                previous_run_id=info["retry_previous_run_id"],
                 repair_reason=info["repair_reason"],
                 repair_manifest_sha256=info["repair_manifest_sha256"],
                 repair_predecessor_run_id=info["repair_predecessor_run_id"],
                 repair_predecessor_receipt_sha256=info["repair_predecessor_receipt_sha256"],
             )
-        self.assertEqual(
-            executor.budget._state(ledger.read_events())[1][retry_unit],
-            continuation["attempt_history"] + [run_id],
-        )
-        self.assertEqual(reservation["repair_reason"], info["repair_reason"])
+        self.assertEqual(ledger.read_events()[:len(source_rows)], source_rows)
         self.assertEqual(reservation["previous_run_id"], info["retry_previous_run_id"])
-        self.assertEqual(reservation["checkpoint_sha256"], None)
         ledger.finish(run_id=run_id, measured_cpu_seconds=0.1, status="failed")
-        with mock.patch.object(ledger, "validate_update0_retry_state", return_value=info):
-            with self.assertRaises(executor.budget.ResourceBlocked):
-                ledger.update0_retry_info()
+        with self.assertRaises(executor.budget.ResourceBlocked):
+            ledger.reserve(
+                run_id="UPDATE:0-" + "b" * 16, unit_id="UPDATE:0", role="builder",
+                reserved_cpu_seconds=1.0, unit_kind="training_update",
+                previous_run_id=run_id, repair_reason=info["repair_reason"],
+            )
+        self.assertEqual(executor.budget._state(ledger.read_events())[1]["UPDATE:0"][-1], run_id)
+
     def test_pre_game_start_retry_exception_remains_consumed(self):
         ledger = executor.budget.open_stage1_ledger(STAGE1 / "artifacts" / "ledger")
         before = ledger.read_events()
@@ -1577,13 +1558,13 @@ class Stage1ExecutorTests(unittest.TestCase):
                 block_order_seed=block_order_seed,
                 owner_order_sha256="e" * 64,
                 source_model_digest=source_digest,
-                result_model_digest="d" * 40,
+                result_model_digest="d" * 64,
             )
 
         learning_stub.train_policy_iteration_block = train_block
         learning_stub.policy_probe_diagnostics = lambda *_args: {}
         model_stub = types.ModuleType("model")
-        model_stub.model_digest = lambda _model: "d" * 40
+        model_stub.model_digest = lambda _model: "d" * 64
         prepare_stub = types.ModuleType("prepare")
         derived_blocks = []
 

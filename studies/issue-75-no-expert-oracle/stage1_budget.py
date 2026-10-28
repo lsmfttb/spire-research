@@ -401,6 +401,9 @@ UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256 = "f4a8e2942dca010cdad32ce40d76e7f4c96a4
 UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS = 3837.4562621977375
 UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS = 44.12528176000001
 UPDATE0_SEED_FAILURE_MANIFEST = "update0-seed-failure-continuation.json"
+UPDATE0_RECONSTRUCTION_REASON = "ORIGINAL_CHECKPOINT_LOST_RECOMPUTATION"
+UPDATE0_RECONSTRUCTION_LOST_RUN_ID = "UPDATE:0-e3aa5e8338044be1"
+UPDATE0_RECONSTRUCTION_MAX_CPU_SECONDS = 3837.4562621977375
 
 
 def _load_block0_repair_manifest(artifacts_root: Path) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
@@ -880,7 +883,8 @@ def _load_update0_seed_failure_continuation(
 
 def _validate_update0_retry_state(
     artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
-    units: Mapping[str, Sequence[str]], current_binding: tuple[str, str],
+    units: Mapping[str, Sequence[str]], current_binding: tuple[str, str], *,
+    allow_post_reconstruction_artifacts: bool = False,
 ) -> tuple[dict[str, Any], str]:
     try:
         actual_binding = _current_package_binding()
@@ -1025,9 +1029,10 @@ def _validate_update0_retry_state(
         "retry_available": len(history) == 3,
     }
     if len(history) == 3:
-        for name in ("pi1.pt", "block-0-step.pt"):
-            if (Path(artifacts_root) / "models" / name).exists():
-                raise ResourceBlocked("UPDATE:0 has an optimizer checkpoint and cannot start a fresh retry")
+        if not allow_post_reconstruction_artifacts:
+            for name in ("pi1.pt", "block-0-step.pt"):
+                if (Path(artifacts_root) / "models" / name).exists():
+                    raise ResourceBlocked("UPDATE:0 has an optimizer checkpoint and cannot start a fresh retry")
         return info, continuation_sha
 
     previous = latest["run_id"]
@@ -1061,6 +1066,140 @@ def _validate_update0_retry_state(
             raise ResourceBlocked("UPDATE:0 has work after a terminal corrected attempt")
         previous = run_id
     return info, continuation_sha
+
+def _load_update0_reconstruction_manifest() -> tuple[dict[str, Any], str]:
+    manifest = {
+        "schema_id": "issue75-update0-lost-checkpoint-reconstruction-v1",
+        "planner_decision_comment_id": 6459123910,
+        "scope": "STUDY_ONLY",
+        "original_history": [
+            "UPDATE:0-8c7ee939e4924cc6", "UPDATE:0-86e384596b684093",
+            "UPDATE:0-25e99c84541b4dac", UPDATE0_RECONSTRUCTION_LOST_RUN_ID,
+        ],
+        "lost_run_id": UPDATE0_RECONSTRUCTION_LOST_RUN_ID,
+        "lost_run_package_commit": "4f0706b92ddee59651385bf0e54d2f13a1f48ece",
+        "lost_run_source_lock_sha256": "0ce4571d54785f21ee17358a083198243f1862a4052413b135e76030e4bf21e5",
+        "lost_reservation_sha256": "c5c5856db85893dfa1d05c67fb34a81a3b2c316cfdce3681a349b4ad6ed8453f",
+        "lost_result_path": "units/UPDATE-0/result-UPDATE:0-e3aa5e8338044be1.json",
+        "lost_result_sha256": "62f52bf15436fd0953e57f2471b9a9a364f83c5094a612c7db8244ec9853aa76",
+        "lost_worker_job_path": "units/UPDATE-0/worker-job-UPDATE:0-e3aa5e8338044be1.json",
+        "lost_worker_job_sha256": "ead83124d804d4a764ca7064c18c3ae0ca63cf19969c91d8abbf6b675bf7c780",
+    }
+    return manifest, sha256_bytes(canonical(manifest))
+
+
+def _validate_update0_reconstruction_state(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]], current_binding: tuple[str, str],
+    *, run_id: str | None = None,
+) -> dict[str, Any]:
+    manifest, manifest_sha = _load_update0_reconstruction_manifest()
+    unit_id = "UPDATE:0"
+    history = list(units.get(unit_id, ()))
+    original_history = list(manifest["original_history"])
+    if history[:4] != original_history:
+        raise ResourceBlocked("UPDATE:0 reconstruction does not preserve the exact original run history")
+
+    # Reuse the existing validator for the three pre-optimizer failures and all
+    # 128 immutable owner feature/source receipts.
+    original_units = dict(units)
+    original_units[unit_id] = original_history[:3]
+    prior, _ = _validate_update0_retry_state(
+        artifacts_root, runs, original_units, current_binding,
+        allow_post_reconstruction_artifacts=True,
+    )
+    lost_id = UPDATE0_RECONSTRUCTION_LOST_RUN_ID
+    lost = runs.get(lost_id)
+    reservation = None if not isinstance(lost, Mapping) else lost.get("reservation")
+    if (
+        prior.get("retry_previous_run_id") != original_history[2]
+        or not isinstance(reservation, Mapping)
+        or lost.get("finish") is not None
+        or reservation.get("unit_id") != unit_id
+        or reservation.get("run_id") != lost_id
+        or reservation.get("unit_kind") != "training_update"
+        or reservation.get("role") != "builder"
+        or reservation.get("package_commit") != manifest["lost_run_package_commit"]
+        or reservation.get("source_lock_sha256") != manifest["lost_run_source_lock_sha256"]
+        or reservation.get("reserved_cpu_seconds") != UPDATE0_RECONSTRUCTION_MAX_CPU_SECONDS
+        or reservation.get("previous_run_id") != original_history[2]
+        or reservation.get("checkpoint_sha256") is not None
+        or reservation.get("repair_reason") != UPDATE0_RETRY_REASON
+        or sha256_bytes(canonical(reservation)) != manifest["lost_reservation_sha256"]
+    ):
+        raise ResourceBlocked("the original UPDATE:0 reservation is not the exact preserved open, charged run")
+    for path_key, digest_key in (("lost_result_path", "lost_result_sha256"),
+                                 ("lost_worker_job_path", "lost_worker_job_sha256")):
+        _compatibility_artifact_bytes(artifacts_root, manifest[path_key], manifest[digest_key])
+
+    common = {
+        "repair_reason": UPDATE0_RECONSTRUCTION_REASON,
+        "repair_manifest_sha256": manifest_sha,
+        "repair_predecessor_run_id": lost_id,
+        "repair_predecessor_receipt_sha256": manifest["lost_result_sha256"],
+        "reserved_cpu_seconds": UPDATE0_RECONSTRUCTION_MAX_CPU_SECONDS,
+        "retry_previous_run_id": lost_id,
+    }
+    suffix = history[4:]
+    if not suffix:
+        for name in ("pi1.pt", "block-0-step.pt", "policy-probe-features.json"):
+            path = Path(artifacts_root) / (Path("models") / name if name.endswith(".pt") else Path(name))
+            if path.exists():
+                raise ResourceBlocked("UPDATE:0 artifacts exist without the authorized reconstruction reservation")
+        if run_id is not None:
+            raise ResourceBlocked("UPDATE:0 reconstruction run has not been reserved")
+        return {**common, "can_start": True, "state": "READY", "latest_run_id": None}
+
+    previous_id, previous_finish = lost_id, None
+    for index, current_id in enumerate(suffix):
+        current = runs.get(current_id)
+        current_reservation = None if not isinstance(current, Mapping) else current.get("reservation")
+        current_finish = None if not isinstance(current, Mapping) else current.get("finish")
+        if (
+            not isinstance(current_reservation, Mapping)
+            or current_reservation.get("run_id") != current_id
+            or current_reservation.get("unit_id") != unit_id
+            or current_reservation.get("unit_kind") != "training_update"
+            or current_reservation.get("role") != "builder"
+            or current_reservation.get("package_commit") != current_binding[0]
+            or current_reservation.get("source_lock_sha256") != current_binding[1]
+            or current_reservation.get("previous_run_id") != previous_id
+            or current_reservation.get("repair_reason") != common["repair_reason"]
+            or current_reservation.get("repair_manifest_sha256") != manifest_sha
+            or current_reservation.get("repair_predecessor_run_id") != lost_id
+            or current_reservation.get("repair_predecessor_receipt_sha256") != common["repair_predecessor_receipt_sha256"]
+            or current_reservation.get("retry_reason") is not None
+            or current_reservation.get("pre_game_start_proof") is not None
+            or not isinstance(current_reservation.get("reserved_cpu_seconds"), (int, float))
+            or not 0 < float(current_reservation["reserved_cpu_seconds"]) <= UPDATE0_RECONSTRUCTION_MAX_CPU_SECONDS
+            or (current_finish is not None and current_finish.get("status") not in {"succeeded", "incomplete", "failed"})
+            or (index < len(suffix) - 1 and (current_finish is None or current_finish.get("status") != "incomplete"))
+            or (previous_finish is None and current_reservation.get("checkpoint_sha256") is not None)
+            or (previous_finish is not None and (
+                previous_finish.get("status") != "incomplete"
+                or current_reservation.get("checkpoint_sha256") != previous_finish.get("checkpoint_sha256")
+            ))
+        ):
+            raise ResourceBlocked("UPDATE:0 differs from the one authorized fixed-input reconstruction/resume chain")
+        if current_finish is not None and current_finish.get("status") == "incomplete":
+            checkpoint = Path(artifacts_root) / "models" / "block-0-step.pt"
+            checkpoint_sha = current_finish.get("checkpoint_sha256")
+            if not isinstance(checkpoint_sha, str) or len(checkpoint_sha) != 64 or not checkpoint.is_file() or _file_sha256(checkpoint) != checkpoint_sha:
+                raise ResourceBlocked("UPDATE:0 may resume only its exact surviving optimizer checkpoint")
+        previous_id, previous_finish = current_id, current_finish
+
+    latest_id = suffix[-1]
+    if run_id is not None and run_id != latest_id:
+        raise ResourceBlocked("UPDATE:0 worker is not the latest reconstruction reservation")
+    latest_finish = runs[latest_id]["finish"]
+    return {
+        **common,
+        "can_start": False,
+        "state": "OPEN" if latest_finish is None else str(latest_finish["status"]).upper(),
+        "latest_run_id": latest_id,
+        "checkpoint_sha256": None if latest_finish is None else latest_finish.get("checkpoint_sha256"),
+    }
+
 
 def _pre_game_start_failure_proof(
     artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]], units: Mapping[str, Sequence[str]],
@@ -1345,6 +1484,32 @@ class Stage1Ledger:
                 "repair_predecessor_receipt_sha256",
             )) or reservation.get("package_commit") != self.binding.package_commit or reservation.get("source_lock_sha256") != self.binding.source_lock_sha256:
                 raise PermissionError("UPDATE:0 worker reservation differs from the one-time failure-repair lineage")
+        elif reservation.get("repair_reason") == UPDATE0_RECONSTRUCTION_REASON:
+            info = self.update0_reconstruction_info(run_id=run_id)
+            if info.get("state") != "OPEN" or any(reservation.get(key) != info.get(key) for key in (
+                "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
+                "repair_predecessor_receipt_sha256",
+            )):
+                raise PermissionError("UPDATE:0 worker reservation differs from the one-time lost-checkpoint reconstruction lineage")
+            job_path = self.directory.parent / "units" / "UPDATE-0" / f"worker-job-{run_id}.json"
+            try:
+                job = json.loads(job_path.read_bytes())
+            except (OSError, ValueError) as exc:
+                raise PermissionError("UPDATE:0 reconstruction worker job is missing or malformed") from exc
+            if any(job.get(key) != value for key, value in {
+                "run_id": run_id,
+                "unit_id": "UPDATE:0",
+                "phase": "update",
+                "package_commit": self.binding.package_commit,
+                "source_lock_sha256": self.binding.source_lock_sha256,
+                "previous_run_id": reservation.get("previous_run_id"),
+                "checkpoint_sha256": reservation.get("checkpoint_sha256"),
+                "repair_reason": info["repair_reason"],
+                "repair_manifest_sha256": info["repair_manifest_sha256"],
+                "repair_predecessor_run_id": info["repair_predecessor_run_id"],
+                "repair_predecessor_receipt_sha256": info["repair_predecessor_receipt_sha256"],
+            }.items()):
+                raise PermissionError("UPDATE:0 reconstruction worker job differs from its exact ledger lineage")
         elif any(reservation.get(key) is not None for key in (
             "retry_reason", "pre_game_start_proof", "pre_game_start_proof_sha256",
             "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
@@ -1398,6 +1563,15 @@ class Stage1Ledger:
             (self.binding.package_commit, self.binding.source_lock_sha256),
         )
         return {**info, "repair_manifest_sha256": manifest_sha}
+
+    def update0_reconstruction_info(self, *, run_id: str | None = None) -> dict[str, Any]:
+        """Validate the one authorized fixed-input reconstruction and exact checkpoint resumes."""
+        runs, units = _state(_events(self.events_path))
+        return _validate_update0_reconstruction_state(
+            self.directory.parent, runs, units,
+            (self.binding.package_commit, self.binding.source_lock_sha256),
+            run_id=run_id,
+        )
 
     def block0_decoder_compatibility_records(self) -> dict[str, dict[str, Any]]:
         """Validate the exact registered replacement receipts once before loading block 0."""
@@ -1501,30 +1675,43 @@ class Stage1Ledger:
             last = runs[history[-1]]
             done = last["finish"]
             if done is None:
-                raise ResourceBlocked(f"unresolved reservation remains charged at full cap: {unit_id}")
-            if done.get("status") == "incomplete":
+                if unit_id == "UPDATE:0" and repair_reason == UPDATE0_RECONSTRUCTION_REASON:
+                    info = self.update0_reconstruction_info()
+                    if (
+                        info.get("can_start") is not True
+                        or previous_run_id != info.get("retry_previous_run_id")
+                        or checkpoint_sha256 is not None
+                        or unit_kind != "training_update" or role != "builder"
+                        or cap > info["reserved_cpu_seconds"]
+                        or any(repair_fields.get(key) != info.get(key) for key in (
+                            "repair_reason", "repair_manifest_sha256",
+                            "repair_predecessor_run_id", "repair_predecessor_receipt_sha256",
+                        ))
+                        or retry_reason is not None or pre_game_start_proof is not None
+                    ):
+                        raise ResourceBlocked("UPDATE:0 may cross its preserved open original reservation only for the one exact reconstruction")
+                else:
+                    raise ResourceBlocked(f"unresolved reservation remains charged at full cap: {unit_id}")
+            elif done.get("status") == "incomplete":
                 if retry_reason is not None or pre_game_start_proof is not None:
                     raise CheckpointMismatch("checkpoint resume cannot claim the pre-game-start exception")
-                if last["reservation"].get("repair_reason") == UPDATE0_RETRY_REASON:
+                prior_reason = last["reservation"].get("repair_reason")
+                if unit_id == "UPDATE:0" and prior_reason == UPDATE0_RECONSTRUCTION_REASON:
+                    info = self.update0_reconstruction_info()
+                elif unit_id == "UPDATE:0" and prior_reason == UPDATE0_RETRY_REASON:
                     info = self.validate_update0_retry_state()
-                    if any(
-                        last["reservation"].get(key) != info.get(key)
-                        for key in (
-                            "repair_reason", "repair_manifest_sha256",
-                            "repair_predecessor_run_id", "repair_predecessor_receipt_sha256",
-                        )
-                    ) or any(
-                        repair_fields.get(key) != info.get(key)
-                        for key in (
-                            "repair_reason", "repair_manifest_sha256",
-                            "repair_predecessor_run_id", "repair_predecessor_receipt_sha256",
-                        )
-                    ):
-                        raise CheckpointMismatch("UPDATE:0 checkpoint resume changed its original failure lineage")
-                elif any(value is not None for value in (
-                    repair_reason, repair_manifest_sha256, repair_predecessor_run_id,
-                    repair_predecessor_receipt_sha256,
-                )):
+                else:
+                    info = None
+                if info is not None:
+                    lineage_fields = (
+                        "repair_reason", "repair_manifest_sha256",
+                        "repair_predecessor_run_id", "repair_predecessor_receipt_sha256",
+                    )
+                    if (cap > info["reserved_cpu_seconds"]
+                        or any(last["reservation"].get(key) != info.get(key) for key in lineage_fields)
+                        or any(repair_fields.get(key) != info.get(key) for key in lineage_fields)):
+                        raise CheckpointMismatch("UPDATE:0 checkpoint resume changed its original repair lineage/cap")
+                elif any(value is not None for value in repair_fields.values()):
                     raise CheckpointMismatch("checkpoint resume carries unregistered repair metadata")
                 if float(done.get("measured_cpu_seconds", 0.0)) > float(done.get("reserved_cpu_seconds", 0.0)):
                     raise ResourceBlocked("an incomplete unit exceeded its immutable reservation and cannot be resumed")
