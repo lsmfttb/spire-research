@@ -1155,8 +1155,16 @@ def pilot(execution_commit: str | None = None) -> dict:
     table = read_json(SEED_TABLE)
     root = ARTIFACTS / "pilot" / package_commit
     final_path, policy_path = _pilot_artifact_paths(package_commit, report_generator_commit)
-    prior_report_path = ARTIFACTS / f"pilot-report-{package_commit}.json"
-    prior_policy_path = ARTIFACTS / f"time-policy-{package_commit}.json"
+    prior_report_paths = [
+        path for path in ARTIFACTS.glob(f"pilot-report-{package_commit}*.json")
+        if path != final_path
+    ]
+    prior_policy_paths = [
+        path for path in ARTIFACTS.glob(f"time-policy-{package_commit}*.json")
+        if path != policy_path
+    ]
+    prior_report_path = max(prior_report_paths, key=lambda path: path.stat().st_mtime_ns, default=None)
+    prior_policy_path = max(prior_policy_paths, key=lambda path: path.stat().st_mtime_ns, default=None)
     if final_path.exists():
         return read_json(final_path)
     if package_commit != report_generator_commit:
@@ -1238,7 +1246,7 @@ def pilot(execution_commit: str | None = None) -> dict:
                 "supersedes_prior_unversioned_policy": (
                     {"path": prior_policy_path.relative_to(STUDY).as_posix(),
                      "sha256": file_sha256(prior_policy_path)}
-                    if prior_policy_path.is_file() else None
+                    if prior_policy_path is not None and prior_policy_path.is_file() else None
                 ),
                 "projection_seconds": projected,
                 "allowance_factor": ALLOWANCE_FACTOR,
@@ -1301,7 +1309,7 @@ def pilot(execution_commit: str | None = None) -> dict:
             "supersedes_prior_unversioned_report": (
                 {"path": prior_report_path.relative_to(STUDY).as_posix(),
                  "sha256": file_sha256(prior_report_path)}
-                if prior_report_path.is_file() else None
+                if prior_report_path is not None and prior_report_path.is_file() else None
             ),
             "verified_inheritance": inheritance,
             "configured_concurrency": CONCURRENCY,
@@ -1348,7 +1356,10 @@ def pilot(execution_commit: str | None = None) -> dict:
             "single_global_active_wall_allowance": policy["allowance_seconds"],
             "allowance_factor": ALLOWANCE_FACTOR,
             "time_policy_path": policy_path.relative_to(STUDY).as_posix(),
-            "search_proposal_attempts_wall_seconds": policy["extrapolation"]["search_attempt_wall_seconds"],
+            "search_proposal_attempts_wall_seconds": {
+                **policy["extrapolation"]["search_attempt_wall_seconds"],
+                "samples_seconds": attempt_times,
+            },
             "formal_results": False,
             "efficacy_inference": False,
         }
