@@ -1601,7 +1601,9 @@ def _existing_unit_receipt(
     if finish.get("status") != "succeeded":
         if (
             allow_pre_game_start_retry
-            and unit_id == budget.PRE_GAME_START_RETRY_UNIT_ID
+            and unit_id in {
+                budget.PRE_GAME_START_RETRY_UNIT_ID, budget.TRAIN_7500129_RETRY_UNIT_ID,
+            }
             and finish.get("status") == "failed"
         ):
             ledger.pre_game_start_retry_info(
@@ -1947,7 +1949,11 @@ def _run_owner_batch(
         unit_id = str(row["unit_id"])
         existing = _existing_unit_receipt(
             ledger, unit_id,
-            allow_pre_game_start_retry=(phase == "train" and unit_id == budget.PRE_GAME_START_RETRY_UNIT_ID),
+            allow_pre_game_start_retry=(
+                phase == "train" and unit_id in {
+                    budget.PRE_GAME_START_RETRY_UNIT_ID, budget.TRAIN_7500129_RETRY_UNIT_ID,
+                }
+            ),
             decoder_compatibility=decoder_compatibility,
         )
         if existing is not None:
@@ -1973,10 +1979,11 @@ def _run_owner_batch(
                 and int(row.get("block_index", -1)) == 0
             ):
                 repair_info = ledger.block0_phase_repair_info(unit_id=unit_id)
-            elif (
-                previous_finish.get("status") == "failed"
-                and unit_id == budget.PRE_GAME_START_RETRY_UNIT_ID
-                and previous_run_id == budget.PRE_GAME_START_RETRY_RUN_ID
+            elif previous_finish.get("status") == "failed" and (
+                (unit_id == budget.PRE_GAME_START_RETRY_UNIT_ID
+                 and previous_run_id == budget.PRE_GAME_START_RETRY_RUN_ID)
+                or (unit_id == budget.TRAIN_7500129_RETRY_UNIT_ID
+                    and previous_run_id == budget.TRAIN_7500129_RETRY_RUN_ID)
             ):
                 retry_reason = budget.PRE_GAME_START_RETRY_REASON
                 retry_proof = ledger.pre_game_start_retry_info(
@@ -1986,7 +1993,12 @@ def _run_owner_batch(
                 raise budget.ResourceBlocked(f"unit is not eligible for retry or checkpoint resume: {unit_id}")
         run_id = f"{unit_id}-{uuid.uuid4().hex[:16]}"
         cap = float(estimates[unit_id])
-        if retry_proof is not None and cap > budget.PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS:
+        retry_cap = (
+            budget.TRAIN_7500129_RESERVED_CPU_SECONDS
+            if unit_id == budget.TRAIN_7500129_RETRY_UNIT_ID
+            else budget.PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS
+        )
+        if retry_proof is not None and cap > retry_cap:
             raise budget.ResourceBlocked("the one-row retry estimate exceeds its immutable original CPU ceiling")
         reservation_previous_run_id = None if repair_info is not None else previous_run_id
         pending.append({

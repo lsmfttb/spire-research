@@ -676,6 +676,101 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertEqual(executor._file_sha256(receipt), receipt_sha)
         self.assertEqual(executor._file_sha256(worker_job), worker_job_sha)
 
+    def test_train_7500129_allows_one_exact_zero_start_successor_only(self):
+        budget = executor.budget
+        ledger = self._test_ledger("train-7500129-retry")
+        unit_id = budget.TRAIN_7500129_RETRY_UNIT_ID
+        predecessor = budget.TRAIN_7500129_RETRY_RUN_ID
+        source_root = STAGE1 / "artifacts" / "units" / "TRAIN-7500129"
+        evidence_root = executor.ARTIFACT_ROOT / "units" / "TRAIN-7500129"
+        evidence_root.mkdir(parents=True)
+        for name in (
+            f"failure-{predecessor}.json", f"worker-job-{predecessor}.json",
+            f"worker-log-{predecessor}.txt",
+        ):
+            shutil.copyfile(source_root / name, evidence_root / name)
+
+        original_reservation = {
+            "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
+            "run_id": predecessor, "unit_id": unit_id, "role": "builder",
+            "unit_kind": "owner_arm", "reserved_cpu_seconds": budget.TRAIN_7500129_RESERVED_CPU_SECONDS,
+            "attempt_cap": None, "previous_run_id": None, "checkpoint_sha256": None,
+            "retry_reason": None, "repair_reason": None, "repair_manifest_sha256": None,
+            "repair_predecessor_run_id": None, "repair_predecessor_receipt_sha256": None,
+            "pre_game_start_proof": None, "pre_game_start_proof_sha256": None,
+            "package_commit": budget.TRAIN_7500129_RETRY_PACKAGE_COMMIT,
+            "source_lock_sha256": budget.TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256,
+            "created_at_ns": budget.TRAIN_7500129_RESERVED_AT_NS,
+        }
+        original_finish = {
+            "event": "finish", "schema_id": "issue75-stage1-budget-event-v2",
+            "run_id": predecessor, "unit_id": unit_id, "status": "failed",
+            "measured_cpu_seconds": budget.TRAIN_7500129_MEASURED_CPU_SECONDS,
+            "reserved_cpu_seconds": budget.TRAIN_7500129_RESERVED_CPU_SECONDS,
+            "started_attempts": 0, "checkpoint_sha256": None, "result_sha256": None,
+            "package_commit": budget.TRAIN_7500129_RETRY_PACKAGE_COMMIT,
+            "source_lock_sha256": budget.TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256,
+            "finished_at_ns": budget.TRAIN_7500129_FINISHED_AT_NS,
+        }
+        ledger.events_path.parent.mkdir(parents=True, exist_ok=True)
+        ledger.events_path.write_bytes(
+            budget.canonical(original_reservation) + b"\n" + budget.canonical(original_finish) + b"\n"
+        )
+        proof = ledger.pre_game_start_retry_info(unit_id=unit_id, predecessor_run_id=predecessor)
+        self.assertEqual(proof["started_attempts"], 0)
+        self.assertEqual(proof["worker_error_type"], "RuntimeError")
+        self.assertTrue(all(proof[key] for key in (
+            "worker_result_absent", "run_result_absent", "native_output_absent",
+            "runtime_root_absent", "search_output_absent",
+        )))
+        self.assertIsNone(executor._existing_unit_receipt(
+            ledger, unit_id, allow_pre_game_start_retry=True,
+        ))
+
+        class ReservationCaptured(Exception):
+            pass
+
+        def capture_reservation(specs):
+            self.assertEqual(len(specs), 1)
+            self.assertEqual(specs[0]["unit_id"], unit_id)
+            self.assertEqual(specs[0]["previous_run_id"], predecessor)
+            self.assertEqual(specs[0]["pre_game_start_proof"], proof)
+            raise ReservationCaptured
+
+        with mock.patch.object(ledger, "reserve_many", side_effect=capture_reservation):
+            with self.assertRaises(ReservationCaptured):
+                executor._run_owner_batch(
+                    ledger, [{"unit_id": unit_id, "phase": "training", "block_index": 1}],
+                    phase="train", estimates={unit_id: budget.TRAIN_7500129_RESERVED_CPU_SECONDS},
+                )
+        native_dir = evidence_root / "runs" / predecessor / "native"
+        native_dir.mkdir(parents=True)
+        with self.assertRaises(budget.ResourceBlocked):
+            ledger.pre_game_start_retry_info(unit_id=unit_id, predecessor_run_id=predecessor)
+        shutil.rmtree(evidence_root / "runs")
+        log_path = evidence_root / f"worker-log-{predecessor}.txt"
+        original_log = log_path.read_bytes()
+        log_path.write_bytes(original_log + b" ")
+        with self.assertRaises(budget.ResourceBlocked):
+            ledger.pre_game_start_retry_info(unit_id=unit_id, predecessor_run_id=predecessor)
+        log_path.write_bytes(original_log)
+
+        run_id = unit_id + "-" + "a" * 16
+        ledger.reserve(
+            run_id=run_id, unit_id=unit_id, role="builder",
+            reserved_cpu_seconds=budget.TRAIN_7500129_RESERVED_CPU_SECONDS,
+            unit_kind="owner_arm", previous_run_id=predecessor,
+            retry_reason=budget.PRE_GAME_START_RETRY_REASON, pre_game_start_proof=proof,
+        )
+        ledger.require_open_reservation(run_id=run_id, unit_id=unit_id)
+        ledger.finish(run_id=run_id, measured_cpu_seconds=1.0, status="failed", started_attempts=0)
+        with self.assertRaises(budget.ResourceBlocked):
+            ledger.reserve(
+                run_id=unit_id + "-" + "b" * 16, unit_id=unit_id, role="builder",
+                reserved_cpu_seconds=1.0, unit_kind="owner_arm", previous_run_id=run_id,
+                retry_reason=budget.PRE_GAME_START_RETRY_REASON, pre_game_start_proof=proof,
+            )
+
     def test_formal_forecast_applies_prior_use_to_live_next_reservation_boundary(self):
         estimates = {"TRAIN:7500002": 5.0}
         dynamic = {"projected_total_builder_cpu_seconds": 169_993.18149394685}

@@ -456,6 +456,18 @@ PRE_GAME_START_RETRY_MEASURED_CPU_SECONDS = 0.03347004399999998
 PRE_GAME_START_RETRY_WALL_SECONDS = 0.6596911649999999
 PRE_GAME_START_RETRY_RESERVED_AT_NS = 1793049822031952961
 PRE_GAME_START_RETRY_FINISHED_AT_NS = 1793049822696986726
+TRAIN_7500129_RETRY_UNIT_ID = "TRAIN:7500129"
+TRAIN_7500129_RETRY_RUN_ID = "TRAIN:7500129-eaf9d4a813c44c2b"
+TRAIN_7500129_RETRY_PACKAGE_COMMIT = "e7c4f93b41ec3f6e2feb5fbe2ecbe65d13fe71b8"
+TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256 = "5df84e3aef5e2076dd9b5a414fd4695ff651449c75e419fada5a12bdcb4fc129"
+TRAIN_7500129_FAILURE_RECEIPT_SHA256 = "555b467bf0faa2bb45b510be114953ae020d9040df019a27da0217348ccb4198"
+TRAIN_7500129_WORKER_JOB_SHA256 = "bdc75d447df4e8f14d7b3a8f11bb376b0428f3de9bd6e42da90b57b011de9df1"
+TRAIN_7500129_WORKER_LOG_SHA256 = "2cdc389d4d105065e9b98bf0629b57963f0010b67e002fe9994109f8044c8c2f"
+TRAIN_7500129_RESERVED_CPU_SECONDS = 165.9459124477378
+TRAIN_7500129_MEASURED_CPU_SECONDS = 3.6495236630000005
+TRAIN_7500129_WALL_SECONDS = 5.403732783000123
+TRAIN_7500129_RESERVED_AT_NS = 1793184440169844215
+TRAIN_7500129_FINISHED_AT_NS = 1793184445581056191
 PRE_GAME_START_PROOF_SCHEMA = "issue75-pre-game-start-infra-proof-v1"
 SCHEDULER_TRAIN_RECOVERY_RUN_ID = "SCHEDULER:TRAIN-3e416101548944b3"
 SCHEDULER_TRAIN_RECOVERY_RESERVED_AT_NS = 1793049822021316152
@@ -1441,11 +1453,156 @@ def _pre_game_start_failure_proof(
     return proof
 
 
+def _train_7500129_pre_game_start_failure_proof(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]], units: Mapping[str, Sequence[str]],
+    *, predecessor_run_id: str, require_pristine: bool, successor_run_id: str | None = None,
+) -> dict[str, Any]:
+    """Prove the exact immutable TRAIN:7500129 failure stopped before game/search start."""
+    unit_id = TRAIN_7500129_RETRY_UNIT_ID
+    history = list(units.get(unit_id, ()))
+    expected_history = [TRAIN_7500129_RETRY_RUN_ID]
+    if successor_run_id is not None:
+        expected_history.append(successor_run_id)
+    if predecessor_run_id != TRAIN_7500129_RETRY_RUN_ID or history != expected_history:
+        raise ResourceBlocked("TRAIN:7500129 retry must follow its exact zero-start predecessor exactly once")
+    run = runs.get(predecessor_run_id)
+    if not isinstance(run, Mapping):
+        raise ResourceBlocked("the reviewed TRAIN:7500129 predecessor is absent")
+    reservation, finish = run.get("reservation"), run.get("finish")
+    expected_reservation = {
+        "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
+        "run_id": TRAIN_7500129_RETRY_RUN_ID, "unit_id": unit_id,
+        "role": "builder", "unit_kind": "owner_arm", "attempt_cap": None,
+        "previous_run_id": None, "checkpoint_sha256": None,
+        "reserved_cpu_seconds": TRAIN_7500129_RESERVED_CPU_SECONDS,
+        "package_commit": TRAIN_7500129_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256,
+        "created_at_ns": TRAIN_7500129_RESERVED_AT_NS,
+    }
+    expected_finish = {
+        "event": "finish", "schema_id": "issue75-stage1-budget-event-v2",
+        "run_id": TRAIN_7500129_RETRY_RUN_ID, "unit_id": unit_id,
+        "status": "failed", "measured_cpu_seconds": TRAIN_7500129_MEASURED_CPU_SECONDS,
+        "reserved_cpu_seconds": TRAIN_7500129_RESERVED_CPU_SECONDS,
+        "started_attempts": 0, "checkpoint_sha256": None, "result_sha256": None,
+        "package_commit": TRAIN_7500129_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256,
+        "finished_at_ns": TRAIN_7500129_FINISHED_AT_NS,
+    }
+    if not isinstance(reservation, Mapping) or any(reservation.get(k) != v for k, v in expected_reservation.items()):
+        raise ResourceBlocked("TRAIN:7500129 reservation differs from its immutable reviewed failure")
+    if not isinstance(finish, Mapping) or any(finish.get(k) != v for k, v in expected_finish.items()):
+        raise ResourceBlocked("TRAIN:7500129 finish does not prove the exact zero-start failure")
+
+    units_root = Path(artifacts_root) / "units" / "TRAIN-7500129"
+    failure_path = units_root / f"failure-{TRAIN_7500129_RETRY_RUN_ID}.json"
+    job_path = units_root / f"worker-job-{TRAIN_7500129_RETRY_RUN_ID}.json"
+    log_path = units_root / f"worker-log-{TRAIN_7500129_RETRY_RUN_ID}.txt"
+    try:
+        failure_bytes, job_bytes, log_bytes = failure_path.read_bytes(), job_path.read_bytes(), log_path.read_bytes()
+    except OSError as exc:
+        raise ResourceBlocked("TRAIN:7500129 immutable failure, job, or worker-log evidence is missing") from exc
+    if (
+        artifact_sha256(failure_path, failure_bytes) != TRAIN_7500129_FAILURE_RECEIPT_SHA256
+        or artifact_sha256(job_path, job_bytes) != TRAIN_7500129_WORKER_JOB_SHA256
+        or artifact_sha256(log_path, log_bytes) != TRAIN_7500129_WORKER_LOG_SHA256
+    ):
+        raise ResourceBlocked("TRAIN:7500129 predecessor evidence bytes differ from the reviewed receipts")
+    try:
+        failure, job, worker_log = json.loads(failure_bytes), json.loads(job_bytes), json.loads(log_bytes)
+    except json.JSONDecodeError as exc:
+        raise ResourceBlocked("TRAIN:7500129 predecessor evidence is not valid JSON") from exc
+    row = job.get("row")
+    if (
+        failure.get("schema_id") != "issue75-stage1-unit-result-v1"
+        or failure.get("status") != "FAILED" or failure.get("boundary") != "worker_returned_nonzero"
+        or failure.get("unit_id") != unit_id or failure.get("run_id") != predecessor_run_id
+        or failure.get("measured_cpu_seconds") != TRAIN_7500129_MEASURED_CPU_SECONDS
+        or failure.get("wall_seconds") != TRAIN_7500129_WALL_SECONDS
+        or failure.get("reserved_cpu_seconds") != TRAIN_7500129_RESERVED_CPU_SECONDS
+        or failure.get("checkpoint_sha256") is not None
+        or job.get("schema_id") != "issue75-stage1-worker-job-v1"
+        or job.get("run_id") != predecessor_run_id or job.get("unit_id") != unit_id
+        or job.get("phase") != "training"
+        or job.get("package_commit") != TRAIN_7500129_RETRY_PACKAGE_COMMIT
+        or job.get("source_lock_sha256") != TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256
+        or not isinstance(row, Mapping) or row.get("formal") is not True
+        or row.get("unit_id") != unit_id or row.get("arm") != "TRAIN"
+        or row.get("phase") != "training" or row.get("block_index") != 1
+        or row.get("owner_seed") != 7500129 or row.get("game_seed") != 7500129
+        or row.get("paired_owner_key") != "train-7500129"
+        or row.get("policy_rng_seed") != 235643749
+        or row.get("search_invocation_seeds") != [931671957, 2098887910, 1706439549, 1707978817]
+        or worker_log != {"error_type": "RuntimeError", "status": "STAGE1_WORKER_FAILED"}
+    ):
+        raise ResourceBlocked("TRAIN:7500129 failure/job/log no longer prove the registered zero-start row")
+
+    run_root = units_root / "runs" / predecessor_run_id
+    absence = {
+        "worker_result_absent": not (units_root / "result.json").exists(),
+        "run_result_absent": not (run_root / "result.json").exists(),
+        "native_output_absent": not (run_root / "native").exists() and not (units_root / "native").exists(),
+        "runtime_root_absent": not (units_root / "runtime" / predecessor_run_id).exists(),
+        "search_output_absent": not (Path(artifacts_root) / "search" / "TRAIN-7500129").exists(),
+    }
+    if require_pristine and not all(absence.values()):
+        raise ResourceBlocked("TRAIN:7500129 predecessor has game, search, or result artifacts")
+    return {
+        "schema_id": PRE_GAME_START_PROOF_SCHEMA, "unit_id": unit_id,
+        "predecessor_run_id": predecessor_run_id,
+        "package_commit": TRAIN_7500129_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256,
+        "failure_boundary": "worker_returned_nonzero", "worker_error_type": "RuntimeError",
+        "started_attempts": 0, "worker_wall_seconds": TRAIN_7500129_WALL_SECONDS,
+        "failure_receipt_sha256": TRAIN_7500129_FAILURE_RECEIPT_SHA256,
+        "worker_job_sha256": TRAIN_7500129_WORKER_JOB_SHA256,
+        "worker_log_sha256": TRAIN_7500129_WORKER_LOG_SHA256, **absence,
+    }
+
+
+def _validate_train_7500129_retry_reservation(
+    reservation: Mapping[str, Any], runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]], artifacts_root: Path, *, require_pristine: bool,
+) -> dict[str, Any]:
+    unit_id = str(reservation.get("unit_id", ""))
+    run_id = str(reservation.get("run_id", ""))
+    predecessor = str(reservation.get("previous_run_id", ""))
+    history = list(units.get(unit_id, ()))
+    suffix = run_id.rsplit("-", 1)[-1]
+    if (
+        unit_id != TRAIN_7500129_RETRY_UNIT_ID
+        or len(history) != 2 or history != [TRAIN_7500129_RETRY_RUN_ID, run_id]
+        or not run_id.startswith(unit_id + "-") or len(suffix) != 16
+        or any(char not in "0123456789abcdef" for char in suffix)
+        or predecessor != TRAIN_7500129_RETRY_RUN_ID
+        or reservation.get("role") != "builder" or reservation.get("unit_kind") != "owner_arm"
+        or reservation.get("attempt_cap") is not None or reservation.get("checkpoint_sha256") is not None
+        or reservation.get("retry_reason") != PRE_GAME_START_RETRY_REASON
+        or not isinstance(reservation.get("reserved_cpu_seconds"), (int, float))
+        or not 0 < float(reservation["reserved_cpu_seconds"]) <= TRAIN_7500129_RESERVED_CPU_SECONDS
+    ):
+        raise ResourceBlocked("TRAIN:7500129 reservation is not the one exact authorized successor")
+    proof = _train_7500129_pre_game_start_failure_proof(
+        artifacts_root, runs, units, predecessor_run_id=predecessor,
+        require_pristine=require_pristine, successor_run_id=run_id,
+    )
+    if (
+        reservation.get("pre_game_start_proof") != proof
+        or reservation.get("pre_game_start_proof_sha256") != sha256_bytes(canonical(proof))
+    ):
+        raise ResourceBlocked("TRAIN:7500129 retry is not bound to its preserved predecessor evidence")
+    return proof
+
+
 def _validate_pre_game_start_retry_reservation(
     reservation: Mapping[str, Any], runs: Mapping[str, Mapping[str, Any]],
     units: Mapping[str, Sequence[str]], artifacts_root: Path, *, require_pristine: bool,
 ) -> dict[str, Any]:
     unit_id = str(reservation.get("unit_id", ""))
+    if unit_id == TRAIN_7500129_RETRY_UNIT_ID:
+        return _validate_train_7500129_retry_reservation(
+            reservation, runs, units, artifacts_root, require_pristine=require_pristine,
+        )
     predecessor = str(reservation.get("previous_run_id", ""))
     history = units.get(unit_id, ())
     if (
@@ -1660,15 +1817,22 @@ class Stage1Ledger:
 
     def pre_game_start_retry_info(self, *, unit_id: str, predecessor_run_id: str) -> dict[str, Any]:
         """Return proof only for the one fixed immutable pre-game-start predecessor."""
-        if unit_id != PRE_GAME_START_RETRY_UNIT_ID or predecessor_run_id != PRE_GAME_START_RETRY_RUN_ID:
-            raise ResourceBlocked("no pre-game-start retry exception is registered for this unit")
         runs, units = _state(_events(self.events_path))
-        if units.get(unit_id) != [predecessor_run_id] or runs[predecessor_run_id]["finish"] is None:
-            raise ResourceBlocked("pre-game-start retry predecessor has changed")
-        return _pre_game_start_failure_proof(
-            self.directory.parent, runs, units, predecessor_run_id=predecessor_run_id,
-            require_pristine=True,
-        )
+        if unit_id == PRE_GAME_START_RETRY_UNIT_ID and predecessor_run_id == PRE_GAME_START_RETRY_RUN_ID:
+            if units.get(unit_id) != [predecessor_run_id] or runs[predecessor_run_id]["finish"] is None:
+                raise ResourceBlocked("pre-game-start retry predecessor has changed")
+            return _pre_game_start_failure_proof(
+                self.directory.parent, runs, units, predecessor_run_id=predecessor_run_id,
+                require_pristine=True,
+            )
+        if unit_id == TRAIN_7500129_RETRY_UNIT_ID and predecessor_run_id == TRAIN_7500129_RETRY_RUN_ID:
+            if units.get(unit_id) != [predecessor_run_id] or runs[predecessor_run_id]["finish"] is None:
+                raise ResourceBlocked("TRAIN:7500129 retry predecessor has changed")
+            return _train_7500129_pre_game_start_failure_proof(
+                self.directory.parent, runs, units, predecessor_run_id=predecessor_run_id,
+                require_pristine=True,
+            )
+        raise ResourceBlocked("no pre-game-start retry exception is registered for this unit")
 
     def validate_block0_phase_repair_state(self) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
         """Validate all original and any single append-only replacement receipts."""
@@ -1873,6 +2037,24 @@ class Stage1Ledger:
                         or cap > info["reserved_cpu_seconds"]
                     ):
                         raise ResourceBlocked("UPDATE:0 retry differs from its exact registered repair cap/lineage")
+                elif history == [TRAIN_7500129_RETRY_RUN_ID] and unit_id == TRAIN_7500129_RETRY_UNIT_ID:
+                    run_suffix = run_id.rsplit("-", 1)[-1]
+                    if (
+                        previous_run_id != TRAIN_7500129_RETRY_RUN_ID or checkpoint_sha256 is not None
+                        or not run_id.startswith(unit_id + "-") or len(run_suffix) != 16
+                        or any(char not in "0123456789abcdef" for char in run_suffix)
+                    ):
+                        raise ResourceBlocked("TRAIN:7500129 retry must link its exact failed predecessor and a new run id")
+                    if retry_reason != PRE_GAME_START_RETRY_REASON:
+                        raise ResourceBlocked("TRAIN:7500129 retry lacks the explicit pre-game-start failure reason")
+                    proof = _train_7500129_pre_game_start_failure_proof(
+                        self.directory.parent, runs, units, predecessor_run_id=previous_run_id,
+                        require_pristine=True,
+                    )
+                    if pre_game_start_proof != proof:
+                        raise ResourceBlocked("TRAIN:7500129 proof differs from the verified original failure")
+                    if unit_kind != "owner_arm" or role != "builder" or cap > TRAIN_7500129_RESERVED_CPU_SECONDS:
+                        raise ResourceBlocked("TRAIN:7500129 retry changed its registered row or CPU ceiling")
                 elif history == [PRE_GAME_START_RETRY_RUN_ID] and unit_id == PRE_GAME_START_RETRY_UNIT_ID:
                     if previous_run_id != PRE_GAME_START_RETRY_RUN_ID or checkpoint_sha256 is not None:
                         raise ResourceBlocked("the one-row exception must link its exact failed predecessor")
@@ -2086,7 +2268,18 @@ class Stage1Ledger:
                     else:
                         blocked.append(unit)
                 elif done.get("status") == "failed":
-                    if unit == PRE_GAME_START_RETRY_UNIT_ID and history == [PRE_GAME_START_RETRY_RUN_ID]:
+                    if unit == TRAIN_7500129_RETRY_UNIT_ID and history == [TRAIN_7500129_RETRY_RUN_ID]:
+                        try:
+                            _train_7500129_pre_game_start_failure_proof(
+                                self.directory.parent, runs, units,
+                                predecessor_run_id=TRAIN_7500129_RETRY_RUN_ID, require_pristine=True,
+                            )
+                        except ResourceBlocked:
+                            blocked.append(unit)
+                            continue
+                        future += estimates[unit]
+                        retry_units.append(unit)
+                    elif unit == PRE_GAME_START_RETRY_UNIT_ID and history == [PRE_GAME_START_RETRY_RUN_ID]:
                         try:
                             _pre_game_start_failure_proof(
                                 self.directory.parent, runs, units,
