@@ -25,13 +25,15 @@ Git and worktrees:
 - Fetch/prune remote state before starting and base new work on current `origin/main`, or on the exact remote study branch for a repair.
 - Use a separate worktree for non-trivial work. A worktree is a disposable execution environment, not durable task state.
 - Push before handoff and report the remote branch plus exact commit SHA. Local-only commits are not reviewable project state.
-- After handoff, remove the local worktree unless an active long-running process still needs it. A later repair should create a fresh worktree from remote state.
+- After durable handoff of required generated artifacts, remove the local worktree unless an active long-running process still needs it. A later repair should create a fresh worktree from remote state.
 - Reviewer worktrees should be detached at the exact reviewed commit and removed after review.
 
 Data:
 
 - Generated data must not make a worktree non-disposable.
 - Retained local data belongs outside worktrees and must have a producer commit plus either a named downstream consumer or a review/delete date.
+- Required outputs for a scientific claim or downstream run (including trained model weights, optimizer resume state, fixed probe data, and bound receipts when applicable) must be retained outside disposable worktrees or in remotely retrievable committed artifacts, with source/run identity and content hashes. A path or hash in a JSON receipt is not the artifact itself.
+- Before handoff or worktree cleanup, Builder verifies the required files can be retrieved and loaded from the durable destination independently of the producing worktree. If not, report the delivery as incomplete and preserve the only surviving copy; do not represent text-only receipts as a complete model handoff.
 - "Might be useful later" is not a retention reason.
 
 Routing:
@@ -45,6 +47,6 @@ Roles are intentionally lightweight:
 
 - Planner: scientific question, information boundary, evaluation, interpretation, and long-lived architecture.
 - Builder: implementation and experiment execution.
-- Reviewer: independent correctness/evidence review.
+- Reviewer: independent correctness/evidence review, including read-back of required delivered artifacts and downstream usability without the producing worktree; do not PASS a model/result delivery whose essential bytes are absent.
 
 If a change needs extensive global history to justify itself, first assume the active abstraction is too complicated.
