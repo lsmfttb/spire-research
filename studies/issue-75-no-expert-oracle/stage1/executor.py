@@ -614,7 +614,8 @@ def _forecast_estimates(ledger: Any) -> tuple[dict[str, float], dict[str, Any]]:
     projection = cost["stage1_builder_projection_cpu_seconds"]
     registered = cost["registered_workload"]
     if (
-        projection.get("proposed_builder_hard_cap") != budget.BUILDER_LIMIT
+        projection.get("proposed_builder_hard_cap") != budget.COST_MODEL_BUILDER_LIMIT
+        or projection.get("proposed_all_in_hard_cap") != budget.COST_MODEL_ALL_IN_LIMIT
         or projection.get("protected_reviewer_reserve") != budget.REVIEWER_LIMIT
         or registered.get("maximum_search_cpu_seconds") != 108544.0
     ):
@@ -679,6 +680,8 @@ def _forecast_estimates(ledger: Any) -> tuple[dict[str, float], dict[str, Any]]:
         "builder_hard_cap_cpu_seconds": budget.BUILDER_LIMIT,
         "reviewer_protected_cpu_seconds": budget.REVIEWER_LIMIT,
         "aggregate_hard_cap_cpu_seconds": budget.ALL_IN_LIMIT,
+        "accepted_cost_model_builder_hard_cap_cpu_seconds": budget.COST_MODEL_BUILDER_LIMIT,
+        "accepted_cost_model_all_in_hard_cap_cpu_seconds": budget.COST_MODEL_ALL_IN_LIMIT,
         "cost_model_sha256_lf": budget.normalized_file_sha256(STUDY / "planning" / "stage1-cost-model.json"),
         "limitations": list(cost.get("limitations", ())),
     }
@@ -729,9 +732,9 @@ def _accepted_preflight_evidence() -> tuple[dict[str, Any], dict[str, Any], str,
         or forecast.get("forecast_builder_cpu_seconds") != 161896.17019694686
         or forecast.get("preflight_actual_cpu_seconds") != 8077.011297
         or forecast.get("projected_total_builder_cpu_seconds") != 169973.18149394685
-        or forecast.get("builder_hard_cap_cpu_seconds") != budget.BUILDER_LIMIT
+        or forecast.get("builder_hard_cap_cpu_seconds") != budget.COST_MODEL_BUILDER_LIMIT
         or forecast.get("reviewer_protected_cpu_seconds") != budget.REVIEWER_LIMIT
-        or forecast.get("aggregate_hard_cap_cpu_seconds") != budget.ALL_IN_LIMIT
+        or forecast.get("aggregate_hard_cap_cpu_seconds") != budget.COST_MODEL_ALL_IN_LIMIT
     ):
         raise budget.ResourceBlocked("accepted preflight reports do not match the reviewed bounded-risk decision")
     return report, forecast, report_sha, forecast_sha
@@ -1414,6 +1417,31 @@ def _expected_policy_binding(
     return digest, {"source": model_label, "checkpoint_sha256": checkpoint_sha, "formal_use": True}
 
 
+def _validate_historical_update0_compatibility(
+    *, unit_id: str, run_id: str, reservation: Mapping[str, Any],
+    finish: Mapping[str, Any] | None, result_path: Path,
+) -> tuple[str, str] | None:
+    """Accept only the exact independently reviewed UPDATE:0 receipt at its original binding."""
+    expected = budget.UPDATE0_HISTORICAL_COMPATIBILITY
+    if unit_id != "UPDATE:0" or run_id != expected["run_id"]:
+        return None
+    if reservation != expected["reservation"] or finish != expected["finish"]:
+        raise PermissionError("historical UPDATE:0 ledger events differ from the independently retained source binding")
+    expected_result_path = _inside_artifacts(ARTIFACT_ROOT / str(expected["result_path"]))
+    if result_path.resolve(strict=True) != expected_result_path.resolve(strict=True):
+        raise PermissionError("historical UPDATE:0 result is not at its exact retained artifact path")
+    if not result_path.is_file() or _file_sha256(result_path) != expected["result_sha256"]:
+        raise PermissionError("historical UPDATE:0 result bytes differ from the reviewed retention manifest")
+    result = _read_json(result_path)
+    if any(result.get(key) != value for key, value in expected["result_fields"].items()):
+        raise PermissionError("historical UPDATE:0 receipt differs from its exact retained 64-step result")
+    for relative, digest in expected["artifacts"].items():
+        path = _inside_artifacts(ARTIFACT_ROOT / relative)
+        if not path.is_file() or _file_sha256(path) != digest:
+            raise PermissionError(f"historical UPDATE:0 retained artifact hash mismatch: {relative}")
+    return str(expected["package_commit"]), str(expected["source_lock_sha256"])
+
+
 def _validate_success_result(
     ledger: Any, *, unit_id: str, run_id: str, reservation: Mapping[str, Any],
     result: Mapping[str, Any], result_path: Path, finish: Mapping[str, Any] | None = None,
@@ -1422,6 +1450,13 @@ def _validate_success_result(
     package_commit, source_lock_sha256 = source_binding or (
         ledger.binding.package_commit, ledger.binding.source_lock_sha256,
     )
+    historical_binding = _validate_historical_update0_compatibility(
+        unit_id=unit_id, run_id=run_id, reservation=reservation,
+        finish=finish, result_path=result_path,
+    )
+    if historical_binding is not None and source_binding != historical_binding:
+        raise PermissionError("historical UPDATE:0 receipt was not bound to its original source package")
+    historical_update0 = historical_binding is not None
     if (
         reservation.get("unit_id") != unit_id
         or reservation.get("role") != "builder"
@@ -1509,25 +1544,26 @@ def _validate_success_result(
         ):
             raise PermissionError(f"successful update receipt differs from its registered block/model: {unit_id}")
         if block == 0 and reservation.get("repair_reason") == budget.UPDATE0_RECONSTRUCTION_REASON:
-            lineage = ledger.update0_reconstruction_info(run_id=run_id)
-            optimizer = result.get("optimizer_checkpoint")
-            optimizer_path = _inside_artifacts(ARTIFACT_ROOT / "models" / "block-0-step.pt")
-            probe_path = _inside_artifacts(ARTIFACT_ROOT / "policy-probe-features.json")
-            if (
-                lineage.get("state") not in {"OPEN", "SUCCEEDED"}
-                or lineage.get("latest_run_id") != run_id
-                or not isinstance(optimizer, Mapping)
-                or optimizer.get("path") != optimizer_path.relative_to(ARTIFACT_ROOT).as_posix()
-                or optimizer.get("completed_steps") != 64
-                or not _valid_digest(optimizer.get("sha256"), 64)
-                or not optimizer_path.is_file()
-                or _file_sha256(optimizer_path) != optimizer.get("sha256")
-                or result.get("probe_state_count") != 128
-                or not _valid_digest(result.get("probe_features_sha256"), 64)
-                or not probe_path.is_file()
-                or _file_sha256(probe_path) != result.get("probe_features_sha256")
-            ):
-                raise PermissionError("reconstructed UPDATE:0 lacks its exact optimizer checkpoint/probe evidence")
+            if not historical_update0:
+                lineage = ledger.update0_reconstruction_info(run_id=run_id)
+                optimizer = result.get("optimizer_checkpoint")
+                optimizer_path = _inside_artifacts(ARTIFACT_ROOT / "models" / "block-0-step.pt")
+                probe_path = _inside_artifacts(ARTIFACT_ROOT / "policy-probe-features.json")
+                if (
+                    lineage.get("state") not in {"OPEN", "SUCCEEDED"}
+                    or lineage.get("latest_run_id") != run_id
+                    or not isinstance(optimizer, Mapping)
+                    or optimizer.get("path") != optimizer_path.relative_to(ARTIFACT_ROOT).as_posix()
+                    or optimizer.get("completed_steps") != 64
+                    or not _valid_digest(optimizer.get("sha256"), 64)
+                    or not optimizer_path.is_file()
+                    or _file_sha256(optimizer_path) != optimizer.get("sha256")
+                    or result.get("probe_state_count") != 128
+                    or not _valid_digest(result.get("probe_features_sha256"), 64)
+                    or not probe_path.is_file()
+                    or _file_sha256(probe_path) != result.get("probe_features_sha256")
+                ):
+                    raise PermissionError("reconstructed UPDATE:0 lacks its exact optimizer checkpoint/probe evidence")
             _, loaded_digest, loaded_source = _load_model(f"pi{block + 1}")
             if (
                 not _valid_digest(loaded_digest, 64)
@@ -1599,6 +1635,18 @@ def _existing_unit_receipt(
         )
     if not result_path.is_file():
         raise PermissionError(f"successful ledger unit lacks its durable result: {unit_id}")
+    historical = budget.UPDATE0_HISTORICAL_COMPATIBILITY
+    if unit_id == "UPDATE:0" and (
+        run_id == historical["run_id"]
+        or reservation.get("package_commit") != ledger.binding.package_commit
+        or reservation.get("source_lock_sha256") != ledger.binding.source_lock_sha256
+    ):
+        source_binding = _validate_historical_update0_compatibility(
+            unit_id=unit_id, run_id=run_id, reservation=reservation or {},
+            finish=finish, result_path=result_path,
+        )
+        if source_binding is None:
+            raise PermissionError("non-current UPDATE:0 receipt lacks the exact reviewed historical source binding")
     result = _read_json(result_path)
     return _validate_success_result(
         ledger, unit_id=unit_id, run_id=run_id, reservation=reservation or {},

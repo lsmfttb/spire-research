@@ -26,6 +26,7 @@ from stage1_budget import (  # noqa: E402
     LOCKED_PACKAGE_FILES,
     LOCKED_REPOSITORY_DEPENDENCIES,
     REVIEWER_LIMIT,
+    RESOURCE_BUDGET_AMENDMENT,
     canonical,
     sha256_bytes,
     verify_stage1_package as verify_package_lock,
@@ -49,6 +50,57 @@ def file_sha256(path: Path) -> str:
         while chunk := stream.read(1024 * 1024):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _verify_resource_budget_amendment(lock: Mapping[str, Any]) -> None:
+    amendment = RESOURCE_BUDGET_AMENDMENT
+    base_commit = amendment["base_package_commit"]
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=STUDY,
+        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    ).stdout.strip()
+    lock_path = STAGE1 / "source-lock.json"
+    recorded_amendment = lock.get("resource_budget_amendment")
+    if head != base_commit or recorded_amendment not in (None, amendment):
+        raise ValueError("resource-cap amendment is allowed only from the exact reviewed base package")
+    if recorded_amendment is None and preflight.normalized_sha256(lock_path) != amendment["base_source_lock_sha256"]:
+        raise ValueError("resource-cap amendment requires the exact original Stage 1 source lock")
+
+    def historical_file(relative_path: str) -> bytes:
+        repository_path = f"{STUDY.relative_to(STUDY.parents[1]).as_posix()}/{relative_path}"
+        return subprocess.run(
+            ["git", "show", f"{base_commit}:{repository_path}"], cwd=STUDY,
+            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        ).stdout
+
+    locked_hashes = lock.get("locked_files_sha256_lf", {})
+    config_bytes = historical_file("stage1/config.json")
+    budget_bytes = historical_file("stage1/budget.json")
+    config_hash = hashlib.sha256(config_bytes).hexdigest()
+    budget_hash = hashlib.sha256(budget_bytes).hexdigest()
+    if recorded_amendment is None and (
+        lock.get("stage1_config_sha256") != config_hash
+        or lock.get("budget_config_sha256") != budget_hash
+        or locked_hashes.get("stage1/config.json") != config_hash
+        or locked_hashes.get("stage1/budget.json") != budget_hash
+    ):
+        raise ValueError("resource-cap amendment base files do not match the original source lock")
+
+    expected_config = json.loads(config_bytes)
+    expected_config["resources"]["builder_process_tree_cpu_hard_seconds"] = BUILDER_LIMIT
+    expected_config["resources"]["reviewer_cpu_protected_seconds"] = REVIEWER_LIMIT
+    expected_config["resources"]["all_in_cpu_hard_seconds"] = ALL_IN_LIMIT
+    if preflight.load_json(STAGE1 / "config.json") != expected_config:
+        raise ValueError("resource-cap amendment changed Stage 1 config beyond the approved ceilings")
+
+    expected_budget = json.loads(budget_bytes)
+    expected_budget["limits_cpu_seconds"] = {
+        "builder": BUILDER_LIMIT,
+        "reviewer_protected": REVIEWER_LIMIT,
+        "all_in": ALL_IN_LIMIT,
+    }
+    if preflight.load_json(STAGE1 / "budget.json") != expected_budget:
+        raise ValueError("resource-cap amendment changed Stage 1 budget beyond the approved ceilings")
 
 
 def _stage0_source_blob(source_commit: str, relative_path: str) -> bytes:
@@ -448,6 +500,7 @@ def prepare_stage1_package() -> dict[str, Any]:
         "execution_authorized": True,
         "prepared_from_commit": PREPARATION_BASE,
         "final_package_commit_binding": "all execution receipts bind the exact package commit and source-lock digest",
+        "resource_budget_amendment": RESOURCE_BUDGET_AMENDMENT,
         "stage1_config_sha256": config_sha256,
         "seed_table_sha256": table_sha256,
         "budget_config_sha256": budget_sha256,
@@ -663,10 +716,25 @@ def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[st
         "stage1/seed-table.json": "seed_table_sha256",
         "stage1/budget.json": "budget_config_sha256",
     }
+    resource_cap_amendment = False
     if not preflight_transition:
-        for relative, field in immutable_files.items():
-            if preflight.normalized_sha256(STUDY / relative) != lock.get(field):
-                raise ValueError(f"refusing to change registered Stage 1 input: {relative}")
+        changed_budget_inputs = {
+            relative for relative, field in immutable_files.items()
+            if relative in {"stage1/config.json", "stage1/budget.json"}
+            and preflight.normalized_sha256(STUDY / relative) != lock.get(field)
+        }
+        if changed_budget_inputs:
+            if (
+                lock.get("resource_budget_amendment") is None
+                and changed_budget_inputs != {"stage1/config.json", "stage1/budget.json"}
+            ):
+                raise ValueError("both locked Stage 1 resource-cap files must change together")
+            _verify_resource_budget_amendment(lock)
+            resource_cap_amendment = True
+        else:
+            for relative, field in immutable_files.items():
+                if preflight.normalized_sha256(STUDY / relative) != lock.get(field):
+                    raise ValueError(f"refusing to change registered Stage 1 input: {relative}")
 
     refreshed = _locked_file_hashes()
     repairable = {
@@ -676,7 +744,7 @@ def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[st
         "stage1/update0-seed-failure-continuation.json",
         "algorithm.py", "learning.py", "runtime.py",
     }
-    if preflight_transition:
+    if preflight_transition or resource_cap_amendment:
         repairable |= {"stage1/config.json", "stage1/budget.json"}
     changed = {
         relative for relative, digest in refreshed.items()
@@ -699,6 +767,8 @@ def refresh_stage1_source_lock(*, preflight_transition: bool = False) -> dict[st
         raise ValueError("source-lock refresh found changes outside the authorized Issue 73 runner binding")
     lock["locked_files_sha256_lf"] = refreshed
     lock["locked_repository_dependencies_sha256_lf"] = repository_dependencies
+    if resource_cap_amendment:
+        lock["resource_budget_amendment"] = RESOURCE_BUDGET_AMENDMENT
     lock["final_package_commit_binding"] = (
         "all execution receipts bind the exact package commit and source-lock digest"
     )

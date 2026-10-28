@@ -1,5 +1,5 @@
 {
-  "budget_config_sha256": "b2f8f9c6d790d8f4ec540121ae1bb1f30d7a68c5e2e16a4c1a5d9b4e34bf238c",
+  "budget_config_sha256": "1c4e8d3e0345d019c8bdb2cafb581b52c0638318a29c712005147e1c2b991d72",
   "execution_authorized": true,
   "final_package_commit_binding": "all execution receipts bind the exact package commit and source-lock digest",
   "formal_seeds_or_games_consumed": 0,
@@ -17,16 +17,16 @@
     "stage0.py": "3ab0860b235d2ca32749bde5b1e691fee4f68e07be591acd84d266e2d0587b17",
     "stage1/block0-decoder-compatibility.json": "30025d12de38da023aa23d60a0b09f03790b41cbe80163a78225a9527ea010a3",
     "stage1/block0-repair-lineage.json": "3c864646741682e900eb6352e0357b2650f28e3aec38519e0a2704b2ccdd542f",
-    "stage1/budget.json": "b2f8f9c6d790d8f4ec540121ae1bb1f30d7a68c5e2e16a4c1a5d9b4e34bf238c",
-    "stage1/config.json": "dedba8f4b11de92286c7e687c1afebc3330e073ba4d608a20c960ea7be467c5d",
-    "stage1/executor.py": "075597a9f8c97d28b5914a63484b131721700d7aaccf8c201e77f5f5efe3f636",
+    "stage1/budget.json": "1c4e8d3e0345d019c8bdb2cafb581b52c0638318a29c712005147e1c2b991d72",
+    "stage1/config.json": "355b4158808bdbb93f976c89a4da618b81623f53dc59c72a820da285e3371916",
+    "stage1/executor.py": "b1a63d97520d025f16089a805d178d09c77cc5bfa0220aef875cd4855e888beb",
     "stage1/preflight-proxy.json": "f60612234cbaf35ae18430efe778cf17db0838a6c54b8869242a27969c7de533",
-    "stage1/prepare.py": "9d8a606789b38d9c838258ff8e942b163508728d3999d7f976a6e44af281927b",
+    "stage1/prepare.py": "44eac4f9991cab202310da31b73f4274d223bd306e8c3440947057790e5ffe55",
     "stage1/seed-table.json": "b61b08cb757ce07eb3a20734ea6bf46decd97437ad30cf4a6d1ce0a90a74d6dd",
-    "stage1/test_activation.py": "364ceca3bd17bed5a03f8ba5d00baafe1be62655de83867f11b165f8bb2aff2c",
-    "stage1/test_executor.py": "4e1ee02f53f4e6a8a81f497f3561c24caae01f069dacb54b16d12a4eaeb799fd",
+    "stage1/test_activation.py": "919c3f82618f19f04bd23054e4b4871683b27490d44c39d630f965c4f2e91a0b",
+    "stage1/test_executor.py": "6e7c3209f958a03ef4829153ec1550f39ae6e26a16b9b7d3025a3169d6983b79",
     "stage1/update0-seed-failure-continuation.json": "68c8c069c0acce813bcce1cc44bb26b359687fc3a37aeadd85404fc8da3a184c",
-    "stage1_budget.py": "d27b8b63fae9c59e09d03fbf3a98d7ef6c59a8e03adad14aea82292e2a8e47f1",
+    "stage1_budget.py": "af6c8f3959b3d2dbaa36cbc8f8f2646b74ebd8582229f22c681c3860793dc28d",
     "test_issue75_contract.py": "9c989a249d93a7837330925d85ea1545c0006eacd6f4ae577a625c8e18700462"
   },
   "locked_repository_dependencies_sha256_lf": {
@@ -37,6 +37,24 @@
   "native_sampling_performed": false,
   "package_status": "FORMAL_EXECUTION_ENABLED",
   "prepared_from_commit": "a8410ff48ecf168f904726c79da302d10f921984",
+  "resource_budget_amendment": {
+    "base_package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+    "base_source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+    "limits_cpu_seconds": {
+      "all_in": 190000,
+      "builder": 180000,
+      "reviewer_protected": 10000
+    },
+    "planner_decision_comment_id": 6461623049,
+    "previous_limits_cpu_seconds": {
+      "all_in": 180000,
+      "builder": 170000,
+      "reviewer_protected": 10000
+    },
+    "schema_id": "issue75-resource-budget-amendment-v1",
+    "search_call_cpu_cap_seconds": 32,
+    "search_call_started_attempt_cap": 16
+  },
   "runtime": {
     "native_import_only_negative_test": {
       "checkpoints_loaded_or_created": 0,
@@ -101,6 +119,6 @@
     "source_commit": "c77d64243320639bf156330760d511d2a13eee85",
     "source_lock_sha256_lf": "b3ce3d33c27ec392f6d88151bce3c86a8fdce8c9dc0152d417069441f7140d38"
   },
-  "stage1_config_sha256": "dedba8f4b11de92286c7e687c1afebc3330e073ba4d608a20c960ea7be467c5d",
+  "stage1_config_sha256": "355b4158808bdbb93f976c89a4da618b81623f53dc59c72a820da285e3371916",
   "study_id": "issue-75-no-expert-oracle"
 }

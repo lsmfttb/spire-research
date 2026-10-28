@@ -241,7 +241,7 @@ class LedgerTests(unittest.TestCase):
         self.ledger.reserve(run_id="review", unit_id="review", role="reviewer",
                             reserved_cpu_seconds=10_000, unit_kind="review")
         with self.assertRaises(budget.ResourceBlocked):
-            self.reserve("builder-over", "TRAIN:1", cap=170_001, kind="training_owner",
+            self.reserve("builder-over", "TRAIN:1", cap=budget.BUILDER_LIMIT + 1, kind="training_owner",
                          attempts=None)
 
     def test_incomplete_and_failed_units_are_not_silently_omitted_from_forecast(self):

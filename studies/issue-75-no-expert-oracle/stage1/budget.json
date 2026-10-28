@@ -4,8 +4,8 @@
   "future_forecast_required_before_formal_owner_seed": true,
   "ledger_status": "PREFLIGHT_COMPLETE_ACCEPTED_FORMAL_PROSPECTIVE",
   "limits_cpu_seconds": {
-    "all_in": 180000,
-    "builder": 170000,
+    "all_in": 190000,
+    "builder": 180000,
     "reviewer_protected": 10000
   },
   "reservation_policy": "write-ahead unique run ID; unresolved reservation is charged at its full cap; finished receipt charges measured process-tree CPU",

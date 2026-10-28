@@ -16,9 +16,29 @@ import threading
 import time
 from typing import Any, Mapping, Sequence
 
-BUILDER_LIMIT = 170_000
-REVIEWER_LIMIT = 10_000
-ALL_IN_LIMIT = 180_000
+COST_MODEL_BUILDER_LIMIT = 170_000
+COST_MODEL_ALL_IN_LIMIT = 180_000
+RESOURCE_BUDGET_AMENDMENT = {
+    "schema_id": "issue75-resource-budget-amendment-v1",
+    "planner_decision_comment_id": 6461623049,
+    "base_package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+    "base_source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+    "previous_limits_cpu_seconds": {
+        "builder": COST_MODEL_BUILDER_LIMIT,
+        "reviewer_protected": 10_000,
+        "all_in": COST_MODEL_ALL_IN_LIMIT,
+    },
+    "limits_cpu_seconds": {
+        "builder": 180_000,
+        "reviewer_protected": 10_000,
+        "all_in": 190_000,
+    },
+    "search_call_cpu_cap_seconds": 32,
+    "search_call_started_attempt_cap": 16,
+}
+BUILDER_LIMIT = RESOURCE_BUDGET_AMENDMENT["limits_cpu_seconds"]["builder"]
+REVIEWER_LIMIT = RESOURCE_BUDGET_AMENDMENT["limits_cpu_seconds"]["reviewer_protected"]
+ALL_IN_LIMIT = RESOURCE_BUDGET_AMENDMENT["limits_cpu_seconds"]["all_in"]
 SEARCH_CPU_CAP_SECONDS = 32.0
 SEARCH_ATTEMPT_CAP = 16
 PR_SET_CHILD_SUBREAPER = 36
@@ -90,6 +110,9 @@ def verify_stage1_package() -> dict[str, Any]:
         or lock.get("model_training_performed") is not False
     ):
         raise PermissionError("Stage 1 source lock is not a valid registered executable package")
+    if lock.get("resource_budget_amendment") != RESOURCE_BUDGET_AMENDMENT:
+        raise PermissionError("Stage 1 source lock does not bind the approved one-time resource-cap amendment")
+
     files = lock.get("locked_files_sha256_lf")
     if not isinstance(files, dict) or set(files) != set(LOCKED_PACKAGE_FILES):
         raise PermissionError("Stage 1 lock does not cover the exact registered package file set")
@@ -113,6 +136,17 @@ def verify_stage1_package() -> dict[str, Any]:
 
     config = json.loads((STAGE1 / "config.json").read_text(encoding="utf-8"))
     execution = config.get("execution")
+    resources = config.get("resources")
+    if not isinstance(resources, dict) or {
+        "builder_process_tree_cpu_hard_seconds": resources.get("builder_process_tree_cpu_hard_seconds"),
+        "reviewer_cpu_protected_seconds": resources.get("reviewer_cpu_protected_seconds"),
+        "all_in_cpu_hard_seconds": resources.get("all_in_cpu_hard_seconds"),
+    } != {
+        "builder_process_tree_cpu_hard_seconds": BUILDER_LIMIT,
+        "reviewer_cpu_protected_seconds": REVIEWER_LIMIT,
+        "all_in_cpu_hard_seconds": ALL_IN_LIMIT,
+    }:
+        raise PermissionError("Stage 1 config does not match the amended resource hard limits")
     if not isinstance(execution, dict):
         raise PermissionError("Stage 1 package has no execution phase declaration")
     stage1_enabled = execution.get("stage1_execution_authorized")
@@ -404,6 +438,72 @@ UPDATE0_SEED_FAILURE_MANIFEST = "update0-seed-failure-continuation.json"
 UPDATE0_RECONSTRUCTION_REASON = "ORIGINAL_CHECKPOINT_LOST_RECOMPUTATION"
 UPDATE0_RECONSTRUCTION_LOST_RUN_ID = "UPDATE:0-e3aa5e8338044be1"
 UPDATE0_RECONSTRUCTION_MAX_CPU_SECONDS = 3837.4562621977375
+UPDATE0_HISTORICAL_COMPATIBILITY = {
+    # Independently reviewed durable artifact bundle, Reviewer comment #6461521816.
+    "review_comment_id": 6461521816,
+    "retention_manifest_sha256": "a0c161b4df4fe753ddd39b86a0f8c30ca79c9ea098c34fef6858ce5fd49aedd0",
+    "run_id": "UPDATE:0-4db46e9573a4405a",
+    "package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+    "source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+    "result_path": "units/UPDATE-0/result-UPDATE:0-4db46e9573a4405a.json",
+    "result_sha256": "71e79487df8a28c6759dca42ea4df080293d25b4e41b55e569065891dc1e7cef",
+    "reservation": {
+        "attempt_cap": None, "checkpoint_sha256": None,
+        "created_at_ns": 1793164287443687581, "event": "reserve",
+        "package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+        "pre_game_start_proof": None, "pre_game_start_proof_sha256": None,
+        "previous_run_id": "UPDATE:0-e3aa5e8338044be1",
+        "repair_manifest_sha256": "1722bcaa93c78497fc788dc6a1bca86a56290989f5f3466a839d4da387a892b7",
+        "repair_predecessor_receipt_sha256": "62f52bf15436fd0953e57f2471b9a9a364f83c5094a612c7db8244ec9853aa76",
+        "repair_predecessor_run_id": "UPDATE:0-e3aa5e8338044be1",
+        "repair_reason": "ORIGINAL_CHECKPOINT_LOST_RECOMPUTATION",
+        "reserved_cpu_seconds": 3837.4562621977375, "retry_reason": None,
+        "role": "builder", "run_id": "UPDATE:0-4db46e9573a4405a",
+        "schema_id": "issue75-stage1-budget-event-v2",
+        "source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+        "unit_id": "UPDATE:0", "unit_kind": "training_update",
+    },
+    "finish": {
+        "checkpoint_sha256": None, "event": "finish",
+        "finished_at_ns": 1793164542484198585, "measured_cpu_seconds": 298.957140816,
+        "package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+        "reserved_cpu_seconds": 3837.4562621977375,
+        "result_sha256": "71e79487df8a28c6759dca42ea4df080293d25b4e41b55e569065891dc1e7cef",
+        "run_id": "UPDATE:0-4db46e9573a4405a",
+        "schema_id": "issue75-stage1-budget-event-v2",
+        "source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+        "started_attempts": 0, "status": "succeeded", "unit_id": "UPDATE:0",
+    },
+    "result_fields": {
+        "schema_id": "issue75-stage1-unit-result-v1", "status": "SUCCEEDED",
+        "unit_id": "UPDATE:0", "ledger_run_id": "UPDATE:0-4db46e9573a4405a",
+        "source_commit": "00d6405ba9090878d3016400706aeaa645446689",
+        "package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+        "source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+        "block_index": 0, "owner_count": 128, "completed_steps": 64,
+        "block_order_seed": 948217156, "expert_decisions": 0,
+        "source_model_digest": "38fe80665067f4ba931f825c882985e73dda1dd95fe19105754d55e8308dfeaf",
+        "result_model_digest": "33b3d3d891e53b7434919318ccb1c8411a0bebe1e2e48616ef040206261db557",
+        "model_checkpoint": {
+            "path": "models/pi1.pt",
+            "sha256": "d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21978",
+            "model_digest": "33b3d3d891e53b7434919318ccb1c8411a0bebe1e2e48616ef040206261db557",
+        },
+        "optimizer_checkpoint": {
+            "path": "models/block-0-step.pt",
+            "sha256": "7bdff6bdd14d8bf5bdcd1cf286e687b5a6df4ef6c11f80bad1ee18787e40f514",
+            "schema_id": "issue75-policy-block-step-checkpoint-v1",
+            "block_index": 0, "completed_steps": 64,
+        },
+        "probe_features_sha256": "67ff80625288bbada9089fcf758a286cb2e7c132b0138975fd92fc4192b9094f",
+        "probe_state_count": 128,
+    },
+    "artifacts": {
+        "models/pi1.pt": "d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21978",
+        "models/block-0-step.pt": "7bdff6bdd14d8bf5bdcd1cf286e687b5a6df4ef6c11f80bad1ee18787e40f514",
+        "policy-probe-features.json": "67ff80625288bbada9089fcf758a286cb2e7c132b0138975fd92fc4192b9094f",
+    },
+}
 
 
 def _load_block0_repair_manifest(artifacts_root: Path) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:

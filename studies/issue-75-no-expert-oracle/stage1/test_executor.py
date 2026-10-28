@@ -897,6 +897,51 @@ class Stage1ExecutorTests(unittest.TestCase):
         with self.assertRaisesRegex(PermissionError, "registered initial-model digest"):
             executor._load_model("pi0")
 
+    def test_historical_update0_receipt_preserves_exact_original_source_binding(self):
+        expected = executor.budget.UPDATE0_HISTORICAL_COMPATIBILITY
+        result_path = executor.ARTIFACT_ROOT / expected["result_path"]
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        result_path.write_bytes(executor._canonical(expected["result_fields"]) + bytes([10]))
+        for relative in expected["artifacts"]:
+            path = executor.ARTIFACT_ROOT / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"reviewed artifact fixture")
+
+        pinned_hashes = {
+            expected["result_path"]: expected["result_sha256"],
+            **expected["artifacts"],
+        }
+
+        def pinned_hash(path):
+            relative = Path(path).resolve().relative_to(executor.ARTIFACT_ROOT.resolve()).as_posix()
+            return pinned_hashes[relative]
+
+        ledger = FakeReceiptLedger()
+        run_id = expected["run_id"]
+        binding = (expected["package_commit"], expected["source_lock_sha256"])
+        with (
+            mock.patch.object(
+                executor, "_existing_unit",
+                return_value=(run_id, expected["reservation"], expected["finish"]),
+            ),
+            mock.patch.object(executor, "_file_sha256", side_effect=pinned_hash),
+            mock.patch.object(executor, "_validate_success_result", return_value=expected["result_fields"]) as validate,
+        ):
+            self.assertEqual(executor._existing_unit_receipt(ledger, "UPDATE:0"), expected["result_fields"])
+        self.assertEqual(validate.call_args.kwargs["source_binding"], binding)
+        self.assertEqual(expected["retention_manifest_sha256"], "a0c161b4df4fe753ddd39b86a0f8c30ca79c9ea098c34fef6858ce5fd49aedd0")
+
+        altered_finish = {**expected["finish"], "result_sha256": "f" * 64}
+        with (
+            mock.patch.object(
+                executor, "_existing_unit",
+                return_value=(run_id, expected["reservation"], altered_finish),
+            ),
+            mock.patch.object(executor, "_file_sha256", side_effect=pinned_hash),
+            self.assertRaisesRegex(PermissionError, "historical UPDATE:0 ledger events"),
+        ):
+            executor._existing_unit_receipt(ledger, "UPDATE:0")
+
     def test_reused_successful_receipts_bind_registered_row_and_original_bytes(self):
         ledger = FakeReceiptLedger()
         row = next(item for item in executor._unit_rows("preflight") if item["arm"] == "E")
@@ -1148,6 +1193,32 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertEqual(plan["unit_id"], "SCHEDULER:TRAIN:CONTINUATION:2")
         self.assertEqual(plan["cap"], 20.0)
 
+        # Keep the previously opened 20-second reservation charged; a new
+        # invocation receives the next unique scheduler reservation.
+        for index in range(2, 7):
+            ledger.reserve(
+                run_id=f"continuation-{index}",
+                unit_id=f"SCHEDULER:TRAIN:CONTINUATION:{index}", role="builder",
+                reserved_cpu_seconds=executor.TRAINING_SCHEDULER_CONTINUATION_RESERVATION,
+                unit_kind="scheduler",
+            )
+        before = ledger.read_events()
+        plan = executor._training_scheduler_plan(
+            ledger, {"SCHEDULER:TRAIN": executor.FORMAL_SCHEDULER_RESERVATION},
+        )
+        self.assertEqual(plan["action"], "reserve")
+        self.assertEqual(plan["unit_id"], "SCHEDULER:TRAIN:CONTINUATION:7")
+        self.assertEqual(plan["cap"], 20.0)
+        self.assertEqual(ledger.read_events(), before)
+
+    def test_scheduler_controller_headroom_stops_before_reservation_exhaustion(self):
+        reservation = {"cap": 20.0}
+        with mock.patch.object(executor.time, "process_time", return_value=118.999):
+            executor._require_scheduler_cpu_headroom(reservation, 100.0)
+        with mock.patch.object(executor.time, "process_time", return_value=119.0):
+            with self.assertRaises(executor.budget.ResourceBlocked):
+                executor._require_scheduler_cpu_headroom(reservation, 100.0)
+
     def test_scheduler_reservations_preserve_the_accepted_full_cohort_forecast(self):
         runs = {
             "preflight": {
@@ -1167,9 +1238,9 @@ class Stage1ExecutorTests(unittest.TestCase):
         self.assertEqual(estimates["SCHEDULER:EVALUATE"], 120.0)
         self.assertAlmostEqual(sum(estimates.values()), 161896.17019694686, places=6)
         self.assertAlmostEqual(summary["projected_total_builder_cpu_seconds"], 169973.18149394685, places=6)
-        self.assertEqual(summary["builder_hard_cap_cpu_seconds"], 170000)
+        self.assertEqual(summary["builder_hard_cap_cpu_seconds"], 180000)
         self.assertEqual(summary["reviewer_protected_cpu_seconds"], 10000)
-        self.assertEqual(summary["aggregate_hard_cap_cpu_seconds"], 180000)
+        self.assertEqual(summary["aggregate_hard_cap_cpu_seconds"], 190000)
 
     def test_heldout_phase_requires_a_successful_training_scheduler_receipt(self):
         ledger = FakeLedger(unit_kind="owner_arm")
