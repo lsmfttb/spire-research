@@ -81,6 +81,20 @@ class SuccessorDriverTests(unittest.TestCase):
                 self.assertEqual(result, receipt)
                 self.assertEqual(driver.read_json(progress_path)["status"], "COMPLETE")
 
+    def test_search_wall_distribution_reads_pilot_search_artifact_layout(self):
+        with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:
+            root = Path(temp)
+            for index, duration in enumerate((2.5, 7.0), start=1):
+                path = root / "search" / f"root-{index}" / f"attempt-{index:02d}-result.json.zlib"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                value = {"result": {"complete": True, "wall_seconds": duration}}
+                driver.write_once(path, driver.zlib.compress(driver.canonical(value)))
+            self.assertEqual(driver._attempt_wall_seconds(root), [2.5, 7.0])
+            report1, policy1 = driver._pilot_artifact_paths("a" * 40, "b" * 40)
+            report2, policy2 = driver._pilot_artifact_paths("a" * 40, "c" * 40)
+            self.assertNotEqual(report1, report2)
+            self.assertNotEqual(policy1, policy2)
+
     def test_worker_concurrency_uses_completed_half_open_intervals(self):
         rows = [{"unit_id": unit_id} for unit_id in ("TRAIN-A", "TRAIN-B", "TRAIN-C")]
         with tempfile.TemporaryDirectory(dir=driver.STUDY) as temp:

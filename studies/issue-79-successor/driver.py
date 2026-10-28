@@ -1103,7 +1103,7 @@ def _max_concurrent_workers(root: Path, rows: list[dict]) -> int:
 
 def _attempt_wall_seconds(root: Path) -> list[float]:
     result = []
-    for path in root.glob("units/*/attempt-*/native/search/**/*.json.zlib"):
+    for path in root.glob("search/**/*-result.json.zlib"):
         try:
             value = json.loads(zlib.decompress(path.read_bytes()))
         except (OSError, ValueError, zlib.error):
@@ -1113,7 +1113,7 @@ def _attempt_wall_seconds(root: Path) -> list[float]:
             duration = trial.get("wall_seconds")
             if isinstance(duration, (int, float)) and math.isfinite(float(duration)):
                 result.append(float(duration))
-    return result
+    return sorted(result)
 
 
 def _percentile(values: list[float], pct: float) -> float | None:
@@ -1137,13 +1137,21 @@ def _distribution(values: list[float]) -> dict:
     }
 
 
+def _pilot_artifact_paths(package_commit: str, report_generator_commit: str) -> tuple[Path, Path]:
+    return (
+        ARTIFACTS / f"pilot-report-{package_commit}-{report_generator_commit}.json",
+        ARTIFACTS / f"time-policy-{package_commit}-{report_generator_commit}.json",
+    )
+
+
 def pilot(execution_commit: str | None = None) -> dict:
     report_generator_commit = source_commit()
     package_commit = execution_commit or report_generator_commit
     table = read_json(SEED_TABLE)
     root = ARTIFACTS / "pilot" / package_commit
-    final_path = ARTIFACTS / f"pilot-report-{package_commit}.json"
-    policy_path = ARTIFACTS / f"time-policy-{package_commit}.json"
+    final_path, policy_path = _pilot_artifact_paths(package_commit, report_generator_commit)
+    prior_report_path = ARTIFACTS / f"pilot-report-{package_commit}.json"
+    prior_policy_path = ARTIFACTS / f"time-policy-{package_commit}.json"
     if final_path.exists():
         return read_json(final_path)
     if package_commit != report_generator_commit:
@@ -1178,6 +1186,10 @@ def pilot(execution_commit: str | None = None) -> dict:
             eval_rows, root=root, pilot=True, clock=clock,
         ), package_commit)
         eval_wall = float(eval_phase["elapsed_active_seconds"])
+        training_reports = [existing_success(root, row) for row in training_rows]
+        evaluation_reports = [existing_success(root, row) for row in eval_rows]
+        if any(report is None for report in (*training_reports, *evaluation_reports)):
+            raise RuntimeError("successful pilot phase receipt lacks an immutable owner result")
         measured = clock.elapsed()
         train_projection = training_wall * (384 / len(training_rows))
         update_projection = update_wall * (32 / 16) * 3
@@ -1218,6 +1230,11 @@ def pilot(execution_commit: str | None = None) -> dict:
                 "report_generator_commit": report_generator_commit,
                 "source_lock_sha256": source_lock_sha(),
                 "seed_table_sha256": file_sha256(SEED_TABLE),
+                "supersedes_prior_unversioned_policy": (
+                    {"path": prior_policy_path.relative_to(STUDY).as_posix(),
+                     "sha256": file_sha256(prior_policy_path)}
+                    if prior_policy_path.is_file() else None
+                ),
                 "projection_seconds": projected,
                 "allowance_factor": ALLOWANCE_FACTOR,
                 "allowance_seconds": math.ceil(projected * ALLOWANCE_FACTOR),
@@ -1276,6 +1293,11 @@ def pilot(execution_commit: str | None = None) -> dict:
             "source_branch_sha": package_commit,
             "report_generator_commit": report_generator_commit,
             "source_lock_sha256": source_lock_sha(),
+            "supersedes_prior_unversioned_report": (
+                {"path": prior_report_path.relative_to(STUDY).as_posix(),
+                 "sha256": file_sha256(prior_report_path)}
+                if prior_report_path.is_file() else None
+            ),
             "verified_inheritance": inheritance,
             "configured_concurrency": CONCURRENCY,
             "concurrency_measurement": (
@@ -1303,6 +1325,13 @@ def pilot(execution_commit: str | None = None) -> dict:
                 "owner_arm_count": len(eval_rows),
                 "rows": eval_phase["result_summary"].get("row_wall_seconds", {}),
                 "tries": eval_phase["result_summary"].get("tries", {}),
+            },
+            "search_coverage": {
+                "training": _search_coverage(training_reports),
+                "five_arm_evaluation": _search_coverage(evaluation_reports),
+                "R_and_J_heldout": _search_coverage([
+                    report for report in evaluation_reports if report.get("arm") in {"R", "J"}
+                ]),
             },
             "total_pilot_active_seconds": measured,
             "complete_task_projection_seconds": projected,
@@ -1478,17 +1507,20 @@ def analyze(root: Path) -> dict:
     return report
 
 
-def formal(pilot_execution_commit: str | None = None) -> dict:
+def formal(
+    pilot_execution_commit: str | None = None,
+    pilot_report_generator_commit: str | None = None,
+) -> dict:
     package_commit = source_commit()
     pilot_commit = pilot_execution_commit or package_commit
+    report_generator_commit = pilot_report_generator_commit or package_commit
     final_path = ARTIFACTS / f"formal-analysis-{package_commit}.json"
     if final_path.exists():
         return read_json(final_path)
-    policy_path = ARTIFACTS / f"time-policy-{pilot_commit}.json"
+    pilot_report_path, policy_path = _pilot_artifact_paths(pilot_commit, report_generator_commit)
     if not policy_path.is_file():
-        raise RuntimeError("formal study requires the matching package commit's pilot-derived time policy")
+        raise RuntimeError("formal study requires the selected pilot's matching time policy")
     policy = read_json(policy_path)
-    pilot_report_path = ARTIFACTS / f"pilot-report-{pilot_commit}.json"
     if not pilot_report_path.is_file():
         raise RuntimeError("formal study requires the completed report for its selected pilot package")
     pilot_report = read_json(pilot_report_path)
@@ -1559,6 +1591,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=("prepare", "verify", "pilot", "formal"))
     parser.add_argument("--pilot-execution-commit", help="select a completed pilot with matching phase receipts")
+    parser.add_argument("--pilot-report-generator-commit", help="select the immutable report revision for the pilot")
     parser.add_argument("--worker", type=Path)
     args = parser.parse_args()
     if args.worker is not None:
@@ -1580,7 +1613,7 @@ def main() -> int:
         print(json.dumps(pilot(args.pilot_execution_commit), sort_keys=True))
         return 0
     if args.mode == "formal":
-        result = formal(args.pilot_execution_commit)
+        result = formal(args.pilot_execution_commit, args.pilot_report_generator_commit)
         print(json.dumps(result, sort_keys=True))
         return 0 if result.get("status") in {"COMPLETE", "BLOCK_COMPLETE"} else 2
     parser.error("select a mode or a worker job")
