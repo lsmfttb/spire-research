@@ -407,30 +407,79 @@ def load_modules(active_root: Path, *, pilot: bool):
 def verify_inheritance(active_root: Path | None = None) -> dict:
     active_root = active_root or (ARTIFACTS / "verify")
     algorithm, runtime, model, learning, executor = load_modules(active_root, pilot=False)
+    lock = read_json(SOURCE_LOCK)
+    if file_sha256(STUDY / "contract.json") != lock["contract_sha256"]:
+        raise RuntimeError("successor contract differs from its registered source lock")
+    if file_sha256(SEED_TABLE) != lock["seed_table_sha256"]:
+        raise RuntimeError("registered seed table differs from its source lock")
+    for relative, expected_sha in lock["source_reference"]["files_sha256"].items():
+        if file_sha256(STUDY75 / relative) != expected_sha:
+            raise RuntimeError(f"reviewed #75 source differs from the successor lock: {relative}")
+    if (STAGE1 / "config.json").read_bytes() != (STUDY75 / "stage1" / "config.json").read_bytes():
+        raise RuntimeError("copied Stage 1 config differs from its reviewed source bytes")
     config = read_json(STUDY75 / "config.json")
+    external = config["source"]
+    for key in ("sts_lightspeed_commit", "stsr_source_commit", "native_module_sha256", "native_module_path"):
+        if external.get(key) != lock["external_runtime"][key]:
+            raise RuntimeError(f"pinned external source identity differs from the source lock: {key}")
     runtime.verify_source_repositories(config)
     native = runtime.verify_native_module(config)
+    native_sha = file_sha256(native)
+    if native_sha != lock["external_runtime"]["native_module_sha256"]:
+        raise RuntimeError("loaded native module bytes differ from the successor source lock")
     loaded, digest, _ = executor._load_model("pi1")
     manifest = read_json(RETAINED / "retention-manifest.json")
-    if digest != "33b3d3d891e53b7434919318ccb1c8411a0bebe1e2e48616ef040206261db557":
+    manifest_result = manifest.get("result", {})
+    if digest != lock["inherited_pi1"]["model_digest"]:
         raise RuntimeError("inherited pi1 parameter digest differs from the retained scientific artifact")
-    if file_sha256(RETAINED / "pi1.pt") != read_json(SOURCE_LOCK)["inherited_pi1"]["model_sha256"]:
-        raise RuntimeError("inherited pi1 bytes differ from the committed source lock")
-    if not native.is_file():
-        raise RuntimeError("pinned native module disappeared")
+    for path, key in (
+        (RETAINED / "pi1.pt", "model_sha256"),
+        (RETAINED / "block-0-step.pt", "optimizer_sha256"),
+        (RETAINED / "retention-manifest.json", "manifest_sha256"),
+    ):
+        if file_sha256(path) != lock["inherited_pi1"][key]:
+            raise RuntimeError(f"retained inherited bytes differ from their source lock: {path.name}")
+    if manifest_result.get("pi1_state_digest") != digest:
+        raise RuntimeError("retention manifest does not bind the inherited pi1 state digest")
+    if manifest_result.get("optimizer_parameter_steps") != [64] or manifest_result.get("expert_decisions") != 0:
+        raise RuntimeError("retention manifest does not establish the no-Expert 64-step pi1 lineage")
+    import torch
+    optimizer_state = torch.load(RETAINED / "block-0-step.pt", map_location="cpu", weights_only=True)
+    if optimizer_state.get("completed_steps") != 64 or optimizer_state.get("schema_id") != "issue75-policy-block-step-checkpoint-v1":
+        raise RuntimeError("retained 64-step optimizer checkpoint is not loadable or has an unexpected schema")
+    checkpoint_model = optimizer_state.get("model_state_dict", {})
+    loaded_model = loaded.state_dict()
+    if checkpoint_model.keys() != loaded_model.keys() or any(
+        not torch.equal(checkpoint_model[key], loaded_model[key]) for key in loaded_model
+    ):
+        raise RuntimeError("retained optimizer checkpoint model bytes do not match inherited pi1")
+    if not optimizer_state.get("optimizer_state_dict", {}).get("state"):
+        raise RuntimeError("retained optimizer state is empty")
+    parameter_count = sum(parameter.numel() for parameter in loaded.parameters())
+    if parameter_count != lock["model_width_and_input"]["trainable_parameters"]:
+        raise RuntimeError("inherited pi1 parameter count differs from the registered architecture")
     return {
         "python": sys.version.split()[0],
-        "torch": __import__("torch").__version__,
+        "torch": torch.__version__,
         "numpy": __import__("numpy").__version__,
-        "native_module_sha256": file_sha256(native),
+        "reviewed_source_commit": lock["source_reference"]["commit"],
+        "reviewed_source_files_sha256": lock["source_reference"]["files_sha256"],
+        "external_source_commits": {
+            "sts_lightspeed": external["sts_lightspeed_commit"],
+            "stsr_source": external["stsr_source_commit"],
+        },
+        "native_module_sha256": native_sha,
         "pi1_file_sha256": file_sha256(RETAINED / "pi1.pt"),
         "pi1_model_digest": digest,
         "pi1_optimizer_sha256": file_sha256(RETAINED / "block-0-step.pt"),
+        "optimizer_checkpoint_completed_steps": optimizer_state["completed_steps"],
+        "optimizer_checkpoint_model_matches_pi1": True,
         "pi1_manifest_sha256": file_sha256(RETAINED / "retention-manifest.json"),
-        "retention_manifest_pi1_digest": manifest.get("result", {}).get("pi1_state_digest"),
-        "retention_optimizer_steps": manifest.get("result", {}).get("optimizer_parameter_steps"),
-        "retention_no_expert_decisions": manifest.get("result", {}).get("expert_decisions"),
-        "trainable_parameters": sum(parameter.numel() for parameter in loaded.parameters()),
+        "retention_manifest_pi1_digest": manifest_result["pi1_state_digest"],
+        "retention_optimizer_steps": manifest_result["optimizer_parameter_steps"],
+        "retention_no_expert_decisions": manifest_result["expert_decisions"],
+        "trainable_parameters": parameter_count,
+        "source_lock_sha256": source_lock_sha(),
     }
 
 
