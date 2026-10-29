@@ -200,6 +200,15 @@ def registered_arm_policy(phase,arm,row,fallback):
  if arm in policies: return policies[arm]
  return fallback(phase,arm,row)
 
+def native_controller_arm(arm):
+ # The Issue 79 executor's registered labels are BASE/PGONLY/JTRAIN, but the
+ # shared native controller accepts only P0/P1 (and the other Issue 79 arms).
+ # JTRAIN uses P1 here because this evaluation loads the frozen JTRAIN model
+ # without invoking the online J search procedure.
+ policies={"BASE":"P0","PGONLY":"P1","JTRAIN":"P1"}
+ try: return policies[arm]
+ except KeyError as exc: raise ValueError(f"unregistered Issue 81 evaluation arm for native controller: {arm}") from exc
+
 def patch_modules(root,*,pilot=False):
  global ACTIVE_BLOCK
  alg,rt,model,learn,ex=ORIGINAL_LOAD(root,pilot=pilot)
@@ -267,10 +276,11 @@ def patch_modules(root,*,pilot=False):
  def no_search_init(out,*,sampling,reviewer_proof=None,stage1_binding=None):
   cfg,runner,native,encoder=init(out,sampling=False,reviewer_proof=None,stage1_binding=None); oldrun=runner._run_one
   def natural(*a,**kw):
-   call=dict(kw); call["root_callback"]=None; call["capture_checkpoints"]=False; call["capture_root_limit"]=None
+   call=dict(kw); registered_arm=str(call.get("arm")); call["arm"]=native_controller_arm(registered_arm)
+   call["root_callback"]=None; call["capture_checkpoints"]=False; call["capture_root_limit"]=None
    result=oldrun(*a,**call); attempt=Path(call["out"]).parent
    writej(attempt/"natural-owner-observation.json",{"schema_id":"issue81-natural-owner-observation-v1",
-   "arm":str(call.get("arm")),"seed":int(call["seed"]),"completed_transitions":int(result.get("completed_transitions",0)),
+   "arm":registered_arm,"controller_arm":str(call.get("arm")),"seed":int(call["seed"]),"completed_transitions":int(result.get("completed_transitions",0)),
    "screen_counts":result.get("screen_counts") if isinstance(result.get("screen_counts"),dict) else None,"action_kind_counts":result.get("action_kind_counts") if isinstance(result.get("action_kind_counts"),dict) else None,"native_result_keys":sorted(str(k) for k in result),"search_root_callback":False})
    return result
   runner._run_one=natural; return cfg,runner,native,encoder
@@ -288,6 +298,64 @@ def worker(job_path):
   writej(path/"attempt-resource.json",{"schema_id":"issue81-attempt-resource-v1","unit_id":job.get("unit_id"),
   "run_id":job.get("run_id"),"worker_pid":os.getpid(),"exit_code":code,"process_tree_cpu_seconds":cpu,
   "worker_wall_seconds":max(0.,time.monotonic()-start),"status":"SUCCEEDED" if code==0 else "FAILED"})
+
+def run_smoke_once(rows,*,root,clock,package_commit):
+ start=time.monotonic(); complete={}; row_wall={}; native_wall={}; tries={}
+ python=str(D.PINNED_PYTHON); env=os.environ.copy()
+ for name in ("STS_LIGHTSPEED_SOURCE_DIR","STSRL_SOURCE_DIR"):
+  if not env.get(name): raise RuntimeError(f"{name} must name the exact pinned source worktree")
+ for row in rows:
+  unit=row["unit_id"]; saved=D.existing_success(root,row,package_commit)
+  if saved is not None:
+   complete[unit]=saved; tries[unit]=1
+   wall=float(saved.get("resource",{}).get("worker_wall_seconds",0.0)); row_wall[unit]=wall; native_wall[unit]=wall
+   continue
+  base=root/"units"/D.unit_key(unit)
+  prior=sorted(base.glob("attempt-*")) if base.exists() else []
+  if prior:
+   return {"status":"PRIOR_FAILED_ATTEMPT_EXISTS","completed":len(complete),"results":complete,
+    "remaining":[r["unit_id"] for r in rows if r["unit_id"] not in complete],"tries":tries,
+    "elapsed_seconds":time.monotonic()-start}
+  base.mkdir(parents=True,exist_ok=True); attempt=base/"attempt-0001"; attempt.mkdir(exist_ok=False)
+  job={"schema_id":"issue79-owner-worker-job-v1","artifact_root":str(root),"attempt_dir":str(attempt),
+   "result_path":str(attempt/"result.json"),"output_dir":str(attempt/"native"),
+   "run_id":f"{unit}-attempt-0001","unit_id":unit,"phase":row["phase"],"row":row,"pilot":False,
+   "package_commit":package_commit,"runner_code_commit":package_commit,"source_lock_sha256":D.source_lock_sha()}
+  job_path=attempt/"worker-job.json"; D.write_json_once(job_path,job); log=(attempt/"worker.log").open("ab")
+  process=subprocess.Popen([python,str(Path(__file__).resolve()),"--worker",str(job_path)],cwd=REPO,env=env,
+   stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+  if clock is not None: clock.set_processes({process.pid})
+  try:
+   while True:
+    if clock is not None and clock.expired():
+     try: os.killpg(process.pid,signal.SIGTERM)
+     except ProcessLookupError: pass
+     try: process.wait(timeout=10)
+     except subprocess.TimeoutExpired:
+      try: os.killpg(process.pid,signal.SIGKILL)
+      except ProcessLookupError: pass
+      process.wait()
+     D.write_json_once(attempt/"global-wall-stop.json",{"schema_id":"issue79-global-wall-stop-v1",
+      "unit_id":unit,"run_id":job["run_id"],"allowance_seconds":clock.allowance,
+      "cumulative_active_seconds":clock.elapsed()})
+     return {"status":"GLOBAL_ACTIVE_WALL_ALLOWANCE_EXCEEDED","completed":len(complete),"results":complete,
+      "remaining":[r["unit_id"] for r in rows if r["unit_id"] not in complete],"tries":tries,
+      "elapsed_seconds":time.monotonic()-start}
+    code=process.poll()
+    if code is not None: break
+    time.sleep(0.25)
+  finally:
+   log.close()
+   if clock is not None: clock.set_processes(set())
+  result=D.read_json(job["result_path"]) if Path(job["result_path"]).exists() else None
+  if not result or result.get("status")!="SUCCEEDED":
+   return {"status":"SMOKE_WORKER_FAILED","completed":len(complete),"results":complete,
+    "remaining":[r["unit_id"] for r in rows if r["unit_id"] not in complete],"tries":{**tries,unit:1},
+    "failed_unit":unit,"worker_exit_code":code,"elapsed_seconds":time.monotonic()-start}
+  complete[unit]=result; tries[unit]=1
+  wall=float(result.get("resource",{}).get("worker_wall_seconds",0.0)); row_wall[unit]=wall; native_wall[unit]=wall
+ return {"status":"SUCCEEDED","completed":len(complete),"results":complete,"tries":tries,
+  "row_wall_seconds":row_wall,"native_wall_seconds_by_unit":native_wall,"elapsed_seconds":time.monotonic()-start}
 
 def verify_models(ex):
  import torch
@@ -639,6 +707,7 @@ def run_evaluation_only():
    "runner_code_commit":package,"source_lock_sha256":fsha(LOCK),
    "evaluation_only_contract_sha256":fsha(EVALUATION_ONLY_CONTRACT),
    "parent_failed_package_commit":"7ff0fcaf3fb53c6aaeb26a6b960345a320d25e51",
+   "previous_evaluation_only_package_commit":"b36683920b38c8cc41c6ebc6a401835599cf7b5d",
    "parent_training_model_sha256":EXPECT["pg_sha"],"optimizer_checkpoint_sha256":EXPECT["pg_opt"],
    "clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE,
    "model_identities":identity["models"],"registered_seed_table_sha256":fsha(SEEDS)}
@@ -647,7 +716,7 @@ def run_evaluation_only():
    "package_commit":package,"source_lock_sha256":fsha(LOCK),"supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID,
    "allowance_seconds":SUPPLEMENTAL_ALLOWANCE,"active_wall_seconds":clock.elapsed(),"identity":identity,
    "smoke_seeds":list(SMOKE_SEEDS),"heldout_units":len(plan["heldout"])})
-  smoke=D.run_units(plan["smoke"],root=root,pilot=False,clock=clock,package_commit=package)
+  smoke=run_smoke_once(plan["smoke"],root=root,clock=clock,package_commit=package)
   if smoke.get("status")!="SUCCEEDED" or smoke.get("completed")!=len(plan["smoke"]):
    out={"status":"SMOKE_INCOMPLETE","smoke_expected":len(plan["smoke"]),
     "active_wall_seconds":clock.elapsed(),"attempt_summary":partial_unit_summary(root,plan["smoke"],package)}

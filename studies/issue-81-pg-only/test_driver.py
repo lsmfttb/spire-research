@@ -63,4 +63,16 @@ class ContractTests(unittest.TestCase):
  def test_unregistered_eval_arm_uses_fallback(self):
   fallback=lambda phase,arm,row:("fallback",phase,arm,row["phase"])
   self.assertEqual(d.registered_arm_policy("heldout","OTHER",{"phase":"heldout"},fallback),("fallback","heldout","OTHER","heldout"))
+ def test_registered_eval_arms_map_to_native_controller_labels_without_search(self):
+  self.assertEqual({arm:d.native_controller_arm(arm) for arm in ("BASE","PGONLY","JTRAIN")},
+   {"BASE":"P0","PGONLY":"P1","JTRAIN":"P1"})
+  with self.assertRaisesRegex(ValueError,"unregistered Issue 81 evaluation arm"):
+   d.native_controller_arm("R")
+ def test_diagnostic_smoke_stops_after_one_failed_worker_attempt(self):
+  source=inspect.getsource(d.run_smoke_once)
+  self.assertNotIn("D.run_units",source)
+  self.assertIn("PRIOR_FAILED_ATTEMPT_EXISTS",source)
+  self.assertIn("SMOKE_WORKER_FAILED",source)
+  main=inspect.getsource(d.run_evaluation_only)
+  self.assertIn("run_smoke_once",main)
 if __name__=="__main__": unittest.main()
