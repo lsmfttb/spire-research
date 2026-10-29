@@ -29,4 +29,12 @@ class ContractTests(unittest.TestCase):
   self.assertIn("FileNotFoundError",result.stderr)
  def test_worker_module_loader_accepts_pilot_keyword(self):
   self.assertIn("pilot",inspect.signature(d.patch_modules).parameters)
+ def test_registered_eval_arms_do_not_eagerly_call_fallback(self):
+  def fail(*_args): raise AssertionError("fallback must not run for a registered arm")
+  for arm,expected in (("BASE",("pi1",False)),("PGONLY",("pi4",False)),("JTRAIN",("jtrain",False))):
+   self.assertEqual(d.registered_arm_policy("heldout",arm,{"phase":"heldout"},fail),expected)
+  self.assertEqual(d.registered_arm_policy("training","TRAIN",{"phase":"training","block_index":3},fail),("pi3",False))
+ def test_unregistered_eval_arm_uses_fallback(self):
+  fallback=lambda phase,arm,row:("fallback",phase,arm,row["phase"])
+  self.assertEqual(d.registered_arm_policy("heldout","OTHER",{"phase":"heldout"},fallback),("fallback","heldout","OTHER","heldout"))
 if __name__=="__main__": unittest.main()
