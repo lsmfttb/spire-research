@@ -19,6 +19,7 @@ BUNDLE=STUDY79/"artifacts/issue79-formal-review-bundle-968309e7de0132e3ec763c3c7
 RAW79=Path("/mnt/d/DeadlycatCoding/stsrl-data/issue79/formal-raw-968309e7de0132e3ec763c3c7dc036a2da472285.tar")
 TRAIN=tuple(range(7600001,7600385)); EVAL=tuple(range(7640001,7640097))
 ARMS=("BASE","PGONLY","JTRAIN"); ALLOWANCE=3784.5
+PREVIOUS_PACKAGE="a7d6df2ee635ccd14b37365c21b5a4bafabb5379"
 EXPECT={"pi1_sha":"d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21978",
 "pi1_digest":"33b3d3d891e53b7434919318ccb1c8411a0bebe1e2e48616ef040206261db557",
 "pi1_opt":"7bdff6bdd14d8bf5bdcd1cf286e687b5a6df4ef6c11f80bad1ee18787e40f514",
@@ -362,6 +363,33 @@ def action_coverage(root,outcomes):
    "coverage_limitation":"counts are reported only when exposed by the pinned native result"}
  return sums
 
+def preexecution_failure_summary():
+ root=ART/"formal"/PREVIOUS_PACKAGE
+ logs=sorted(root.glob("units/TRAIN-*/attempt-*/worker.log"))
+ attempts_per_owner={}; log_hashes={}; cli_errors=0
+ for path in logs:
+  owner=path.parent.parent.name
+  attempts_per_owner[owner]=attempts_per_owner.get(owner,0)+1
+  digest=fsha(path); log_hashes[digest]=log_hashes.get(digest,0)+1
+  if "the following arguments are required: --mode" in path.read_text(encoding="utf-8",errors="replace"):
+   cli_errors+=1
+ hist={}
+ for count in attempts_per_owner.values():
+  hist[str(count)]=hist.get(str(count),0)+1
+ progress_path=root/"progress.json"
+ progress=readj(progress_path) if progress_path.is_file() else {}
+ started=sum(1 for _ in root.rglob("started.json"))
+ results=sum(1 for _ in root.rglob("result.json"))
+ resources=sum(1 for _ in root.rglob("attempt-resource.json"))
+ return {"previous_package_commit":PREVIOUS_PACKAGE,"previous_progress_status":progress.get("status"),
+  "previous_active_wall_seconds":progress.get("active_wall_seconds"),"worker_log_count":len(logs),
+  "distinct_training_owner_units":len(attempts_per_owner),"attempts_per_owner_histogram":hist,
+  "cli_missing_mode_error_count":cli_errors,"worker_log_sha256_counts":log_hashes,
+  "worker_started_receipt_count":started,"result_receipt_count":results,
+  "attempt_resource_receipt_count":resources,
+  "simulator_worker_started":bool(started or results or resources),
+  "classification":"launcher CLI rejected every recorded worker invocation before worker_main" if logs and cli_errors==len(logs) and not (started or results or resources) else "REVIEW_REQUIRED"}
+
 def analyze(root,package):
  outcomes=[]
  for seed in EVAL:
@@ -390,6 +418,7 @@ def analyze(root,package):
  "owner_arm_count":len(outcomes),"registered_owner_arm_count":288,"primary_contrast":"JTRAIN-PGONLY terminal-floor paired owner bootstrap",
  "per_arm":per,"contrasts":contrasts,"evaluation_owner_arm_outcomes":outcomes,
  "noncombat_action_coverage":action_coverage(root,outcomes),"attempt_resources":attempts_summary(root),
+ "preexecution_failure_summary":preexecution_failure_summary(),
  "training_updates":[readj(root/"models"/f"issue81-update-{i}.json") for i in (1,2,3) if (root/"models"/f"issue81-update-{i}.json").is_file()],
  "first_boss_qualification":{"act2_reach_is_directly_reported":True,"floor16_proves_first_boss_death":False,
  "terminal_hp_potions_deck":"not retained in compact #79 terminal receipt; not inferred"},
@@ -430,7 +459,7 @@ def run_formal():
   writej(root/f"analysis-{package}.json",report)
   compact={k:report[k] for k in ("schema_id","status","package_commit","source_lock_sha256","owner_arm_count",
    "primary_contrast","per_arm","contrasts","noncombat_action_coverage","attempt_resources","training_updates",
-   "first_boss_qualification","j_elite_mechanism_note","limitations")}
+   "first_boss_qualification","j_elite_mechanism_note","preexecution_failure_summary","limitations")}
   compact["retained_raw_root"]=str(root); compact["durable_data_root"]=str(DATA)
   write_once(STUDY/"results-summary.json",canon(compact)+b"\n")
   atomicj(progress,{"schema_id":"issue81-progress-v1","status":"COMPLETE","package_commit":package,"owner_arm_count":288,
@@ -443,8 +472,9 @@ def run_formal():
  finally: clock.close()
 
 def main():
- p=argparse.ArgumentParser(); p.add_argument("--mode",choices=("prepare","verify","formal"),required=True); p.add_argument("--worker",type=Path); a=p.parse_args()
+ p=argparse.ArgumentParser(); p.add_argument("--mode",choices=("prepare","verify","formal")); p.add_argument("--worker",type=Path); a=p.parse_args()
  if a.worker: return worker(a.worker)
+ if a.mode is None: p.error("--mode is required unless --worker is used")
  if a.mode=="prepare": print(json.dumps(prepare(),sort_keys=True)); return 0
  if a.mode=="verify": print(json.dumps(verify(),sort_keys=True)); return 0
  result=run_formal(); print(json.dumps(result,sort_keys=True)); return 0 if result.get("status")=="COMPLETE" else 2

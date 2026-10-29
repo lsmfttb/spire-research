@@ -1,6 +1,6 @@
 import importlib.util
 from pathlib import Path
-import unittest
+import unittest, subprocess, sys
 p=Path(__file__).with_name("driver.py")
 s=importlib.util.spec_from_file_location("issue81_driver_test",p)
 d=importlib.util.module_from_spec(s); s.loader.exec_module(d)
@@ -22,4 +22,9 @@ class ContractTests(unittest.TestCase):
  def test_search_guard_and_zero_elite_are_wired(self):
   source=p.read_text(); self.assertIn("Issue 81 forbids every search call",source)
   self.assertIn("PGONLY performed a nonzero elite update",source)
+ def test_worker_entry_does_not_require_mode(self):
+  missing=p.with_name("missing-worker-job-for-cli-test.json")
+  result=subprocess.run([sys.executable,str(p),"--worker",str(missing)],capture_output=True,text=True)
+  self.assertNotIn("the following arguments are required: --mode",result.stderr)
+  self.assertIn("FileNotFoundError",result.stderr)
 if __name__=="__main__": unittest.main()
