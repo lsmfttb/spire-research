@@ -14,6 +14,32 @@ class ContractTests(unittest.TestCase):
   self.assertTrue(all(not r["search_invocation_seeds"] for r in t["rows"]))
   for owner in range(7640001,7640097):
    self.assertEqual(len({r["policy_rng_seed"] for r in ev if r["owner_seed"]==owner}),3)
+ def test_evaluation_only_plan_reuses_only_registered_heldout_rows(self):
+  plan=d.evaluation_only_plan()
+  self.assertEqual(len(plan["smoke"]),3)
+  self.assertEqual(len(plan["heldout"]),288)
+  self.assertEqual({r["owner_seed"] for r in plan["smoke"]},set(d.SMOKE_SEEDS))
+  self.assertTrue(all(r["formal"] is False and r["search_invocation_seeds"]==[] for r in plan["smoke"]))
+  self.assertTrue(all(r["formal"] is True and r["search_invocation_seeds"]==[] for r in plan["heldout"]))
+  self.assertTrue(set(d.SMOKE_SEEDS).isdisjoint(set(d.TRAIN)|set(d.EVAL)))
+  self.assertEqual({r["owner_seed"] for r in plan["heldout"]},set(d.EVAL))
+ def test_evaluation_only_entrypoint_cannot_train(self):
+  source=inspect.getsource(d.run_evaluation_only)
+  self.assertNotIn("run_formal",source)
+  self.assertFalse(hasattr(d,"run_formal"))
+  self.assertNotIn("train_update",source)
+  self.assertNotIn("rows_for(table,\"training\"",source)
+  self.assertIn("SUPPLEMENTAL_ALLOWANCE",source)
+ def test_supplemental_authorization_is_evaluation_only(self):
+  c=d.evaluation_only_contract()
+  self.assertEqual(c["supplemental_clock"]["allowance_seconds"],1800.0)
+  self.assertTrue(c["no_training_loop"])
+  self.assertTrue(c["no_optimizer_updates"])
+  self.assertEqual(c["original_clock"]["elapsed_seconds"],3784.857659886001)
+ def test_formal_training_cli_is_not_available(self):
+  result=subprocess.run([sys.executable,str(p),"--mode","formal"],capture_output=True,text=True)
+  self.assertNotEqual(result.returncode,0)
+  self.assertIn("invalid choice",result.stderr)
  def test_registered_allowance(self):
   c=d.contract(); self.assertGreaterEqual(c["resource"]["allowance_factor"],1.5)
   self.assertLessEqual(c["resource"]["allowance_factor"],2.0)

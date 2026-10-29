@@ -19,6 +19,10 @@ BUNDLE=STUDY79/"artifacts/issue79-formal-review-bundle-968309e7de0132e3ec763c3c7
 RAW79=Path("/mnt/d/DeadlycatCoding/stsrl-data/issue79/formal-raw-968309e7de0132e3ec763c3c7dc036a2da472285.tar")
 TRAIN=tuple(range(7600001,7600385)); EVAL=tuple(range(7640001,7640097))
 ARMS=("BASE","PGONLY","JTRAIN"); ALLOWANCE=3784.5
+SUPPLEMENTAL_CLOCK_ID="issue81-eval-supplement-20261030"; SUPPLEMENTAL_ALLOWANCE=1800.0
+SMOKE_SEEDS=(7699001,7699002,7699003)
+PGONLY_ROOT=ART/"formal"/"7ff0fcaf3fb53c6aaeb26a6b960345a320d25e51"
+EVALUATION_ONLY_CONTRACT=STUDY/"evaluation-only-contract.json"
 PREVIOUS_PACKAGES=("a7d6df2ee635ccd14b37365c21b5a4bafabb5379","a623cb1087221b953bd100099077c0effb6f34b3","7ff0fcaf3fb53c6aaeb26a6b960345a320d25e51")
 EXPECT={"pi1_sha":"d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21978",
 "pi1_digest":"33b3d3d891e53b7434919318ccb1c8411a0bebe1e2e48616ef040206261db557",
@@ -26,6 +30,9 @@ EXPECT={"pi1_sha":"d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21
 "j_sha":"36e7dfdc78d3409eb65b2db05f6c6df5821330f502cbbd286bf191e39456eb57",
 "j_digest":"521079ea9cb3e57f8b27057f37d6ecfc9181290f532713c18d307d79849704f5",
 "j_opt":"622bbc288f2fa405060065af2a45ebdbc72dd8601ac7c3a257a2bf22a4020b6e",
+"pg_sha":"ae90cd8f96c06f4cbe6cd5133e1c827530cba2d043cb02d07dcf53fe2945c78f",
+"pg_digest":"3eac3177892778192309262e2c4a42734c3a30fa3b742f3ab2732bdd5b9810ce",
+"pg_opt":"80d15b396083e0194544838bdb79728c83075e2c14d29257377307be424cea77",
 "native":"bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
 "sts":"8ded44c7ee341f48bb1bd49eeaa6cf6bc0384b2","stsr":"7d172f7c24c9d29429b6946ba44f6b59760b0d96"}
 def canon(v): return json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False).encode()
@@ -119,6 +126,27 @@ def extract_ref(member,dest,expected):
  if sha(p.stdout)!=expected: raise RuntimeError(f"bundle source digest mismatch: {member}")
  write_once(dest,p.stdout)
 
+def evaluation_only_contract():
+ return {"schema_id":"issue81-evaluation-only-amendment-v1","study_id":"issue-81-pgonly-j-elite-ablation",
+ "authorization_comment":"https://github.com/lsmfttb/spire-research/issues/81#issuecomment-6505214689",
+ "execution_mode":"evaluation_only","no_training_loop":True,"no_optimizer_updates":True,
+ "original_failed_package_commit":"7ff0fcaf3fb53c6aaeb26a6b960345a320d25e51",
+ "original_clock":{"id":"issue81-global","elapsed_seconds":3784.857659886001,"allowance_seconds":3784.5,"immutable":True},
+ "supplemental_clock":{"id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE,
+ "one_clock_covers_smoke_heldout_failures_and_retries":True,"concurrent_overlap_counted_once":True},
+ "diagnostic_smoke":{"owner_seeds":list(SMOKE_SEEDS),"arms":list(ARMS),"formal":False,
+ "outside_training_and_heldout_populations":True,"efficacy_cohort":False},
+ "heldout":{"seed_table_sha256":fsha(SEEDS),"owners":96,"arms":list(ARMS),"expected_terminals":288,
+ "reuses_original_registered_rows_and_streams":True,"online_search":"none"},
+ "models":{"BASE":{"path":str(PI1ROOT/"models/pi1.pt"),"sha256":EXPECT["pi1_sha"],"state_digest":EXPECT["pi1_digest"],
+ "optimizer_sha256":EXPECT["pi1_opt"]},
+ "PGONLY":{"path":str(PGONLY_ROOT/"models/pi4.pt"),"sha256":EXPECT["pg_sha"],"state_digest":EXPECT["pg_digest"],
+ "optimizer_path":str(PGONLY_ROOT/"models/block-3-step.pt"),"optimizer_sha256":EXPECT["pg_opt"]},
+ "JTRAIN":{"path":str(REF/"jtrain-pi4.pt"),"sha256":EXPECT["j_sha"],"state_digest":EXPECT["j_digest"],
+ "optimizer_sha256":EXPECT["j_opt"]}},
+ "native_module_sha256":EXPECT["native"],"sts_lightspeed_commit":EXPECT["sts"],"stsr_source_commit":EXPECT["stsr"],
+ "preserve_prior_package_roots":list(PREVIOUS_PACKAGES)}
+
 def prepare():
  mb=subprocess.run(["git","merge-base","HEAD",BASE],cwd=REPO,check=True,text=True,capture_output=True).stdout.strip()
  if mb!=BASE: raise RuntimeError(f"task branch not based on exact #79 SHA: {mb}")
@@ -129,6 +157,11 @@ def prepare():
  cfg=readj(STUDY75/"config.json"); set_native(cfg); config_bytes=canon(cfg)+b"\n"
  write_once(STUDY/"config.json",config_bytes); write_once(STAGE1/"config.json",stage_bytes)
  write_once(SEEDS,canon(seed_table())+b"\n"); write_once(CONTRACT,canon(contract())+b"\n")
+ pgo_model=PGONLY_ROOT/"models/pi4.pt"; pgo_opt=PGONLY_ROOT/"models/block-3-step.pt"
+ if fsha(pgo_model)!=EXPECT["pg_sha"] or fsha(pgo_opt)!=EXPECT["pg_opt"]: raise RuntimeError("retained PGONLY model/checkpoint identity mismatch")
+ pgo_audit=readj(PGONLY_ROOT/"models/issue81-update-3.json")
+ if pgo_audit.get("model_sha256")!=EXPECT["pg_sha"] or pgo_audit.get("checkpoint_sha256")!=EXPECT["pg_opt"] or pgo_audit.get("result_model_digest")!=EXPECT["pg_digest"] or pgo_audit.get("completed_steps")!=64 or pgo_audit.get("elite_loss_sum")!=0.0 or pgo_audit.get("elite_gradient_norm_sum")!=0.0: raise RuntimeError("retained PGONLY training audit does not bind the approved frozen model")
+ write_once(EVALUATION_ONLY_CONTRACT,canon(evaluation_only_contract())+b"\n")
  lock79=readj(STUDY79/"source-lock.json"); refs=lock79["source_reference"]["files_sha256"]
  actual={p:fsha(STUDY75/p) for p in refs}
  if actual!=refs: raise RuntimeError("#75 files differ from #79 locked source")
@@ -141,8 +174,10 @@ def prepare():
  "stsr_source_commit":runtime_source["stsr_source_commit"],"native_module_sha256":fsha(NATIVE),"native_module_path":str(NATIVE)},
  "models":{"pi1_sha256":fsha(PI1ROOT/"models/pi1.pt"),"pi1_optimizer_sha256":fsha(PI1ROOT/"models/block-0-step.pt"),
  "retention_manifest_sha256":fsha(PI1ROOT/"retention-manifest.json"),"jtrain_sha256":fsha(REF/"jtrain-pi4.pt"),
- "jtrain_optimizer_sha256":fsha(REF/"jtrain-block-3-step.pt")},
+ "jtrain_optimizer_sha256":fsha(REF/"jtrain-block-3-step.pt"),"pgonly_sha256":fsha(PGONLY_ROOT/"models/pi4.pt"),"pgonly_optimizer_sha256":fsha(PGONLY_ROOT/"models/block-3-step.pt")},
+ "supplemental_evaluation":{"clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE,"evaluation_only":True,"smoke_seeds":list(SMOKE_SEEDS)},
  "code_sha256":fsha(STUDY/"driver.py"),"launcher_sha256":fsha(STUDY/"run_issue81.sh"),"contract_sha256":fsha(CONTRACT),
+ "evaluation_only_contract_sha256":fsha(EVALUATION_ONLY_CONTRACT),
  "seed_table_sha256":fsha(SEEDS),"config_sha256":fsha(STUDY/"config.json"),
  "stage1_config_sha256":fsha(STAGE1/"config.json"),"allowance_seconds":ALLOWANCE,"strict_elite_only_removal":True}
  writej(LOCK,lock)
@@ -151,11 +186,12 @@ def prepare():
 def check_lock():
  l=readj(LOCK)
  for key,path in (("code_sha256",STUDY/"driver.py"),("launcher_sha256",STUDY/"run_issue81.sh"),("contract_sha256",CONTRACT),("seed_table_sha256",SEEDS),
- ("config_sha256",STUDY/"config.json"),("stage1_config_sha256",STAGE1/"config.json"),
+ ("config_sha256",STUDY/"config.json"),("stage1_config_sha256",STAGE1/"config.json"),("evaluation_only_contract_sha256",EVALUATION_ONLY_CONTRACT),
  ("issue79_driver_sha256",STUDY79/"driver.py"),("issue79_source_lock_sha256",STUDY79/"source-lock.json")):
   if fsha(path)!=l[key]: raise RuntimeError(f"locked file changed: {path}")
  for p,h in l["issue75_files_sha256"].items():
   if fsha(STUDY75/p)!=h: raise RuntimeError(f"#75 source lock mismatch: {p}")
+ if fsha(PGONLY_ROOT/"models/pi4.pt")!=l["models"]["pgonly_sha256"] or fsha(PGONLY_ROOT/"models/block-3-step.pt")!=l["models"]["pgonly_optimizer_sha256"]: raise RuntimeError("retained PGONLY model/checkpoint changed after source lock")
  return l
 
 def registered_arm_policy(phase,arm,row,fallback):
@@ -173,6 +209,7 @@ def patch_modules(root,*,pilot=False):
  def model_path(label):
   if label=="pi1": return PI1ROOT/"models/pi1.pt"
   if label=="jtrain": return REF/"jtrain-pi4.pt"
+  if label=="pi4": return PGONLY_ROOT/"models/pi4.pt"
   return oldpath(label)
  ex._model_path=model_path
  oldarm=ex._arm_policy
@@ -254,19 +291,23 @@ def worker(job_path):
 
 def verify_models(ex):
  import torch
- a,ad,_=ex._load_model("pi1"); j,jd,_=ex._load_model("jtrain")
- ap=PI1ROOT/"models/block-0-step.pt"; jp=REF/"jtrain-block-3-step.pt"
- ast=torch.load(ap,map_location="cpu",weights_only=True); jst=torch.load(jp,map_location="cpu",weights_only=True)
+ a,ad,_=ex._load_model("pi1"); p,pd,_=ex._load_model("pi4"); j,jd,_=ex._load_model("jtrain")
+ ap=PI1ROOT/"models/block-0-step.pt"; pp=PGONLY_ROOT/"models/block-3-step.pt"; jp=REF/"jtrain-block-3-step.pt"
+ ast=torch.load(ap,map_location="cpu",weights_only=True); pst=torch.load(pp,map_location="cpu",weights_only=True); jst=torch.load(jp,map_location="cpu",weights_only=True)
+ audit=readj(PGONLY_ROOT/"models/issue81-update-3.json")
  if fsha(PI1ROOT/"models/pi1.pt")!=EXPECT["pi1_sha"] or ad!=EXPECT["pi1_digest"]: raise RuntimeError("pi1 identity mismatch")
+ if fsha(PGONLY_ROOT/"models/pi4.pt")!=EXPECT["pg_sha"] or pd!=EXPECT["pg_digest"]: raise RuntimeError("PGONLY identity mismatch")
  if fsha(REF/"jtrain-pi4.pt")!=EXPECT["j_sha"] or jd!=EXPECT["j_digest"]: raise RuntimeError("JTRAIN identity mismatch")
- if ast.get("completed_steps")!=64 or jst.get("completed_steps")!=64: raise RuntimeError("optimizer step count mismatch")
- for k,v in a.state_dict().items():
-  if not torch.equal(v,ast["model_state_dict"][k]): raise RuntimeError("pi1 optimizer embeds a different model")
- for k,v in j.state_dict().items():
-  if not torch.equal(v,jst["model_state_dict"][k]): raise RuntimeError("JTRAIN optimizer embeds a different model")
+ if fsha(pp)!=EXPECT["pg_opt"] or audit.get("model_sha256")!=EXPECT["pg_sha"] or audit.get("checkpoint_sha256")!=EXPECT["pg_opt"] or audit.get("result_model_digest")!=EXPECT["pg_digest"]: raise RuntimeError("PGONLY final update audit/model/checkpoint chain mismatch")
+ if any(st.get("completed_steps")!=64 for st in (ast,pst,jst)): raise RuntimeError("optimizer step count mismatch")
+ for model,state in ((a,ast),(p,pst),(j,jst)):
+  for k,v in model.state_dict().items():
+   if not torch.equal(v,state["model_state_dict"][k]): raise RuntimeError("optimizer embeds a model different from the frozen policy")
+ if any(audit.get(k)!=0 for k in ("elite_loss_sum","elite_gradient_norm_sum","elite_owner_count_sum","elite_root_count_sum")): raise RuntimeError("PGONLY source update included elite supervision")
  return {"pi1_sha256":fsha(PI1ROOT/"models/pi1.pt"),"pi1_digest":ad,"pi1_optimizer_sha256":fsha(ap),
+ "pgonly_sha256":fsha(PGONLY_ROOT/"models/pi4.pt"),"pgonly_digest":pd,"pgonly_optimizer_sha256":fsha(pp),
  "jtrain_sha256":fsha(REF/"jtrain-pi4.pt"),"jtrain_digest":jd,"jtrain_optimizer_sha256":fsha(jp),
- "embedded_models_match":True,"optimizer_steps":64}
+ "embedded_models_match":True,"optimizer_steps":64,"pgonly_zero_elite_training_audit":True}
 
 def verify():
  check_lock()
@@ -307,6 +348,46 @@ D._original_train_update=D.train_update; D.train_update=train_update
 
 def rows_for(table,phase,block=None):
  return [r for r in table["rows"] if r["phase"]==phase and r["formal"] is True and (block is None or r.get("block_index")==block)]
+
+def evaluation_only_plan(table=None):
+ table=readj(SEEDS) if table is None else table
+ if table.get("source_commit")!=BASE or table.get("training_owner_ids")!=list(TRAIN) or table.get("evaluation_owner_ids")!=list(EVAL) or table.get("evaluation_arm_order")!=list(ARMS):
+  raise RuntimeError("evaluation-only execution does not match the registered owner/arm streams")
+ if len(table.get("rows",[]))!=384+288: raise RuntimeError("registered seed table row count changed")
+ smoke=[]
+ for seed,arm in zip(SMOKE_SEEDS,ARMS):
+  row=D._row(seed,phase="heldout",arm=arm,formal=False,block=None)
+  row["unit_id"]=f"SMOKE:{seed}:{arm}"; row["paired_owner_key"]=f"smoke-{seed}"; row["search_invocation_seeds"]=[]
+  smoke.append(row)
+ heldout=rows_for(table,"heldout")
+ if len(heldout)!=288 or any(r.get("formal") is not True or r.get("phase")!="heldout" or r.get("search_invocation_seeds")!=[] for r in heldout):
+  raise RuntimeError("heldout units differ from the original fixed no-search formal cohort")
+ if {r["owner_seed"] for r in heldout}!=set(EVAL) or {r["arm"] for r in heldout}!={*ARMS}:
+  raise RuntimeError("heldout owner/arm population differs from the preregistered cohort")
+ if set(SMOKE_SEEDS)&(set(TRAIN)|set(EVAL)): raise RuntimeError("nonformal smoke seeds overlap a registered cohort")
+ if any(r.get("phase")!="heldout" or r.get("formal") is not False or r.get("search_invocation_seeds")!=[] for r in smoke):
+  raise RuntimeError("diagnostic smoke must be nonformal heldout-mode, no-search work")
+ return {"smoke":smoke,"heldout":heldout}
+
+def validate_terminal_batch(batch,rows,*,formal):
+ if batch.get("status")!="SUCCEEDED" or batch.get("completed")!=len(rows):
+  raise RuntimeError("worker batch did not produce all expected terminal receipts")
+ expected_digest={"BASE":EXPECT["pi1_digest"],"PGONLY":EXPECT["pg_digest"],"JTRAIN":EXPECT["j_digest"]}
+ terminals=[]
+ for row in rows:
+  report=batch.get("results",{}).get(row["unit_id"])
+  if not isinstance(report,dict) or report.get("status")!="SUCCEEDED": raise RuntimeError(f"missing successful result for {row['unit_id']}")
+  if report.get("phase")!="heldout" or bool(report.get("formal")) is not formal or report.get("arm")!=row["arm"] or int(report.get("owner_seed",-1))!=row["owner_seed"]: raise RuntimeError(f"terminal receipt is misbound: {row['unit_id']}")
+  if report.get("terminal_outcome") is None or not isinstance(report.get("terminal_floor"),int): raise RuntimeError(f"native terminal evidence missing: {row['unit_id']}")
+  if report.get("model_digest")!=expected_digest[row["arm"]]: raise RuntimeError(f"loaded model identity differs for {row['unit_id']}")
+  if report.get("native_module_sha256")!=EXPECT["native"] or report.get("native_source_commit")!=EXPECT["sts"] or report.get("stsr_source_commit")!=EXPECT["stsr"]: raise RuntimeError(f"loaded native source identity differs for {row['unit_id']}")
+  if report.get("expert_decisions")!=0 or report.get("search")!=[]: raise RuntimeError(f"forbidden Expert or online search call in {row['unit_id']}")
+  terminals.append({"unit_id":row["unit_id"],"owner_seed":row["owner_seed"],"arm":row["arm"],
+   "formal":formal,"terminal_outcome":report["terminal_outcome"],"terminal_floor":report["terminal_floor"],
+   "terminal_act":report["terminal_act"],"act2_reached":bool(report.get("act2_plus",False)),
+   "act3_reached":bool(report.get("act3_plus",False)),"act4_reached":bool(report.get("act4_reached",False)),
+   "heart_victory":bool(report.get("heart_victory",False)),"model_digest":report["model_digest"]})
+ return terminals
 
 def elite_note():
  if not RAW79.is_file(): return {"status":"SOURCE_UNAVAILABLE"}
@@ -470,54 +551,145 @@ def analyze(root,package):
  "CI spanning zero is not equivalence","terminal floor 16 does not identify first-Boss cause",
  "native result action-family counts are reported only when exposed; unavailable values are not inferred"]}
 
-def run_formal():
- package=D.source_commit(); root=ART/"formal"/package; root.mkdir(parents=True,exist_ok=True); progress=root/"progress.json"
- clock=D.ActiveClock("issue81-global",ALLOWANCE)
+def saved_batch(root,rows,package):
+ results={}
+ for row in rows:
+  found=D.existing_success_record(root,row,package)
+  if found is None: return None
+  results[row["unit_id"]]=found[0]
+ return {"status":"SUCCEEDED","completed":len(rows),"results":results}
+
+def partial_unit_summary(root,rows,package):
+ successes={arm:0 for arm in ARMS}; missing=[]; failures={}
+ for row in rows:
+  if D.existing_success(root,row,package) is not None:
+   successes[row["arm"]]+=1; continue
+  missing.append(row["unit_id"])
+  directory=root/"units"/D.unit_key(row["unit_id"])
+  attempts=sorted(directory.glob("attempt-*")) if directory.exists() else []
+  if not attempts: failures["NOT_STARTED"]=failures.get("NOT_STARTED",0)+1
+  for attempt in attempts:
+   result_path=attempt/"result.json"
+   if result_path.is_file():
+    result=readj(result_path)
+    if result.get("status")=="FAILED":
+     key=f"{result.get('failure_boundary','UNKNOWN')}: {result.get('failure_detail','')}"
+     failures[key]=failures.get(key,0)+1
+   elif (attempt/"global-wall-stop.json").is_file():
+    failures["GLOBAL_WALL_STOP_WITHOUT_TERMINAL"]=failures.get("GLOBAL_WALL_STOP_WITHOUT_TERMINAL",0)+1
+ return {"successful_terminals_by_arm":successes,"successful_terminal_count":sum(successes.values()),
+  "missing_unit_count":len(missing),"missing_unit_ids":missing,
+  "failure_signatures":dict(sorted(failures.items())),"attempt_resources":attempts_summary(root)}
+
+def finalize_evaluation_only(package,root,identity,active_seconds,smoke_batch,heldout_batch,plan):
+ smoke_terminals=validate_terminal_batch(smoke_batch,plan["smoke"],formal=False)
+ heldout_terminals=validate_terminal_batch(heldout_batch,plan["heldout"],formal=True)
+ writej(root/"diagnostic-smoke-terminals.json",{"schema_id":"issue81-evaluation-only-smoke-v1",
+  "efficacy_cohort":False,"terminals":smoke_terminals,"attempt_resources":attempts_summary(root)})
+ report=analyze(root,package)
+ report.update({"execution_mode":"evaluation_only","package_commit":package,"source_lock_sha256":fsha(LOCK),
+  "active_wall_seconds_before_terminal_completion":active_seconds,"supplemental_active_wall_allowance_seconds":SUPPLEMENTAL_ALLOWANCE,
+  "original_failed_execution_active_wall_seconds":3784.857659886001,
+  "combined_active_wall_seconds":3784.857659886001+active_seconds,
+  "diagnostic_smoke_terminals":smoke_terminals,"verified_heldout_terminal_count":len(heldout_terminals),
+  "loaded_model_identities":identity["models"],"evaluation_only_contract_sha256":fsha(EVALUATION_ONLY_CONTRACT),
+  "limitations":report["limitations"]+["The evaluation-only amendment reuses completed PGONLY training and does not re-estimate training cost."]})
+ if report["status"]!="COMPLETE" or report["owner_arm_count"]!=288:
+  atomicj(root/"analysis-progress.json",report)
+  out={"status":"INCOMPLETE_ANALYSIS","owner_arm_count":report["owner_arm_count"],"active_wall_seconds":active_seconds}
+  atomicj(root/"evaluation-only-progress.json",{"schema_id":"issue81-evaluation-only-progress-v1",**out,"package_commit":package})
+  return out
+ writej(root/f"evaluation-only-analysis-{package}.json",report)
+ compact={k:report[k] for k in ("schema_id","status","execution_mode","package_commit","source_lock_sha256",
+  "owner_arm_count","primary_contrast","per_arm","contrasts","noncombat_action_coverage","attempt_resources",
+  "training_updates","first_boss_qualification","j_elite_mechanism_note","preexecution_failure_summary","limitations",
+  "active_wall_seconds_before_terminal_completion","supplemental_active_wall_allowance_seconds",
+  "original_failed_execution_active_wall_seconds","combined_active_wall_seconds","diagnostic_smoke_terminals",
+  "verified_heldout_terminal_count","loaded_model_identities","evaluation_only_contract_sha256")}
+ compact["retained_raw_root"]=str(root); compact["durable_data_root"]=str(DATA)
+ write_once(STUDY/"evaluation-only-results-summary.json",canon(compact)+b"\n")
+ atomicj(root/"evaluation-only-progress.json",{"schema_id":"issue81-evaluation-only-progress-v1","status":"COMPLETE",
+  "package_commit":package,"owner_arm_count":288,"active_wall_seconds":active_seconds,
+  "supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE,
+  "smoke_terminal_count":3,"analysis_sha256":fsha(root/f"evaluation-only-analysis-{package}.json")})
+ return compact
+
+def run_evaluation_only():
+ package=D.source_commit(); root=ART/"evaluation-only"/package; root.mkdir(parents=True,exist_ok=True)
+ progress=root/"evaluation-only-progress.json"; plan=evaluation_only_plan()
+ complete_smoke=saved_batch(root,plan["smoke"],package)
+ complete_heldout=saved_batch(root,plan["heldout"],package)
+ if complete_smoke is not None and complete_heldout is not None:
+  identity=verify()
+  clock_path=ART/f"active-wall-{SUPPLEMENTAL_CLOCK_ID}.json"
+  clock_state=readj(clock_path) if clock_path.exists() else {"elapsed_seconds":0.0,"active_session":None}
+  if clock_state.get("active_session"):
+   clock=D.ActiveClock(SUPPLEMENTAL_CLOCK_ID,SUPPLEMENTAL_ALLOWANCE)
+   actual=clock.close()
+  else: actual=float(clock_state.get("elapsed_seconds",0.0))
+  atomicj(progress,{"schema_id":"issue81-evaluation-only-progress-v1","status":"TERMINALS_COMPLETE",
+   "package_commit":package,"owner_arm_count":288,"active_wall_seconds":actual,
+   "supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE})
+  return finalize_evaluation_only(package,root,identity,actual,complete_smoke,complete_heldout,plan)
+ closed=False
+ clock=D.ActiveClock(SUPPLEMENTAL_CLOCK_ID,SUPPLEMENTAL_ALLOWANCE)
  try:
-  identity=verify(); atomicj(progress,{"schema_id":"issue81-progress-v1","status":"VERIFIED","package_commit":package,"identity":identity,"allowance":ALLOWANCE})
-  table=readj(SEEDS); updates=[]
-  for block in (1,2,3):
-   rows=rows_for(table,"training",block)
-   phase=D.run_units(rows,root=root,pilot=False,clock=clock,package_commit=package)
-   if phase.get("status")!="SUCCEEDED" or phase.get("completed")!=128:
-    out={"status":phase.get("status","INCOMPLETE_TRAINING"),"block":block,"completed":phase.get("completed"),"remaining":phase.get("remaining")}
-    atomicj(progress,{"schema_id":"issue81-progress-v1",**out,"package_commit":package,"active_wall_seconds":clock.elapsed()}); return out
-   alg,rt,m,l,ex=D.load_modules(root,pilot=False); examples=D._training_examples(rows,root=root,executor=ex,package_commit=package)
-   try: update=D.train_update(block,examples,root=root,pilot=False,clock=clock)
-   finally: del examples
-   updates.append({"block":block,"steps":update.get("completed_steps"),"model_digest":update.get("result_model_digest")})
-   atomicj(progress,{"schema_id":"issue81-progress-v1","status":"BLOCK_COMPLETE","block":block,"updates":updates,"package_commit":package,"active_wall_seconds":clock.elapsed()})
-   if clock.expired(): return {"status":"GLOBAL_ACTIVE_WALL_ALLOWANCE_EXCEEDED","block":block}
-  ev=D.run_units(rows_for(table,"heldout"),root=root,pilot=False,clock=clock,package_commit=package)
-  if ev.get("status")!="SUCCEEDED" or ev.get("completed")!=288:
-   out={"status":ev.get("status","INCOMPLETE_EVALUATION"),"completed":ev.get("completed"),"remaining":ev.get("remaining")}
-   atomicj(progress,{"schema_id":"issue81-progress-v1",**out,"package_commit":package,"active_wall_seconds":clock.elapsed()}); return out
-  report=analyze(root,package)
-  report.update({"package_commit":package,"source_lock_sha256":fsha(LOCK),
-   "active_wall_seconds_before_close":clock.elapsed(),"active_wall_allowance_seconds":ALLOWANCE,
-   "optimizer_identity":{"pi1_optimizer_sha256":EXPECT["pi1_opt"],"jtrain_optimizer_sha256":EXPECT["j_opt"],"block1_initialized_from_pi1_optimizer":True}})
-  if report["status"]!="COMPLETE":
-   atomicj(root/"analysis-progress.json",report); return {"status":"INCOMPLETE_ANALYSIS","owner_arm_count":report["owner_arm_count"]}
-  writej(root/f"analysis-{package}.json",report)
-  compact={k:report[k] for k in ("schema_id","status","package_commit","source_lock_sha256","owner_arm_count",
-   "primary_contrast","per_arm","contrasts","noncombat_action_coverage","attempt_resources","training_updates",
-   "first_boss_qualification","j_elite_mechanism_note","preexecution_failure_summary","limitations")}
-  compact["retained_raw_root"]=str(root); compact["durable_data_root"]=str(DATA)
-  write_once(STUDY/"results-summary.json",canon(compact)+b"\n")
-  atomicj(progress,{"schema_id":"issue81-progress-v1","status":"COMPLETE","package_commit":package,"owner_arm_count":288,
-   "active_wall_seconds":clock.elapsed(),"allowance":ALLOWANCE})
-  return compact
+  identity=verify()
+  binding={"schema_id":"issue81-evaluation-only-package-v1","mode":"evaluation_only","package_commit":package,
+   "runner_code_commit":package,"source_lock_sha256":fsha(LOCK),
+   "evaluation_only_contract_sha256":fsha(EVALUATION_ONLY_CONTRACT),
+   "parent_failed_package_commit":"7ff0fcaf3fb53c6aaeb26a6b960345a320d25e51",
+   "parent_training_model_sha256":EXPECT["pg_sha"],"optimizer_checkpoint_sha256":EXPECT["pg_opt"],
+   "clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE,
+   "model_identities":identity["models"],"registered_seed_table_sha256":fsha(SEEDS)}
+  writej(root/"evaluation-only-package.json",binding)
+  atomicj(progress,{"schema_id":"issue81-evaluation-only-progress-v1","status":"VERIFIED",
+   "package_commit":package,"source_lock_sha256":fsha(LOCK),"supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID,
+   "allowance_seconds":SUPPLEMENTAL_ALLOWANCE,"active_wall_seconds":clock.elapsed(),"identity":identity,
+   "smoke_seeds":list(SMOKE_SEEDS),"heldout_units":len(plan["heldout"])})
+  smoke=D.run_units(plan["smoke"],root=root,pilot=False,clock=clock,package_commit=package)
+  if smoke.get("status")!="SUCCEEDED" or smoke.get("completed")!=len(plan["smoke"]):
+   out={"status":"SMOKE_INCOMPLETE","smoke_expected":len(plan["smoke"]),
+    "active_wall_seconds":clock.elapsed(),"attempt_summary":partial_unit_summary(root,plan["smoke"],package)}
+   atomicj(progress,{"schema_id":"issue81-evaluation-only-progress-v1",**out,"package_commit":package,
+    "supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE})
+   return out
+  smoke_terminals=validate_terminal_batch(smoke,plan["smoke"],formal=False)
+  writej(root/"diagnostic-smoke-terminals.json",{"schema_id":"issue81-evaluation-only-smoke-v1",
+   "efficacy_cohort":False,"terminals":smoke_terminals,"attempt_resources":attempts_summary(root)})
+  atomicj(progress,{"schema_id":"issue81-evaluation-only-progress-v1","status":"SMOKE_COMPLETE",
+   "package_commit":package,"smoke_terminals":smoke_terminals,"active_wall_seconds":clock.elapsed(),
+   "supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE})
+  heldout=D.run_units(plan["heldout"],root=root,pilot=False,clock=clock,package_commit=package)
+  if heldout.get("status")!="SUCCEEDED" or heldout.get("completed")!=288:
+   out={"status":"INCOMPLETE_HELDOUT","heldout_expected":288,
+    "active_wall_seconds":clock.elapsed(),"allowance_seconds":SUPPLEMENTAL_ALLOWANCE,
+    "smoke_terminal_count":len(smoke_terminals),
+    "attempt_summary":partial_unit_summary(root,plan["heldout"],package)}
+   atomicj(progress,{"schema_id":"issue81-evaluation-only-progress-v1",**out,"package_commit":package,
+    "supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID})
+   return out
+  heldout_terminals=validate_terminal_batch(heldout,plan["heldout"],formal=True)
+  actual=clock.close(); closed=True
+  atomicj(progress,{"schema_id":"issue81-evaluation-only-progress-v1","status":"TERMINALS_COMPLETE",
+   "package_commit":package,"owner_arm_count":288,"active_wall_seconds":actual,
+   "supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE,
+   "smoke_terminal_count":len(smoke_terminals),"heldout_terminal_count":len(heldout_terminals)})
+  return finalize_evaluation_only(package,root,identity,actual,smoke,heldout,plan)
  except BaseException as e:
-  atomicj(progress,{"schema_id":"issue81-progress-v1","status":"FAILED","package_commit":package,
-   "active_wall_seconds":clock.elapsed(),"failure_boundary":type(e).__name__,"detail":str(e)[:4096],
-   "traceback":traceback.format_exc()[-12000:]}); raise
- finally: clock.close()
+  atomicj(progress,{"schema_id":"issue81-evaluation-only-progress-v1","status":"FAILED",
+   "package_commit":package,"active_wall_seconds":clock.elapsed(),"supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID,
+   "allowance_seconds":SUPPLEMENTAL_ALLOWANCE,"failure_boundary":type(e).__name__,
+   "detail":str(e)[:4096],"traceback":traceback.format_exc()[-12000:]})
+  raise
+ finally:
+  if not closed: clock.close()
 
 def main():
- p=argparse.ArgumentParser(); p.add_argument("--mode",choices=("prepare","verify","formal")); p.add_argument("--worker",type=Path); a=p.parse_args()
+ p=argparse.ArgumentParser(); p.add_argument("--mode",choices=("prepare","verify","evaluation-only")); p.add_argument("--worker",type=Path); a=p.parse_args()
  if a.worker: return worker(a.worker)
  if a.mode is None: p.error("--mode is required unless --worker is used")
  if a.mode=="prepare": print(json.dumps(prepare(),sort_keys=True)); return 0
  if a.mode=="verify": print(json.dumps(verify(),sort_keys=True)); return 0
- result=run_formal(); print(json.dumps(result,sort_keys=True)); return 0 if result.get("status")=="COMPLETE" else 2
+ result=run_evaluation_only(); print(json.dumps(result,sort_keys=True)); return 0 if result.get("status")=="COMPLETE" else 2
 if __name__=="__main__": raise SystemExit(main())
