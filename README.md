@@ -22,6 +22,8 @@ Research studies and platform code have different lifecycles.
 
 A study may use a disposable branch/worktree and one-off code to answer a scientific question. Study code does not enter the long-lived platform merely because the study completed.
 
+Retained generated task data belongs under `D:\DeadlycatCoding\stsrl-data/` (WSL: `/mnt/d/DeadlycatCoding/stsrl-data/`), outside disposable repository clones and worktrees. WSL-local scratch may be used for high-frequency execution; hash-verify retained copies and load critical models from the durable location.
+
 Code is promoted to `main` only when it is a genuinely reusable current capability. Promotion should produce a small semantic interface, not preserve the study's task-specific structure.
 
 Git history, study commits, Issues, and retained artifact manifests preserve provenance. The current runtime does not need to remain backward-compatible with every historical experiment.
