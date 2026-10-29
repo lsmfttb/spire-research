@@ -19,7 +19,7 @@ BUNDLE=STUDY79/"artifacts/issue79-formal-review-bundle-968309e7de0132e3ec763c3c7
 RAW79=Path("/mnt/d/DeadlycatCoding/stsrl-data/issue79/formal-raw-968309e7de0132e3ec763c3c7dc036a2da472285.tar")
 TRAIN=tuple(range(7600001,7600385)); EVAL=tuple(range(7640001,7640097))
 ARMS=("BASE","PGONLY","JTRAIN"); ALLOWANCE=3784.5
-PREVIOUS_PACKAGE="a7d6df2ee635ccd14b37365c21b5a4bafabb5379"
+PREVIOUS_PACKAGES=("a7d6df2ee635ccd14b37365c21b5a4bafabb5379","a623cb1087221b953bd100099077c0effb6f34b3")
 EXPECT={"pi1_sha":"d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21978",
 "pi1_digest":"33b3d3d891e53b7434919318ccb1c8411a0bebe1e2e48616ef040206261db557",
 "pi1_opt":"7bdff6bdd14d8bf5bdcd1cf286e687b5a6df4ef6c11f80bad1ee18787e40f514",
@@ -158,9 +158,9 @@ def check_lock():
   if fsha(STUDY75/p)!=h: raise RuntimeError(f"#75 source lock mismatch: {p}")
  return l
 
-def patch_modules(root):
+def patch_modules(root,*,pilot=False):
  global ACTIVE_BLOCK
- alg,rt,model,learn,ex=ORIGINAL_LOAD(root,pilot=False)
+ alg,rt,model,learn,ex=ORIGINAL_LOAD(root,pilot=pilot)
  rt.STUDY=STUDY; rt.REPO_ROOT=REPO
  ex.STAGE1=STAGE1; ex.ARTIFACT_ROOT=root; ex.ROOT=REPO; ex.STUDY_ID="issue-81-pgonly-j-elite-ablation"
  oldpath=ex._model_path
@@ -364,31 +364,47 @@ def action_coverage(root,outcomes):
  return sums
 
 def preexecution_failure_summary():
- root=ART/"formal"/PREVIOUS_PACKAGE
- logs=sorted(root.glob("units/TRAIN-*/attempt-*/worker.log"))
- attempts_per_owner={}; log_hashes={}; cli_errors=0
- for path in logs:
-  owner=path.parent.parent.name
-  attempts_per_owner[owner]=attempts_per_owner.get(owner,0)+1
-  digest=fsha(path); log_hashes[digest]=log_hashes.get(digest,0)+1
-  if "the following arguments are required: --mode" in path.read_text(encoding="utf-8",errors="replace"):
-   cli_errors+=1
- hist={}
- for count in attempts_per_owner.values():
-  hist[str(count)]=hist.get(str(count),0)+1
- progress_path=root/"progress.json"
- progress=readj(progress_path) if progress_path.is_file() else {}
- started=sum(1 for _ in root.rglob("started.json"))
- results=sum(1 for _ in root.rglob("result.json"))
- resources=sum(1 for _ in root.rglob("attempt-resource.json"))
- return {"previous_package_commit":PREVIOUS_PACKAGE,"previous_progress_status":progress.get("status"),
-  "previous_active_wall_seconds":progress.get("active_wall_seconds"),"worker_log_count":len(logs),
-  "distinct_training_owner_units":len(attempts_per_owner),"attempts_per_owner_histogram":hist,
-  "cli_missing_mode_error_count":cli_errors,"worker_log_sha256_counts":log_hashes,
-  "worker_started_receipt_count":started,"result_receipt_count":results,
-  "attempt_resource_receipt_count":resources,
-  "simulator_worker_started":bool(started or results or resources),
-  "classification":"launcher CLI rejected every recorded worker invocation before worker_main" if logs and cli_errors==len(logs) and not (started or results or resources) else "REVIEW_REQUIRED"}
+ packages=[]
+ for package in PREVIOUS_PACKAGES:
+  root=ART/"formal"/package
+  logs=sorted(root.glob("units/TRAIN-*/attempt-*/worker.log"))
+  attempts_per_owner={}; log_hashes={}; cli_errors=loader_errors=0; resources=[]
+  for path in logs:
+   owner=path.parent.parent.name
+   attempts_per_owner[owner]=attempts_per_owner.get(owner,0)+1
+   digest=fsha(path); log_hashes[digest]=log_hashes.get(digest,0)+1
+   body=path.read_text(encoding="utf-8",errors="replace")
+   cli_errors+= "the following arguments are required: --mode" in body
+   loader_errors+= "patch_modules() got an unexpected keyword argument 'pilot'" in body
+  hist={}
+  for count in attempts_per_owner.values():
+   hist[str(count)]=hist.get(str(count),0)+1
+  for path in sorted(root.glob("units/**/attempt-resource.json")):
+   resources.append(readj(path))
+  progress_path=root/"progress.json"
+  progress=readj(progress_path) if progress_path.is_file() else {}
+  started=sum(1 for _ in root.rglob("started.json"))
+  results=sum(1 for _ in root.rglob("result.json"))
+  empty_logs=sum(path.stat().st_size==0 for path in logs)
+  if logs and cli_errors==len(logs):
+   classification="launcher CLI rejected every invocation before worker entry"
+  elif logs and loader_errors==len(logs) and not started and not results:
+   classification="worker module adapter failed before worker start receipt and native runtime initialization"
+  elif logs and loader_errors==len(logs)-empty_logs and empty_logs==max(0,len(logs)-len(resources)) and not started and not results and progress.get("failure_boundary")=="KeyboardInterrupt":
+   classification="all workers with error logs failed in module loading; parent interruption left only empty log attempts"
+  else:
+   classification="REVIEW_REQUIRED"
+  packages.append({"package_commit":package,"progress_status":progress.get("status"),
+   "active_wall_seconds":progress.get("active_wall_seconds"),"worker_log_count":len(logs),
+   "distinct_training_owner_units":len(attempts_per_owner),"attempts_per_owner_histogram":hist,
+   "cli_missing_mode_error_count":cli_errors,"unexpected_pilot_keyword_error_count":loader_errors,
+   "worker_log_sha256_counts":log_hashes,"empty_worker_log_count":empty_logs,"worker_started_receipt_count":started,
+   "result_receipt_count":results,"attempt_resource_receipt_count":len(resources),
+   "failed_attempt_count":sum(x.get("status")=="FAILED" for x in resources),
+   "known_failed_cpu_seconds":sum(float(x.get("process_tree_cpu_seconds",0.)) for x in resources),
+   "known_failed_worker_wall_seconds":sum(float(x.get("worker_wall_seconds",0.)) for x in resources),
+   "worker_main_entered":bool(started),"classification":classification})
+ return {"schema_id":"issue81-preexecution-recovery-audit-v1","packages":packages}
 
 def analyze(root,package):
  outcomes=[]

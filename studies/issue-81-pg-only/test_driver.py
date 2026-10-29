@@ -1,6 +1,6 @@
 import importlib.util
 from pathlib import Path
-import unittest, subprocess, sys
+import unittest, subprocess, sys, inspect
 p=Path(__file__).with_name("driver.py")
 s=importlib.util.spec_from_file_location("issue81_driver_test",p)
 d=importlib.util.module_from_spec(s); s.loader.exec_module(d)
@@ -27,4 +27,6 @@ class ContractTests(unittest.TestCase):
   result=subprocess.run([sys.executable,str(p),"--worker",str(missing)],capture_output=True,text=True)
   self.assertNotIn("the following arguments are required: --mode",result.stderr)
   self.assertIn("FileNotFoundError",result.stderr)
+ def test_worker_module_loader_accepts_pilot_keyword(self):
+  self.assertIn("pilot",inspect.signature(d.patch_modules).parameters)
 if __name__=="__main__": unittest.main()
