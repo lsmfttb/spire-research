@@ -124,16 +124,18 @@ def prepare():
  for p in (DATA,REF,ART,STAGE1,DATA/"cache/pycache",DATA/"cache/xdg",DATA/"cache/torch",DATA/"tmp"): p.mkdir(parents=True,exist_ok=True)
  extract_ref("models/pi4.pt",REF/"jtrain-pi4.pt",EXPECT["j_sha"])
  extract_ref("models/block-3-step.pt",REF/"jtrain-block-3-step.pt",EXPECT["j_opt"])
- cfg=readj(STUDY75/"stage1/config.json"); set_native(cfg); cb=canon(cfg)+b"\n"
- write_once(STUDY/"config.json",cb); write_once(STAGE1/"config.json",cb)
+ stage_cfg=readj(STUDY75/"stage1/config.json"); set_native(stage_cfg); stage_bytes=canon(stage_cfg)+b"\n"
+ cfg=readj(STUDY75/"config.json"); set_native(cfg); config_bytes=canon(cfg)+b"\n"
+ write_once(STUDY/"config.json",config_bytes); write_once(STAGE1/"config.json",stage_bytes)
  write_once(SEEDS,canon(seed_table())+b"\n"); write_once(CONTRACT,canon(contract())+b"\n")
  lock79=readj(STUDY79/"source-lock.json"); refs=lock79["source_reference"]["files_sha256"]
  actual={p:fsha(STUDY75/p) for p in refs}
  if actual!=refs: raise RuntimeError("#75 files differ from #79 locked source")
- runtime_source=cfg["source"]["registered_stage0_config"]
+ runtime_source=cfg["source"]
  lock={"schema_id":"issue81-source-lock-v1","baseline_commit":BASE,
  "issue79_driver_sha256":fsha(STUDY79/"driver.py"),"issue79_source_lock_sha256":fsha(STUDY79/"source-lock.json"),
  "issue75_source_commit":lock79["source_reference"]["commit"],"issue75_files_sha256":actual,
+ "issue75_config_sha256":fsha(STUDY75/"config.json"),"issue75_stage1_config_sha256":fsha(STUDY75/"stage1/config.json"),
  "runtime":{"sts_lightspeed_commit":runtime_source["sts_lightspeed_commit"],
  "stsr_source_commit":runtime_source["stsr_source_commit"],"native_module_sha256":fsha(NATIVE),"native_module_path":str(NATIVE)},
  "models":{"pi1_sha256":fsha(PI1ROOT/"models/pi1.pt"),"pi1_optimizer_sha256":fsha(PI1ROOT/"models/block-0-step.pt"),
