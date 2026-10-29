@@ -24,6 +24,9 @@ SMOKE_SEEDS=(7699001,7699002,7699003)
 PGONLY_ROOT=ART/"formal"/"7ff0fcaf3fb53c6aaeb26a6b960345a320d25e51"
 EVALUATION_ONLY_CONTRACT=STUDY/"evaluation-only-contract.json"
 PREVIOUS_PACKAGES=("a7d6df2ee635ccd14b37365c21b5a4bafabb5379","a623cb1087221b953bd100099077c0effb6f34b3","7ff0fcaf3fb53c6aaeb26a6b960345a320d25e51")
+PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT="a484175828868da5de7147694122b5ff41da4d25"
+PREVIOUS_BASE_SMOKE_RESULT_SHA256="b8b5a597c78f7ec1cda082374c3f30cd90299041a402a885bc6d2c3f0c560d37"
+PREVIOUS_BASE_SMOKE_SOURCE_LOCK_SHA256="ba440d9a7f005affa4a3eb6703db73267fa773dbf9e747726f5597976bacc6ae"
 EXPECT={"pi1_sha":"d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21978",
 "pi1_digest":"33b3d3d891e53b7434919318ccb1c8411a0bebe1e2e48616ef040206261db557",
 "pi1_opt":"7bdff6bdd14d8bf5bdcd1cf286e687b5a6df4ef6c11f80bad1ee18787e40f514",
@@ -34,7 +37,7 @@ EXPECT={"pi1_sha":"d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21
 "pg_digest":"3eac3177892778192309262e2c4a42734c3a30fa3b742f3ab2732bdd5b9810ce",
 "pg_opt":"80d15b396083e0194544838bdb79728c83075e2c14d29257377307be424cea77",
 "native":"bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
-"sts":"8ded44c7ee341f48bb1bd49eeaa6cf6bc0384b2","stsr":"7d172f7c24c9d29429b6946ba44f6b59760b0d96"}
+"sts":"8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2","stsr":"7d172f7c24c9d29429b6946ba44f6b59760b0d96"}
 def canon(v): return json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False).encode()
 def sha(b): return hashlib.sha256(b).hexdigest()
 def fsha(p):
@@ -299,8 +302,52 @@ def worker(job_path):
   "run_id":job.get("run_id"),"worker_pid":os.getpid(),"exit_code":code,"process_tree_cpu_seconds":cpu,
   "worker_wall_seconds":max(0.,time.monotonic()-start),"status":"SUCCEEDED" if code==0 else "FAILED"})
 
+def previous_smoke_receipt(row,*,current_root):
+ if row.get("unit_id")!="SMOKE:7699001:BASE" or row.get("owner_seed")!=7699001 or row.get("arm")!="BASE" or row.get("formal") is not False:
+  return None
+ current_attempts=current_root/"units"/D.unit_key(row["unit_id"])
+ if current_attempts.exists() and any(current_attempts.glob("attempt-*")): return None
+ prior_root=ART/"evaluation-only"/PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT
+ binding=readj(prior_root/"evaluation-only-package.json")
+ models=binding.get("model_identities",{})
+ if (models.get("pi1_sha256")!=EXPECT["pi1_sha"] or models.get("pi1_digest")!=EXPECT["pi1_digest"] or
+     models.get("pi1_optimizer_sha256")!=EXPECT["pi1_opt"] or binding.get("optimizer_checkpoint_sha256")!=EXPECT["pg_opt"]):
+  raise RuntimeError("prior BASE smoke package model/native identities do not match")
+ if (binding.get("package_commit")!=PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT or
+     binding.get("runner_code_commit")!=PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT or
+     binding.get("source_lock_sha256")!=PREVIOUS_BASE_SMOKE_SOURCE_LOCK_SHA256):
+  raise RuntimeError("prior BASE smoke package binding does not match its registered source")
+ attempt=prior_root/"units"/D.unit_key(row["unit_id"])/"attempt-0001"
+ result_path=attempt/"result.json"
+ if fsha(result_path)!=PREVIOUS_BASE_SMOKE_RESULT_SHA256:
+  raise RuntimeError("prior BASE smoke result is missing or its immutable digest changed")
+ result=readj(result_path); finished=readj(attempt/"finished.json")
+ resource_receipt=readj(attempt/"attempt-resource.json"); job=readj(attempt/"worker-job.json")
+ if (finished.get("status")!="SUCCEEDED" or finished.get("result_sha256")!=PREVIOUS_BASE_SMOKE_RESULT_SHA256 or
+     finished.get("unit_id")!=row["unit_id"] or resource_receipt.get("status")!="SUCCEEDED" or
+     resource_receipt.get("unit_id")!=row["unit_id"] or resource_receipt.get("run_id")!="SMOKE:7699001:BASE-attempt-0001" or
+     job.get("package_commit")!=PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT or job.get("runner_code_commit")!=PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT or
+     job.get("unit_id")!=row["unit_id"] or job.get("phase")!="heldout" or job.get("row",{}).get("formal") is not False or
+     job.get("row",{}).get("arm")!="BASE" or job.get("row",{}).get("owner_seed")!=7699001):
+  raise RuntimeError("prior BASE smoke does not have a matching successful full-worker receipt chain")
+ if (result.get("status")!="SUCCEEDED" or result.get("package_commit")!=PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT or
+     result.get("runner_code_commit")!=PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT or
+     result.get("source_lock_sha256")!=PREVIOUS_BASE_SMOKE_SOURCE_LOCK_SHA256 or
+     result.get("unit_id")!=row["unit_id"] or result.get("owner_seed")!=7699001 or result.get("formal") is not False or
+     result.get("phase")!="heldout" or result.get("arm")!="BASE" or result.get("model_digest")!=EXPECT["pi1_digest"] or
+     result.get("policy_source",{}).get("source")!="pi1" or result.get("policy_source",{}).get("checkpoint_sha256")!=EXPECT["pi1_sha"] or
+     result.get("native_module_sha256")!=EXPECT["native"] or result.get("native_source_commit")!=EXPECT["sts"] or
+     result.get("stsr_source_commit")!=EXPECT["stsr"] or result.get("expert_decisions")!=0 or result.get("search")!=[] or
+     not isinstance(result.get("terminal_floor"),int) or result.get("terminal_outcome") is None):
+  raise RuntimeError("prior BASE smoke terminal does not match the registered model/native/no-search treatment")
+ return result,{"package_commit":PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT,
+  "result_path_under_durable_data_root":result_path.relative_to(DATA).as_posix(),
+  "result_sha256":PREVIOUS_BASE_SMOKE_RESULT_SHA256,"source_lock_sha256":PREVIOUS_BASE_SMOKE_SOURCE_LOCK_SHA256,
+  "finished_receipt_sha256":fsha(attempt/"finished.json"),"resource_receipt_sha256":fsha(attempt/"attempt-resource.json")}
+
 def run_smoke_once(rows,*,root,clock,package_commit):
  start=time.monotonic(); complete={}; row_wall={}; native_wall={}; tries={}
+ reused_prior_receipts={}
  python=str(D.PINNED_PYTHON); env=os.environ.copy()
  for name in ("STS_LIGHTSPEED_SOURCE_DIR","STSRL_SOURCE_DIR"):
   if not env.get(name): raise RuntimeError(f"{name} must name the exact pinned source worktree")
@@ -310,12 +357,17 @@ def run_smoke_once(rows,*,root,clock,package_commit):
    complete[unit]=saved; tries[unit]=1
    wall=float(saved.get("resource",{}).get("worker_wall_seconds",0.0)); row_wall[unit]=wall; native_wall[unit]=wall
    continue
+  prior=previous_smoke_receipt(row,current_root=root)
+  if prior is not None:
+   saved,provenance=prior; complete[unit]=saved; tries[unit]=1; reused_prior_receipts[unit]=provenance
+   wall=float(saved.get("resource",{}).get("worker_wall_seconds",0.0)); row_wall[unit]=wall; native_wall[unit]=wall
+   continue
   base=root/"units"/D.unit_key(unit)
   prior=sorted(base.glob("attempt-*")) if base.exists() else []
   if prior:
    return {"status":"PRIOR_FAILED_ATTEMPT_EXISTS","completed":len(complete),"results":complete,
     "remaining":[r["unit_id"] for r in rows if r["unit_id"] not in complete],"tries":tries,
-    "elapsed_seconds":time.monotonic()-start}
+    "reused_prior_receipts":reused_prior_receipts,"elapsed_seconds":time.monotonic()-start}
   base.mkdir(parents=True,exist_ok=True); attempt=base/"attempt-0001"; attempt.mkdir(exist_ok=False)
   job={"schema_id":"issue79-owner-worker-job-v1","artifact_root":str(root),"attempt_dir":str(attempt),
    "result_path":str(attempt/"result.json"),"output_dir":str(attempt/"native"),
@@ -340,22 +392,23 @@ def run_smoke_once(rows,*,root,clock,package_commit):
       "cumulative_active_seconds":clock.elapsed()})
      return {"status":"GLOBAL_ACTIVE_WALL_ALLOWANCE_EXCEEDED","completed":len(complete),"results":complete,
       "remaining":[r["unit_id"] for r in rows if r["unit_id"] not in complete],"tries":tries,
-      "elapsed_seconds":time.monotonic()-start}
+      "reused_prior_receipts":reused_prior_receipts,"elapsed_seconds":time.monotonic()-start}
     code=process.poll()
     if code is not None: break
     time.sleep(0.25)
   finally:
    log.close()
    if clock is not None: clock.set_processes(set())
-  result=D.read_json(job["result_path"]) if Path(job["result_path"]).exists() else None
+  result=D.read_json(Path(job["result_path"])) if Path(job["result_path"]).exists() else None
   if not result or result.get("status")!="SUCCEEDED":
    return {"status":"SMOKE_WORKER_FAILED","completed":len(complete),"results":complete,
     "remaining":[r["unit_id"] for r in rows if r["unit_id"] not in complete],"tries":{**tries,unit:1},
-    "failed_unit":unit,"worker_exit_code":code,"elapsed_seconds":time.monotonic()-start}
+    "reused_prior_receipts":reused_prior_receipts,"failed_unit":unit,"worker_exit_code":code,"elapsed_seconds":time.monotonic()-start}
   complete[unit]=result; tries[unit]=1
   wall=float(result.get("resource",{}).get("worker_wall_seconds",0.0)); row_wall[unit]=wall; native_wall[unit]=wall
  return {"status":"SUCCEEDED","completed":len(complete),"results":complete,"tries":tries,
-  "row_wall_seconds":row_wall,"native_wall_seconds_by_unit":native_wall,"elapsed_seconds":time.monotonic()-start}
+  "reused_prior_receipts":reused_prior_receipts,"row_wall_seconds":row_wall,
+  "native_wall_seconds_by_unit":native_wall,"elapsed_seconds":time.monotonic()-start}
 
 def verify_models(ex):
  import torch
@@ -653,7 +706,8 @@ def finalize_evaluation_only(package,root,identity,active_seconds,smoke_batch,he
  smoke_terminals=validate_terminal_batch(smoke_batch,plan["smoke"],formal=False)
  heldout_terminals=validate_terminal_batch(heldout_batch,plan["heldout"],formal=True)
  writej(root/"diagnostic-smoke-terminals.json",{"schema_id":"issue81-evaluation-only-smoke-v1",
-  "efficacy_cohort":False,"terminals":smoke_terminals,"attempt_resources":attempts_summary(root)})
+  "efficacy_cohort":False,"terminals":smoke_terminals,"reused_prior_receipts":smoke_batch.get("reused_prior_receipts",{}),
+  "attempt_resources":attempts_summary(root)})
  report=analyze(root,package)
  report.update({"execution_mode":"evaluation_only","package_commit":package,"source_lock_sha256":fsha(LOCK),
   "active_wall_seconds_before_terminal_completion":active_seconds,"supplemental_active_wall_allowance_seconds":SUPPLEMENTAL_ALLOWANCE,
@@ -707,7 +761,7 @@ def run_evaluation_only():
    "runner_code_commit":package,"source_lock_sha256":fsha(LOCK),
    "evaluation_only_contract_sha256":fsha(EVALUATION_ONLY_CONTRACT),
    "parent_failed_package_commit":"7ff0fcaf3fb53c6aaeb26a6b960345a320d25e51",
-   "previous_evaluation_only_package_commit":"b36683920b38c8cc41c6ebc6a401835599cf7b5d",
+   "previous_evaluation_only_package_commit":PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT,
    "parent_training_model_sha256":EXPECT["pg_sha"],"optimizer_checkpoint_sha256":EXPECT["pg_opt"],
    "clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE,
    "model_identities":identity["models"],"registered_seed_table_sha256":fsha(SEEDS)}
@@ -719,13 +773,15 @@ def run_evaluation_only():
   smoke=run_smoke_once(plan["smoke"],root=root,clock=clock,package_commit=package)
   if smoke.get("status")!="SUCCEEDED" or smoke.get("completed")!=len(plan["smoke"]):
    out={"status":"SMOKE_INCOMPLETE","smoke_expected":len(plan["smoke"]),
-    "active_wall_seconds":clock.elapsed(),"attempt_summary":partial_unit_summary(root,plan["smoke"],package)}
+    "active_wall_seconds":clock.elapsed(),"attempt_summary":partial_unit_summary(root,plan["smoke"],package),
+    "reused_prior_receipts":smoke.get("reused_prior_receipts",{})}
    atomicj(progress,{"schema_id":"issue81-evaluation-only-progress-v1",**out,"package_commit":package,
     "supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE})
    return out
   smoke_terminals=validate_terminal_batch(smoke,plan["smoke"],formal=False)
   writej(root/"diagnostic-smoke-terminals.json",{"schema_id":"issue81-evaluation-only-smoke-v1",
-   "efficacy_cohort":False,"terminals":smoke_terminals,"attempt_resources":attempts_summary(root)})
+   "efficacy_cohort":False,"terminals":smoke_terminals,"reused_prior_receipts":smoke.get("reused_prior_receipts",{}),
+   "attempt_resources":attempts_summary(root)})
   atomicj(progress,{"schema_id":"issue81-evaluation-only-progress-v1","status":"SMOKE_COMPLETE",
    "package_commit":package,"smoke_terminals":smoke_terminals,"active_wall_seconds":clock.elapsed(),
    "supplemental_clock_id":SUPPLEMENTAL_CLOCK_ID,"allowance_seconds":SUPPLEMENTAL_ALLOWANCE})

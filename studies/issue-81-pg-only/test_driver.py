@@ -5,6 +5,15 @@ p=Path(__file__).with_name("driver.py")
 s=importlib.util.spec_from_file_location("issue81_driver_test",p)
 d=importlib.util.module_from_spec(s); s.loader.exec_module(d)
 class ContractTests(unittest.TestCase):
+ def test_native_source_commit_expectation_is_full_sha(self):
+  self.assertEqual(d.EXPECT["sts"],"8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2")
+  self.assertEqual(len(d.EXPECT["sts"]),40)
+ def test_prior_base_smoke_receipt_is_verified_and_reused(self):
+  row=d.evaluation_only_plan()["smoke"][0]
+  result,provenance=d.previous_smoke_receipt(row,current_root=Path("/issue81-no-current-attempts"))
+  self.assertEqual(result["package_commit"],d.PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT)
+  self.assertEqual(provenance["result_sha256"],d.PREVIOUS_BASE_SMOKE_RESULT_SHA256)
+  self.assertEqual(provenance["source_lock_sha256"],d.PREVIOUS_BASE_SMOKE_SOURCE_LOCK_SHA256)
  def test_fixed_populations(self):
   t=d.seed_table(); tr=[r for r in t["rows"] if r["phase"]=="training"]; ev=[r for r in t["rows"] if r["phase"]=="heldout"]
   self.assertEqual(len(tr),384); self.assertEqual(len(ev),288)
@@ -73,6 +82,11 @@ class ContractTests(unittest.TestCase):
   self.assertNotIn("D.run_units",source)
   self.assertIn("PRIOR_FAILED_ATTEMPT_EXISTS",source)
   self.assertIn("SMOKE_WORKER_FAILED",source)
+  self.assertIn("previous_smoke_receipt",source)
+  helper=inspect.getsource(d.previous_smoke_receipt)
+  self.assertIn("PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT",helper)
   main=inspect.getsource(d.run_evaluation_only)
   self.assertIn("run_smoke_once",main)
+  self.assertIn("previous_evaluation_only_package_commit",main)
+  self.assertEqual(d.PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT,"a484175828868da5de7147694122b5ff41da4d25")
 if __name__=="__main__": unittest.main()
