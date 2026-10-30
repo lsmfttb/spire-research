@@ -1,0 +1,67 @@
+{
+  "schema_id": "issue81-evaluation-only-continuation-summary-v1",
+  "issue": 81,
+  "status": "COMPLETE",
+  "scope": "Only the 83 previously missing registered heldout units were executed; 205 prior verified receipts were reused read-only. No retraining or simulator dispatch occurred during final analysis.",
+  "source": {
+    "package_commit": "6771374736cd1589b59b79100f383414b070e209",
+    "source_lock_sha256": "4052644e604eac6e45c6de71cede26ac0c1f01603fe2861e5b127dccc266e159"
+  },
+  "heldout": {
+    "verified_terminals": 288,
+    "registered_terminals": 288,
+    "prior_reused": 205,
+    "newly_completed": 83,
+    "per_arm_owners": {
+      "BASE": 96,
+      "PGONLY": 96,
+      "JTRAIN": 96
+    },
+    "active_wall_seconds": 1238.5056472949998,
+    "additional_allowance_seconds": 1500,
+    "combined_original_and_supplemental_active_wall_seconds": 6834.3113538250045
+  },
+  "terminal_floor_mean_by_arm": {
+    "BASE": 9.770833333333334,
+    "PGONLY": 12.96875,
+    "JTRAIN": 13.979166666666666
+  },
+  "primary_contrast": {
+    "id": "JTRAIN minus PGONLY terminal-floor mean",
+    "mean_difference": 1.0104166666666667,
+    "paired_owners": 96,
+    "owner_cluster_bootstrap_replicates": 20000,
+    "ci95": [
+      -0.3020833333333333,
+      2.3020833333333335
+    ],
+    "interpretation": "The interval spans zero; this study does not establish an advantage of the JTRAIN full training procedure over PGONLY, and does not establish equivalence."
+  },
+  "act2_reached": {
+    "BASE": 0,
+    "PGONLY": 13,
+    "JTRAIN": 7,
+    "owners_per_arm": 96
+  },
+  "act3_act4_or_heart_victory": {
+    "all_arms": 0
+  },
+  "limitations": [
+    "Native surrogate with privileged training state; no live-game or public-transfer claim.",
+    "Matching owner seeds do not imply common post-action RNG paths.",
+    "The contrast is a full training-procedure difference, not fixed-data causal isolation of the elite-loss term.",
+    "Terminal floor 16 does not identify first-Boss cause."
+  ],
+  "durable_artifacts": {
+    "root": "D:\\DeadlycatCoding\\stsrl-data\\issue81\\artifacts\\evaluation-only\\6771374736cd1589b59b79100f383414b070e209",
+    "analysis_file": "continuation-analysis-6771374736cd1589b59b79100f383414b070e209.json",
+    "analysis_sha256": "7371D32CB6746023973EFF101F14FE0D3FD7F24801A96071D9D4997F5715E9EA",
+    "terminal_mapping_file": "continuation-terminal-mapping.json",
+    "terminal_mapping_sha256": "DBC23E45BE9E3078CE816FF96751AABFABEFCCF93917393908DCDBC05BF29F41"
+  },
+  "verification": {
+    "tests": "19 passed",
+    "memory_regression": "Streaming feature aggregation keeps only one decoded owner payload live.",
+    "dispatch_guard": "Analysis-only helper rejects all simulator dispatch."
+  }
+}
