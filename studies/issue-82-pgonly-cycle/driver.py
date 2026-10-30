@@ -425,11 +425,69 @@ def distribution(values):
  return {"count":len(ordered),"mean":statistics.fmean(ordered),"median":q(.5),"p90":q(.9),"p95":q(.95),"max":ordered[-1]}
 
 
+def finalize_pilot_clock_outputs(report_path,policy_path,clock_mode,closed_seconds):
+ """Reconcile pilot reports to the closed clock, including report-generation closeout."""
+ if not policy_path.is_file(): return None
+ clock_path=ARTIFACTS/f"active-wall-{clock_mode}.json"
+ policy=read_json(policy_path)
+ sampled=float(policy.get("actual_pilot_active_seconds",closed_seconds))
+ components=policy.get("projection_components_seconds")
+ if isinstance(components,dict) and components:
+  components["pilot_actual_active_wall_carried_forward"]=float(closed_seconds)
+  projection=math.fsum(float(value) for value in components.values())
+ else:
+  projection=float(policy.get("complete_task_projection_seconds",closed_seconds))+float(closed_seconds)-sampled
+ policy["pre_closeout_pilot_active_seconds"]=sampled
+ policy["actual_pilot_active_seconds"]=float(closed_seconds)
+ policy["complete_task_projection_seconds"]=projection
+ policy["complete_task_projection_hours"]=projection/3600.0
+ factor=float(policy["allowance_factor"])
+ allowance=math.ceil(projection*factor)
+ policy["one_global_active_wall_allowance_seconds"]=allowance
+ policy["pilot_active_wall_clock_path"]=str(clock_path)
+ policy["pilot_active_wall_clock_sha256"]=file_sha256(clock_path)
+ atomic_json(policy_path,policy)
+ if not report_path.is_file(): return None
+ report=read_json(report_path)
+ report["pre_closeout_pilot_active_seconds"]=sampled
+ report["pilot_active_seconds"]=float(closed_seconds)
+ report["complete_task_projection_seconds"]=projection
+ report["complete_task_projection_hours"]=projection/3600.0
+ report["single_global_active_wall_allowance_seconds"]=allowance
+ report["time_policy_sha256"]=file_sha256(policy_path)
+ report["active_wall_clock_path"]=str(clock_path)
+ report["active_wall_clock_sha256"]=file_sha256(clock_path)
+ atomic_json(report_path,report)
+ return report
+
+
+def closed_active_wall_clock(mode,*,required=True):
+ path=ARTIFACTS/f"active-wall-{mode}.json"
+ if not path.is_file():
+  if required: raise FileNotFoundError(f"closed active-wall clock is missing: {path}")
+  return None
+ record=read_json(path)
+ if record.get("mode")!=mode: raise RuntimeError(f"active-wall clock mode mismatch: {path}")
+ if record.get("active_session") is not None or record.get("process_ids"):
+  raise RuntimeError(f"active-wall clock is not closed: {path}")
+ elapsed=float(record.get("elapsed_seconds",-1.0))
+ if not math.isfinite(elapsed) or elapsed<0.0: raise RuntimeError(f"invalid closed active-wall total: {path}")
+ return {"path":path,"record":record,"elapsed_seconds":elapsed,"sha256":file_sha256(path)}
+
+
+def pilot_report_recovery_status(report,recovery_clock):
+ if recovery_clock is not None: return "MEASURED"
+ finalization=report.get("finalization") or {}
+ if finalization.get("original_failure"): return "UNMEASURED"
+ return "NOT_REQUIRED"
+
+
 def pilot():
  check_lock()
  package=current_source_commit()
  root=ARTIFACTS/"pilot"/package
  report_path=root/"pilot-report.json"
+ policy_path=root/"time-policy.json"
  if report_path.exists(): return read_json(report_path)
  clock=D.ActiveClock(f"pilot-{package[:12]}",None)
  try:
@@ -487,7 +545,7 @@ def pilot():
    "disposable_update_receipt":update_receipt,
    "limitations":["32 debug training owners and 40 debug evaluation owner-arm games; throughput extrapolation assumes same concurrency",
     "later-policy and retry uncertainty factors are projections, not measured future timings","pilot-trained pi5 aliases all four checkpoint routes and is not efficacy evidence"]}
-  write_json_once(root/"time-policy.json",policy)
+  write_json_once(policy_path,policy)
   result={"schema_id":"issue82-real-native-pilot-v1","status":"PILOT_COMPLETE_NONFORMAL",
    "source_branch_sha":package,"source_lock_sha256":file_sha256(SOURCE_LOCK),"seed_table_sha256":file_sha256(SEED_TABLE),
    "parent_native_preflight":preflight,
@@ -508,19 +566,81 @@ def pilot():
    "time_policy_path":(root/"time-policy.json").relative_to(DATA).as_posix(),"formal_results":False,"efficacy_inference":False}
   write_json_once(report_path,result)
   return result
- finally: clock.close()
+ finally:
+  closed_seconds=clock.close()
+  closed_report=finalize_pilot_clock_outputs(report_path,policy_path,f"pilot-{package[:12]}",closed_seconds)
+  if closed_report is not None and "result" in locals():
+   result.clear(); result.update(closed_report)
 
 
-def ensure_formal_clock_initial_state(pilot_seconds):
+def formal_clock_initial_baseline(prior):
+ sessions=ARTIFACTS/"wall-sessions"
+ candidates=[]
+ if sessions.is_dir():
+  for path in sessions.glob("formal-*.json"):
+   record=read_json(path)
+   if record.get("mode")!="formal" or record.get("session_start_utc") is None: continue
+   if record.get("cumulative_seconds") is None or record.get("session_seconds") is None: continue
+   baseline=round(float(record["cumulative_seconds"])-float(record["session_seconds"]),9)
+   if math.isfinite(baseline) and baseline>=0.0:
+    candidates.append((str(record["session_start_utc"]),baseline))
+ if candidates: return min(candidates)[1]
+ return float(prior.get("session_base_seconds",prior.get("elapsed_seconds",0.0)))
+
+
+def ensure_formal_clock_initial_state(pilot_seconds,*,pilot_clock_sha256,recovery_seconds,
+                                      recovery_clock_sha256,recovery_status):
  path=ARTIFACTS/"active-wall-formal.json"
- if path.exists():
-  prior=read_json(path)
-  if prior.get("active_session"): raise RuntimeError("formal active-wall clock still has an active process")
-  if float(prior.get("elapsed_seconds",0))<pilot_seconds: raise RuntimeError("formal clock lost pilot active time")
-  return
- write_json_once(path,{"schema_id":"issue79-active-wall-clock-v1","mode":"formal","elapsed_seconds":pilot_seconds,
-  "active_session":None,"process_ids":[],"heartbeat_utc":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),
-  "counting_rule":"Issue 82 pilot plus formal active program intervals; idle gaps excluded"})
+ reconciliation_path=ARTIFACTS/"formal-clock-carry-forward.json"
+ exists=path.exists()
+ prior=read_json(path) if exists else {"schema_id":"issue79-active-wall-clock-v1","mode":"formal",
+  "elapsed_seconds":0.0,"session_base_seconds":0.0,"active_session":None,"process_ids":[]}
+ if prior.get("active_session") or prior.get("process_ids"):
+  raise RuntimeError("formal active-wall clock still has an active process")
+ current=float(prior.get("elapsed_seconds",0.0))
+ reconciliation=read_json(reconciliation_path) if reconciliation_path.exists() else None
+ if reconciliation is not None:
+  baseline=float(reconciliation["initial_formal_clock_baseline_seconds"])
+  already_applied=float(reconciliation.get("applied_carry_forward_seconds",0.0))
+ else:
+  baseline=formal_clock_initial_baseline(prior) if exists else 0.0
+  prior_adjustment=prior.get("carry_forward_reconciliation") or {}
+  already_applied=float(prior_adjustment.get("added_seconds",0.0))
+  if prior_adjustment:
+   baseline=float(prior.get("pre_carry_forward_elapsed_seconds",baseline))
+ required=float(pilot_seconds)
+ if recovery_seconds is not None: required+=float(recovery_seconds)
+ required_adjustment=max(0.0,required-baseline)
+ additional=max(0.0,required_adjustment-already_applied)
+ if additional:
+  prior["pre_carry_forward_elapsed_seconds"]=current
+  prior["elapsed_seconds"]=current+additional
+  prior["session_base_seconds"]=current+additional
+  prior["carry_forward_reconciliation"]={"initial_formal_clock_baseline_seconds":baseline,
+   "required_closed_pilot_and_measured_recovery_seconds":required,
+   "added_seconds":additional,"reason":"reconcile the closed pilot and measured recovery against the first formal session baseline"}
+  atomic_json(path,prior)
+ elif not exists:
+  prior["elapsed_seconds"]=required
+  prior["session_base_seconds"]=required
+  prior["heartbeat_utc"]=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())
+  prior["counting_rule"]="Issue 82 closed pilot, measured receipt-only recovery, plus formal active program intervals; idle gaps excluded"
+  atomic_json(path,prior)
+ history=[] if reconciliation is None else list(reconciliation.get("adjustment_history",[]))
+ if additional or reconciliation is None:
+  history.append({"required_known_pilot_plus_recovery_seconds":required,"added_seconds":additional,
+   "pilot_active_wall_clock_sha256":pilot_clock_sha256,"pilot_report_recovery_status":recovery_status,
+   "pilot_report_recovery_active_wall_clock_sha256":recovery_clock_sha256})
+ reconciliation={"schema_id":"issue82-formal-clock-carry-forward-v1",
+  "initial_formal_clock_baseline_seconds":baseline,
+  "applied_carry_forward_seconds":already_applied+additional,
+  "latest_required_known_pilot_plus_recovery_seconds":required,
+  "pilot_report_recovery_status":recovery_status,
+  "pilot_report_recovery_seconds":recovery_seconds,
+  "unmeasured_recovery_interval_is_not_zero":recovery_status=="UNMEASURED",
+  "adjustment_history":history}
+ atomic_json(reconciliation_path,reconciliation)
+ return reconciliation
 
 
 def verify_update(block,rows,root):
@@ -598,6 +718,36 @@ def analyze(root,table,package):
 
 def finalize_pilot(package):
  """Build the missing pilot summary from immutable completed phases; never launches workers."""
+ root=ARTIFACTS/"pilot"/package
+ report_path=root/"pilot-report.json"
+ if report_path.is_file():
+  check_lock()
+  return read_json(report_path)
+ recovery_mode=f"pilot-report-recovery-{package[:12]}"
+ recovery_clock=D.ActiveClock(recovery_mode,None)
+ try:
+  return _assemble_pilot_report(package)
+
+ finally:
+  recovery_clock.close()
+  recovery_record=closed_active_wall_clock(recovery_mode)
+  recovery_session=read_json(recovery_clock.session_path)
+  if report_path.is_file():
+   recovered=read_json(report_path)
+   finalization=recovered.setdefault("finalization",{})
+   finalization["report_recovery_active_wall_status"]="MEASURED"
+   finalization["report_recovery_active_wall_session_seconds"]=float(recovery_session["session_seconds"])
+   finalization["report_recovery_active_wall_cumulative_seconds"]=recovery_record["elapsed_seconds"]
+   finalization["report_recovery_active_wall_clock_path"]=str(recovery_record["path"])
+   finalization["report_recovery_active_wall_clock_sha256"]=recovery_record["sha256"]
+   finalization["report_recovery_wall_session_path"]=str(recovery_clock.session_path)
+   finalization["report_recovery_wall_session_sha256"]=file_sha256(recovery_clock.session_path)
+   atomic_json(report_path,recovered)
+   if "result" in locals(): result.clear(); result.update(recovered)
+
+
+
+def _assemble_pilot_report(package):
  check_lock()
  root=ARTIFACTS/"pilot"/package
  report_path=root/"pilot-report.json"
@@ -691,7 +841,6 @@ def finalize_pilot(package):
  write_json_once(report_path,result)
  return result
 
-
 def find_pilot_package(current_package,table_sha):
  """Select one complete pilot from this source's ancestry, preferring an exact-SHA match."""
  roots=[]
@@ -717,8 +866,16 @@ def formal():
  report=read_json(pilot_path); policy=read_json(policy_path)
  if report.get("source_branch_sha")!=pilot_package or report.get("status")!="PILOT_COMPLETE_NONFORMAL": raise RuntimeError("matching complete source-locked pilot is required")
  if report.get("seed_table_sha256")!=file_sha256(SEED_TABLE) or policy.get("seed_table_sha256")!=file_sha256(SEED_TABLE): raise RuntimeError("pilot used a different seed table")
- allowance=int(policy["one_global_active_wall_allowance_seconds"]); pilot_seconds=float(policy["actual_pilot_active_seconds"])
- ensure_formal_clock_initial_state(pilot_seconds)
+ allowance=int(policy["one_global_active_wall_allowance_seconds"])
+ pilot_clock=closed_active_wall_clock(f"pilot-{pilot_package[:12]}")
+ pilot_seconds=pilot_clock["elapsed_seconds"]
+ recovery_clock=closed_active_wall_clock(f"pilot-report-recovery-{pilot_package[:12]}",required=False)
+ recovery_seconds=None if recovery_clock is None else recovery_clock["elapsed_seconds"]
+ recovery_status=pilot_report_recovery_status(report,recovery_clock)
+ measured_carry_forward=pilot_seconds+(0.0 if recovery_seconds is None else recovery_seconds)
+ carry_forward_reconciliation=ensure_formal_clock_initial_state(measured_carry_forward,
+  pilot_clock_sha256=pilot_clock["sha256"],recovery_seconds=recovery_seconds,
+  recovery_clock_sha256=None if recovery_clock is None else recovery_clock["sha256"],recovery_status=recovery_status)
  root=ARTIFACTS/"formal"/package; root.mkdir(parents=True,exist_ok=True)
  clock=D.ActiveClock("formal",allowance); updates=[]; table=read_json(SEED_TABLE)
  try:
@@ -751,6 +908,13 @@ def formal():
   check_lock(); final=analyze(root,table,package)
   final["pilot_report_sha256"]=file_sha256(pilot_path); final["time_policy_sha256"]=file_sha256(policy_path)
   final["training_updates"]=updates; final["pilot_active_wall_seconds_carried_forward"]=pilot_seconds
+  final["pilot_active_wall_clock_path"]=str(pilot_clock["path"]); final["pilot_active_wall_clock_sha256"]=pilot_clock["sha256"]
+  final["pilot_report_recovery_status"]=recovery_status
+  final["pilot_report_recovery_active_wall_seconds_carried_forward"]=recovery_seconds
+  final["pilot_report_recovery_active_wall_clock_sha256"]=None if recovery_clock is None else recovery_clock["sha256"]
+  final["formal_clock_carry_forward_path"]=str(ARTIFACTS/"formal-clock-carry-forward.json")
+  final["formal_clock_carry_forward_sha256"]=file_sha256(ARTIFACTS/"formal-clock-carry-forward.json")
+  final["active_wall_clock_path"]=str(ARTIFACTS/"active-wall-formal.json")
   final["active_wall_seconds_before_closeout"]=clock.elapsed(); final["active_wall_allowance_seconds"]=allowance
   final_path=root/"final-analysis.json"; write_json_once(final_path,final)
   atomic_json(root/"formal-progress.json",{"schema_id":"issue82-formal-progress-v1","status":"COMPLETE",
@@ -763,7 +927,42 @@ def formal():
    "phase":"training-update","failure":str(exc),"completed_training_owners":sum(int(x["owner_count"]) for x in updates),
    "completed_updates":updates,"active_wall_seconds":clock.elapsed(),"active_wall_allowance_seconds":allowance}
   atomic_json(root/"formal-progress.json",result); return result
- finally: clock.close()
+ finally:
+  clock.close()
+  closed_formal=closed_active_wall_clock("formal")
+  progress_path=root/"formal-progress.json"
+  progress=read_json(progress_path) if progress_path.is_file() else {}
+  closeout={"schema_id":"issue82-active-wall-closeout-v1",
+   "status":"CLOSED_CLOCK_RECONCILED" if progress else "CLOSED_CLOCK_WITHOUT_PROGRESS_MANIFEST",
+   "active_wall_seconds":closed_formal["elapsed_seconds"],"active_wall_allowance_seconds":allowance,
+   "active_wall_clock_path":str(closed_formal["path"]),"active_wall_clock_sha256":closed_formal["sha256"],
+   "pilot_active_wall_seconds_carried_forward":pilot_seconds,
+   "pilot_active_wall_clock_sha256":pilot_clock["sha256"],
+   "pilot_report_recovery_status":recovery_status,
+   "pilot_report_recovery_active_wall_seconds_carried_forward":recovery_seconds,
+   "pilot_report_recovery_active_wall_clock_sha256":None if recovery_clock is None else recovery_clock["sha256"],
+   "formal_clock_carry_forward_path":str(ARTIFACTS/"formal-clock-carry-forward.json"),
+   "formal_clock_carry_forward_sha256":file_sha256(ARTIFACTS/"formal-clock-carry-forward.json"),
+   "known_measured_active_wall_seconds":closed_formal["elapsed_seconds"],
+   "exact_complete_task_active_wall_seconds":closed_formal["elapsed_seconds"] if progress.get("status")=="COMPLETE" and recovery_status!="UNMEASURED" else None,
+   "unmeasured_recovery_interval_is_not_zero":recovery_status=="UNMEASURED"}
+  atomic_json(root/"active-wall-closeout.json",closeout)
+  if progress:
+   progress["active_wall_seconds"]=closed_formal["elapsed_seconds"]
+   progress["active_wall_clock_path"]=str(closed_formal["path"])
+   progress["active_wall_clock_sha256"]=closed_formal["sha256"]
+   progress["pilot_active_wall_seconds_carried_forward"]=pilot_seconds
+   progress["pilot_active_wall_clock_sha256"]=pilot_clock["sha256"]
+   progress["pilot_report_recovery_status"]=recovery_status
+   progress["pilot_report_recovery_active_wall_seconds_carried_forward"]=recovery_seconds
+   progress["pilot_report_recovery_active_wall_clock_sha256"]=None if recovery_clock is None else recovery_clock["sha256"]
+   progress["formal_clock_carry_forward_path"]=str(ARTIFACTS/"formal-clock-carry-forward.json")
+   progress["formal_clock_carry_forward_sha256"]=file_sha256(ARTIFACTS/"formal-clock-carry-forward.json")
+   progress["active_wall_closeout_path"]="active-wall-closeout.json"
+   progress["active_wall_closeout_sha256"]=file_sha256(root/"active-wall-closeout.json")
+   atomic_json(progress_path,progress)
+  if "final" in locals(): final["active_wall_seconds_after_closeout"]=closed_formal["elapsed_seconds"]
+  elif "result" in locals(): result["active_wall_seconds_after_closeout"]=closed_formal["elapsed_seconds"]
 
 
 def main():
