@@ -1,9 +1,12 @@
-import importlib.util
+import gc, hashlib, importlib.util, io, json, tarfile, tempfile, types, unittest, subprocess, sys, inspect, weakref, zlib
 from pathlib import Path
-import unittest, subprocess, sys, inspect
+from unittest.mock import patch
 p=Path(__file__).with_name("driver.py")
 s=importlib.util.spec_from_file_location("issue81_driver_test",p)
 d=importlib.util.module_from_spec(s); s.loader.exec_module(d)
+hp=p.with_name("closeout_issue81.py")
+hs=importlib.util.spec_from_file_location("issue81_closeout_test",hp)
+h=importlib.util.module_from_spec(hs); hs.loader.exec_module(h)
 class ContractTests(unittest.TestCase):
  def test_launcher_resolves_current_task_worktree(self):
   launcher=p.with_name("run_issue81.sh").read_text()
@@ -108,4 +111,53 @@ class ContractTests(unittest.TestCase):
    {"BASE":"P0","PGONLY":"P1","JTRAIN":"P1"})
   with self.assertRaisesRegex(ValueError,"unregistered Issue 81 evaluation arm"):
    d.native_controller_arm("R")
+ def test_closeout_helper_blocks_simulator_dispatch(self):
+  package=types.SimpleNamespace(D=types.SimpleNamespace(run_units=lambda *_args,**_kwargs: "unblocked"))
+  h.disable_simulator(package)
+  with self.assertRaisesRegex(RuntimeError,"analysis-only closeout refuses all simulator dispatch"):
+   package.D.run_units([])
+ def test_elite_closeout_streams_payloads_without_changing_aggregates(self):
+  class WeakPayload(dict): pass
+  live_refs=[]; max_live=[0]; original_loads=json.loads
+  def tracked_loads(data,*args,**kwargs):
+   value=original_loads(data,*args,**kwargs)
+   if isinstance(value,dict) and "roots" in value:
+    value=WeakPayload(value); live_refs.append(weakref.ref(value)); gc.collect()
+    max_live[0]=max(max_live[0],sum(ref() is not None for ref in live_refs))
+   return value
+  class Trajectory:
+   def __init__(self,root):
+    self.complete=True; self.search_root_id=root
+    self.decisions=[types.SimpleNamespace(state_fingerprint="fp-"+root)]
+  class ExampleExecutor:
+   def _training_example_from_payload(self,payload):
+    return types.SimpleNamespace(base="base",joint_trajectories=[Trajectory(root) for root in payload["roots"]])
+  class Algorithm:
+   def elite_candidate(self,base,trajectories):
+    return types.SimpleNamespace(decisions=[1,2]) if trajectories[0].search_root_id=="elite" else None
+  with tempfile.TemporaryDirectory(dir=p.parent,prefix=".elite-stream-test-") as directory:
+   archive=Path(directory)/"features.tar"; seeds=(7600001,7600002)
+   with tarfile.open(archive,"w:") as tar:
+    for seed in seeds:
+     prefix=f"units/TRAIN-{seed}/attempt-0001"; unit=f"TRAIN:{seed}"
+     payload={"owner_seed":seed,"unit_id":unit,"roots":["elite","control"],"search_receipts":[{},{}]}
+     zipped=zlib.compress(json.dumps(payload,separators=(",",":")).encode())
+     result={"owner_seed":seed,"unit_id":unit,"status":"SUCCEEDED","phase":"training","arm":"TRAIN","formal":True,
+      "package_commit":"fixture-package","training_features":{"sha256":hashlib.sha256(zipped).hexdigest()}}
+     for name,body in ((prefix+"/result.json",json.dumps(result).encode()),(prefix+"/training-features.json.zlib",zipped)):
+      member=tarfile.TarInfo(name); member.size=len(body); tar.addfile(member,io.BytesIO(body))
+   with patch.object(d,"RAW79",archive), patch.object(d,"TRAIN",seeds), \
+        patch.object(d.D,"load_modules",return_value=(Algorithm(),None,None,None,ExampleExecutor())), \
+        patch.object(d.json,"loads",side_effect=tracked_loads):
+    result=d.elite_note()
+  self.assertEqual(result["status"],"INCOMPLETE_SOURCE_COVERAGE")
+  self.assertEqual(result["owners_with_successful_source_features"],2)
+  self.assertEqual(result["missing_owners"],382)
+  self.assertEqual(result["source_package_commits"],["fixture-package"])
+  self.assertEqual(result["successful_J_search_root_receipts"],4)
+  self.assertEqual(result["complete_joint_roots_considered"],4)
+  self.assertEqual(result["roots_with_strictly_superior_elite"],2)
+  self.assertEqual(result["selected_strictly_superior_elite_decisions"],4)
+  self.assertEqual(max_live[0],1)
+  self.assertEqual(result["analysis_implementation"]["memory_strategy"],"process one decompressed owner payload at a time")
 if __name__=="__main__": unittest.main()
