@@ -13,6 +13,11 @@ ALLOWANCE=67272
 def canon(v): return json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False).encode()
 def sha_bytes(b): return hashlib.sha256(b).hexdigest()
 def sha_file(p): return sha_bytes(Path(p).read_bytes())
+def canonical_text_sha(p):
+ raw=Path(p).read_bytes();raw.decode("utf-8-sig")
+ raw=raw.replace(bytes((13,10)),bytes((10,))).replace(bytes((13,)),bytes((10,)))
+ if raw.startswith(bytes((239,187,191))):raw=raw[3:]
+ return sha_bytes(raw)
 def readj(p): return json.loads(Path(p).read_text(encoding="utf-8"))
 def write_once(p,v):
  p=Path(p);p.parent.mkdir(parents=True,exist_ok=True);raw=canon(v)+b"\n"
@@ -31,14 +36,20 @@ def load_driver(root,label):
  path=Path(root)/"studies/issue-83-pgonly-scale/driver.py"
  spec=importlib.util.spec_from_file_location("issue83_equiv_"+label,path)
  mod=importlib.util.module_from_spec(spec);sys.modules[spec.name]=mod;spec.loader.exec_module(mod);mod.configure_driver()
- package=mod.current_source_commit();lock=sha_file(mod.SOURCE_LOCK)
+ package=mod.current_source_commit();lock=canonical_text_sha(mod.SOURCE_LOCK)
  mod._equiv_base_load_modules=mod.load_modules
  if label=="original":
   if package!=ORIGINAL or lock!=OLD_LOCK:raise RuntimeError("original source epoch differs from registered source")
-  if sha_file(mod.NATIVE)!=NATIVE:raise RuntimeError("native binary changed")
+  manifest=readj(mod.SOURCE_LOCK)
+  study_mismatch=[k for k,v in manifest["study_files_sha256"].items() if canonical_text_sha(mod.STUDY/k)!=v]
+  source_mismatch=[k for k,v in manifest["source_files_sha256"].items() if sha_file(mod.REPO/k)!=v]
+  if study_mismatch or source_mismatch or canonical_text_sha(mod.STUDY/"contract.json")!=manifest["contract_sha256"] or canonical_text_sha(mod.SEED_TABLE)!=manifest["seed_table_sha256"] or mod.source_identity()!=manifest["runtime_identity"]:
+   raise RuntimeError(f"original source-lock verification failed after text normalization: study={study_mismatch}; source={source_mismatch}")
  else:
-  mod.check_lock()
   if package==ORIGINAL:raise RuntimeError("repair source is not a new execution epoch")
+  mod.check_lock()
+  if lock!=mod.repair_source_lock_sha256():raise RuntimeError("repair source-lock identity differs from canonical source-lock helper")
+ if sha_file(mod.NATIVE)!=NATIVE:raise RuntimeError("native binary changed")
  return mod,package,lock
 
 def install_binding_audit(mod,audit_events,progress):
