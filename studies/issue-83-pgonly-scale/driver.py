@@ -236,7 +236,19 @@ def main():
  parser.add_argument("--pilot-package-sha")
  parser.add_argument("--worker",type=Path)
  args=parser.parse_args(); configure_driver()
- if args.worker is not None: return worker_main(args.worker)
+ if args.worker is not None:
+  global CURRENT_WORKER_PACKAGE_ROOT
+  job=read_json(args.worker)
+  package=job.get("package_commit")
+  if not isinstance(package,str) or len(package)!=40 or any(c not in "0123456789abcdef" for c in package):
+   raise RuntimeError("worker job lacks the exact registered package commit")
+  if job.get("source_lock_sha256")!=repair_source_lock_sha256():
+   raise RuntimeError("worker job source-lock SHA differs from the active Issue 83 epoch")
+  artifact_phase="pilot" if job.get("pilot") is True else "formal"
+  CURRENT_WORKER_PACKAGE_ROOT=ARTIFACTS/artifact_phase/package
+  if not CURRENT_WORKER_PACKAGE_ROOT.is_dir():
+   raise FileNotFoundError(f"registered Issue 83 policy package root is missing: {CURRENT_WORKER_PACKAGE_ROOT}")
+  return worker_main(args.worker)
  if args.mode=="prepare": result=prepare()
  elif args.mode=="verify": result=verify_parent_and_runtime(ARTIFACTS/"verify"/"native-import")
  elif args.mode=="pilot": result=pilot()

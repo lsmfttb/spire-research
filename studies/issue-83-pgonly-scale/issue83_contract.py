@@ -1,12 +1,15 @@
 
 STUDY=REPO/"studies/issue-83-pgonly-scale"; DATA=Path("/mnt/d/DeadlycatCoding/stsrl-data/issue83")
 ARTIFACTS=DATA/"artifacts"; STAGE1=STUDY/"stage1"; SEED_TABLE=STUDY/"seed-table.json"
-CONTRACT=STUDY/"contract.json"; SOURCE_LOCK=STUDY/"source-lock-repair-serialization-v1.json"; PREVIOUS_REPAIR_SOURCE_LOCK=STUDY/"source-lock-repair.json"; ORIGINAL_SOURCE_LOCK=STUDY/"source-lock.json"
+CONTRACT=STUDY/"contract.json"; SOURCE_LOCK=STUDY/"source-lock-repair-model-root-v1.json"; PREVIOUS_SERIALIZATION_SOURCE_LOCK=STUDY/"source-lock-repair-serialization-v1.json"; PREVIOUS_REPAIR_SOURCE_LOCK=STUDY/"source-lock-repair.json"; ORIGINAL_SOURCE_LOCK=STUDY/"source-lock.json"
 BASE_COMMIT="acdbf9b397bce95f3e5d26077c34e80dbc59821e"
 ORIGINAL_EXECUTION_COMMIT="3951ee0749d8e9c3dfcba33590ceb1f880047acc"
 ORIGINAL_SOURCE_LOCK_SHA256="224c7a6e2cbd46d986294e68b31a07ec6518ea6f82eda4636ae0c98ef4fa63b2"
 PREVIOUS_REPAIR_EXECUTION_COMMIT="e944d2d0260f9ab4742c3abc693c22f07419419a"
 PREVIOUS_REPAIR_SOURCE_LOCK_SHA256="d7237514b36a64e74d122dbf4ed1e18e51eaf1d639b3d693882f419f0284b794"
+PREVIOUS_SERIALIZATION_EXECUTION_COMMIT="6bb45b127d9ee16afa356449bc5287cb9ceea7b4"
+PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256="503866077292b3fdff17abf74bb23f7dd96ad23f944770f2cf29143a7e3b5528"
+PREVIOUS_SERIALIZATION_ROOT=ARTIFACTS/"formal"/PREVIOUS_SERIALIZATION_EXECUTION_COMMIT
 LEGACY_FORMAL_ROOT=ARTIFACTS/"formal"/ORIGINAL_EXECUTION_COMMIT
 PARENT_ROOT=Path("/mnt/d/DeadlycatCoding/stsrl-data/issue82/artifacts/formal/8f88f1554821707db6228d2de384f2334ec2615b")
 PARENT_MODEL=PARENT_ROOT/"models/pi12.pt"; PARENT_OPTIMIZER=PARENT_ROOT/"models/block-11-step.pt"
@@ -28,6 +31,7 @@ EVALUATION_LATER_POLICY_FACTOR=1.25; ANALYSIS_MINIMUM_SECONDS=300.0; RETRY_OVERH
 SELECTED_POLICY_LABEL=None
 CURRENT_BLOCK=None
 CURRENT_PILOT=False
+CURRENT_WORKER_PACKAGE_ROOT=None
 
 def derive_seed(*parts):
  return int.from_bytes(hashlib.sha256(("issue83-pgonly-scale-v1|"+"|".join(map(str,parts))).encode()).digest()[:4],"big")&0x7fffffff
@@ -124,15 +128,17 @@ def study_file_hashes():
   "seed-table.json":canonical_text_sha256(SEED_TABLE)}
 
 def source_lock_document():
- return {"schema_id":"issue83-source-lock-repair-v3","base_commit":BASE_COMMIT,
+ return {"schema_id":"issue83-source-lock-repair-v4","base_commit":BASE_COMMIT,
   "text_hash_policy":"UTF-8; ignore optional BOM; normalize CRLF and bare CR to LF for locked text files; binary runtime/model/native files remain byte-exact",
-  "source_epoch":{"kind":"semantics-preserving-artifact-serialization-repair",
-   "supersedes_execution_commit":PREVIOUS_REPAIR_EXECUTION_COMMIT,
-   "supersedes_source_lock_sha256":PREVIOUS_REPAIR_SOURCE_LOCK_SHA256,
+  "source_epoch":{"kind":"semantics-preserving-worker-policy-checkpoint-root-routing",
+   "supersedes_execution_commit":PREVIOUS_SERIALIZATION_EXECUTION_COMMIT,
+   "supersedes_source_lock_sha256":PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256,
+   "previous_serialization_execution_commit":PREVIOUS_SERIALIZATION_EXECUTION_COMMIT,
+   "previous_serialization_source_lock_sha256":PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256,
    "previous_repair_source_lock_sha256":PREVIOUS_REPAIR_SOURCE_LOCK_SHA256,
    "original_execution_commit":ORIGINAL_EXECUTION_COMMIT,
    "original_source_lock_sha256":ORIGINAL_SOURCE_LOCK_SHA256,
-   "repair_id":"json-single-serialization-writer"},
+   "repair_id":"separate-policy-checkpoint-root-from-raw-receipt-root"},
   "study_files_sha256":study_file_hashes(),"source_files_sha256":source_files(),
   "runtime_identity":source_identity(),"seed_table_sha256":canonical_text_sha256(SEED_TABLE),
   "contract_sha256":canonical_text_sha256(CONTRACT),"arms":{"pilot":list(PILOT_ARMS),"validation":list(VALIDATION_ARMS),"test":list(TEST_ARMS)},
@@ -145,6 +151,10 @@ def prepare():
  if original!=ORIGINAL_EXECUTION_COMMIT: raise RuntimeError("repair epoch is not descended from the exact original execution source")
  if file_sha256(ORIGINAL_SOURCE_LOCK)!=ORIGINAL_SOURCE_LOCK_SHA256:
   raise RuntimeError("original execution source lock changed; refusing to append repair epoch")
+ if file_sha256(PREVIOUS_REPAIR_SOURCE_LOCK)!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256:
+  raise RuntimeError("prior repair source lock changed; refusing to append repair epoch")
+ if file_sha256(PREVIOUS_SERIALIZATION_SOURCE_LOCK)!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256:
+  raise RuntimeError("previous serialization source lock changed; refusing to append repair epoch")
  source_identity()
  for p in (DATA,ARTIFACTS,ARTIFACTS/"pilot",ARTIFACTS/"formal",ARTIFACTS/"verify",STAGE1): p.mkdir(parents=True,exist_ok=True)
  for src,dst in ((STUDY81/"config.json",STUDY/"config.json"),(STUDY81/"stage1/config.json",STAGE1/"config.json")):
@@ -162,19 +172,22 @@ def prepare():
 
 def check_lock():
  lock=read_json(SOURCE_LOCK)
- if lock.get("schema_id")!="issue83-source-lock-repair-v3" or study_file_hashes()!=lock.get("study_files_sha256"):
-  raise RuntimeError("Issue 83 repair source lock mismatch")
+ if lock.get("schema_id")!="issue83-source-lock-repair-v4" or study_file_hashes()!=lock.get("study_files_sha256"):
+  raise RuntimeError("Issue 83 model-root repair source lock mismatch")
  epoch=lock.get("source_epoch") or {}
- if (epoch.get("kind")!="semantics-preserving-artifact-serialization-repair" or
-     epoch.get("supersedes_execution_commit")!=PREVIOUS_REPAIR_EXECUTION_COMMIT or
-     epoch.get("supersedes_source_lock_sha256")!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256 or
+ if (epoch.get("kind")!="semantics-preserving-worker-policy-checkpoint-root-routing" or
+     epoch.get("supersedes_execution_commit")!=PREVIOUS_SERIALIZATION_EXECUTION_COMMIT or
+     epoch.get("supersedes_source_lock_sha256")!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256 or
+     epoch.get("previous_serialization_execution_commit")!=PREVIOUS_SERIALIZATION_EXECUTION_COMMIT or
+     epoch.get("previous_serialization_source_lock_sha256")!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256 or
      epoch.get("previous_repair_source_lock_sha256")!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256 or
      epoch.get("original_execution_commit")!=ORIGINAL_EXECUTION_COMMIT or
      epoch.get("original_source_lock_sha256")!=ORIGINAL_SOURCE_LOCK_SHA256 or
-     epoch.get("repair_id")!="json-single-serialization-writer" or
+     epoch.get("repair_id")!="separate-policy-checkpoint-root-from-raw-receipt-root" or
+     file_sha256(PREVIOUS_SERIALIZATION_SOURCE_LOCK)!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256 or
      file_sha256(PREVIOUS_REPAIR_SOURCE_LOCK)!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256 or
      file_sha256(ORIGINAL_SOURCE_LOCK)!=ORIGINAL_SOURCE_LOCK_SHA256):
-  raise RuntimeError("serialization repair source lock does not preserve both prior execution epochs")
+  raise RuntimeError("model-root repair source lock does not preserve all prior execution epochs")
  if source_files()!=lock.get("source_files_sha256") or source_identity()!=lock.get("runtime_identity"):
   raise RuntimeError("pinned sources or model identities changed")
  if canonical_text_sha256(SEED_TABLE)!=lock.get("seed_table_sha256") or canonical_text_sha256(CONTRACT)!=lock.get("contract_sha256"):
@@ -318,7 +331,7 @@ def rows_for(table,*,phase,formal,block=None,cohort=None,arms=None):
   (block is None or r.get("block_index")==block) and (cohort is None or r.get("cohort")==cohort) and
   (arms is None or r.get("arm") in arms)]
 
-def verify_update(block,rows,root):
+def verify_update(block,rows,root,*,execution_package=None,execution_lock_sha256=None):
  path=root/"models"/f"issue83-update-{block}.json"
  if not path.is_file(): return None
  rec=read_json(path); ownerhash=hashlib.sha256(",".join(map(str,sorted(int(x["owner_seed"]) for x in rows))).encode("ascii")).hexdigest()
@@ -332,7 +345,9 @@ def verify_update(block,rows,root):
  if block>=26:
   epoch_path=root/"training-block-source-epochs"/f"block-{block}.json"
   summary=rec.get("training_input_epoch_summary") or {}
-  if (rec.get("execution_source_commit")!=current_source_commit() or rec.get("source_lock_sha256")!=repair_source_lock_sha256() or
+  expected_package=execution_package or current_source_commit()
+  expected_lock=execution_lock_sha256 or repair_source_lock_sha256()
+  if (rec.get("execution_source_commit")!=expected_package or rec.get("source_lock_sha256")!=expected_lock or
       summary.get("path")!=epoch_path.relative_to(root).as_posix() or summary.get("sha256")!=file_sha256(epoch_path)):
    raise RuntimeError(f"block {block} update does not bind its mixed/source epoch owner receipts")
  ds=rec.get("diagnostics",[])
@@ -359,6 +374,24 @@ def save_training_progress(root,package,clock,updates,current_block=None):
  atomic_json(root/"training-progress.json",{"schema_id":"issue83-training-progress-v1","source_branch_sha":package,
   "status":"ACTIVE","completed_training_owners":sum(x["owner_count"] for x in updates),"completed_blocks":updates,
   "current_block":current_block,"active_wall_seconds":clock.elapsed(),"allowance_seconds":clock.allowance})
+
+def persist_formal_progress(root,package,clock,updates,*,phase,block_index=None,expected_rows=None,
+                            missing_rows=None,boundary=None):
+ expected_rows=[] if expected_rows is None else expected_rows
+ missing_rows=[] if missing_rows is None else missing_rows
+ completed=sum(int(x["owner_count"]) for x in updates)
+ record={"schema_id":"issue83-progress-v2","status":"ACTIVE","phase":phase,
+  "source_branch_sha":package,"source_lock_sha256":repair_source_lock_sha256(),
+  "completed_training_owners":completed,
+  "completed_training_blocks":[int(x["block_index"]) for x in updates if "block_index" in x],
+  "current_block":block_index,"expected_owner_count":len(expected_rows),
+  "expected_owner_seeds":[int(x["owner_seed"]) for x in expected_rows],
+  "missing_owner_count":len(missing_rows),
+  "missing_owner_seeds":[int(x["owner_seed"]) for x in missing_rows],
+  "active_wall_seconds":clock.elapsed(),"allowance_seconds":clock.allowance,
+  "durable_boundary":boundary or {}}
+ atomic_json(Path(root)/"formal-progress.json",record)
+ return record
 
 def _phase_reports(root,rows,package):
  out=[]
@@ -617,7 +650,9 @@ def analyze_test(root,table,package,selection,*,data_root):
 
 
 def source_bound_training_receipt(data_root,row,package):
- old=(ORIGINAL_EXECUTION_COMMIT,ORIGINAL_SOURCE_LOCK_SHA256); new=(package,repair_source_lock_sha256())
+ old=(ORIGINAL_EXECUTION_COMMIT,ORIGINAL_SOURCE_LOCK_SHA256)
+ previous=(PREVIOUS_SERIALIZATION_EXECUTION_COMMIT,PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256)
+ current=(package,repair_source_lock_sha256())
  block=int(row["block_index"]); folder=Path(data_root)/"units"/D.unit_key(row["unit_id"])
  if not folder.is_dir(): return None
  matches=[]
@@ -627,8 +662,9 @@ def source_bound_training_receipt(data_root,row,package):
   if value.get("unit_id")!=row["unit_id"] or value.get("owner_seed")!=row["owner_seed"]:
    raise RuntimeError(f"training receipt bound to wrong owner: {result}")
   identity=(value.get("package_commit"),value.get("source_lock_sha256"))
-  if identity==old and block>26: raise RuntimeError(f"old receipt outside source epoch: {result}")
-  if identity not in (old,new): raise RuntimeError(f"unregistered training receipt source: {result}")
+  if identity==old and block>26: raise RuntimeError(f"original-source receipt outside block 12-26: {result}")
+  if identity==previous and block!=26: raise RuntimeError(f"previous repair receipt outside block 26: {result}")
+  if identity not in (old,previous,current): raise RuntimeError(f"unregistered training receipt source: {result}")
   if (value.get("phase")!=row["phase"] or value.get("arm")!=row["arm"] or value.get("formal") is not True or
       value.get("expert_decisions")!=0 or value.get("search")!=[] or value.get("terminal_outcome") is None or value.get("terminal_floor") is None):
    raise RuntimeError(f"training receipt violates contract: {result}")
@@ -662,16 +698,21 @@ def training_examples_across_epochs(rows,data_root,executor,package):
 
 def training_block_source_epoch(root,data_root,rows,block,package):
  receipts=[]; counts={}; old=(ORIGINAL_EXECUTION_COMMIT,ORIGINAL_SOURCE_LOCK_SHA256)
+ previous=(PREVIOUS_SERIALIZATION_EXECUTION_COMMIT,PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256)
  for row in sorted(rows,key=lambda item:int(item["owner_seed"])):
   found=source_bound_training_receipt(data_root,row,package)
   if found is None: raise RuntimeError(f"block {block} lacks owner {row['unit_id']}")
-  report,path,identity=found; epoch="original-3951ee0" if identity==old else "repair-"+package[:12]
+  report,path,identity=found
+  if identity==old: epoch="original-3951ee0"
+  elif identity==previous: epoch="repair-"+PREVIOUS_SERIALIZATION_EXECUTION_COMMIT[:12]
+  else: epoch="repair-"+package[:12]
   counts[epoch]=counts.get(epoch,0)+1; pointer=report.get("training_features") or {}
   receipts.append({"unit_id":row["unit_id"],"owner_seed":int(row["owner_seed"]),"execution_source_commit":identity[0],
    "source_lock_sha256":identity[1],"result_path":path.relative_to(Path(data_root)).as_posix(),
    "result_sha256":file_sha256(path),"training_features_path":pointer.get("path"),"training_features_sha256":pointer.get("sha256")})
- expected=({"original-3951ee0":128} if block<=25 else
-  {"original-3951ee0":127,"repair-"+package[:12]:1} if block==26 else {"repair-"+package[:12]:128})
+ if block<=25: expected={"original-3951ee0":128}
+ elif block==26: expected={"original-3951ee0":127,"repair-"+PREVIOUS_SERIALIZATION_EXECUTION_COMMIT[:12]:1}
+ else: expected={"repair-"+package[:12]:128}
  if counts!=expected: raise RuntimeError(f"block {block} source counts differ: {counts}, expected {expected}")
  record={"schema_id":"issue83-training-block-source-epochs-v1","status":"VERIFIED_BEFORE_UPDATE",
   "block_index":block,"owner_count":len(rows),"source_epoch_counts":counts,"source_epoch_receipts":receipts,
@@ -682,15 +723,20 @@ def training_block_source_epoch(root,data_root,rows,block,package):
 
 
 def write_source_epoch_plan(root,package,allowance):
- plan={"schema_id":"issue83-source-epoch-plan-v1","status":"LOCKED_BEFORE_RESUMED_FORMAL",
+ plan={"schema_id":"issue83-source-epoch-plan-v2","status":"LOCKED_BEFORE_RESUMED_FORMAL",
   "repair_execution_source_commit":package,"repair_source_lock_sha256":repair_source_lock_sha256(),
+  "previous_serialization_execution_source_commit":PREVIOUS_SERIALIZATION_EXECUTION_COMMIT,
+  "previous_serialization_source_lock_sha256":PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256,
   "original_execution_source_commit":ORIGINAL_EXECUTION_COMMIT,"original_source_lock_sha256":ORIGINAL_SOURCE_LOCK_SHA256,
   "native_source_commit":EXPECTED["sts_commit"],"native_module_sha256":EXPECTED["native_sha256"],
   "raw_training_receipts_remain_at":str(LEGACY_FORMAL_ROOT),
-  "allocation":{"blocks_12_to_25":{"source":ORIGINAL_EXECUTION_COMMIT,"owners_per_block":128},
-   "block_26":{"original_source_receipts":127,"repair_source_receipts":1,"repair_owner_seed":8301831},
-   "blocks_27_to_35":{"source":package,"owners_per_block":128},
-   "expected_total_original_source_receipts":1919,"expected_total_repair_source_receipts":1153},
+  "allocation":{"blocks_12_to_25":{"source":ORIGINAL_EXECUTION_COMMIT,"lock":ORIGINAL_SOURCE_LOCK_SHA256,"owners_per_block":128},
+   "block_26":{"original_source_receipts":127,"previous_serialization_source_receipts":1,
+    "previous_serialization_source":PREVIOUS_SERIALIZATION_EXECUTION_COMMIT,
+    "previous_serialization_lock":PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256},
+   "blocks_27_to_35":{"source":package,"lock":repair_source_lock_sha256(),"owners_per_block":128},
+   "expected_total_original_source_receipts":1919,"expected_total_previous_serialization_receipts":1,
+   "expected_total_current_repair_receipts":1152},
   "preserve_original_failures_and_interrupted_attempt":{"owner_seed":8301831,"failed_attempts":13,"interrupted_attempt":14},
   "active_wall_allowance_seconds":allowance,"training_data_not_copied":True,"original_epoch_evidence_not_overwritten":True}
  write_json_once(Path(root)/"source-epoch-plan.json",plan)
@@ -709,7 +755,7 @@ def complete_training_epoch_manifest(root,package):
  for rec in records:
   owners+=int(rec["owner_count"])
   for epoch,count in rec["source_epoch_counts"].items(): total[epoch]=total.get(epoch,0)+int(count)
- expected={"original-3951ee0":1919,"repair-"+package[:12]:1153}
+ expected={"original-3951ee0":1919,"repair-"+PREVIOUS_SERIALIZATION_EXECUTION_COMMIT[:12]:1,"repair-"+package[:12]:1152}
  if owners!=3072 or total!=expected: raise RuntimeError(f"source epoch totals differ: {owners}, {total}")
  manifest={"schema_id":"issue83-source-epoch-training-complete-v1","status":"ALL_3072_TRAINING_RECEIPTS_AND_24_UPDATES_SOURCE_BOUND",
   "repair_execution_source_commit":package,"repair_source_lock_sha256":repair_source_lock_sha256(),
@@ -749,28 +795,50 @@ def formal():
  root=ARTIFACTS/"formal"/package; data_root=LEGACY_FORMAL_ROOT
  root.mkdir(parents=True,exist_ok=True); clock=D.ActiveClock("formal",allowance); updates=[]
  try:
+  persist_formal_progress(root,package,clock,updates,phase="preflight",
+   boundary={"next_boundary":"verify_source_epoch_plan_and_existing_updates","training_blocks":[12,35]})
   check_lock(); write_source_epoch_plan(root,package,allowance); require_no_test_before_selection(data_root,root,table)
   for block in range(12,36):
    rows=rows_for(table,phase="training",formal=True,cohort="training",block=block)
+   persist_formal_progress(root,package,clock,updates,phase="training_block_boundary",block_index=block,
+    expected_rows=rows,boundary={"next_boundary":"verify_existing_receipts_and_update_or_run_missing_owners"})
    if block<=25:
     training_block_source_epoch(root,data_root,rows,block,package)
     rec=verify_update(block,rows,LEGACY_FORMAL_ROOT)
     if rec is None: raise RuntimeError(f"original completed update {block} is missing")
     receipt_path=LEGACY_FORMAL_ROOT/"models"/f"issue83-update-{block}.json"
     execution_source=ORIGINAL_EXECUTION_COMMIT; lock_sha=ORIGINAL_SOURCE_LOCK_SHA256
+   elif block==26:
+    training_block_source_epoch(root,data_root,rows,block,package)
+    rec=verify_update(block,rows,PREVIOUS_SERIALIZATION_ROOT,
+     execution_package=PREVIOUS_SERIALIZATION_EXECUTION_COMMIT,
+     execution_lock_sha256=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256)
+    if rec is None: raise RuntimeError("previous serialization-epoch block 26 update is missing; refuse to repeat its games")
+    receipt_path=PREVIOUS_SERIALIZATION_ROOT/"models"/"issue83-update-26.json"
+    execution_source=PREVIOUS_SERIALIZATION_EXECUTION_COMMIT; lock_sha=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256
    else:
     missing=[row for row in rows if source_bound_training_receipt(data_root,row,package) is None]
     if missing:
+     persist_formal_progress(root,package,clock,updates,phase="training_games",block_index=block,
+      expected_rows=rows,missing_rows=missing,boundary={"next_boundary":"run_missing_natural_owners",
+       "raw_receipts_root":str(data_root),"failed_attempts_are_not_terminals":True})
      games=D.run_units(missing,root=data_root,pilot=False,clock=clock,package_commit=package)
      if games.get("status")!="SUCCEEDED":
-      result={"schema_id":"issue83-progress-v1","status":games.get("status"),"phase":"training","block_index":block,
-       "completed":games.get("completed"),"remaining":games.get("remaining"),"updates":updates,
-       "active_wall_seconds":clock.elapsed(),"allowance":allowance}; atomic_json(root/"formal-progress.json",result); return result
+      result={"schema_id":"issue83-progress-v2","status":games.get("status"),"phase":"training_games","block_index":block,
+       "completed":games.get("completed"),"remaining":games.get("remaining"),"missing_owner_seeds":[int(x["owner_seed"]) for x in missing],
+       "completed_training_owners":sum(int(x["owner_count"]) for x in updates),
+       "active_wall_seconds":clock.elapsed(),"allowance_seconds":allowance,
+       "source_branch_sha":package,"source_lock_sha256":repair_source_lock_sha256()}; atomic_json(root/"formal-progress.json",result); return result
+    persist_formal_progress(root,package,clock,updates,phase="training_receipt_verification",block_index=block,
+     expected_rows=rows,boundary={"next_boundary":"verify_all_terminal_receipts_and_source_epochs"})
     training_input_epoch=training_block_source_epoch(root,data_root,rows,block,package)
     rec=verify_update(block,rows,root)
     if rec is None:
      a,r,m,l,e=D.load_modules(root,pilot=False)
      examples=training_examples_across_epochs(rows,data_root,e,package)
+     persist_formal_progress(root,package,clock,updates,phase="training_optimizer_update",block_index=block,
+      expected_rows=rows,boundary={"next_boundary":"apply_registered_64_step_pgonly_update",
+       "training_input_epoch_manifest_sha256":file_sha256(root/"training-block-source-epochs"/f"block-{block}.json")})
      rec=train_update(block,examples,root=root,pilot=False,clock=clock,source_epoch_summary=training_input_epoch); del examples
      rec=verify_update(block,rows,root)
     if rec is None: raise RuntimeError(f"repair-epoch update {block} was not verifiable")
@@ -778,17 +846,35 @@ def formal():
     execution_source=package; lock_sha=repair_source_lock_sha256()
    updates.append(training_update_summary(rec,receipt_path,execution_source,lock_sha))
    save_training_progress(root,package,clock,updates,current_block=block)
+   persist_formal_progress(root,package,clock,updates,phase="training_block_complete",block_index=block,
+    expected_rows=rows,boundary={"next_boundary":"advance_to_next_training_block_or_validation",
+     "update_receipt_sha256":file_sha256(receipt_path),"execution_source_commit":execution_source,
+     "execution_source_lock_sha256":lock_sha})
    if clock.expired():
-    result={"schema_id":"issue83-progress-v1","status":"GLOBAL_ACTIVE_WALL_ALLOWANCE_EXCEEDED","phase":"training",
-     "block_index":block,"updates":updates,"active_wall_seconds":clock.elapsed(),"allowance":allowance}
+    result={"schema_id":"issue83-progress-v2","status":"GLOBAL_ACTIVE_WALL_ALLOWANCE_EXCEEDED","phase":"training",
+     "block_index":block,"updates":updates,"completed_training_owners":sum(int(x["owner_count"]) for x in updates),
+     "active_wall_seconds":clock.elapsed(),"allowance_seconds":allowance,
+     "source_branch_sha":package,"source_lock_sha256":repair_source_lock_sha256()}
     atomic_json(root/"formal-progress.json",result); return result
+  persist_formal_progress(root,package,clock,updates,phase="training_complete",
+   boundary={"next_boundary":"write_source_epoch_manifest_then_validate","training_owner_count":3072})
   complete_training_epoch_manifest(root,package)
   validation_rows=rows_for(table,phase="heldout",formal=True,cohort="validation")
+  validation_missing=[row for row in validation_rows if not D.existing_success_record(data_root,row,package)]
+  persist_formal_progress(root,package,clock,updates,phase="validation_games",expected_rows=validation_rows,
+   missing_rows=validation_missing,
+   boundary={"next_boundary":"run_independent_validation_games","test_still_locked_until_selection":True})
   vr=D.run_units(validation_rows,root=data_root,pilot=False,clock=clock,package_commit=package)
   if vr.get("status")!="SUCCEEDED":
-   result={"schema_id":"issue83-progress-v1","status":vr.get("status"),"phase":"validation","completed":vr.get("completed"),
-    "remaining":vr.get("remaining"),"active_wall_seconds":clock.elapsed(),"allowance":allowance}
+   result={"schema_id":"issue83-progress-v2","status":vr.get("status"),"phase":"validation_games",
+    "completed":vr.get("completed"),"remaining":vr.get("remaining"),
+    "missing_owner_seeds":[int(x["owner_seed"]) for x in validation_missing],
+    "completed_training_owners":sum(int(x["owner_count"]) for x in updates),
+    "active_wall_seconds":clock.elapsed(),"allowance_seconds":allowance,
+    "source_branch_sha":package,"source_lock_sha256":repair_source_lock_sha256()}
    atomic_json(root/"formal-progress.json",result); return result
+  persist_formal_progress(root,package,clock,updates,phase="validation_complete_selection_pending",
+   boundary={"next_boundary":"freeze_prespecified_validation_selection_before_any_test"})
   selection=freeze_selection(root,table,package,data_root=data_root)
   arms=["PARENT","SELECTED"]+(["FINAL"] if selection["selected_checkpoint"]!="pi36" else [])
   test_rows=rows_for(table,phase="heldout",formal=True,cohort="test",arms=arms)
@@ -798,11 +884,22 @@ def formal():
    raise RuntimeError("test attempts predate validation selection")
   write_once(root/"test-opened.json",canonical({"selection_receipt_sha256":file_sha256(root/"checkpoint-selection.json"),
    "opened_before_first_test":True,"source_epoch_training_complete_sha256":file_sha256(root/"source-epoch-training-complete.json")})+b"\n")
+  test_missing=[row for row in test_rows if not D.existing_success_record(data_root,row,package)]
+  persist_formal_progress(root,package,clock,updates,phase="test_games",expected_rows=test_rows,
+   missing_rows=test_missing,
+   boundary={"next_boundary":"run_only_frozen_selected_test_arms","selection_receipt_sha256":file_sha256(root/"checkpoint-selection.json"),
+    "test_opened_receipt_sha256":file_sha256(root/"test-opened.json")})
   ev=D.run_units(test_rows,root=data_root,pilot=False,clock=clock,package_commit=package)
   if ev.get("status")!="SUCCEEDED":
-   result={"schema_id":"issue83-progress-v1","status":ev.get("status"),"phase":"test","completed":ev.get("completed"),
-    "remaining":ev.get("remaining"),"active_wall_seconds":clock.elapsed(),"allowance":allowance}
+   result={"schema_id":"issue83-progress-v2","status":ev.get("status"),"phase":"test_games",
+    "completed":ev.get("completed"),"remaining":ev.get("remaining"),
+    "missing_owner_seeds":[int(x["owner_seed"]) for x in test_missing],
+    "completed_training_owners":sum(int(x["owner_count"]) for x in updates),
+    "active_wall_seconds":clock.elapsed(),"allowance_seconds":allowance,
+    "source_branch_sha":package,"source_lock_sha256":repair_source_lock_sha256()}
    atomic_json(root/"formal-progress.json",result); return result
+  persist_formal_progress(root,package,clock,updates,phase="test_complete_analysis_pending",
+   boundary={"next_boundary":"verify_test_receipts_and_write_primary_analysis"})
   final=analyze_test(root,table,package,selection,data_root=data_root)
   final.update({"pilot_report_sha256":file_sha256(pilot_path),"time_policy_sha256":file_sha256(policy_path),
    "validation_selection_before_test":True,"training_updates":updates,
@@ -813,14 +910,25 @@ def formal():
    "active_wall_allowance_seconds":allowance,
    "formal_clock_carry_forward_sha256":file_sha256(ARTIFACTS/"formal-clock-carry-forward.json")})
   final_path=root/"final-analysis.json"; write_once(final_path,canonical(final)+b"\n")
-  atomic_json(root/"formal-progress.json",{"schema_id":"issue83-progress-v1","status":"COMPLETE",
+  atomic_json(root/"formal-progress.json",{"schema_id":"issue83-progress-v2","status":"COMPLETE",
    "training_owners":3072,"training_blocks":24,"validation_games":448,"test_games":len(test_rows),
    "selected_checkpoint":selection["selected_checkpoint"],"active_wall_seconds":clock.elapsed(),"allowance":allowance,
    "source_epoch_training_complete_sha256":file_sha256(root/"source-epoch-training-complete.json"),
    "final_analysis_sha256":file_sha256(final_path)}); return final
  except GlobalWallExpired as exc:
-  result={"schema_id":"issue83-progress-v1","status":"GLOBAL_ACTIVE_WALL_ALLOWANCE_EXCEEDED","failure":str(exc),
-   "updates":updates,"active_wall_seconds":clock.elapsed(),"allowance":allowance}; atomic_json(root/"formal-progress.json",result); return result
+  result={"schema_id":"issue83-progress-v2","status":"GLOBAL_ACTIVE_WALL_ALLOWANCE_EXCEEDED","failure":str(exc),
+   "updates":updates,"completed_training_owners":sum(int(x["owner_count"]) for x in updates),
+   "active_wall_seconds":clock.elapsed(),"allowance_seconds":allowance,
+   "source_branch_sha":package,"source_lock_sha256":repair_source_lock_sha256()}
+  atomic_json(root/"formal-progress.json",result); return result
+ except Exception as exc:
+  progress_path=root/"formal-progress.json"
+  progress=read_json(progress_path) if progress_path.exists() else {"schema_id":"issue83-progress-v2"}
+  progress.update({"status":"FAILED","failure_type":type(exc).__name__,"failure":str(exc),
+   "active_wall_seconds":clock.elapsed(),"allowance_seconds":allowance,
+   "source_branch_sha":package,"source_lock_sha256":repair_source_lock_sha256()})
+  atomic_json(progress_path,progress)
+  raise
  finally:
   clock.close(); closed=closed_active_wall_clock("formal")
   progress_path=root/"formal-progress.json"; progress=read_json(progress_path) if progress_path.exists() else {}
@@ -874,12 +982,15 @@ def load_modules(root,*,pilot):
   initialize_with_phase3_repair._issue83_phase3_repair_wrapper=True
   rt.initialize_native_runtime=initialize_with_phase3_repair
  ex.STUDY_ID="issue-83-pgonly-scale"; old_path=ex._model_path
+ model_root=Path(CURRENT_WORKER_PACKAGE_ROOT) if CURRENT_WORKER_PACKAGE_ROOT is not None else Path(root)
  def model_path(label):
   if label=="pi12": return PARENT_MODEL
   if label.startswith("pi") and label[2:].isdigit() and int(label[2:])>=13:
    index=int(label[2:])
-   if pilot or index<=26: return old_path(label) if pilot else LEGACY_FORMAL_ROOT/"models"/f"{label}.pt"
-   return root/"models"/f"{label}.pt"
+   if pilot: return old_path(label)
+   if index<=26: return LEGACY_FORMAL_ROOT/"models"/f"{label}.pt"
+   if index==27: return PREVIOUS_SERIALIZATION_ROOT/"models"/f"{label}.pt"
+   return model_root/"models"/f"{label}.pt"
   return old_path(label)
  ex._model_path=model_path
  learn.FORMAL_BLOCK_OWNERS=32 if pilot else 128
