@@ -446,6 +446,9 @@ def finalize_pilot_clock_outputs(report_path,policy_path,clock_mode,closed_secon
  policy["one_global_active_wall_allowance_seconds"]=allowance
  policy["pilot_active_wall_clock_path"]=str(clock_path)
  policy["pilot_active_wall_clock_sha256"]=file_sha256(clock_path)
+ policy["post_clock_closeout_active_wall_status"]="UNMEASURED"
+ policy["post_clock_closeout_active_wall_seconds"]=None
+ policy["exact_complete_task_active_wall_seconds"]=None
  atomic_json(policy_path,policy)
  if not report_path.is_file(): return None
  report=read_json(report_path)
@@ -457,6 +460,9 @@ def finalize_pilot_clock_outputs(report_path,policy_path,clock_mode,closed_secon
  report["time_policy_sha256"]=file_sha256(policy_path)
  report["active_wall_clock_path"]=str(clock_path)
  report["active_wall_clock_sha256"]=file_sha256(clock_path)
+ report["post_clock_closeout_active_wall_status"]="UNMEASURED"
+ report["post_clock_closeout_active_wall_seconds"]=None
+ report["exact_complete_task_active_wall_seconds"]=None
  atomic_json(report_path,report)
  return report
 
@@ -735,6 +741,8 @@ def finalize_pilot(package):
   if report_path.is_file():
    recovered=read_json(report_path)
    finalization=recovered.setdefault("finalization",{})
+   finalization["post_clock_closeout_active_wall_status"]="UNMEASURED"
+   finalization["post_clock_closeout_active_wall_seconds"]=None
    finalization["report_recovery_active_wall_status"]="MEASURED"
    finalization["report_recovery_active_wall_session_seconds"]=float(recovery_session["session_seconds"])
    finalization["report_recovery_active_wall_cumulative_seconds"]=recovery_record["elapsed_seconds"]
@@ -872,8 +880,8 @@ def formal():
  recovery_clock=closed_active_wall_clock(f"pilot-report-recovery-{pilot_package[:12]}",required=False)
  recovery_seconds=None if recovery_clock is None else recovery_clock["elapsed_seconds"]
  recovery_status=pilot_report_recovery_status(report,recovery_clock)
- measured_carry_forward=pilot_seconds+(0.0 if recovery_seconds is None else recovery_seconds)
- carry_forward_reconciliation=ensure_formal_clock_initial_state(measured_carry_forward,
+ # The reconciler adds measured recovery_seconds; pass pilot-only time to avoid double counting.
+ carry_forward_reconciliation=ensure_formal_clock_initial_state(pilot_seconds,
   pilot_clock_sha256=pilot_clock["sha256"],recovery_seconds=recovery_seconds,
   recovery_clock_sha256=None if recovery_clock is None else recovery_clock["sha256"],recovery_status=recovery_status)
  root=ARTIFACTS/"formal"/package; root.mkdir(parents=True,exist_ok=True)
@@ -944,7 +952,10 @@ def formal():
    "formal_clock_carry_forward_path":str(ARTIFACTS/"formal-clock-carry-forward.json"),
    "formal_clock_carry_forward_sha256":file_sha256(ARTIFACTS/"formal-clock-carry-forward.json"),
    "known_measured_active_wall_seconds":closed_formal["elapsed_seconds"],
-   "exact_complete_task_active_wall_seconds":closed_formal["elapsed_seconds"] if progress.get("status")=="COMPLETE" and recovery_status!="UNMEASURED" else None,
+   "exact_complete_task_active_wall_seconds":None,
+   "post_clock_closeout_active_wall_status":"UNMEASURED",
+   "post_clock_closeout_active_wall_seconds":None,
+   "post_clock_closeout_limitation":"Closeout and manifest writes occur after the formal clock closes and are not included in its measured elapsed value.",
    "unmeasured_recovery_interval_is_not_zero":recovery_status=="UNMEASURED"}
   atomic_json(root/"active-wall-closeout.json",closeout)
   if progress:
@@ -960,9 +971,20 @@ def formal():
    progress["formal_clock_carry_forward_sha256"]=file_sha256(ARTIFACTS/"formal-clock-carry-forward.json")
    progress["active_wall_closeout_path"]="active-wall-closeout.json"
    progress["active_wall_closeout_sha256"]=file_sha256(root/"active-wall-closeout.json")
+   progress["exact_complete_task_active_wall_seconds"]=None
+   progress["post_clock_closeout_active_wall_status"]="UNMEASURED"
+   progress["post_clock_closeout_active_wall_seconds"]=None
    atomic_json(progress_path,progress)
-  if "final" in locals(): final["active_wall_seconds_after_closeout"]=closed_formal["elapsed_seconds"]
-  elif "result" in locals(): result["active_wall_seconds_after_closeout"]=closed_formal["elapsed_seconds"]
+  if "final" in locals():
+   final["active_wall_seconds_at_clock_close"]=closed_formal["elapsed_seconds"]
+   final["exact_complete_task_active_wall_seconds"]=None
+   final["post_clock_closeout_active_wall_status"]="UNMEASURED"
+   final["post_clock_closeout_active_wall_seconds"]=None
+  elif "result" in locals():
+   result["active_wall_seconds_at_clock_close"]=closed_formal["elapsed_seconds"]
+   result["exact_complete_task_active_wall_seconds"]=None
+   result["post_clock_closeout_active_wall_status"]="UNMEASURED"
+   result["post_clock_closeout_active_wall_seconds"]=None
 
 
 def main():
