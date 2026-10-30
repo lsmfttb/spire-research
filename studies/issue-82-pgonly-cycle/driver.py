@@ -505,7 +505,7 @@ def pilot():
     "all_checkpoint_arms_use_pilot_pi5_alias":True,"efficacy_inference":False},
    "pilot_active_seconds":measured,"complete_task_projection_seconds":projection,"complete_task_projection_hours":projection/3600,
    "single_global_active_wall_allowance_seconds":allowance,"allowance_factor":ALLOWANCE_FACTOR,
-   "time_policy_path":(root/"time-policy.json").relative_to(STUDY).as_posix(),"formal_results":False,"efficacy_inference":False}
+   "time_policy_path":(root/"time-policy.json").relative_to(DATA).as_posix(),"formal_results":False,"efficacy_inference":False}
   write_json_once(report_path,result)
   return result
  finally: clock.close()
@@ -596,11 +596,116 @@ def analyze(root,table,package):
   "efficacy_inference_scope":"study-only"}
 
 
+def finalize_pilot(package):
+ """Build the missing pilot summary from immutable completed phases; never launches workers."""
+ check_lock()
+ root=ARTIFACTS/"pilot"/package
+ report_path=root/"pilot-report.json"
+ if report_path.is_file(): return read_json(report_path)
+ policy_path=root/"time-policy.json"
+ policy=read_json(policy_path)
+ table=read_json(SEED_TABLE)
+ if policy.get("source_branch_sha")!=package or policy.get("seed_table_sha256")!=file_sha256(SEED_TABLE):
+  raise RuntimeError("existing pilot timing record does not match this source and registered seed table")
+ phase={name:read_json(root/f"pilot-phase-{name}.json") for name in ("training","update","evaluation")}
+ if any(x.get("status")!="SUCCEEDED" or x.get("package_commit")!=package for x in phase.values()):
+  raise RuntimeError("cannot finalize pilot without all three successful source-bound phases")
+ train_rows=rows_for(table,phase="training",formal=False)
+ eval_rows=rows_for(table,phase="heldout",formal=False)
+ train_reports=[D.existing_success(root,row,package) for row in train_rows]
+ eval_reports=[D.existing_success(root,row,package) for row in eval_rows]
+ if len(train_rows)!=32 or len(train_reports)!=32 or any(x is None for x in train_reports):
+  raise RuntimeError("pilot training receipts are incomplete")
+ if len(eval_rows)!=40 or len(eval_reports)!=40 or any(x is None for x in eval_reports):
+  raise RuntimeError("five-arm pilot evaluation receipts are incomplete")
+ all_reports=train_reports+eval_reports
+ if any(x.get("expert_decisions")!=0 or x.get("search")!=[] for x in all_reports):
+  raise RuntimeError("pilot receipts show Expert or online search activity")
+ if any(x.get("terminal_outcome") is None or x.get("terminal_floor") is None for x in all_reports):
+  raise RuntimeError("pilot receipts contain a nonterminal owner")
+ update=read_json(root/"models/issue82-update-4.json")
+ if (update.get("owner_count")!=32 or update.get("completed_steps_in_this_block")!=64 or
+     update.get("optimizer_step_before_block")!=64 or update.get("optimizer_step_after_block")!=128 or
+     update.get("optimizer_inherited_state_sha256")!=EXPECTED["parent_optimizer_sha256"] or
+     update.get("expert_decisions")!=0 or update.get("search_invocations")!=0):
+  raise RuntimeError("disposable pilot update does not match registered PGONLY continuation")
+ if (len(update.get("diagnostics",[]))!=64 or any(d.get("loss_elite")!=0.0 or d.get("grad_norm_elite")!=0.0 or
+     d.get("elite_owner_count")!=0 or d.get("elite_root_count")!=0 for d in update["diagnostics"])):
+  raise RuntimeError("pilot update diagnostics contain elite contributions")
+ _,_,_,_,executor=D.load_modules(root,pilot=True)
+ _,pilot_model_digest,_=executor._load_model("pi5")
+ checkpoint_path=root/"models/block-4-step.pt"
+ saved=__import__("torch").load(checkpoint_path,map_location="cpu",weights_only=True)
+ if (pilot_model_digest!=update.get("result_model_digest") or
+     file_sha256(checkpoint_path)!=update.get("optimizer_checkpoint",{}).get("sha256") or
+     set(optimizer_steps(saved.get("optimizer_state_dict",{})))!={128}):
+  raise RuntimeError("pilot read-back model or inherited AdamW step-128 checkpoint mismatch")
+ formal_attempts=list((ARTIFACTS/"formal").glob("*/units/*/attempt-*"))
+ if formal_attempts: raise RuntimeError("formal seeds were already attempted before pilot finalization")
+ train_summary=phase["training"]["result_summary"]
+ eval_summary=phase["evaluation"]["result_summary"]
+ train_concurrency=D._max_concurrent_workers(root,train_rows)
+ eval_concurrency=D._max_concurrent_workers(root,eval_rows)
+ if max(train_concurrency,eval_concurrency)!=CONCURRENCY:
+  raise RuntimeError("pilot did not attain the registered effective concurrency")
+ preflight_path=ARTIFACTS/f"parent-native-preflight-{package}.json"
+ preflight=read_json(preflight_path)
+ if (preflight.get("status")!="PASS_IMPORT_ONLY" or preflight.get("parent_model_sha256")!=EXPECTED["parent_model_sha256"] or
+     preflight.get("parent_optimizer_sha256")!=EXPECTED["parent_optimizer_sha256"] or preflight.get("native_module_sha256")!=EXPECTED["native_sha256"]):
+  raise RuntimeError("pilot parent/native preflight identity mismatch")
+ result={"schema_id":"issue82-real-native-pilot-v1","status":"PILOT_COMPLETE_NONFORMAL",
+  "source_branch_sha":package,"source_lock_sha256":policy["source_lock_sha256"],
+  "report_generation_source_sha":current_source_commit(),"seed_table_sha256":policy["seed_table_sha256"],
+  "parent_native_preflight":preflight,
+  "training_games":{"registered":len(train_rows),"complete_terminals":len(train_reports),
+   "elapsed_active_seconds":float(phase["training"]["elapsed_active_seconds"]),
+   "actual_max_concurrent_workers":train_concurrency,"row_wall_seconds":train_summary.get("row_wall_seconds",{}),
+   "tries":train_summary.get("tries",{}),"terminals":[{"owner_seed":r["owner_seed"],"terminal_floor":t["terminal_floor"],
+    "terminal_outcome":t["terminal_outcome"],"expert_decisions":t["expert_decisions"]} for r,t in zip(train_rows,train_reports)]},
+  "disposable_update":{"elapsed_active_seconds":float(phase["update"]["elapsed_active_seconds"]),"owners":update["owner_count"],
+   "steps":update["completed_steps_in_this_block"],"optimizer_step_before":update["optimizer_step_before_block"],
+   "optimizer_step_after":update["optimizer_step_after_block"],"inherited_optimizer_sha256":update["optimizer_inherited_state_sha256"],
+   "result_model_digest":update["result_model_digest"],"formal_checkpoint":False},
+  "five_arm_evaluation_paths":{"registered_owner_arm_count":len(eval_rows),"complete_terminals":len(eval_reports),
+   "elapsed_active_seconds":float(phase["evaluation"]["elapsed_active_seconds"]),"actual_max_concurrent_workers":eval_concurrency,
+   "row_wall_seconds":eval_summary.get("row_wall_seconds",{}),"tries":eval_summary.get("tries",{}),
+   "all_checkpoint_arms_use_pilot_pi5_alias":True,"efficacy_inference":False},
+  "pilot_active_seconds":float(policy["actual_pilot_active_seconds"]),
+  "complete_task_projection_seconds":float(policy["complete_task_projection_seconds"]),
+  "complete_task_projection_hours":float(policy["complete_task_projection_hours"]),
+  "single_global_active_wall_allowance_seconds":int(policy["one_global_active_wall_allowance_seconds"]),
+  "allowance_factor":float(policy["allowance_factor"]),
+  "time_policy_path":policy_path.relative_to(DATA).as_posix(),"formal_results":False,"efficacy_inference":False,
+  "finalization":{"method":"receipt-only; no games, simulator workers, or optimizer update rerun",
+   "original_failure":"report assembly raised ValueError after all phases and time policy were durably written; the time-policy path was made relative to the repository although it resides under the durable data root"}}
+ write_json_once(report_path,result)
+ return result
+
+
+def find_pilot_package(current_package,table_sha):
+ """Select one complete pilot from this source's ancestry, preferring an exact-SHA match."""
+ roots=[]
+ for directory in sorted((ARTIFACTS/"pilot").iterdir()):
+  report=directory/"pilot-report.json"; policy=directory/"time-policy.json"
+  if not report.is_file() or not policy.is_file(): continue
+  r=read_json(report); t=read_json(policy)
+  if r.get("status")!="PILOT_COMPLETE_NONFORMAL" or r.get("seed_table_sha256")!=table_sha: continue
+  pilot_sha=r.get("source_branch_sha")
+  if pilot_sha!=t.get("source_branch_sha"): continue
+  ancestor=subprocess.run(["git","merge-base","--is-ancestor",pilot_sha,current_package],cwd=REPO,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+  if ancestor.returncode==0: roots.append((pilot_sha,report,policy))
+ if not roots: raise RuntimeError("no complete source-ancestor pilot matches the registered seed table")
+ exact=[x for x in roots if x[0]==current_package]
+ chosen=exact if exact else roots
+ if len(chosen)!=1: raise RuntimeError("multiple complete ancestor pilots match; refuse ambiguous selection")
+ return chosen[0]
+
 def formal():
  check_lock(); package=current_source_commit()
- pilot_root=ARTIFACTS/"pilot"/package; pilot_path=pilot_root/"pilot-report.json"; policy_path=pilot_root/"time-policy.json"
+ pilot_package,pilot_path,policy_path=find_pilot_package(package,file_sha256(SEED_TABLE))
+ pilot_root=ARTIFACTS/"pilot"/pilot_package
  report=read_json(pilot_path); policy=read_json(policy_path)
- if report.get("source_branch_sha")!=package or report.get("status")!="PILOT_COMPLETE_NONFORMAL": raise RuntimeError("matching complete source-locked pilot is required")
+ if report.get("source_branch_sha")!=pilot_package or report.get("status")!="PILOT_COMPLETE_NONFORMAL": raise RuntimeError("matching complete source-locked pilot is required")
  if report.get("seed_table_sha256")!=file_sha256(SEED_TABLE) or policy.get("seed_table_sha256")!=file_sha256(SEED_TABLE): raise RuntimeError("pilot used a different seed table")
  allowance=int(policy["one_global_active_wall_allowance_seconds"]); pilot_seconds=float(policy["actual_pilot_active_seconds"])
  ensure_formal_clock_initial_state(pilot_seconds)
@@ -653,13 +758,17 @@ def formal():
 
 def main():
  parser=argparse.ArgumentParser()
- parser.add_argument("--mode",choices=("prepare","verify","pilot","formal"))
+ parser.add_argument("--mode",choices=("prepare","verify","pilot","finalize-pilot","formal"))
+ parser.add_argument("--pilot-package-sha")
  parser.add_argument("--worker",type=Path)
  args=parser.parse_args(); configure_driver()
  if args.worker is not None: return worker_main(args.worker)
  if args.mode=="prepare": result=prepare()
  elif args.mode=="verify": result=verify_parent_and_runtime(ARTIFACTS/"verify"/"native-import")
  elif args.mode=="pilot": result=pilot()
+ elif args.mode=="finalize-pilot":
+  if not args.pilot_package_sha: parser.error("--pilot-package-sha is required with --mode finalize-pilot")
+  result=finalize_pilot(args.pilot_package_sha)
  elif args.mode=="formal": result=formal()
  else: parser.error("select --mode or --worker")
  print(json.dumps(result,sort_keys=True,separators=(",",":"),ensure_ascii=False))
