@@ -1,7 +1,7 @@
 
 STUDY=REPO/"studies/issue-83-pgonly-scale"; DATA=Path("/mnt/d/DeadlycatCoding/stsrl-data/issue83")
 ARTIFACTS=DATA/"artifacts"; STAGE1=STUDY/"stage1"; SEED_TABLE=STUDY/"seed-table.json"
-CONTRACT=STUDY/"contract.json"; SOURCE_LOCK=STUDY/"source-lock-repair-checkout-portability-v1.json"; PREVIOUS_MODEL_ROOT_SOURCE_LOCK=STUDY/"source-lock-repair-model-root-v1.json"; PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT="ecb588e580c0226da3aabaf54d79f2c2267308e3"; PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256="6b4e5551610b77c77b924a9dac9ed52c72027b4e149ba05850f15b9042c06b42"; PREVIOUS_SERIALIZATION_SOURCE_LOCK=STUDY/"source-lock-repair-serialization-v1.json"; PREVIOUS_REPAIR_SOURCE_LOCK=STUDY/"source-lock-repair.json"; ORIGINAL_SOURCE_LOCK=STUDY/"source-lock.json"
+CONTRACT=STUDY/"contract.json"; SOURCE_LOCK=STUDY/"source-lock-selected-worker-root-v1.json"; PREVIOUS_PORTABILITY_SOURCE_LOCK=STUDY/"source-lock-repair-checkout-portability-v1.json"; PREVIOUS_PORTABILITY_EXECUTION_COMMIT="456544eb589bad815e4646150e827ba443e8f2c5"; PREVIOUS_PORTABILITY_SOURCE_LOCK_SHA256="8f3f264692955c16081398acd5cba6103b7f48d06c26b9b98129763d79c422c6"; PREVIOUS_MODEL_ROOT_SOURCE_LOCK=STUDY/"source-lock-repair-model-root-v1.json"; PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT="ecb588e580c0226da3aabaf54d79f2c2267308e3"; PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256="6b4e5551610b77c77b924a9dac9ed52c72027b4e149ba05850f15b9042c06b42"; PREVIOUS_SERIALIZATION_SOURCE_LOCK=STUDY/"source-lock-repair-serialization-v1.json"; PREVIOUS_REPAIR_SOURCE_LOCK=STUDY/"source-lock-repair.json"; ORIGINAL_SOURCE_LOCK=STUDY/"source-lock.json"
 BASE_COMMIT="acdbf9b397bce95f3e5d26077c34e80dbc59821e"
 ORIGINAL_EXECUTION_COMMIT="3951ee0749d8e9c3dfcba33590ceb1f880047acc"
 ORIGINAL_SOURCE_LOCK_SHA256="224c7a6e2cbd46d986294e68b31a07ec6518ea6f82eda4636ae0c98ef4fa63b2"
@@ -135,11 +135,13 @@ def study_file_hashes():
   "seed-table.json":canonical_text_sha256(SEED_TABLE)}
 
 def source_lock_document():
- return {"schema_id":"issue83-source-lock-repair-v5","base_commit":BASE_COMMIT,
+ return {"schema_id":"issue83-source-lock-repair-v6","base_commit":BASE_COMMIT,
   "text_hash_policy":"UTF-8; ignore optional BOM; normalize CRLF and bare CR to LF for locked text files; binary runtime/model/native files remain byte-exact",
-  "source_epoch":{"kind":"line-ending-independent-source-lock-chain-validation",
-   "supersedes_execution_commit":PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT,
-   "supersedes_source_lock_sha256":PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256,
+  "source_epoch":{"kind":"selected-policy-worker-uses-registered-package-root",
+   "supersedes_execution_commit":PREVIOUS_PORTABILITY_EXECUTION_COMMIT,
+   "supersedes_source_lock_sha256":PREVIOUS_PORTABILITY_SOURCE_LOCK_SHA256,
+   "previous_portability_execution_commit":PREVIOUS_PORTABILITY_EXECUTION_COMMIT,
+   "previous_portability_source_lock_sha256":PREVIOUS_PORTABILITY_SOURCE_LOCK_SHA256,
    "previous_model_root_execution_commit":PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT,
    "previous_model_root_source_lock_sha256":PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256,
    "previous_serialization_execution_commit":PREVIOUS_SERIALIZATION_EXECUTION_COMMIT,
@@ -147,7 +149,7 @@ def source_lock_document():
    "previous_repair_source_lock_sha256":PREVIOUS_REPAIR_SOURCE_LOCK_SHA256,
    "original_execution_commit":ORIGINAL_EXECUTION_COMMIT,
    "original_source_lock_sha256":ORIGINAL_SOURCE_LOCK_SHA256,
-   "repair_id":"normalize-checkout-line-endings-for-locked-text-files"},
+   "repair_id":"selected-policy-worker-reads-selection-from-registered-package-root"},
   "study_files_sha256":study_file_hashes(),"source_files_sha256":source_files(),
   "runtime_identity":source_identity(),"seed_table_sha256":canonical_text_sha256(SEED_TABLE),
   "contract_sha256":canonical_text_sha256(CONTRACT),"arms":{"pilot":list(PILOT_ARMS),"validation":list(VALIDATION_ARMS),"test":list(TEST_ARMS)},
@@ -159,13 +161,17 @@ def prepare():
  original=subprocess.run(["git","merge-base","HEAD",ORIGINAL_EXECUTION_COMMIT],cwd=REPO,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True).stdout.strip()
  if original!=ORIGINAL_EXECUTION_COMMIT: raise RuntimeError("repair epoch is not descended from the exact original execution source")
  model_root=subprocess.run(["git","merge-base","HEAD",PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT],cwd=REPO,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True).stdout.strip()
- if model_root!=PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT: raise RuntimeError("checkout-portability epoch is not descended from the exact model-root repair source")
+ if model_root!=PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT: raise RuntimeError("selected-worker-root epoch is not descended from the exact model-root repair source")
+ portability=subprocess.run(["git","merge-base","HEAD",PREVIOUS_PORTABILITY_EXECUTION_COMMIT],cwd=REPO,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True).stdout.strip()
+ if portability!=PREVIOUS_PORTABILITY_EXECUTION_COMMIT: raise RuntimeError("selected-worker-root epoch is not descended from the exact checkout-portability repair source")
  if canonical_text_sha256(ORIGINAL_SOURCE_LOCK)!=ORIGINAL_SOURCE_LOCK_SHA256:
   raise RuntimeError("original execution source lock changed; refusing to append repair epoch")
  if canonical_text_sha256(PREVIOUS_REPAIR_SOURCE_LOCK)!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256:
   raise RuntimeError("prior repair source lock changed; refusing to append repair epoch")
  if canonical_text_sha256(PREVIOUS_SERIALIZATION_SOURCE_LOCK)!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256:
   raise RuntimeError("previous serialization source lock changed; refusing to append repair epoch")
+ if canonical_text_sha256(PREVIOUS_PORTABILITY_SOURCE_LOCK)!=PREVIOUS_PORTABILITY_SOURCE_LOCK_SHA256:
+  raise RuntimeError("previous checkout-portability source lock changed; refusing to append repair epoch")
  source_identity()
  for p in (DATA,ARTIFACTS,ARTIFACTS/"pilot",ARTIFACTS/"formal",ARTIFACTS/"verify",STAGE1): p.mkdir(parents=True,exist_ok=True)
  for src,dst in ((STUDY81/"config.json",STUDY/"config.json"),(STUDY81/"stage1/config.json",STAGE1/"config.json")):
@@ -184,12 +190,14 @@ def prepare():
 
 def check_lock():
  lock=read_json(SOURCE_LOCK)
- if lock.get("schema_id")!="issue83-source-lock-repair-v5" or study_file_hashes()!=lock.get("study_files_sha256"):
-  raise RuntimeError("Issue 83 model-root repair source lock mismatch")
+ if lock.get("schema_id")!="issue83-source-lock-repair-v6" or study_file_hashes()!=lock.get("study_files_sha256"):
+  raise RuntimeError("Issue 83 selected-worker-root repair source lock mismatch")
  epoch=lock.get("source_epoch") or {}
- if (epoch.get("kind")!="line-ending-independent-source-lock-chain-validation" or
-     epoch.get("supersedes_execution_commit")!=PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT or
-     epoch.get("supersedes_source_lock_sha256")!=PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256 or
+ if (epoch.get("kind")!="selected-policy-worker-uses-registered-package-root" or
+     epoch.get("supersedes_execution_commit")!=PREVIOUS_PORTABILITY_EXECUTION_COMMIT or
+     epoch.get("supersedes_source_lock_sha256")!=PREVIOUS_PORTABILITY_SOURCE_LOCK_SHA256 or
+     epoch.get("previous_portability_execution_commit")!=PREVIOUS_PORTABILITY_EXECUTION_COMMIT or
+     epoch.get("previous_portability_source_lock_sha256")!=PREVIOUS_PORTABILITY_SOURCE_LOCK_SHA256 or
      epoch.get("previous_model_root_execution_commit")!=PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT or
      epoch.get("previous_model_root_source_lock_sha256")!=PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256 or
      epoch.get("previous_serialization_execution_commit")!=PREVIOUS_SERIALIZATION_EXECUTION_COMMIT or
@@ -197,7 +205,8 @@ def check_lock():
      epoch.get("previous_repair_source_lock_sha256")!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256 or
      epoch.get("original_execution_commit")!=ORIGINAL_EXECUTION_COMMIT or
      epoch.get("original_source_lock_sha256")!=ORIGINAL_SOURCE_LOCK_SHA256 or
-     epoch.get("repair_id")!="normalize-checkout-line-endings-for-locked-text-files" or
+     epoch.get("repair_id")!="selected-policy-worker-reads-selection-from-registered-package-root" or
+     canonical_text_sha256(PREVIOUS_PORTABILITY_SOURCE_LOCK)!=PREVIOUS_PORTABILITY_SOURCE_LOCK_SHA256 or
      canonical_text_sha256(PREVIOUS_MODEL_ROOT_SOURCE_LOCK)!=PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256 or
      canonical_text_sha256(PREVIOUS_SERIALIZATION_SOURCE_LOCK)!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256 or
      canonical_text_sha256(PREVIOUS_REPAIR_SOURCE_LOCK)!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256 or
@@ -296,8 +305,19 @@ def worker_main(job_path):
  job=read_json(job_path); row=job["row"]; CURRENT_PILOT=bool(job.get("pilot"))
  CURRENT_BLOCK=int(row["block_index"]) if row.get("phase")=="training" else None
  if row.get("arm")=="SELECTED":
-  sel=read_json(Path(job["artifact_root"])/"checkpoint-selection.json")
+  package_root=CURRENT_WORKER_PACKAGE_ROOT
+  if package_root is None or package_root.name!=job.get("package_commit"):
+   raise RuntimeError("selected worker lacks its registered policy package root")
+  selection_path=package_root/"checkpoint-selection.json"
+  if not selection_path.is_file(): raise FileNotFoundError(f"frozen selection receipt is missing from registered package root: {selection_path}")
+  sel=read_json(selection_path)
   if sel.get("status")!="FROZEN_BEFORE_TEST": raise RuntimeError("missing frozen selection")
+  opened_path=package_root/"test-opened.json"
+  if not opened_path.is_file(): raise RuntimeError("selected worker lacks test-opened receipt")
+  opened=read_json(opened_path)
+  if (opened.get("selection_receipt_sha256")!=file_sha256(selection_path) or
+      opened.get("opened_before_first_test") is not True):
+   raise RuntimeError("test-opened receipt does not bind the frozen selection")
   SELECTED_POLICY_LABEL=sel["selected_checkpoint"]
  return int(D.worker_main(job_path))
 
