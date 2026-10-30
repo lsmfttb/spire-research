@@ -1,7 +1,7 @@
 
 STUDY=REPO/"studies/issue-83-pgonly-scale"; DATA=Path("/mnt/d/DeadlycatCoding/stsrl-data/issue83")
 ARTIFACTS=DATA/"artifacts"; STAGE1=STUDY/"stage1"; SEED_TABLE=STUDY/"seed-table.json"
-CONTRACT=STUDY/"contract.json"; SOURCE_LOCK=STUDY/"source-lock-repair-model-root-v1.json"; PREVIOUS_SERIALIZATION_SOURCE_LOCK=STUDY/"source-lock-repair-serialization-v1.json"; PREVIOUS_REPAIR_SOURCE_LOCK=STUDY/"source-lock-repair.json"; ORIGINAL_SOURCE_LOCK=STUDY/"source-lock.json"
+CONTRACT=STUDY/"contract.json"; SOURCE_LOCK=STUDY/"source-lock-repair-checkout-portability-v1.json"; PREVIOUS_MODEL_ROOT_SOURCE_LOCK=STUDY/"source-lock-repair-model-root-v1.json"; PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT="ecb588e580c0226da3aabaf54d79f2c2267308e3"; PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256="6b4e5551610b77c77b924a9dac9ed52c72027b4e149ba05850f15b9042c06b42"; PREVIOUS_SERIALIZATION_SOURCE_LOCK=STUDY/"source-lock-repair-serialization-v1.json"; PREVIOUS_REPAIR_SOURCE_LOCK=STUDY/"source-lock-repair.json"; ORIGINAL_SOURCE_LOCK=STUDY/"source-lock.json"
 BASE_COMMIT="acdbf9b397bce95f3e5d26077c34e80dbc59821e"
 ORIGINAL_EXECUTION_COMMIT="3951ee0749d8e9c3dfcba33590ceb1f880047acc"
 ORIGINAL_SOURCE_LOCK_SHA256="224c7a6e2cbd46d986294e68b31a07ec6518ea6f82eda4636ae0c98ef4fa63b2"
@@ -112,6 +112,13 @@ def canonical_text_sha256(path):
  if raw.startswith(bytes((239,187,191))): raw=raw[3:]
  return sha256_bytes(raw)
 
+def write_json_source_once(path,value):
+ path=Path(path)
+ if path.exists():
+  if read_json(path)!=value: raise FileExistsError(f"immutable JSON source differs: {path}")
+  return canonical_text_sha256(path)
+ return write_json_once(path,value)
+
 def repair_source_lock_sha256():
  return canonical_text_sha256(SOURCE_LOCK)
 
@@ -128,17 +135,19 @@ def study_file_hashes():
   "seed-table.json":canonical_text_sha256(SEED_TABLE)}
 
 def source_lock_document():
- return {"schema_id":"issue83-source-lock-repair-v4","base_commit":BASE_COMMIT,
+ return {"schema_id":"issue83-source-lock-repair-v5","base_commit":BASE_COMMIT,
   "text_hash_policy":"UTF-8; ignore optional BOM; normalize CRLF and bare CR to LF for locked text files; binary runtime/model/native files remain byte-exact",
-  "source_epoch":{"kind":"semantics-preserving-worker-policy-checkpoint-root-routing",
-   "supersedes_execution_commit":PREVIOUS_SERIALIZATION_EXECUTION_COMMIT,
-   "supersedes_source_lock_sha256":PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256,
+  "source_epoch":{"kind":"line-ending-independent-source-lock-chain-validation",
+   "supersedes_execution_commit":PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT,
+   "supersedes_source_lock_sha256":PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256,
+   "previous_model_root_execution_commit":PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT,
+   "previous_model_root_source_lock_sha256":PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256,
    "previous_serialization_execution_commit":PREVIOUS_SERIALIZATION_EXECUTION_COMMIT,
    "previous_serialization_source_lock_sha256":PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256,
    "previous_repair_source_lock_sha256":PREVIOUS_REPAIR_SOURCE_LOCK_SHA256,
    "original_execution_commit":ORIGINAL_EXECUTION_COMMIT,
    "original_source_lock_sha256":ORIGINAL_SOURCE_LOCK_SHA256,
-   "repair_id":"separate-policy-checkpoint-root-from-raw-receipt-root"},
+   "repair_id":"normalize-checkout-line-endings-for-locked-text-files"},
   "study_files_sha256":study_file_hashes(),"source_files_sha256":source_files(),
   "runtime_identity":source_identity(),"seed_table_sha256":canonical_text_sha256(SEED_TABLE),
   "contract_sha256":canonical_text_sha256(CONTRACT),"arms":{"pilot":list(PILOT_ARMS),"validation":list(VALIDATION_ARMS),"test":list(TEST_ARMS)},
@@ -149,22 +158,25 @@ def prepare():
  if mb!=BASE_COMMIT: raise RuntimeError("wrong base source")
  original=subprocess.run(["git","merge-base","HEAD",ORIGINAL_EXECUTION_COMMIT],cwd=REPO,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True).stdout.strip()
  if original!=ORIGINAL_EXECUTION_COMMIT: raise RuntimeError("repair epoch is not descended from the exact original execution source")
- if file_sha256(ORIGINAL_SOURCE_LOCK)!=ORIGINAL_SOURCE_LOCK_SHA256:
+ model_root=subprocess.run(["git","merge-base","HEAD",PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT],cwd=REPO,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True).stdout.strip()
+ if model_root!=PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT: raise RuntimeError("checkout-portability epoch is not descended from the exact model-root repair source")
+ if canonical_text_sha256(ORIGINAL_SOURCE_LOCK)!=ORIGINAL_SOURCE_LOCK_SHA256:
   raise RuntimeError("original execution source lock changed; refusing to append repair epoch")
- if file_sha256(PREVIOUS_REPAIR_SOURCE_LOCK)!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256:
+ if canonical_text_sha256(PREVIOUS_REPAIR_SOURCE_LOCK)!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256:
   raise RuntimeError("prior repair source lock changed; refusing to append repair epoch")
- if file_sha256(PREVIOUS_SERIALIZATION_SOURCE_LOCK)!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256:
+ if canonical_text_sha256(PREVIOUS_SERIALIZATION_SOURCE_LOCK)!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256:
   raise RuntimeError("previous serialization source lock changed; refusing to append repair epoch")
  source_identity()
  for p in (DATA,ARTIFACTS,ARTIFACTS/"pilot",ARTIFACTS/"formal",ARTIFACTS/"verify",STAGE1): p.mkdir(parents=True,exist_ok=True)
  for src,dst in ((STUDY81/"config.json",STUDY/"config.json"),(STUDY81/"stage1/config.json",STAGE1/"config.json")):
   raw=src.read_bytes()
-  if dst.exists() and dst.read_bytes()!=raw: raise FileExistsError(f"refusing to replace config: {dst}")
+  if dst.exists() and canonical_text_sha256(dst)!=canonical_text_sha256(src): raise FileExistsError(f"refusing to replace config: {dst}")
   if not dst.exists(): dst.write_bytes(raw)
- write_json_once(SEED_TABLE,make_seed_table()); write_json_once(CONTRACT,contract_document())
+ write_json_source_once(SEED_TABLE,make_seed_table()); write_json_source_once(CONTRACT,contract_document())
  lock=source_lock_document()
  if SOURCE_LOCK.exists() and read_json(SOURCE_LOCK)!=lock: raise FileExistsError("source lock differs")
- write_once(SOURCE_LOCK,canonical(lock)+b"\n"); check_lock()
+ if not SOURCE_LOCK.exists(): write_once(SOURCE_LOCK,canonical(lock)+b"\n")
+ check_lock()
  return {"status":"PREPARED","source_lock_sha256":repair_source_lock_sha256(),"seed_sha256":canonical_text_sha256(SEED_TABLE),
   "seed_rows":len(read_json(SEED_TABLE)["rows"]),"pilot_games":48,"training_games":3072,
   "validation_games":448,"maximum_test_games":960,"parent_model_sha256":file_sha256(PARENT_MODEL),
@@ -172,21 +184,24 @@ def prepare():
 
 def check_lock():
  lock=read_json(SOURCE_LOCK)
- if lock.get("schema_id")!="issue83-source-lock-repair-v4" or study_file_hashes()!=lock.get("study_files_sha256"):
+ if lock.get("schema_id")!="issue83-source-lock-repair-v5" or study_file_hashes()!=lock.get("study_files_sha256"):
   raise RuntimeError("Issue 83 model-root repair source lock mismatch")
  epoch=lock.get("source_epoch") or {}
- if (epoch.get("kind")!="semantics-preserving-worker-policy-checkpoint-root-routing" or
-     epoch.get("supersedes_execution_commit")!=PREVIOUS_SERIALIZATION_EXECUTION_COMMIT or
-     epoch.get("supersedes_source_lock_sha256")!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256 or
+ if (epoch.get("kind")!="line-ending-independent-source-lock-chain-validation" or
+     epoch.get("supersedes_execution_commit")!=PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT or
+     epoch.get("supersedes_source_lock_sha256")!=PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256 or
+     epoch.get("previous_model_root_execution_commit")!=PREVIOUS_MODEL_ROOT_EXECUTION_COMMIT or
+     epoch.get("previous_model_root_source_lock_sha256")!=PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256 or
      epoch.get("previous_serialization_execution_commit")!=PREVIOUS_SERIALIZATION_EXECUTION_COMMIT or
      epoch.get("previous_serialization_source_lock_sha256")!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256 or
      epoch.get("previous_repair_source_lock_sha256")!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256 or
      epoch.get("original_execution_commit")!=ORIGINAL_EXECUTION_COMMIT or
      epoch.get("original_source_lock_sha256")!=ORIGINAL_SOURCE_LOCK_SHA256 or
-     epoch.get("repair_id")!="separate-policy-checkpoint-root-from-raw-receipt-root" or
-     file_sha256(PREVIOUS_SERIALIZATION_SOURCE_LOCK)!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256 or
-     file_sha256(PREVIOUS_REPAIR_SOURCE_LOCK)!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256 or
-     file_sha256(ORIGINAL_SOURCE_LOCK)!=ORIGINAL_SOURCE_LOCK_SHA256):
+     epoch.get("repair_id")!="normalize-checkout-line-endings-for-locked-text-files" or
+     canonical_text_sha256(PREVIOUS_MODEL_ROOT_SOURCE_LOCK)!=PREVIOUS_MODEL_ROOT_SOURCE_LOCK_SHA256 or
+     canonical_text_sha256(PREVIOUS_SERIALIZATION_SOURCE_LOCK)!=PREVIOUS_SERIALIZATION_SOURCE_LOCK_SHA256 or
+     canonical_text_sha256(PREVIOUS_REPAIR_SOURCE_LOCK)!=PREVIOUS_REPAIR_SOURCE_LOCK_SHA256 or
+     canonical_text_sha256(ORIGINAL_SOURCE_LOCK)!=ORIGINAL_SOURCE_LOCK_SHA256):
   raise RuntimeError("model-root repair source lock does not preserve all prior execution epochs")
  if source_files()!=lock.get("source_files_sha256") or source_identity()!=lock.get("runtime_identity"):
   raise RuntimeError("pinned sources or model identities changed")
@@ -776,7 +791,7 @@ def require_no_test_before_selection(data_root,root,table):
 
 def formal():
  check_lock(); package=current_source_commit(); table=read_json(SEED_TABLE)
- old_lock=file_sha256(ORIGINAL_SOURCE_LOCK)
+ old_lock=canonical_text_sha256(ORIGINAL_SOURCE_LOCK)
  if old_lock!=ORIGINAL_SOURCE_LOCK_SHA256: raise RuntimeError("original source lock changed")
  legacy_seed_sha=read_json(ORIGINAL_SOURCE_LOCK).get("seed_table_sha256")
  if not isinstance(legacy_seed_sha,str): raise RuntimeError("original lock lacks its exact seed-table identity")
