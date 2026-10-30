@@ -276,7 +276,7 @@ def main():
   result={"schema_id":"issue83-native-repair-equivalence-v1","status":"PASS",
    "original_execution_source_commit":oldsha,"original_source_lock_sha256":oldlock,
    "repair_execution_source_commit":newsha,"repair_source_lock_sha256":newlock,
-   "native_source_commit":new.EXPECT["sts_commit"],"native_module_sha256":sha_file(new.NATIVE),
+   "native_source_commit":new.EXPECTED["sts_commit"],"native_module_sha256":sha_file(new.NATIVE),
    "representative_training_owners":list(OWNERS),"formal_seed_consumption":0,
    "replays_are_nonformal_same_owner_game_seed_and_policy_rng":True,
    "original_success_receipts_and_attempts_overwritten":False,
