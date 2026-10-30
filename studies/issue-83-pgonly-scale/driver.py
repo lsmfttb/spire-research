@@ -65,6 +65,7 @@ def configure_driver():
   "FORMAL_TRAINING":FORMAL_TRAINING,"FORMAL_EVALUATION":FORMAL_EVALUATION,
   "ARMS":ARMS,"CONCURRENCY":CONCURRENCY,"HEARTBEAT_SECONDS":2.0,
   "canonical":canonical,"sha256":sha256_bytes,"file_sha256":file_sha256,
+  "source_lock_sha":repair_source_lock_sha256,
   "write_once":write_once,"write_json_once":write_json_once,"atomic_json":atomic_json,
   "derive_seed":derive_seed,"__file__":str(STUDY/"driver.py"),
  }.items(): setattr(D,name,value)

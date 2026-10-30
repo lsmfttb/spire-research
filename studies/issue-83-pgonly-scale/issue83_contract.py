@@ -1,7 +1,11 @@
 
 STUDY=REPO/"studies/issue-83-pgonly-scale"; DATA=Path("/mnt/d/DeadlycatCoding/stsrl-data/issue83")
 ARTIFACTS=DATA/"artifacts"; STAGE1=STUDY/"stage1"; SEED_TABLE=STUDY/"seed-table.json"
-CONTRACT=STUDY/"contract.json"; SOURCE_LOCK=STUDY/"source-lock.json"; BASE_COMMIT="acdbf9b397bce95f3e5d26077c34e80dbc59821e"
+CONTRACT=STUDY/"contract.json"; SOURCE_LOCK=STUDY/"source-lock-repair.json"; ORIGINAL_SOURCE_LOCK=STUDY/"source-lock.json"
+BASE_COMMIT="acdbf9b397bce95f3e5d26077c34e80dbc59821e"
+ORIGINAL_EXECUTION_COMMIT="3951ee0749d8e9c3dfcba33590ceb1f880047acc"
+ORIGINAL_SOURCE_LOCK_SHA256="224c7a6e2cbd46d986294e68b31a07ec6518ea6f82eda4636ae0c98ef4fa63b2"
+LEGACY_FORMAL_ROOT=ARTIFACTS/"formal"/ORIGINAL_EXECUTION_COMMIT
 PARENT_ROOT=Path("/mnt/d/DeadlycatCoding/stsrl-data/issue82/artifacts/formal/8f88f1554821707db6228d2de384f2334ec2615b")
 PARENT_MODEL=PARENT_ROOT/"models/pi12.pt"; PARENT_OPTIMIZER=PARENT_ROOT/"models/block-11-step.pt"
 PARENT_UPDATE=PARENT_ROOT/"models/issue82-update-11.json"
@@ -95,26 +99,46 @@ def contract_document():
    "one_global_allowance_factor":1.75,"overlaps_count_once":True,"idle_gaps_excluded":True},
   "data_root":str(DATA),"limitations":["single trained lineage","changing on-policy distribution","privileged native surrogate not public/live-client parity"]}
 
+def canonical_text_sha256(path):
+ raw=Path(path).read_bytes()
+ raw.decode("utf-8-sig")
+ raw=raw.replace(bytes((13,10)),bytes((10,))).replace(bytes((13,)),bytes((10,)))
+ if raw.startswith(bytes((239,187,191))): raw=raw[3:]
+ return sha256_bytes(raw)
+
+def repair_source_lock_sha256():
+ return canonical_text_sha256(SOURCE_LOCK)
+
 def source_files():
  paths=[STUDY81/"driver.py",STUDY81/"source-lock.json",STUDY79/"driver.py",STUDY79/"source-lock.json",
   STUDY75/"algorithm.py",STUDY75/"learning.py",STUDY75/"model.py",STUDY75/"runtime.py",
   STUDY75/"config.json",STUDY75/"stage1/config.json",STUDY75/"stage1/executor.py"]
- return {p.relative_to(REPO).as_posix():file_sha256(p) for p in paths}
+ return {p.relative_to(REPO).as_posix():canonical_text_sha256(p) for p in paths}
 
 def study_file_hashes():
- return {"driver.py":file_sha256(STUDY/"driver.py"),"issue83_contract.py":file_sha256(STUDY/"issue83_contract.py"),
-  "run_issue83.sh":file_sha256(STUDY/"run_issue83.sh"),"config.json":file_sha256(STUDY/"config.json"),
-  "stage1/config.json":file_sha256(STAGE1/"config.json"),"contract.json":file_sha256(CONTRACT),"seed-table.json":file_sha256(SEED_TABLE)}
+ return {"driver.py":canonical_text_sha256(STUDY/"driver.py"),"issue83_contract.py":canonical_text_sha256(STUDY/"issue83_contract.py"),
+  "run_issue83.sh":canonical_text_sha256(STUDY/"run_issue83.sh"),"config.json":canonical_text_sha256(STUDY/"config.json"),
+  "stage1/config.json":canonical_text_sha256(STAGE1/"config.json"),"contract.json":canonical_text_sha256(CONTRACT),
+  "seed-table.json":canonical_text_sha256(SEED_TABLE)}
 
 def source_lock_document():
- return {"schema_id":"issue83-source-lock-v1","base_commit":BASE_COMMIT,"study_files_sha256":study_file_hashes(),
-  "source_files_sha256":source_files(),"runtime_identity":source_identity(),"seed_table_sha256":file_sha256(SEED_TABLE),
-  "contract_sha256":file_sha256(CONTRACT),"arms":{"pilot":list(PILOT_ARMS),"validation":list(VALIDATION_ARMS),"test":list(TEST_ARMS)},
+ return {"schema_id":"issue83-source-lock-repair-v2","base_commit":BASE_COMMIT,
+  "text_hash_policy":"UTF-8; ignore optional BOM; normalize CRLF and bare CR to LF for locked text files; binary runtime/model/native files remain byte-exact",
+  "source_epoch":{"kind":"semantics-preserving-adapter-repair","supersedes_execution_commit":ORIGINAL_EXECUTION_COMMIT,
+   "supersedes_source_lock_sha256":ORIGINAL_SOURCE_LOCK_SHA256,
+   "repair_id":"dead-adventurer-phase3-native-projection-coverage"},
+  "study_files_sha256":study_file_hashes(),"source_files_sha256":source_files(),
+  "runtime_identity":source_identity(),"seed_table_sha256":canonical_text_sha256(SEED_TABLE),
+  "contract_sha256":canonical_text_sha256(CONTRACT),"arms":{"pilot":list(PILOT_ARMS),"validation":list(VALIDATION_ARMS),"test":list(TEST_ARMS)},
   "concurrency":8,"one_global_allowance_set_after_pilot":True,"raw_evidence_root":str(DATA)}
 
 def prepare():
  mb=subprocess.run(["git","merge-base","HEAD",BASE_COMMIT],cwd=REPO,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True).stdout.strip()
  if mb!=BASE_COMMIT: raise RuntimeError("wrong base source")
+ original=subprocess.run(["git","merge-base","HEAD",ORIGINAL_EXECUTION_COMMIT],cwd=REPO,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True).stdout.strip()
+ if original!=ORIGINAL_EXECUTION_COMMIT: raise RuntimeError("repair epoch is not descended from the exact original execution source")
+ if file_sha256(ORIGINAL_SOURCE_LOCK)!=ORIGINAL_SOURCE_LOCK_SHA256:
+  raise RuntimeError("original execution source lock changed; refusing to append repair epoch")
  source_identity()
  for p in (DATA,ARTIFACTS,ARTIFACTS/"pilot",ARTIFACTS/"formal",ARTIFACTS/"verify",STAGE1): p.mkdir(parents=True,exist_ok=True)
  for src,dst in ((STUDY81/"config.json",STUDY/"config.json"),(STUDY81/"stage1/config.json",STAGE1/"config.json")):
@@ -125,20 +149,88 @@ def prepare():
  lock=source_lock_document()
  if SOURCE_LOCK.exists() and read_json(SOURCE_LOCK)!=lock: raise FileExistsError("source lock differs")
  write_once(SOURCE_LOCK,canonical(lock)+b"\n"); check_lock()
- return {"status":"PREPARED","source_lock_sha256":file_sha256(SOURCE_LOCK),"seed_sha256":file_sha256(SEED_TABLE),
+ return {"status":"PREPARED","source_lock_sha256":repair_source_lock_sha256(),"seed_sha256":canonical_text_sha256(SEED_TABLE),
   "seed_rows":len(read_json(SEED_TABLE)["rows"]),"pilot_games":48,"training_games":3072,
   "validation_games":448,"maximum_test_games":960,"parent_model_sha256":file_sha256(PARENT_MODEL),
   "parent_optimizer_sha256":file_sha256(PARENT_OPTIMIZER),"parent_update_sha256":file_sha256(PARENT_UPDATE)}
 
 def check_lock():
  lock=read_json(SOURCE_LOCK)
- if lock.get("schema_id")!="issue83-source-lock-v1" or study_file_hashes()!=lock.get("study_files_sha256"):
-  raise RuntimeError("Issue 83 source lock mismatch")
+ if lock.get("schema_id")!="issue83-source-lock-repair-v2" or study_file_hashes()!=lock.get("study_files_sha256"):
+  raise RuntimeError("Issue 83 repair source lock mismatch")
+ epoch=lock.get("source_epoch") or {}
+ if (epoch.get("kind")!="semantics-preserving-adapter-repair" or
+     epoch.get("supersedes_execution_commit")!=ORIGINAL_EXECUTION_COMMIT or
+     epoch.get("supersedes_source_lock_sha256")!=ORIGINAL_SOURCE_LOCK_SHA256 or
+     epoch.get("repair_id")!="dead-adventurer-phase3-native-projection-coverage" or
+     file_sha256(ORIGINAL_SOURCE_LOCK)!=ORIGINAL_SOURCE_LOCK_SHA256):
+  raise RuntimeError("repair source lock does not preserve the exact original execution epoch")
  if source_files()!=lock.get("source_files_sha256") or source_identity()!=lock.get("runtime_identity"):
   raise RuntimeError("pinned sources or model identities changed")
- if file_sha256(SEED_TABLE)!=lock.get("seed_table_sha256") or file_sha256(CONTRACT)!=lock.get("contract_sha256"):
+ if canonical_text_sha256(SEED_TABLE)!=lock.get("seed_table_sha256") or canonical_text_sha256(CONTRACT)!=lock.get("contract_sha256"):
   raise RuntimeError("contract or seed table changed")
  return lock
+
+def repair_dead_adventurer_phase3_projection(projection,actions):
+ """Recover only the source-defined Dead Adventurer phase-3 search candidate.
+
+ The unchanged native projection rejects this valid candidate because it
+ insists on a reward entry even though the native state machine guarantees an
+ encounter at phase 3. The native semantic mapping and exact ordered action
+ binding already exist; this restores the fields discarded by that early
+ rejection. Every other unsupported candidate remains fail-closed.
+ """
+ if not isinstance(projection,dict) or not isinstance(actions,(list,tuple)): return None
+ candidates=projection.get("candidates")
+ if (projection.get("schema_id")!="native-privileged-noncombat-choice-projection-v1" or
+     projection.get("audience")!="training_oracle_only" or projection.get("public_api_safe") is not False or
+     projection.get("native_source_commit")!=EXPECTED["sts_commit"] or
+     projection.get("candidate_order_source")!="StepSimulator::legalActions; ordered occurrences are retained without deduplication" or
+     projection.get("screen_identity")!={"availability":"available","source":"GameContext::screenState","value":"EVENT_SCREEN","visibility":"public_now"} or
+     not isinstance(candidates,list) or len(candidates)!=2 or len(actions)!=2 or
+     projection.get("candidate_count")!=2 or projection.get("supported_candidate_count")!=1 or
+     projection.get("coverage_status")!="NATIVE_CHOICE_SEMANTIC_NOT_READY"):
+  return None
+ if projection.get("unsupported_candidates")!=[{"candidate_index":0,"kind":"event",
+      "reason":"Dead Adventurer phase has no native reward entry"}]: return None
+ c0,c1=candidates
+ if not isinstance(c0,dict) or not isinstance(c1,dict): return None
+ if c0.get("coverage_status")!="unsupported" or c0.get("reason")!="Dead Adventurer phase has no native reward entry": return None
+ if c1.get("coverage_status")!="supported": return None
+ f0=c0.get("features"); f1=c1.get("features")
+ if not isinstance(f0,dict) or not isinstance(f1,dict) or set(f0)!={"event","choice"} or set(f1)!={"event","choice"}: return None
+ event={"availability":"available","source":"GameContext::curEvent and constants/Events.h",
+        "value":"Dead Adventurer","visibility":"public_now"}
+ if f0.get("event")!=event or f1.get("event")!=event: return None
+ if f0.get("choice")!={"availability":"unavailable","reason":"Dead Adventurer phase has no native reward entry",
+                         "required_for_choice_semantics":True}: return None
+ leave={"availability":"available","source":"GameContext::chooseEventOption DEAD_ADVENTURER reward codes",
+        "value":{"choice_type":"leave_dead_adventurer","effect_type":"return_to_map"},"visibility":"oracle_only"}
+ if f1.get("choice")!=leave: return None
+ for index,(candidate,action,idx1) in enumerate(((c0,actions[0],0),(c1,actions[1],1))):
+  binding=candidate.get("candidate_binding"); value=binding.get("value") if isinstance(binding,dict) else None
+  native=value.get("candidate_action") if isinstance(value,dict) else None; raw=getattr(action,"raw",None)
+  if (not isinstance(binding,dict) or binding.get("availability")!="available" or binding.get("visibility")!="oracle_only" or
+      not isinstance(value,dict) or value.get("candidate_index")!=index or
+      not isinstance(native,dict) or native.get("kind")!="event" or native.get("idx1")!=idx1 or
+      getattr(action,"kind",None)!="event" or not isinstance(raw,dict) or raw.get("idx1")!=idx1): return None
+ # Native setup sets phase=0 and rewards=[0,1,2]. The only transition that
+ # leaves EVENT_SCREEN while preserving this event increments phase by one;
+ # at phase 3, chooseEventOption's 100% (or 110% at A15+) encounter chance
+ # always enters the native encounter, so rewards[3] is never read. Therefore
+ # this exact out-of-range projection reason identifies reachable phase 3.
+ c0["features"]["choice"]={"availability":"available",
+  "source":"GameContext::chooseEventOption DEAD_ADVENTURER reward codes",
+  "value":{"choice_type":"search_dead_adventurer_site",
+   "effect_type":"native_phase_reward_or_encounter_transition","current_phase":3},"visibility":"oracle_only"}
+ c0["coverage_status"]="supported"; c0.pop("reason",None)
+ projection["coverage_status"]="supported"; projection["supported_candidate_count"]=2
+ projection["unsupported_candidates"]=[]
+ return {"repair_id":"dead-adventurer-phase3-native-projection-coverage","candidate_index":0,
+  "derived_phase":3,"projection_reason":"Dead Adventurer phase has no native reward entry",
+  "choice_type":"search_dead_adventurer_site","effect_type":"native_phase_reward_or_encounter_transition",
+  "phase_reward_kind":"not-applicable: phase 3 always enters encounter before reward lookup"}
+
 
 def verify_parent_and_runtime(output_dir):
  check_lock(); a,r,m,l,e=D.load_modules(output_dir,pilot=True); pol,digest,_=e._load_model("pi12")
@@ -175,7 +267,7 @@ def optimizer_steps(state):
  return sorted(int(v["step"].item()) for v in state.get("state",{}).values() if "step" in v)
 
 
-def train_update(block,examples,*,root,pilot,clock=None):
+def train_update(block,examples,*,root,pilot,clock=None,source_epoch_summary=None):
  global CURRENT_BLOCK
  CURRENT_BLOCK=block; alg,rt,m,l,e=D.load_modules(root,pilot=pilot); count=32 if pilot else 128
  frozen,src,_=e._load_model(f"pi{block}"); ownerhash=hashlib.sha256(",".join(str(int(x.owner_seed)) for x in examples).encode("ascii")).hexdigest()
@@ -206,7 +298,9 @@ def train_update(block,examples,*,root,pilot,clock=None):
   "optimizer_inherited_state_sha256":file_sha256(PARENT_OPTIMIZER) if block==12 else None,
   "owner_seed_sha256":ownerhash,"source_model_digest":result.source_model_digest,"result_model_digest":result.result_model_digest,
   "model":model,"optimizer_checkpoint":{"path":ck.relative_to(root).as_posix(),"sha256":file_sha256(ck),"steps":steps},
-  "diagnostics":ds,"elapsed_seconds":time.monotonic()-start,"expert_decisions":0,"search_invocations":0,"pilot_nonformal":pilot}
+  "diagnostics":ds,"elapsed_seconds":time.monotonic()-start,"expert_decisions":0,"search_invocations":0,"pilot_nonformal":pilot,
+   "execution_source_commit":current_source_commit(),"source_lock_sha256":repair_source_lock_sha256(),
+   "training_input_epoch_summary":source_epoch_summary}
  write_json_once(rp,rec); return rec
 
 def rows_for(table,*,phase,formal,block=None,cohort=None,arms=None):
@@ -225,6 +319,12 @@ def verify_update(block,rows,root):
   raise RuntimeError(f"block {block} update receipt mismatch")
  inherited=EXPECTED["parent_optimizer_sha256"] if block==12 else None
  if rec.get("optimizer_inherited_state_sha256")!=inherited: raise RuntimeError(f"block {block} optimizer lineage mismatch")
+ if block>=26:
+  epoch_path=root/"training-block-source-epochs"/f"block-{block}.json"
+  summary=rec.get("training_input_epoch_summary") or {}
+  if (rec.get("execution_source_commit")!=current_source_commit() or rec.get("source_lock_sha256")!=repair_source_lock_sha256() or
+      summary.get("path")!=epoch_path.relative_to(root).as_posix() or summary.get("sha256")!=file_sha256(epoch_path)):
+   raise RuntimeError(f"block {block} update does not bind its mixed/source epoch owner receipts")
  ds=rec.get("diagnostics",[])
  if len(ds)!=64 or any(d.get("loss_elite")!=0.0 or d.get("grad_norm_elite")!=0.0 or d.get("elite_owner_count")!=0 or d.get("elite_root_count")!=0 for d in ds):
   raise RuntimeError(f"block {block} diagnostics contain elite contributions")
@@ -321,8 +421,8 @@ def pilot():
   tc=D._max_concurrent_workers(root,tr); ec=D._max_concurrent_workers(root,ev)
   if max(tc,ec)>8 or min(tc,ec)!=8: raise RuntimeError("pilot did not attain registered 8-worker concurrency")
   upd=read_json(root/"models/issue83-update-12.json")
-  policy={"schema_id":"issue83-wall-policy-v1","source_branch_sha":package,"source_lock_sha256":file_sha256(SOURCE_LOCK),
-   "seed_table_sha256":file_sha256(SEED_TABLE),"actual_pilot_active_seconds":measured,
+  policy={"schema_id":"issue83-wall-policy-v1","source_branch_sha":package,"source_lock_sha256":repair_source_lock_sha256(),
+   "seed_table_sha256":canonical_text_sha256(SEED_TABLE),"actual_pilot_active_seconds":measured,
    "max_training_workers":tc,"max_evaluation_workers":ec,
    "projection_components_seconds":{"pilot_actual":measured,"3072_training_factor_1_35":trainproj,
     "24_updates":updateproj,"448_validation_plus_960_test_factor_1_25":evalproj,"retry_margin_10_percent":retry,"analysis":analysis},
@@ -336,7 +436,7 @@ def pilot():
     "later-policy/retry factors are projected","forecast includes max 960 test games","clone is not efficacy evidence"]}
   write_json_once(policy_path,policy)
   result={"schema_id":"issue83-pilot-v1","status":"PILOT_COMPLETE_NONFORMAL","source_branch_sha":package,
-   "source_lock_sha256":file_sha256(SOURCE_LOCK),"seed_table_sha256":file_sha256(SEED_TABLE),"parent_preflight":pre,
+   "source_lock_sha256":repair_source_lock_sha256(),"seed_table_sha256":canonical_text_sha256(SEED_TABLE),"parent_preflight":pre,
    "training":{"games":32,"complete_terminals":32,"active_seconds":tw,"max_workers":tc,
     "row_wall_seconds":tp["result_summary"].get("row_wall_seconds",{}),"tries":tp["result_summary"].get("tries",{})},
    "update":{"owners":upd["owner_count"],"steps":64,"optimizer_before":64,"optimizer_after":128,
@@ -355,7 +455,7 @@ def _assemble_pilot_report(package):
  check_lock(); root=ARTIFACTS/"pilot"/package; report_path=root/"pilot-report.json"
  if report_path.is_file(): return read_json(report_path)
  policy_path=root/"time-policy.json"; policy=read_json(policy_path); table=read_json(SEED_TABLE)
- lock_sha=file_sha256(SOURCE_LOCK); seed_sha=file_sha256(SEED_TABLE)
+ lock_sha=repair_source_lock_sha256(); seed_sha=canonical_text_sha256(SEED_TABLE)
  if (policy.get("source_branch_sha")!=package or policy.get("source_lock_sha256")!=lock_sha or
      policy.get("seed_table_sha256")!=seed_sha): raise RuntimeError("pilot timing receipt is not bound to this source lock and seed table")
  lock_bytes=subprocess.run(["git","show",f"{package}:{STUDY.relative_to(REPO).as_posix()}/source-lock.json"],
@@ -427,7 +527,7 @@ def finalize_pilot(package):
  check_lock(); root=ARTIFACTS/"pilot"/package; report_path=root/"pilot-report.json"
  if report_path.is_file():
   report=read_json(report_path)
-  if report.get("source_branch_sha")!=package or report.get("source_lock_sha256")!=file_sha256(SOURCE_LOCK):
+  if report.get("source_branch_sha")!=package or report.get("source_lock_sha256")!=repair_source_lock_sha256():
    raise RuntimeError("existing pilot report source identity mismatch")
   return report
  recovery_mode=f"pilot-report-recovery-{package[:12]}"; recovery_clock=D.ActiveClock(recovery_mode,None)
@@ -450,8 +550,8 @@ def finalize_pilot(package):
    atomic_json(report_path,recovered)
    if result is not None: result.clear(); result.update(recovered)
 
-def analyze_validation(root,table,package):
- rows=rows_for(table,phase="heldout",formal=True,cohort="validation"); out=_phase_reports(root,rows,package)
+def analyze_validation(root,table,package,*,data_root):
+ rows=rows_for(table,phase="heldout",formal=True,cohort="validation"); out=_phase_reports(data_root,rows,package)
  if len(out)!=448: raise RuntimeError("validation requires 448 complete games")
  counts={a:sum(x["arm"]==a for x in out) for a in VALIDATION_ARMS}
  if counts!={a:64 for a in VALIDATION_ARMS}: raise RuntimeError(f"wrong validation arm counts: {counts}")
@@ -461,53 +561,174 @@ def analyze_validation(root,table,package):
  _,_,_,_,e=D.load_modules(root,pilot=False); digests={}
  for label in ("pi12",)+CHECKPOINT_LABELS: _,digests[label],_=e._load_model(label)
  return {"schema_id":"issue83-validation-selection-v1","status":"FROZEN_BEFORE_TEST","source_branch_sha":package,
-  "source_lock_sha256":file_sha256(SOURCE_LOCK),"seed_table_sha256":file_sha256(SEED_TABLE),"validation_games":448,
+  "source_lock_sha256":repair_source_lock_sha256(),"seed_table_sha256":canonical_text_sha256(SEED_TABLE),"validation_games":448,
   "candidate_order":list(CHECKPOINT_LABELS),"tie_break":"earliest checkpoint",
   "selection_rule":"highest mean terminal floor among six new checkpoints","selected_checkpoint":chosen["checkpoint"],
   "selected_arm":chosen["arm"],"selected_mean_terminal_floor":chosen["mean_terminal_floor"],
   "candidate_means":candidates,"parent_mean_terminal_floor":means["PARENT"],"per_arm":_per_arm(out),
-  "model_digests":digests,"owner_arm_outcomes":out,"test_outcomes_opened":False}
+  "model_digests":digests,"owner_arm_outcomes":out,"test_outcomes_opened":False,
+  "training_source_epoch_manifest_sha256":file_sha256(root/"source-epoch-training-complete.json")}
 
-def freeze_selection(root,table,package):
+def freeze_selection(root,table,package,*,data_root):
  p=root/"checkpoint-selection.json"
  if p.exists():
   old=read_json(p)
   if (old.get("status")!="FROZEN_BEFORE_TEST" or old.get("source_branch_sha")!=package or
-      old.get("source_lock_sha256")!=file_sha256(SOURCE_LOCK) or old.get("seed_table_sha256")!=file_sha256(SEED_TABLE) or
+      old.get("source_lock_sha256")!=repair_source_lock_sha256() or old.get("seed_table_sha256")!=canonical_text_sha256(SEED_TABLE) or
       old.get("selected_checkpoint") not in CHECKPOINT_LABELS or len(old.get("owner_arm_outcomes",[]))!=448 or
-      old.get("test_outcomes_opened") is not False):
+      old.get("test_outcomes_opened") is not False or
+      old.get("training_source_epoch_manifest_sha256")!=file_sha256(root/"source-epoch-training-complete.json")):
    raise RuntimeError("selection receipt mismatch")
   return old
- result=analyze_validation(root,table,package); write_once(p,canonical(result)+b"\n"); return result
+ result=analyze_validation(root,table,package,data_root=data_root); write_once(p,canonical(result)+b"\n"); return result
 
 def _has_attempt(root,row):
  folder=root/"units"/D.unit_key(row["unit_id"])
  return folder.exists() and any(folder.glob("attempt-*"))
 
-def analyze_test(root,table,package,selection):
+def analyze_test(root,table,package,selection,*,data_root):
  arms=["PARENT","SELECTED"]+(["FINAL"] if selection["selected_checkpoint"]!="pi36" else [])
  if selection["selected_checkpoint"]=="pi36":
   redundant=rows_for(table,phase="heldout",formal=True,cohort="test",arms=["FINAL"])
-  if any(_has_attempt(root,row) for row in redundant): raise RuntimeError("fixed pi36 was redundantly tested when it equals SELECTED")
- rows=rows_for(table,phase="heldout",formal=True,cohort="test",arms=arms); out=_phase_reports(root,rows,package)
+  if any(_has_attempt(data_root,row) for row in redundant): raise RuntimeError("fixed pi36 was redundantly tested when it equals SELECTED")
+ rows=rows_for(table,phase="heldout",formal=True,cohort="test",arms=arms); out=_phase_reports(data_root,rows,package)
  if len(out)!=320*len(arms): raise RuntimeError("wrong test terminal count")
  if {a:sum(x["arm"]==a for x in out) for a in arms}!={a:320 for a in arms}: raise RuntimeError("wrong test arm size")
  primary=_paired_bootstrap(out,"SELECTED","PARENT","SELECTED-PARENT")
  secondary=None if "FINAL" not in arms else _paired_bootstrap(out,"FINAL","PARENT","FINAL-PARENT")
  return {"schema_id":"issue83-test-analysis-v1","status":"COMPLETE","source_branch_sha":package,
-  "source_lock_sha256":file_sha256(SOURCE_LOCK),"seed_table_sha256":file_sha256(SEED_TABLE),
+  "source_lock_sha256":repair_source_lock_sha256(),"seed_table_sha256":canonical_text_sha256(SEED_TABLE),
   "selection_receipt_sha256":file_sha256(root/"checkpoint-selection.json"),"test_owners":320,
   "complete_test_games":len(out),"arms":arms,"primary_registered_contrast":"SELECTED-PARENT terminal_floor",
   "primary":primary,"secondary_fixed_pi36_minus_parent":secondary,"per_arm":_per_arm(out),"owner_arm_outcomes":out,
   "selected_checkpoint":selection["selected_checkpoint"],"fixed_final_checkpoint":"pi36",
+  "training_source_epoch_manifest_sha256":file_sha256(root/"source-epoch-training-complete.json"),
   "limitations":["paired owners do not ensure shared future hidden RNG","single training lineage","privileged native surrogate is not public/live-client parity"]}
 
+
+def source_bound_training_receipt(data_root,row,package):
+ old=(ORIGINAL_EXECUTION_COMMIT,ORIGINAL_SOURCE_LOCK_SHA256); new=(package,repair_source_lock_sha256())
+ block=int(row["block_index"]); folder=Path(data_root)/"units"/D.unit_key(row["unit_id"])
+ if not folder.is_dir(): return None
+ matches=[]
+ for result in sorted(folder.glob("attempt-*/result.json")):
+  value=read_json(result)
+  if value.get("status")!="SUCCEEDED": continue
+  if value.get("unit_id")!=row["unit_id"] or value.get("owner_seed")!=row["owner_seed"]:
+   raise RuntimeError(f"training receipt bound to wrong owner: {result}")
+  identity=(value.get("package_commit"),value.get("source_lock_sha256"))
+  if identity==old and block>26: raise RuntimeError(f"old receipt outside source epoch: {result}")
+  if identity not in (old,new): raise RuntimeError(f"unregistered training receipt source: {result}")
+  if (value.get("phase")!=row["phase"] or value.get("arm")!=row["arm"] or value.get("formal") is not True or
+      value.get("expert_decisions")!=0 or value.get("search")!=[] or value.get("terminal_outcome") is None or value.get("terminal_floor") is None):
+   raise RuntimeError(f"training receipt violates contract: {result}")
+  job=read_json(result.parent/"worker-job.json"); jr=job.get("row") or {}
+  for k in ("unit_id","owner_seed","game_seed","policy_rng_seed","block_index","phase","arm","formal","cohort"):
+   if jr.get(k)!=row.get(k): raise RuntimeError(f"worker job differs from registered field {k}: {result}")
+  if (job.get("package_commit")!=identity[0] or job.get("source_lock_sha256")!=identity[1]):
+   raise RuntimeError(f"worker job/result source mismatch: {result}")
+  matches.append((value,result,identity))
+ if len(matches)>1: raise RuntimeError(f"duplicate successful receipt for {row['unit_id']}")
+ return matches[0] if matches else None
+
+
+def training_examples_across_epochs(rows,data_root,executor,package):
+ import zlib
+ examples=[]
+ for row in sorted(rows,key=lambda item:int(item["owner_seed"])):
+  found=source_bound_training_receipt(data_root,row,package)
+  if found is None: raise RuntimeError(f"training block lacks owner {row['unit_id']}")
+  report,path,_=found; pointer=report.get("training_features")
+  if not isinstance(pointer,dict) or pointer.get("compression")!="zlib": raise RuntimeError(f"missing features: {row['unit_id']}")
+  compressed=(Path(data_root)/pointer["path"]).read_bytes()
+  if sha256_bytes(compressed)!=pointer["sha256"]: raise RuntimeError(f"compressed feature hash mismatch: {row['unit_id']}")
+  raw=zlib.decompress(compressed)
+  if sha256_bytes(raw)!=pointer["uncompressed_sha256"]: raise RuntimeError(f"feature payload hash mismatch: {row['unit_id']}")
+  example=executor._training_example_from_payload(json.loads(raw))
+  if example.owner_seed!=row["owner_seed"] or not example.base.complete: raise RuntimeError(f"wrong/incomplete owner features: {row['unit_id']}")
+  examples.append(example)
+ return examples
+
+
+def training_block_source_epoch(root,data_root,rows,block,package):
+ receipts=[]; counts={}; old=(ORIGINAL_EXECUTION_COMMIT,ORIGINAL_SOURCE_LOCK_SHA256)
+ for row in sorted(rows,key=lambda item:int(item["owner_seed"])):
+  found=source_bound_training_receipt(data_root,row,package)
+  if found is None: raise RuntimeError(f"block {block} lacks owner {row['unit_id']}")
+  report,path,identity=found; epoch="original-3951ee0" if identity==old else "repair-"+package[:12]
+  counts[epoch]=counts.get(epoch,0)+1; pointer=report.get("training_features") or {}
+  receipts.append({"unit_id":row["unit_id"],"owner_seed":int(row["owner_seed"]),"execution_source_commit":identity[0],
+   "source_lock_sha256":identity[1],"result_path":path.relative_to(Path(data_root)).as_posix(),
+   "result_sha256":file_sha256(path),"training_features_path":pointer.get("path"),"training_features_sha256":pointer.get("sha256")})
+ expected=({"original-3951ee0":128} if block<=25 else
+  {"original-3951ee0":127,"repair-"+package[:12]:1} if block==26 else {"repair-"+package[:12]:128})
+ if counts!=expected: raise RuntimeError(f"block {block} source counts differ: {counts}, expected {expected}")
+ record={"schema_id":"issue83-training-block-source-epochs-v1","status":"VERIFIED_BEFORE_UPDATE",
+  "block_index":block,"owner_count":len(rows),"source_epoch_counts":counts,"source_epoch_receipts":receipts,
+  "registered_expected_counts":expected,"raw_evidence_root":str(data_root)}
+ path=Path(root)/"training-block-source-epochs"/f"block-{block}.json"
+ write_json_once(path,canonical(record)+b"\n")
+ return {"path":path.relative_to(root).as_posix(),"sha256":file_sha256(path),"counts":counts}
+
+
+def write_source_epoch_plan(root,package,allowance):
+ plan={"schema_id":"issue83-source-epoch-plan-v1","status":"LOCKED_BEFORE_RESUMED_FORMAL",
+  "repair_execution_source_commit":package,"repair_source_lock_sha256":repair_source_lock_sha256(),
+  "original_execution_source_commit":ORIGINAL_EXECUTION_COMMIT,"original_source_lock_sha256":ORIGINAL_SOURCE_LOCK_SHA256,
+  "native_source_commit":EXPECTED["sts_commit"],"native_module_sha256":EXPECTED["native_sha256"],
+  "raw_training_receipts_remain_at":str(LEGACY_FORMAL_ROOT),
+  "allocation":{"blocks_12_to_25":{"source":ORIGINAL_EXECUTION_COMMIT,"owners_per_block":128},
+   "block_26":{"original_source_receipts":127,"repair_source_receipts":1,"repair_owner_seed":8301831},
+   "blocks_27_to_35":{"source":package,"owners_per_block":128},
+   "expected_total_original_source_receipts":1919,"expected_total_repair_source_receipts":1153},
+  "preserve_original_failures_and_interrupted_attempt":{"owner_seed":8301831,"failed_attempts":13,"interrupted_attempt":14},
+  "active_wall_allowance_seconds":allowance,"training_data_not_copied":True,"original_epoch_evidence_not_overwritten":True}
+ write_json_once(Path(root)/"source-epoch-plan.json",canonical(plan)+b"\n")
+
+
+def training_update_summary(rec,path,source,lock):
+ return {"block_index":int(rec["block_index"]),"status":rec["status"],"owner_count":int(rec["owner_count"]),
+  "execution_source_commit":source,"source_lock_sha256":lock,"update_receipt_path":str(path),
+  "update_receipt_sha256":file_sha256(path),"result_model_digest":rec["result_model_digest"],
+  "optimizer_checkpoint_sha256":rec["optimizer_checkpoint"]["sha256"]}
+
+
+def complete_training_epoch_manifest(root,package):
+ paths=[Path(root)/"training-block-source-epochs"/f"block-{b}.json" for b in range(12,36)]
+ records=[read_json(x) for x in paths]; total={}; owners=0
+ for rec in records:
+  owners+=int(rec["owner_count"])
+  for epoch,count in rec["source_epoch_counts"].items(): total[epoch]=total.get(epoch,0)+int(count)
+ expected={"original-3951ee0":1919,"repair-"+package[:12]:1153}
+ if owners!=3072 or total!=expected: raise RuntimeError(f"source epoch totals differ: {owners}, {total}")
+ manifest={"schema_id":"issue83-source-epoch-training-complete-v1","status":"ALL_3072_TRAINING_RECEIPTS_AND_24_UPDATES_SOURCE_BOUND",
+  "repair_execution_source_commit":package,"repair_source_lock_sha256":repair_source_lock_sha256(),
+  "original_execution_source_commit":ORIGINAL_EXECUTION_COMMIT,"original_source_lock_sha256":ORIGINAL_SOURCE_LOCK_SHA256,
+  "training_owner_count":owners,"source_epoch_counts":total,
+  "block_epoch_receipt_manifest_sha256":[file_sha256(x) for x in paths],
+  "source_epoch_manifest_paths":[x.relative_to(Path(root)).as_posix() for x in paths],
+  "limitations":["old and repaired executables are distinct source epochs","treatment equivalence requires native witness and feature-equivalence evidence"]}
+ path=Path(root)/"source-epoch-training-complete.json"
+ write_json_once(path,canonical(manifest)+b"\n")
+
+
+def require_no_test_before_selection(data_root,root,table):
+ if (Path(root)/"checkpoint-selection.json").exists(): return
+ rows=rows_for(table,phase="heldout",formal=True,cohort="test")
+ started=[x["unit_id"] for x in rows if _has_attempt(data_root,x)]
+ if started: raise RuntimeError(f"test began before selection: {started[:8]}")
+
 def formal():
- check_lock(); package=current_source_commit()
- pilot_sha,pilot_path,policy_path=find_pilot_package(package,file_sha256(SEED_TABLE),file_sha256(SOURCE_LOCK))
+ check_lock(); package=current_source_commit(); table=read_json(SEED_TABLE)
+ old_lock=file_sha256(ORIGINAL_SOURCE_LOCK)
+ if old_lock!=ORIGINAL_SOURCE_LOCK_SHA256: raise RuntimeError("original source lock changed")
+ legacy_seed_sha=read_json(ORIGINAL_SOURCE_LOCK).get("seed_table_sha256")
+ if not isinstance(legacy_seed_sha,str): raise RuntimeError("original lock lacks its exact seed-table identity")
+ pilot_sha,pilot_path,policy_path=find_pilot_package(ORIGINAL_EXECUTION_COMMIT,legacy_seed_sha,old_lock)
  report=read_json(pilot_path); policy=read_json(policy_path)
- if report.get("status")!="PILOT_COMPLETE_NONFORMAL": raise RuntimeError("matching complete pilot required")
+ if report.get("status")!="PILOT_COMPLETE_NONFORMAL": raise RuntimeError("matching original pilot required")
  allowance=int(policy["one_global_active_wall_allowance_seconds"])
+ if allowance!=67272: raise RuntimeError("registered global active-wall allowance changed")
  pilot_clock=closed_active_wall_clock(f"pilot-{pilot_sha[:12]}")
  pilot_seconds=pilot_clock["elapsed_seconds"]
  recovery_clock=closed_active_wall_clock(f"pilot-report-recovery-{pilot_sha[:12]}",required=False)
@@ -515,55 +736,77 @@ def formal():
  recovery_status=pilot_report_recovery_status(report,recovery_clock)
  ensure_formal_clock_initial_state(pilot_seconds,pilot_clock_sha256=pilot_clock["sha256"],recovery_seconds=recovery,
   recovery_clock_sha256=None if recovery_clock is None else recovery_clock["sha256"],recovery_status=recovery_status)
- root=ARTIFACTS/"formal"/package; root.mkdir(parents=True,exist_ok=True)
- clock=D.ActiveClock("formal",allowance); updates=[]; table=read_json(SEED_TABLE)
+ root=ARTIFACTS/"formal"/package; data_root=LEGACY_FORMAL_ROOT
+ root.mkdir(parents=True,exist_ok=True); clock=D.ActiveClock("formal",allowance); updates=[]
  try:
-  check_lock()
+  check_lock(); write_source_epoch_plan(root,package,allowance); require_no_test_before_selection(data_root,root,table)
   for block in range(12,36):
    rows=rows_for(table,phase="training",formal=True,cohort="training",block=block)
-   games=D.run_units(rows,root=root,pilot=False,clock=clock,package_commit=package)
-   if games.get("status")!="SUCCEEDED":
-    result={"schema_id":"issue83-progress-v1","status":games.get("status"),"phase":"training","block_index":block,
-     "completed":games.get("completed"),"remaining":games.get("remaining"),"updates":updates,
-     "active_wall_seconds":clock.elapsed(),"allowance":allowance}; atomic_json(root/"formal-progress.json",result); return result
-   rec=verify_update(block,rows,root)
-   if rec is None:
-    a,r,m,l,e=D.load_modules(root,pilot=False); examples=D._training_examples(rows,root=root,executor=e,package_commit=package)
-    rec=train_update(block,examples,root=root,pilot=False,clock=clock); del examples
-   updates.append(rec); save_training_progress(root,package,clock,updates,current_block=block)
+   if block<=25:
+    training_block_source_epoch(root,data_root,rows,block,package)
+    rec=verify_update(block,rows,LEGACY_FORMAL_ROOT)
+    if rec is None: raise RuntimeError(f"original completed update {block} is missing")
+    receipt_path=LEGACY_FORMAL_ROOT/"models"/f"issue83-update-{block}.json"
+    execution_source=ORIGINAL_EXECUTION_COMMIT; lock_sha=ORIGINAL_SOURCE_LOCK_SHA256
+   else:
+    missing=[row for row in rows if source_bound_training_receipt(data_root,row,package) is None]
+    if missing:
+     games=D.run_units(missing,root=data_root,pilot=False,clock=clock,package_commit=package)
+     if games.get("status")!="SUCCEEDED":
+      result={"schema_id":"issue83-progress-v1","status":games.get("status"),"phase":"training","block_index":block,
+       "completed":games.get("completed"),"remaining":games.get("remaining"),"updates":updates,
+       "active_wall_seconds":clock.elapsed(),"allowance":allowance}; atomic_json(root/"formal-progress.json",result); return result
+    training_input_epoch=training_block_source_epoch(root,data_root,rows,block,package)
+    rec=verify_update(block,rows,root)
+    if rec is None:
+     a,r,m,l,e=D.load_modules(root,pilot=False)
+     examples=training_examples_across_epochs(rows,data_root,e,package)
+     rec=train_update(block,examples,root=root,pilot=False,clock=clock,source_epoch_summary=training_input_epoch); del examples
+     rec=verify_update(block,rows,root)
+    if rec is None: raise RuntimeError(f"repair-epoch update {block} was not verifiable")
+    receipt_path=root/"models"/f"issue83-update-{block}.json"
+    execution_source=package; lock_sha=repair_source_lock_sha256()
+   updates.append(training_update_summary(rec,receipt_path,execution_source,lock_sha))
+   save_training_progress(root,package,clock,updates,current_block=block)
    if clock.expired():
     result={"schema_id":"issue83-progress-v1","status":"GLOBAL_ACTIVE_WALL_ALLOWANCE_EXCEEDED","phase":"training",
      "block_index":block,"updates":updates,"active_wall_seconds":clock.elapsed(),"allowance":allowance}
     atomic_json(root/"formal-progress.json",result); return result
-  vr=D.run_units(rows_for(table,phase="heldout",formal=True,cohort="validation"),root=root,pilot=False,clock=clock,package_commit=package)
+  complete_training_epoch_manifest(root,package)
+  validation_rows=rows_for(table,phase="heldout",formal=True,cohort="validation")
+  vr=D.run_units(validation_rows,root=data_root,pilot=False,clock=clock,package_commit=package)
   if vr.get("status")!="SUCCEEDED":
    result={"schema_id":"issue83-progress-v1","status":vr.get("status"),"phase":"validation","completed":vr.get("completed"),
     "remaining":vr.get("remaining"),"active_wall_seconds":clock.elapsed(),"allowance":allowance}
    atomic_json(root/"formal-progress.json",result); return result
-  selection=freeze_selection(root,table,package)
+  selection=freeze_selection(root,table,package,data_root=data_root)
   arms=["PARENT","SELECTED"]+(["FINAL"] if selection["selected_checkpoint"]!="pi36" else [])
   test_rows=rows_for(table,phase="heldout",formal=True,cohort="test",arms=arms)
   all_test=rows_for(table,phase="heldout",formal=True,cohort="test")
   if not (root/"checkpoint-selection.json").is_file(): raise RuntimeError("test blocked until frozen selection exists")
-  if not (root/"test-opened.json").exists() and any(_has_attempt(root,x) for x in all_test):
+  if not (root/"test-opened.json").exists() and any(_has_attempt(data_root,x) for x in all_test):
    raise RuntimeError("test attempts predate validation selection")
   write_once(root/"test-opened.json",canonical({"selection_receipt_sha256":file_sha256(root/"checkpoint-selection.json"),
-   "opened_before_first_test":True})+b"\n")
-  ev=D.run_units(test_rows,root=root,pilot=False,clock=clock,package_commit=package)
+   "opened_before_first_test":True,"source_epoch_training_complete_sha256":file_sha256(root/"source-epoch-training-complete.json")})+b"\n")
+  ev=D.run_units(test_rows,root=data_root,pilot=False,clock=clock,package_commit=package)
   if ev.get("status")!="SUCCEEDED":
    result={"schema_id":"issue83-progress-v1","status":ev.get("status"),"phase":"test","completed":ev.get("completed"),
     "remaining":ev.get("remaining"),"active_wall_seconds":clock.elapsed(),"allowance":allowance}
    atomic_json(root/"formal-progress.json",result); return result
-  final=analyze_test(root,table,package,selection)
+  final=analyze_test(root,table,package,selection,data_root=data_root)
   final.update({"pilot_report_sha256":file_sha256(pilot_path),"time_policy_sha256":file_sha256(policy_path),
-   "validation_selection_before_test":True,"training_updates":updates,"pilot_active_wall_seconds_carried_forward":pilot_seconds,
-   "pilot_active_wall_clock_sha256":pilot_clock["sha256"],"pilot_report_recovery_status":recovery_status,
-   "active_wall_seconds_before_closeout":clock.elapsed(),"active_wall_allowance_seconds":allowance,
+   "validation_selection_before_test":True,"training_updates":updates,
+   "source_epoch_training_complete_sha256":file_sha256(root/"source-epoch-training-complete.json"),
+   "source_epoch_totals":read_json(root/"source-epoch-training-complete.json")["source_epoch_counts"],
+   "pilot_active_wall_seconds_carried_forward":pilot_seconds,"pilot_active_wall_clock_sha256":pilot_clock["sha256"],
+   "pilot_report_recovery_status":recovery_status,"active_wall_seconds_before_closeout":clock.elapsed(),
+   "active_wall_allowance_seconds":allowance,
    "formal_clock_carry_forward_sha256":file_sha256(ARTIFACTS/"formal-clock-carry-forward.json")})
   final_path=root/"final-analysis.json"; write_once(final_path,canonical(final)+b"\n")
   atomic_json(root/"formal-progress.json",{"schema_id":"issue83-progress-v1","status":"COMPLETE",
    "training_owners":3072,"training_blocks":24,"validation_games":448,"test_games":len(test_rows),
    "selected_checkpoint":selection["selected_checkpoint"],"active_wall_seconds":clock.elapsed(),"allowance":allowance,
+   "source_epoch_training_complete_sha256":file_sha256(root/"source-epoch-training-complete.json"),
    "final_analysis_sha256":file_sha256(final_path)}); return final
  except GlobalWallExpired as exc:
   result={"schema_id":"issue83-progress-v1","status":"GLOBAL_ACTIVE_WALL_ALLOWANCE_EXCEEDED","failure":str(exc),
@@ -589,10 +832,43 @@ def load_modules(root,*,pilot):
  global CURRENT_PILOT
  CURRENT_PILOT=bool(pilot); ISSUE81.ACTIVE_BLOCK=CURRENT_BLOCK
  alg,rt,model,learn,ex=ISSUE81.patch_modules(root,pilot=pilot)
+ if not getattr(rt.initialize_native_runtime,"_issue83_phase3_repair_wrapper",False):
+  initialize_native_runtime=rt.initialize_native_runtime
+  def initialize_with_phase3_repair(*args,**kwargs):
+   cfg,runner,module,encoder=initialize_native_runtime(*args,**kwargs)
+   if not getattr(runner,"_issue83_phase3_repair_installed",False):
+    validate=runner.validate_live_native_candidate_bindings
+    events=[]
+    def validate_with_phase3_repair(projection,actions):
+     event=repair_dead_adventurer_phase3_projection(projection,actions)
+     if event is not None:
+      validate(projection,actions)
+      events.append(event)
+      return None
+     return validate(projection,actions)
+    runner.validate_live_native_candidate_bindings=validate_with_phase3_repair
+    runner._issue83_phase3_repair_events=events
+    select=runner.StudyController.select_action
+    def select_with_repair_audit(self,adapter,snapshot,actions,context,step_index):
+     before=len(events)
+     decision=select(self,adapter,snapshot,actions,context,step_index)
+     recovered=events[before:]
+     if recovered:
+      if not self.trace or self.trace[-1].get("kind")!="categorical":
+       raise RuntimeError("phase-3 repair audit has no corresponding categorical decision")
+      self.trace[-1]["issue83_projection_repairs"]=list(recovered)
+     return decision
+    runner.StudyController.select_action=select_with_repair_audit
+    runner._issue83_phase3_repair_installed=True
+   return cfg,runner,module,encoder
+  initialize_with_phase3_repair._issue83_phase3_repair_wrapper=True
+  rt.initialize_native_runtime=initialize_with_phase3_repair
  ex.STUDY_ID="issue-83-pgonly-scale"; old_path=ex._model_path
  def model_path(label):
   if label=="pi12": return PARENT_MODEL
   if label.startswith("pi") and label[2:].isdigit() and int(label[2:])>=13:
+   index=int(label[2:])
+   if pilot or index<=26: return old_path(label) if pilot else LEGACY_FORMAL_ROOT/"models"/f"{label}.pt"
    return root/"models"/f"{label}.pt"
   return old_path(label)
  ex._model_path=model_path
