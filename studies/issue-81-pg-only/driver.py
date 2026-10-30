@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, hashlib, importlib.util, json, os, resource, subprocess, sys, tarfile, time, traceback, zlib
+import argparse, gc, hashlib, importlib.util, json, os, resource, subprocess, sys, tarfile, time, traceback, zlib
 from pathlib import Path
 
 BASE="1a117752e6057ea2660e196f150a85c12117a0e0"
@@ -616,35 +616,44 @@ def validate_terminal_batch(batch,rows,*,formal):
    "heart_victory":bool(report.get("heart_victory",False)),"model_digest":report["model_digest"]})
  return terminals
 
+def summarize_training_feature(payload, alg, ex):
+ example=ex._training_example_from_payload(payload); byroot={}; roots=superior=labels=0
+ for trajectory in example.joint_trajectories:
+  if trajectory.complete and trajectory.decisions:
+   byroot.setdefault(str(trajectory.search_root_id or trajectory.decisions[0].state_fingerprint),[]).append(trajectory)
+ for trajectories in byroot.values():
+  roots+=1; candidate=alg.elite_candidate(example.base,trajectories)
+  if candidate is not None: superior+=1; labels+=len(candidate.decisions)
+ return roots,superior,labels
+
 def elite_note():
  if not RAW79.is_file(): return {"status":"SOURCE_UNAVAILABLE"}
- alg,rt,m,l,ex=D.load_modules(ART/"verify"); found={}; roots=superior=labels=searches=0; packages=set()
+ alg,rt,m,l,ex=D.load_modules(ART/"verify"); seen=set(); roots=superior=labels=searches=0; packages=set()
  with tarfile.open(RAW79,"r:") as tar:
-  members=tar.getmembers(); files={m.name:m for m in members if m.isfile()}
-  feats=[m for m in members if m.isfile() and m.name.endswith("training-features.json.zlib") and any(f"TRAIN-{s}" in m.name for s in TRAIN)]
-  for m in feats:
-   prefix=m.name.rsplit("/",1)[0]; rp=files.get(prefix+"/result.json")
-   if rp is None: continue
-   report=json.loads(tar.extractfile(rp).read()); seed=int(report.get("owner_seed",-1))
-   if report.get("status")!="SUCCEEDED" or report.get("phase")!="training" or report.get("arm")!="TRAIN" or report.get("formal") is not True or seed not in TRAIN: continue
-   zipped=tar.extractfile(m).read()
+  members=tar.getmembers(); files={member.name:member for member in members if member.isfile()}
+  feats=[member for member in members if member.isfile() and member.name.endswith("training-features.json.zlib") and any(f"TRAIN-{seed}" in member.name for seed in TRAIN)]
+  for feature_member in feats:
+   prefix=feature_member.name.rsplit("/",1)[0]; result_member=files.get(prefix+"/result.json")
+   if result_member is None: continue
+   report=json.loads(tar.extractfile(result_member).read()); seed=int(report.get("owner_seed",-1))
+   if report.get("status")!="SUCCEEDED" or report.get("phase")!="training" or report.get("arm")!="TRAIN" or report.get("formal") is not True or seed not in TRAIN or seed in seen: continue
+   zipped=tar.extractfile(feature_member).read()
    if report.get("training_features",{}).get("sha256")!=sha(zipped): continue
    payload=json.loads(zlib.decompress(zipped))
-   if payload.get("owner_seed")!=seed or payload.get("unit_id")!=f"TRAIN:{seed}" or seed in found: continue
-   packages.add(str(report.get("package_commit"))); found[seed]=(ex._training_example_from_payload(payload),payload)
- for seed,(example,payload) in found.items():
-  byroot={}
-  for t in example.joint_trajectories:
-   if t.complete and t.decisions: byroot.setdefault(str(t.search_root_id or t.decisions[0].state_fingerprint),[]).append(t)
-  searches+=len(payload.get("search_receipts",[]))
-  for ts in byroot.values():
-   roots+=1; candidate=alg.elite_candidate(example.base,ts)
-   if candidate is not None: superior+=1; labels+=len(candidate.decisions)
- return {"status":"COMPLETE" if len(found)==384 else "INCOMPLETE_SOURCE_COVERAGE",
- "registered_training_owners":384,"owners_with_successful_source_features":len(found),"missing_owners":384-len(found),
+   if payload.get("owner_seed")!=seed or payload.get("unit_id")!=f"TRAIN:{seed}": continue
+   root_count,superior_count,label_count=summarize_training_feature(payload,alg,ex)
+   roots+=root_count; superior+=superior_count; labels+=label_count
+   searches+=len(payload.get("search_receipts",[])); packages.add(str(report.get("package_commit"))); seen.add(seed)
+   del payload,zipped,report
+   if len(seen)%8==0: gc.collect()
+ analysis_commit=subprocess.run(["git","rev-parse","HEAD"],cwd=REPO,check=True,text=True,capture_output=True).stdout.strip()
+ return {"status":"COMPLETE" if len(seen)==384 else "INCOMPLETE_SOURCE_COVERAGE",
+ "registered_training_owners":384,"owners_with_successful_source_features":len(seen),"missing_owners":384-len(seen),
  "source_package_commits":sorted(packages),"successful_J_search_root_receipts":searches,
  "complete_joint_roots_considered":roots,"roots_with_strictly_superior_elite":superior,
- "selected_strictly_superior_elite_decisions":labels,"method":"retained #79 successful training receipts and feature payloads; source elite_candidate grouped by original J root"}
+ "selected_strictly_superior_elite_decisions":labels,"method":"retained #79 successful training receipts and feature payloads; source elite_candidate grouped by original J root",
+ "analysis_implementation":{"commit":analysis_commit,"driver_sha256":fsha(Path(__file__).resolve()),
+  "memory_strategy":"process one decompressed owner payload at a time"}}
 
 def attempts_summary(root):
  arr=[readj(p) for p in sorted(root.glob("units/**/attempt-resource.json"))]
