@@ -607,13 +607,23 @@ def finalize_pilot(package):
  table=read_json(SEED_TABLE)
  if policy.get("source_branch_sha")!=package or policy.get("seed_table_sha256")!=file_sha256(SEED_TABLE):
   raise RuntimeError("existing pilot timing record does not match this source and registered seed table")
+ execution_lock_bytes=subprocess.run(["git","show",f"{package}:{STUDY.relative_to(REPO).as_posix()}/source-lock.json"],
+  cwd=REPO,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
+ if sha256_bytes(execution_lock_bytes)!=policy.get("source_lock_sha256"):
+  raise RuntimeError("pilot's committed execution source lock does not match its immutable timing record")
+ write_once(root/"source-lock-execution.json",execution_lock_bytes)
  phase={name:read_json(root/f"pilot-phase-{name}.json") for name in ("training","update","evaluation")}
  if any(x.get("status")!="SUCCEEDED" or x.get("package_commit")!=package for x in phase.values()):
   raise RuntimeError("cannot finalize pilot without all three successful source-bound phases")
  train_rows=rows_for(table,phase="training",formal=False)
  eval_rows=rows_for(table,phase="heldout",formal=False)
- train_reports=[D.existing_success(root,row,package) for row in train_rows]
- eval_reports=[D.existing_success(root,row,package) for row in eval_rows]
+ original_lock_sha=D.source_lock_sha
+ D.source_lock_sha=lambda: policy["source_lock_sha256"]
+ try:
+  train_reports=[D.existing_success(root,row,package) for row in train_rows]
+  eval_reports=[D.existing_success(root,row,package) for row in eval_rows]
+ finally:
+  D.source_lock_sha=original_lock_sha
  if len(train_rows)!=32 or len(train_reports)!=32 or any(x is None for x in train_reports):
   raise RuntimeError("pilot training receipts are incomplete")
  if len(eval_rows)!=40 or len(eval_reports)!=40 or any(x is None for x in eval_reports):
