@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT=/home/lsmft/spire-research-issue81
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DATA=/mnt/d/DeadlycatCoding/stsrl-data/issue81
 PYTHON=/mnt/d/DeadlycatCoding/stsrl-data/stsrl-spikes/py313-torch/bin/python3.13
 export STS_LIGHTSPEED_SOURCE_DIR="$DATA/sources/sts_lightspeed"

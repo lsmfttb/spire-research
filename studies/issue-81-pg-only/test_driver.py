@@ -5,15 +5,16 @@ p=Path(__file__).with_name("driver.py")
 s=importlib.util.spec_from_file_location("issue81_driver_test",p)
 d=importlib.util.module_from_spec(s); s.loader.exec_module(d)
 class ContractTests(unittest.TestCase):
+ def test_launcher_resolves_current_task_worktree(self):
+  launcher=p.with_name("run_issue81.sh").read_text()
+  self.assertIn("dirname",launcher)
+  self.assertIn("/../..",launcher)
+  self.assertNotIn("ROOT=/home/lsmft/spire-research-issue81",launcher)
+  self.assertNotIn('" + "',launcher)
+  self.assertIn("BASH_SOURCE",launcher)
  def test_native_source_commit_expectation_is_full_sha(self):
   self.assertEqual(d.EXPECT["sts"],"8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2")
   self.assertEqual(len(d.EXPECT["sts"]),40)
- def test_prior_base_smoke_receipt_is_verified_and_reused(self):
-  row=d.evaluation_only_plan()["smoke"][0]
-  result,provenance=d.previous_smoke_receipt(row,current_root=Path("/issue81-no-current-attempts"))
-  self.assertEqual(result["package_commit"],d.PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT)
-  self.assertEqual(provenance["result_sha256"],d.PREVIOUS_BASE_SMOKE_RESULT_SHA256)
-  self.assertEqual(provenance["source_lock_sha256"],d.PREVIOUS_BASE_SMOKE_SOURCE_LOCK_SHA256)
  def test_fixed_populations(self):
   t=d.seed_table(); tr=[r for r in t["rows"] if r["phase"]=="training"]; ev=[r for r in t["rows"] if r["phase"]=="heldout"]
   self.assertEqual(len(tr),384); self.assertEqual(len(ev),288)
@@ -32,23 +33,53 @@ class ContractTests(unittest.TestCase):
   self.assertTrue(all(r["formal"] is True and r["search_invocation_seeds"]==[] for r in plan["heldout"]))
   self.assertTrue(set(d.SMOKE_SEEDS).isdisjoint(set(d.TRAIN)|set(d.EVAL)))
   self.assertEqual({r["owner_seed"] for r in plan["heldout"]},set(d.EVAL))
- def test_evaluation_only_entrypoint_cannot_train(self):
-  source=inspect.getsource(d.run_evaluation_only)
+ def test_continuation_entrypoint_cannot_train_or_repeat_smoke(self):
+  source=inspect.getsource(d.run_missing_heldout_continuation)
   self.assertNotIn("run_formal",source)
   self.assertFalse(hasattr(d,"run_formal"))
   self.assertNotIn("train_update",source)
-  self.assertNotIn("rows_for(table,\"training\"",source)
-  self.assertIn("SUPPLEMENTAL_ALLOWANCE",source)
+  self.assertNotIn("run_smoke_once",source)
+  self.assertIn("D.run_units(run_rows",source)
+  self.assertIn("RESUME_ALLOWANCE",source)
+  self.assertNotIn("SUPPLEMENTAL_ALLOWANCE",source)
+  self.assertFalse(hasattr(d,"run_evaluation_only"))
+  self.assertTrue(callable(d.verify))
+ def test_continuation_clock_and_population_are_locked(self):
+  c=d.continuation_contract()
+  self.assertEqual(c["clock"]["id"],"issue81-heldout-resume-20261030")
+  self.assertEqual(c["clock"]["allowance_seconds"],1500.0)
+  self.assertEqual(c["heldout"]["registered_terminal_count"],288)
+  self.assertEqual(c["heldout"]["run_only_missing_count"],83)
+  self.assertFalse(c["smoke"]["run_new_smoke"])
+  self.assertFalse(c["training"]["repeat_training"])
+ def test_historical_success_mapping_audits_205_and_exact_83_missing(self):
+  rows=d.evaluation_only_plan()["heldout"]
+  records,mapping,missing,binding=d.prior_heldout_records(rows)
+  self.assertEqual(len(records),205)
+  self.assertEqual({arm:sum(value[0]["arm"]==arm for value in records.values()) for arm in d.ARMS},
+   {"BASE":69,"PGONLY":68,"JTRAIN":68})
+  self.assertEqual(len(mapping),205)
+  self.assertEqual(len(missing),83)
+  self.assertEqual(missing[:2],["EVAL:7640069:PGONLY","EVAL:7640069:JTRAIN"])
+  self.assertEqual(missing[-3:],["EVAL:7640096:BASE","EVAL:7640096:PGONLY","EVAL:7640096:JTRAIN"])
+  self.assertEqual(binding["terminal_mapping_count"],205)
+ def test_smoke_receipts_are_reused_and_not_in_heldout_mapping(self):
+  smoke,provenance=d.prior_smoke_batch(d.evaluation_only_plan()["smoke"])
+  self.assertEqual(smoke["completed"],3)
+  self.assertEqual(len(smoke["reused_prior_receipts"]),3)
+  self.assertEqual(provenance["terminal_mapping_count"],3)
+  self.assertFalse(d.readj(d.ART/"evaluation-only"/d.PREVIOUS_TERMINAL_PACKAGE_COMMIT/"diagnostic-smoke-terminals.json")["efficacy_cohort"])
  def test_supplemental_authorization_is_evaluation_only(self):
   c=d.evaluation_only_contract()
   self.assertEqual(c["supplemental_clock"]["allowance_seconds"],1800.0)
   self.assertTrue(c["no_training_loop"])
   self.assertTrue(c["no_optimizer_updates"])
   self.assertEqual(c["original_clock"]["elapsed_seconds"],3784.857659886001)
- def test_formal_training_cli_is_not_available(self):
-  result=subprocess.run([sys.executable,str(p),"--mode","formal"],capture_output=True,text=True)
-  self.assertNotEqual(result.returncode,0)
-  self.assertIn("invalid choice",result.stderr)
+ def test_unapproved_all_288_mode_is_not_available(self):
+  for mode in ("formal","evaluation-only"):
+   result=subprocess.run([sys.executable,str(p),"--mode",mode],capture_output=True,text=True)
+   self.assertNotEqual(result.returncode,0)
+   self.assertIn("invalid choice",result.stderr)
  def test_registered_allowance(self):
   c=d.contract(); self.assertGreaterEqual(c["resource"]["allowance_factor"],1.5)
   self.assertLessEqual(c["resource"]["allowance_factor"],2.0)
@@ -77,16 +108,4 @@ class ContractTests(unittest.TestCase):
    {"BASE":"P0","PGONLY":"P1","JTRAIN":"P1"})
   with self.assertRaisesRegex(ValueError,"unregistered Issue 81 evaluation arm"):
    d.native_controller_arm("R")
- def test_diagnostic_smoke_stops_after_one_failed_worker_attempt(self):
-  source=inspect.getsource(d.run_smoke_once)
-  self.assertNotIn("D.run_units",source)
-  self.assertIn("PRIOR_FAILED_ATTEMPT_EXISTS",source)
-  self.assertIn("SMOKE_WORKER_FAILED",source)
-  self.assertIn("previous_smoke_receipt",source)
-  helper=inspect.getsource(d.previous_smoke_receipt)
-  self.assertIn("PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT",helper)
-  main=inspect.getsource(d.run_evaluation_only)
-  self.assertIn("run_smoke_once",main)
-  self.assertIn("previous_evaluation_only_package_commit",main)
-  self.assertEqual(d.PREVIOUS_EVALUATION_ONLY_PACKAGE_COMMIT,"a484175828868da5de7147694122b5ff41da4d25")
 if __name__=="__main__": unittest.main()
