@@ -168,6 +168,7 @@ def _issue73_snapshot_paths(config: Mapping[str, Any]) -> tuple[str, ...]:
     paths = {
         "runner.py",
         "policy.py",
+        "public_history_execution.py",
         "source_lock_integrity.py",
         "config.json",
         "config.lock.sha256",
@@ -201,14 +202,21 @@ def issue73_source_identity() -> dict[str, Any]:
     if actual_root_tree != root_tree:
         raise RuntimeError("pinned Issue 73 root tree differs from the registered Git tree")
 
-    snapshot_wsl = f"{DATA_ROOT_WSL}/sources/issue73-{commit}"
+    issue73_config_bytes = subprocess.run(
+        ["git", "-C", str(repo), "show", f"{commit}:{ISSUE73_SOURCE_STUDY}/config.json"],
+        check=True, capture_output=True,
+    ).stdout
+    issue73_config = json.loads(issue73_config_bytes)
+    runtime_optimizer = issue73_config["runtime_optimizer"]
+    snapshot_wsl = f"{DATA_ROOT_WSL}/sources/issue73-{commit}-issue84-runtime-v2"
     snapshot = host_path(snapshot_wsl)
     manifest_path = snapshot / "source-snapshot.json"
     if not manifest_path.is_file():
         raise RuntimeError(f"durable pinned Issue 73 source snapshot is missing: {snapshot_wsl}")
     manifest = read_json(manifest_path)
     expected_manifest = {
-        "schema_id": "issue84-locked-issue73-source-snapshot-v1",
+        "schema_id": "issue84-locked-issue73-source-snapshot-v2",
+        "snapshot_revision": 2,
         "consumer": "issue-84-six-arm",
         "issue73_source_commit": commit,
         "issue73_root_tree_git_sha1": root_tree,
@@ -217,6 +225,9 @@ def issue73_source_identity() -> dict[str, Any]:
         "issue74_selection_lock_sha256_lf": source["issue74_selection_lock_sha256_lf"],
         "issue73_root_source_lock_sha256_lf": source["issue73_root_source_lock_sha256_lf"],
         "issue73_pi_init_sha256": source["issue73_pi_init_sha256"],
+        "runtime_optimizer_id": runtime_optimizer["optimizer_id"],
+        "runtime_optimizer_source_path": runtime_optimizer["source_path"],
+        "runtime_optimizer_sha256": runtime_optimizer["sha256"],
     }
     for key, value in expected_manifest.items():
         if manifest.get(key) != value:
@@ -271,6 +282,12 @@ def issue73_source_identity() -> dict[str, Any]:
         raise RuntimeError("pinned Issue 73 source lock differs from its registered normalized hash")
     if file_sha256(pi_init_path) != source["issue73_pi_init_sha256"]:
         raise RuntimeError("pinned Issue 73 pi_init checkpoint differs from its registered hash")
+    runtime_optimizer_path = snapshot / ISSUE73_SOURCE_STUDY / "public_history_execution.py"
+    optimizer_digest = hashlib.sha256(
+        runtime_optimizer_path.read_bytes().replace(b"\r\n", b"\n")
+    ).hexdigest()
+    if optimizer_digest != runtime_optimizer["sha256"]:
+        raise RuntimeError("pinned Issue 73 runtime optimizer differs from its registered hash")
     return {
         "path": snapshot_wsl,
         "source_repository": SOURCE_REPO_WSL,
@@ -279,6 +296,8 @@ def issue73_source_identity() -> dict[str, Any]:
         "manifest_sha256": file_sha256(manifest_path),
         "file_count": len(required_paths),
         "total_bytes": total_bytes,
+        "runtime_optimizer_id": runtime_optimizer["optimizer_id"],
+        "runtime_optimizer_sha256": optimizer_digest,
         "files_sha256": file_hashes,
     }
 
@@ -291,6 +310,7 @@ def bind_issue73_source_paths(runtime: Any, preflight: Any, snapshot_root: Path)
     runtime.ISSUE73_DIR = issue73
     runtime.ISSUE73_POLICY_PATH = issue73 / "policy.py"
     runtime.ISSUE73_RUNNER_PATH = issue73 / "runner.py"
+    runtime.ISSUE73_RUNTIME_OPTIMIZER_PATH = issue73 / "public_history_execution.py"
     runtime.PI_INIT_PATH = issue73 / "receipts/stage0/policies/pi_init.pt"
     preflight.ROOT = snapshot_root
     def source_git(*args: str, cwd: Path | None = None) -> str:
@@ -597,6 +617,12 @@ def verify_preflight() -> dict[str, Any]:
     native = runtime.verify_native_module(config)
     if file_sha256(Path(native)) != NATIVE_SHA256:
         raise RuntimeError("loaded native module is not the source-locked binary")
+    runtime_probe = root / "issue73-runtime-probe"
+    _, _, _, runtime_identity = runtime.initialize_native_runtime(
+        runtime_probe, sampling=False, stage1_binding=None,
+    )
+    if runtime_identity.get("optimizer_id") != "issue65-demand-driven-public-history-v1":
+        raise RuntimeError("pinned Issue 65 runtime optimizer did not initialize")
     parent, parent_digest, parent_record = executor._load_model("pi12")
     if parent_digest != PARENT_MODEL_DIGEST or parent_record["checkpoint_sha256"] != PARENT_MODEL_SHA256:
         raise RuntimeError("#82 pi12 model failed exact hash/digest inheritance check")
@@ -616,6 +642,11 @@ def verify_preflight() -> dict[str, Any]:
         "source_lock_sha256": source["sha256"],
         "issue73_source_snapshot": source["lock"]["issue73_source_snapshot"],
         "issue73_lineage": issue73_lineage,
+        "issue73_runtime_optimizer": {
+            "status": "VERIFIED_NO_GAMES_STARTED",
+            "optimizer_id": runtime_identity["optimizer_id"],
+            "source_sha256": source["lock"]["issue73_source_snapshot"]["runtime_optimizer_sha256"],
+        },
         "source_commit": backend.source_commit(),
         "native_module_sha256": file_sha256(Path(native)),
         "parent_model_sha256": parent_record["checkpoint_sha256"],

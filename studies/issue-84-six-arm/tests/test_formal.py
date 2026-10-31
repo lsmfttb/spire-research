@@ -14,6 +14,7 @@ sys.path.insert(0, str(STUDY))
 
 from driver import (
     T_REF,
+    _issue73_snapshot_paths,
     bind_issue73_source_paths,
     make_task_wall_forecast,
     save_preflight_receipt,
@@ -148,6 +149,10 @@ class FormalAnalysisTests(unittest.TestCase):
             issue73 = snapshot / "studies" / "issue-73-privileged-noncombat-oracle-stage0"
             self.assertEqual(runtime.ISSUE73_DIR, issue73)
             self.assertEqual(runtime.ISSUE73_RUNNER_PATH, issue73 / "runner.py")
+            self.assertEqual(
+                runtime.ISSUE73_RUNTIME_OPTIMIZER_PATH,
+                issue73 / "public_history_execution.py",
+            )
             self.assertEqual(runtime.ISSUE73_POLICY_PATH, issue73 / "policy.py")
             self.assertEqual(runtime.PI_INIT_PATH, issue73 / "receipts/stage0/policies/pi_init.pt")
             self.assertEqual(preflight.ROOTS, issue73 / "receipts/stage0/roots")
@@ -156,6 +161,12 @@ class FormalAnalysisTests(unittest.TestCase):
                 preflight.SELECTION_PATH,
                 STUDY / "upstream" / "issue-75-no-expert-oracle" / "issue74-root-selection-lock.json",
             )
+
+    def test_issue73_snapshot_includes_the_local_locked_runtime_optimizer(self):
+        config = json.loads(
+            (STUDY / "upstream" / "issue-75-no-expert-oracle" / "config.json").read_text()
+        )
+        self.assertIn("public_history_execution.py", _issue73_snapshot_paths(config))
 
     def test_seed_table_path_is_versioned_by_source_package(self):
         first = seed_table_path("6c30f045f3d308731561d22b3706d99520b7d0a2")
