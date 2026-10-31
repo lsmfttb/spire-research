@@ -8,6 +8,7 @@ import tempfile
 import sys
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 STUDY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(STUDY))
@@ -19,11 +20,131 @@ from driver import (
     make_task_wall_forecast,
     save_preflight_receipt,
     seed_table_path,
+    _preflight_optimizer_evidence,
+    install_issue73_capture_limit_compat,
+    refresh_source_lock,
+    sha256,
 )
 from formal import paired_bootstrap
 
 
 class FormalAnalysisTests(unittest.TestCase):
+    def test_preflight_optimizer_record_keeps_runtime_source_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime_path = Path(temporary) / "issue73" / "public_history_execution.py"
+            parent_optimizer_path = Path(temporary) / "parent" / "block-11-step.pt"
+            runtime_path.parent.mkdir()
+            parent_optimizer_path.parent.mkdir()
+            runtime_path.write_bytes(b"locked runtime optimizer")
+            parent_optimizer_path.write_bytes(b"parent optimizer checkpoint")
+            record = _preflight_optimizer_evidence(
+                optimizer_id="issue65-demand-driven-public-history-v1",
+                source_sha256="a" * 64,
+                runtime_optimizer_path=runtime_path,
+                parent_optimizer_path=parent_optimizer_path,
+            )
+            self.assertEqual(
+                record["issue73_runtime_optimizer"]["loaded_path"],
+                runtime_path.as_posix(),
+            )
+            self.assertNotEqual(
+                record["issue73_runtime_optimizer"]["loaded_path"],
+                parent_optimizer_path.as_posix(),
+            )
+            self.assertEqual(
+                record["parent_optimizer_checkpoint_sha256"],
+                sha256(parent_optimizer_path.read_bytes()),
+            )
+
+    def test_pinned_issue73_adapter_preserves_issue75_training_inputs_and_nested_runs(self):
+        class Controller:
+            def __init__(self, *, capture_checkpoints=False, capture_all_roots=False):
+                self.capture_checkpoints = capture_checkpoints
+                self.capture_all_roots = bool(capture_all_roots)
+                self.roots = []
+                self.trace = []
+                self.rng = SimpleNamespace(manual_seed=lambda value: setattr(self, "policy_seed", value))
+
+        class Runner:
+            StudyController = Controller
+
+        runner = Runner()
+
+        def initialize_native_runtime(*args, **kwargs):
+            def run_one(**run_kwargs):
+                controller = runner.StudyController(
+                    capture_checkpoints=run_kwargs["capture_checkpoints"],
+                    capture_all_roots=run_kwargs.get("capture_all_roots", False),
+                )
+                nested_result = None
+                if not run_kwargs.get("_nested", False):
+                    nested_result = runner._run_one(
+                        _nested=True,
+                        capture_checkpoints=True,
+                        capture_all_roots=True,
+                        policy_rng_seed=73,
+                    )
+                    controller.trace.extend((
+                        {
+                            "kind": "categorical", "step": 4, "chosen_index": 0,
+                            "legal_action_identities": [{"id": "a"}],
+                            "projection_digest": "state-a", "matrix": [[1.0, 2.0]],
+                        },
+                        {"kind": "single_action", "step": 5},
+                        {
+                            "kind": "categorical", "step": 6, "chosen_index": 1,
+                            "legal_action_identities": [{"id": "b"}, {"id": "c"}],
+                            "projection_digest": "state-b", "matrix": [[3.0], [4.0]],
+                        },
+                    ))
+                captured = []
+                for decision_index in range(10):
+                    capture = controller.capture_all_roots or len(controller.roots) < 2
+                    if capture:
+                        controller.roots.append(decision_index)
+                        captured.append(decision_index)
+                        callback = run_kwargs.get("root_callback")
+                        if callable(callback):
+                            callback({"decision_index": decision_index})
+                return {
+                    "captured": captured,
+                    "forwarded": run_kwargs,
+                    "policy_seed": getattr(controller, "policy_seed", None),
+                    "nested_captured": None if nested_result is None else nested_result["captured"],
+                    "nested_policy_seed": None if nested_result is None else nested_result["policy_seed"],
+                }
+
+            runner._run_one = run_one
+            return {}, runner, object(), object()
+
+        runtime = SimpleNamespace(initialize_native_runtime=initialize_native_runtime)
+        install_issue73_capture_limit_compat(runtime)
+        _, initialized_runner, _, _ = runtime.initialize_native_runtime()
+        original_init = Controller.__init__
+        result = initialized_runner._run_one(
+            capture_checkpoints=True,
+            capture_all_roots=False,
+            checkpoint_screens=None,
+            root_callback=lambda record: None,
+            capture_root_limit=4,
+            capture_training_features=True,
+            capture_trace=True,
+            policy_rng_seed=842,
+        )
+        self.assertEqual(result["captured"], [0, 1, 2, 3])
+        self.assertNotIn("capture_root_limit", result["forwarded"])
+        self.assertNotIn("capture_training_features", result["forwarded"])
+        self.assertNotIn("policy_rng_seed", result["forwarded"])
+        self.assertEqual(result["policy_seed"], 842)
+        self.assertEqual(result["nested_captured"], list(range(10)))
+        self.assertEqual(result["nested_policy_seed"], 73)
+        decisions = result["_volatile_training_decisions"]
+        self.assertEqual([row["step"] for row in decisions], [4, 6])
+        self.assertEqual(decisions[0]["candidate_features"], [[1.0, 2.0]])
+        self.assertEqual(decisions[1]["candidate_features"], [[3.0], [4.0]])
+        self.assertNotIn("matrix", decisions[0])
+        self.assertIs(Controller.__init__, original_init)
+
     def test_owner_paired_bootstrap_is_deterministic_and_interpolates(self):
         left = {
             "seed-1": {"owner_seed": 1, "terminal_floor": 5},
@@ -94,6 +215,34 @@ class FormalAnalysisTests(unittest.TestCase):
             with self.assertRaisesRegex(FileExistsError, "differs"):
                 save_preflight_receipt({**receipt, "native_module_sha256": "d" * 64}, data_root=Path(temporary))
             self.assertEqual(first["status"], "SUCCEEDED_NO_GAMES_STARTED")
+
+    def test_source_lock_refresh_archives_previous_bytes_before_replacement(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            lock_path = root / "study" / "source-lock.json"
+            lock_path.parent.mkdir()
+            previous = b'{"source_lock":"previous"}\n'
+            lock_path.write_bytes(previous)
+            replacement = {
+                "schema_id": "issue84-source-lock-v1", "revision": 2,
+                "local_code_files": {"driver.py": "a" * 64},
+            }
+            with patch("driver.SOURCE_LOCK_PATH", lock_path), patch.dict(
+                "os.environ", {"ISSUE84_PACKAGE_COMMIT": "4e25bf1bec80dbdc119c490f31155ee2996726ea"},
+            ):
+                receipt = refresh_source_lock(lock=replacement, data_root=root / "data")
+                archive = Path(receipt["archived_previous_lock"])
+                self.assertEqual(archive.read_bytes(), previous)
+                self.assertEqual(receipt["archived_previous_lock_sha256"], sha256(previous))
+                self.assertEqual(
+                    lock_path.read_bytes(),
+                    json.dumps(
+                        replacement, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ).encode("utf-8") + b"\n",
+                )
+                retry = refresh_source_lock(lock=replacement, data_root=root / "data")
+                self.assertIsNone(retry["archived_previous_lock"])
 
     def test_clean_worker_import_path_contains_locked_preflight_dependency(self):
         upstream75 = STUDY / "upstream" / "issue-75-no-expert-oracle"

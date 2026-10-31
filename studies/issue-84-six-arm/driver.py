@@ -84,6 +84,136 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+class _RootCaptureLimit:
+    """Expose the pinned #73 first-N checkpoint behavior expected by #75."""
+
+    def __init__(self, roots: list, limit: int):
+        if type(limit) is not int or limit <= 0:
+            raise ValueError("capture_root_limit must be a positive integer")
+        self.roots = roots
+        self.limit = limit
+
+    def __bool__(self) -> bool:
+        return len(self.roots) < self.limit
+
+
+def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
+    """Adapt #75's root cap, policy RNG, and volatile training features.
+
+    The #73 controller captures its first two roots by default. #75's stage-1
+    executor explicitly requests the first four training roots. Installing a
+    per-call gate preserves that first-N capture behavior without changing the
+    pinned runner source or capturing every later decision state. The pinned
+    #73 runner retains candidate matrices in its controller trace but omits
+    them from its returned summary when durable=False; #75 consumes those
+    matrices through its volatile training-decision interface.
+    """
+    root_limit = kwargs.pop("capture_root_limit", None)
+    training_features = kwargs.pop("capture_training_features", None)
+    policy_rng_seed = kwargs.pop("policy_rng_seed", None)
+    if training_features is not None and type(training_features) is not bool:
+        raise ValueError("capture_training_features must be boolean when supplied")
+    if training_features is not None and bool(training_features) != bool(kwargs.get("capture_trace", True)):
+        raise ValueError("pinned #73 trace capture is the source of #75 training features")
+    if root_limit is None and policy_rng_seed is None and training_features is not True:
+        return original_run_one(*args, **kwargs)
+    if root_limit is not None:
+        if type(root_limit) is not int or root_limit <= 0:
+            raise ValueError("capture_root_limit must be a positive integer")
+        if (
+            not kwargs.get("capture_checkpoints")
+            or kwargs.get("capture_all_roots", False)
+            or kwargs.get("checkpoint_screens")
+            or not callable(kwargs.get("root_callback"))
+        ):
+            raise ValueError("capture_root_limit requires checkpoint capture with a callback and no other root filter")
+    if policy_rng_seed is not None and (type(policy_rng_seed) is not int or policy_rng_seed < 0):
+        raise ValueError("policy_rng_seed must be a nonnegative integer")
+
+    controller_class = runner.StudyController
+    original_init = controller_class.__init__
+    owner_pending = True
+    owner_controllers = []
+
+    def initialize_with_root_limit(controller, *init_args, **init_kwargs):
+        nonlocal owner_pending
+        original_init(controller, *init_args, **init_kwargs)
+        # _run_one may invoke nested root-search trajectories through the same
+        # runner. Apply this call's options to its own controller only; nested
+        # calls install their own wrapper and policy RNG context.
+        if not owner_pending:
+            return
+        owner_pending = False
+        owner_controllers.append(controller)
+        if root_limit is not None:
+            controller.capture_all_roots = _RootCaptureLimit(controller.roots, root_limit)
+        if policy_rng_seed is not None:
+            controller.rng.manual_seed(policy_rng_seed)
+
+    controller_class.__init__ = initialize_with_root_limit
+    try:
+        result = original_run_one(*args, **kwargs)
+        if training_features:
+            if len(owner_controllers) != 1:
+                raise RuntimeError("pinned #73 did not initialize exactly one owner controller")
+            trace = getattr(owner_controllers[0], "trace", None)
+            if not isinstance(trace, list):
+                raise RuntimeError("pinned #73 owner controller has no in-memory decision trace")
+            if not isinstance(result, dict):
+                raise TypeError("pinned #73 run result must be a dictionary")
+            decisions = []
+            for row in trace:
+                if row.get("kind") != "categorical":
+                    continue
+                if "matrix" not in row:
+                    raise RuntimeError("captured categorical training decision lacks candidate features")
+                decisions.append({
+                    **{key: value for key, value in row.items() if key != "matrix"},
+                    "candidate_features": row["matrix"],
+                })
+            result["_volatile_training_decisions"] = decisions
+        return result
+    finally:
+        controller_class.__init__ = original_init
+
+
+def install_issue73_capture_limit_compat(runtime) -> None:
+    """Bridge the #75 root-limit keyword at the pinned #73 runtime boundary."""
+    if getattr(runtime, "_issue84_capture_limit_compat_installed", False):
+        return
+    original_initialize = runtime.initialize_native_runtime
+
+    def initialize_with_capture_limit_compat(*args, **kwargs):
+        config, runner, module, encoder = original_initialize(*args, **kwargs)
+        original_run_one = runner._run_one
+
+        def run_one_with_capture_limit(*run_args, **run_kwargs):
+            return call_pinned_issue73_run_one(
+                runner, original_run_one, *run_args, **run_kwargs,
+            )
+
+        runner._run_one = run_one_with_capture_limit
+        return config, runner, module, encoder
+
+    runtime.initialize_native_runtime = initialize_with_capture_limit_compat
+    runtime._issue84_capture_limit_compat_installed = True
+
+
+def _preflight_optimizer_evidence(
+    *, optimizer_id: str, source_sha256: str, runtime_optimizer_path: Path,
+    parent_optimizer_path: Path,
+) -> dict[str, Any]:
+    return {
+        "issue73_runtime_optimizer": {
+            "status": "VERIFIED_NO_GAMES_STARTED",
+            "optimizer_id": optimizer_id,
+            "source_sha256": source_sha256,
+            "loaded_path": Path(runtime_optimizer_path).as_posix(),
+        },
+        "parent_optimizer_checkpoint_sha256": file_sha256(parent_optimizer_path),
+    }
+
+
 def read_json(path: Path) -> dict[str, Any]:
     value = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(value, dict):
@@ -458,6 +588,41 @@ def write_source_lock() -> dict[str, Any]:
     return {"source_lock_sha256": sha256(payload), "locked_code_files": len(lock["local_code_files"])}
 
 
+def refresh_source_lock(*, lock: Mapping[str, Any] | None = None, data_root: Path | None = None) -> dict[str, Any]:
+    """Archive the current lock before atomically binding an implementation repair."""
+    frozen = dict(lock) if lock is not None else make_source_lock()
+    payload = canonical(frozen) + b"\n"
+    path = SOURCE_LOCK_PATH
+    previous = path.read_bytes() if path.is_file() else None
+    if previous == payload:
+        return {"source_lock_sha256": sha256(payload), "archived_previous_lock": None}
+
+    archived_path = None
+    if previous is not None:
+        previous_sha = sha256(previous)
+        root = Path(data_root) if data_root is not None else host_path(DATA_ROOT_WSL)
+        archive = root / "artifacts" / "source-lock-history" / (
+            f"{package_commit()}-{previous_sha}.json"
+        )
+        write_once(archive, previous)
+        if sha256(archive.read_bytes()) != previous_sha:
+            raise RuntimeError("archived prior source lock failed its SHA-256 check")
+        archived_path = str(archive)
+
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    with temporary.open("xb") as stream:
+        stream.write(payload)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+    return {
+        "source_lock_sha256": sha256(payload),
+        "locked_code_files": len(frozen["local_code_files"]),
+        "archived_previous_lock": archived_path,
+        "archived_previous_lock_sha256": None if previous is None else sha256(previous),
+    }
+
+
 def verify_source_lock(*, require_clean_worktree: bool) -> dict[str, Any]:
     if not SOURCE_LOCK_PATH.is_file():
         raise FileNotFoundError("frozen source-lock.json has not been created")
@@ -533,6 +698,7 @@ def load_modules(active_root: Path, *, pilot: bool):
     preflight = importlib.import_module("preflight")
     snapshot = host_path(issue73_source_identity()["path"])
     bind_issue73_source_paths(runtime, preflight, snapshot)
+    install_issue73_capture_limit_compat(runtime)
     # The vendored #75 config records an absolute path from the original host.
     # Preserve its source hash, but adapt only that machine-specific path to the
     # task's explicitly locked D:-backed WSL location and verify the same bytes.
@@ -622,15 +788,15 @@ def verify_preflight() -> dict[str, Any]:
         runtime_probe, sampling=False, stage1_binding=None,
     )
     runtime_optimizer = importlib.import_module("public_history_execution")
-    optimizer_path = Path(runtime_optimizer.__file__).resolve(strict=True)
+    runtime_optimizer_path = Path(runtime_optimizer.__file__).resolve(strict=True)
     expected_optimizer_path = (
         host_path(source["lock"]["issue73_source_snapshot"]["path"])
         / ISSUE73_SOURCE_STUDY / "public_history_execution.py"
     ).resolve(strict=True)
-    if optimizer_path != expected_optimizer_path:
+    if runtime_optimizer_path != expected_optimizer_path:
         raise RuntimeError("Issue 73 loaded the Issue 65 optimizer from an unlocked path")
     optimizer_id = source["lock"]["issue73_source_snapshot"]["runtime_optimizer_id"]
-    optimizer_sha256 = file_sha256(optimizer_path)
+    optimizer_sha256 = file_sha256(runtime_optimizer_path)
     if optimizer_id != "issue65-demand-driven-public-history-v1" or optimizer_sha256 != (
         source["lock"]["issue73_source_snapshot"]["runtime_optimizer_sha256"]
     ):
@@ -639,8 +805,8 @@ def verify_preflight() -> dict[str, Any]:
     if parent_digest != PARENT_MODEL_DIGEST or parent_record["checkpoint_sha256"] != PARENT_MODEL_SHA256:
         raise RuntimeError("#82 pi12 model failed exact hash/digest inheritance check")
     import torch
-    optimizer_path = host_path(PARENT_MODELS_WSL) / "block-11-step.pt"
-    optimizer_blob = torch.load(optimizer_path, map_location="cpu", weights_only=True)
+    parent_optimizer_path = host_path(PARENT_MODELS_WSL) / "block-11-step.pt"
+    optimizer_blob = torch.load(parent_optimizer_path, map_location="cpu", weights_only=True)
     if optimizer_blob.get("completed_steps") != 64:
         raise RuntimeError("#82 optimizer checkpoint is not step 64")
     optimizer = learning._new_optimizer(parent)
@@ -648,23 +814,23 @@ def verify_preflight() -> dict[str, Any]:
     steps = sorted(int(state["step"].item()) for state in optimizer.state.values())
     if not steps or set(steps) != {64} or len(steps) != len(tuple(parent.parameters())):
         raise RuntimeError("#82 optimizer state does not map exactly to pi12 parameters at step 64")
+    optimizer_evidence = _preflight_optimizer_evidence(
+        optimizer_id=optimizer_id,
+        source_sha256=optimizer_sha256,
+        runtime_optimizer_path=runtime_optimizer_path,
+        parent_optimizer_path=parent_optimizer_path,
+    )
     return {
         "schema_id": "issue84-native-preflight-v1",
         "status": "SUCCEEDED_NO_GAMES_STARTED",
         "source_lock_sha256": source["sha256"],
         "issue73_source_snapshot": source["lock"]["issue73_source_snapshot"],
         "issue73_lineage": issue73_lineage,
-        "issue73_runtime_optimizer": {
-            "status": "VERIFIED_NO_GAMES_STARTED",
-            "optimizer_id": optimizer_id,
-            "source_sha256": optimizer_sha256,
-            "loaded_path": optimizer_path.as_posix(),
-        },
+        **optimizer_evidence,
         "source_commit": backend.source_commit(),
         "native_module_sha256": file_sha256(Path(native)),
         "parent_model_sha256": parent_record["checkpoint_sha256"],
         "parent_model_digest": parent_digest,
-        "parent_optimizer_checkpoint_sha256": file_sha256(optimizer_path),
         "parent_optimizer_parameter_steps": steps,
         "torch_version": torch.__version__,
         "python_version": sys.version,
@@ -1441,6 +1607,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--write-source-lock", action="store_true")
+    modes.add_argument("--refresh-source-lock", action="store_true")
     modes.add_argument("--preflight", action="store_true")
     modes.add_argument("--pilot", action="store_true")
     modes.add_argument("--formal", action="store_true")
@@ -1448,6 +1615,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.write_source_lock:
         result = write_source_lock()
+    elif args.refresh_source_lock:
+        result = refresh_source_lock()
     elif args.preflight:
         result = verify_preflight()
         result = save_preflight_receipt(result)
