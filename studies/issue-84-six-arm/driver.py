@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import atexit
 import copy
 from contextlib import contextmanager
 import hashlib
@@ -74,6 +75,9 @@ PILOT_ORIGINAL_RUNTIME_AST_SHA256 = "47b9dda9e86843c760dffe9b3a548a6338cbda7fc09
 PILOT_PREDECESSOR_RUNTIME_AST_SHA256 = "f25cbe4d154392497f242bce54feec336896b4f6007a1569b9c33394c7fca155"
 PILOT_RESUME_PACKAGE = "9be126a0a0739676953a55367d47fdef5826e5e1"
 PILOT_RESUME_SOURCE_LOCK_SHA256 = "217969125d7736649877686c8295b6d095882e4ad8d0ba0407abd9c65593f9c5"
+# Runtime-binding functions in this historical package have their own digest;
+# it is distinct from the reviewed adapter fingerprint for the current runner.
+PILOT_RESUME_RUNTIME_AST_SHA256 = "194cbc858148981990faf60609779340fa025f24c69daceedc1f5290786ab4a6"
 PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH = "issue-79-successor/driver.py"
 PILOT_CANDIDATE_COVERAGE_BASE_SHA256 = "d8e3f2540cd18c05f0545be713addd3b72469dd71de4bcca72cdc9d50e8966bb"
 PILOT_CARRY_FORWARD = {
@@ -93,12 +97,12 @@ PILOT_CARRY_FORWARD = {
     "C": {
         "package": PILOT_RESUME_PACKAGE,
         "source_lock_sha256": PILOT_RESUME_SOURCE_LOCK_SHA256,
-        "runtime_ast_sha256": PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
+        "runtime_ast_sha256": PILOT_RESUME_RUNTIME_AST_SHA256,
     },
     "D": {
         "package": PILOT_RESUME_PACKAGE,
         "source_lock_sha256": PILOT_RESUME_SOURCE_LOCK_SHA256,
-        "runtime_ast_sha256": PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
+        "runtime_ast_sha256": PILOT_RESUME_RUNTIME_AST_SHA256,
     },
 }
 PILOT_ACTOR_UPDATE_CARRY_FORWARD = {
@@ -1311,10 +1315,7 @@ def _historical_pilot_runtime_fingerprint(package: str) -> str:
         "load_modules",
     }
     relative = "studies/issue-84-six-arm/driver.py"
-    source = subprocess.run(
-        ["git", "show", f"{package}:{relative}"], cwd=REPO, check=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-    ).stdout
+    source = _show_source_commit_file(package, relative)
     tree = ast.parse(source)
     functions = [
         node for node in tree.body
@@ -1352,13 +1353,26 @@ def _pilot_update_algorithm_fingerprint(source: str) -> str:
 
 def _verify_pilot_update_algorithm_unchanged(package: str) -> None:
     relative = "studies/issue-84-six-arm/driver.py"
-    historical = subprocess.run(
-        ["git", "show", f"{package}:{relative}"], cwd=REPO, check=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-    ).stdout
+    historical = _show_source_commit_file(package, relative)
     current = Path(__file__).read_text(encoding="utf-8")
     if _pilot_update_algorithm_fingerprint(current) != _pilot_update_algorithm_fingerprint(historical):
         raise RuntimeError("pilot actor-update inputs or optimizer algorithm differ from the source receipt")
+
+
+def _show_source_commit_file(package: str, relative: str) -> str:
+    """Read immutable source history from the WSL-native repository mirror.
+
+    The active worktree is a Windows Git worktree mounted under /mnt/c. WSL
+    Git cannot resolve its Windows .git indirection, so historical reads use
+    the existing source checkout on /mnt/d and still name the exact commit.
+    """
+    if not re.fullmatch(r"[0-9a-f]{40}", package):
+        raise ValueError("historical source package must be a full commit SHA")
+    repository = host_path(SOURCE_REPO_WSL)
+    return subprocess.run(
+        ["git", "-C", str(repository), "show", f"{package}:{relative}"],
+        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    ).stdout
 
 
 @contextmanager
@@ -2191,8 +2205,18 @@ def _pilot_c_attempt_lineage(
 
 
 def run_pilot() -> dict[str, Any]:
-    source = verify_source_lock(require_clean_worktree=True)
     backend = configure_backend()
+    clock = backend.ActiveClock("issue84-task", None)
+    clock_closed = False
+
+    def close_clock() -> None:
+        nonlocal clock_closed
+        if not clock_closed:
+            clock.close()
+            clock_closed = True
+
+    atexit.register(close_clock)
+    source = verify_source_lock(require_clean_worktree=True)
     os.environ["STS_LIGHTSPEED_SOURCE_DIR"] = STS_SOURCE_WSL
     os.environ["STSRL_SOURCE_DIR"] = STSRL_SOURCE_WSL
     package = package_commit()
@@ -2210,6 +2234,8 @@ def run_pilot() -> dict[str, Any]:
         if not forecast_path.is_file() or file_sha256(forecast_path) != report.get("task_wall_forecast_sha256"):
             raise RuntimeError("completed pilot report lacks its immutable matching whole-task forecast")
         discard_pilot_weights(pilot_root, report.get("discarded_pilot_weights", []), closeout_path)
+        close_clock()
+        atexit.unregister(close_clock)
         return report
 
     progress_path = pilot_root / "pilot-progress.json"
@@ -2231,7 +2257,6 @@ def run_pilot() -> dict[str, Any]:
     progress.setdefault("carry_forward_inputs", {})
     progress.setdefault("actor_update_carry_forward_inputs", {})
     progress.setdefault("execution_lineage_inputs", {})
-    clock = backend.ActiveClock("issue84-task", None)
     clock_start = clock.elapsed_before
     if "clock_elapsed_before" not in progress:
         progress["clock_elapsed_before"] = clock.elapsed_before
@@ -2400,7 +2425,8 @@ def run_pilot() -> dict[str, Any]:
         clock.set_processes(set())
         task_wall = clock.elapsed()
     finally:
-        clock.close()
+        close_clock()
+        atexit.unregister(close_clock)
 
     if closeout_path.is_file():
         pending_closeout = read_json(closeout_path)

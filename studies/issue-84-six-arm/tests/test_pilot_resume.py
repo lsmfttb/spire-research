@@ -17,6 +17,54 @@ import predictors  # noqa: E402
 
 
 class PilotResumeRepairTests(unittest.TestCase):
+    def test_resume_runtime_fingerprint_is_source_qualified_and_distinct(self):
+        self.assertEqual(
+            driver.PILOT_CARRY_FORWARD["C"]["runtime_ast_sha256"],
+            driver.PILOT_RESUME_RUNTIME_AST_SHA256,
+        )
+        self.assertEqual(
+            driver._historical_pilot_runtime_fingerprint(driver.PILOT_RESUME_PACKAGE),
+            driver.PILOT_RESUME_RUNTIME_AST_SHA256,
+        )
+        self.assertEqual(
+            driver._pilot_runtime_fingerprint(),
+            driver.PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
+        )
+
+    def test_pilot_closes_clock_if_preflight_fails(self):
+        events = []
+        callbacks = []
+
+        class Clock:
+            elapsed_before = 12.0
+
+            def close(self):
+                events.append("clock-close")
+
+        def verify_source_lock(**_kwargs):
+            events.append("source-lock")
+            raise RuntimeError("expected source-lock diagnostic failure")
+
+        backend = types.SimpleNamespace(
+            ActiveClock=lambda mode, allowance: (events.append("clock-start") or Clock()),
+        )
+        with (
+            patch.object(driver, "configure_backend", return_value=backend),
+            patch.object(driver, "verify_source_lock", side_effect=verify_source_lock),
+            patch.object(driver.atexit, "register", side_effect=lambda callback: callbacks.append(callback)),
+            patch.object(driver.atexit, "unregister"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "expected source-lock diagnostic failure"):
+                driver.run_pilot()
+
+        self.assertEqual(events, ["clock-start", "source-lock"])
+        self.assertEqual(len(callbacks), 1)
+        callbacks[0]()
+        self.assertEqual(events, ["clock-start", "source-lock", "clock-close"])
+
+    def test_actor_update_fingerprint_reads_exact_predecessor_commit(self):
+        driver._verify_pilot_update_algorithm_unchanged(driver.PILOT_RESUME_PACKAGE)
+
     def test_c_and_d_completed_training_are_carried_without_replay(self):
         predecessor = driver.PILOT_RESUME_PACKAGE
         lock_sha = driver.PILOT_RESUME_SOURCE_LOCK_SHA256
