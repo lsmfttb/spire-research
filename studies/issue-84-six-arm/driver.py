@@ -72,6 +72,8 @@ PILOT_PREDECESSOR_PACKAGE = "fbbcae6d55a505ce4c4a12968c7a09abb2f06f3d"
 PILOT_PREDECESSOR_LOCK_SHA256 = "d23bda9d60572814fbeef8d245246d1cccda74cf4ba565a87d0f1e98f7c49533"
 PILOT_ORIGINAL_RUNTIME_AST_SHA256 = "47b9dda9e86843c760dffe9b3a548a6338cbda7fc095420e965282a24571e35a"
 PILOT_PREDECESSOR_RUNTIME_AST_SHA256 = "f25cbe4d154392497f242bce54feec336896b4f6007a1569b9c33394c7fca155"
+PILOT_RESUME_PACKAGE = "9be126a0a0739676953a55367d47fdef5826e5e1"
+PILOT_RESUME_SOURCE_LOCK_SHA256 = "217969125d7736649877686c8295b6d095882e4ad8d0ba0407abd9c65593f9c5"
 PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH = "issue-79-successor/driver.py"
 PILOT_CANDIDATE_COVERAGE_BASE_SHA256 = "d8e3f2540cd18c05f0545be713addd3b72469dd71de4bcca72cdc9d50e8966bb"
 PILOT_CARRY_FORWARD = {
@@ -84,6 +86,19 @@ PILOT_CARRY_FORWARD = {
         "package": "1179b14dbed830ce915299e5ee63ab190d16e4a6",
         "source_lock_sha256": "625b812e9e174c1cd52381820beae6ea6e402daeedc3180a3329b375878d93e4",
         "runtime_ast_sha256": PILOT_ORIGINAL_RUNTIME_AST_SHA256,
+    },
+    # C and D completed under the reviewed runtime-binding repair before an
+    # operational predictor-cache bug stopped the same pilot. Carry only
+    # these hash-verified cohorts into the repaired package; never replay them.
+    "C": {
+        "package": PILOT_RESUME_PACKAGE,
+        "source_lock_sha256": PILOT_RESUME_SOURCE_LOCK_SHA256,
+        "runtime_ast_sha256": PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
+    },
+    "D": {
+        "package": PILOT_RESUME_PACKAGE,
+        "source_lock_sha256": PILOT_RESUME_SOURCE_LOCK_SHA256,
+        "runtime_ast_sha256": PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
     },
 }
 PILOT_ACTOR_UPDATE_CARRY_FORWARD = {
@@ -114,6 +129,34 @@ PILOT_ACTOR_UPDATE_CARRY_FORWARD = {
         "owner_seed_sha256": "c531521816644d45ee26d2fe52ef6ddd17f166cbb52c9852c3def7a9e3ecf9c6",
         "owner_training_feature_manifest_sha256": "7127b4dd127346e29fa26248ea3597dcf5cbfdcee86acfd7db3d2456b0de5dcf",
         "decision_count": 1155,
+    },
+    "C": {
+        "package": PILOT_RESUME_PACKAGE,
+        "source_lock_sha256": PILOT_RESUME_SOURCE_LOCK_SHA256,
+        "training_package": PILOT_RESUME_PACKAGE,
+        "training_source_lock_sha256": PILOT_RESUME_SOURCE_LOCK_SHA256,
+        "progress_sha256": "7fa14a3f84a5eee388eedca3581a274f8a3992634b3e33f53ac2701cdbe6b550",
+        "receipt_sha256": "560d92d015a4141ace06827e6a6dbd59cd40c8f4305986f332c454bec407d5f1",
+        "model_sha256": "08a8f65e0a33b8c666182e9e5050a0006f0c2c9dc47c14d106099b3506f08f85",
+        "checkpoint_sha256": "d83e81f226f81cec57acb0ea1679870479986f25816b508d00ee0e8fc8a119c4",
+        "model_digest": "36979f8628e760d98f8f06df94d30b7149e1b9113aefd09a533dcbc45ec24fc0",
+        "owner_seed_sha256": "c531521816644d45ee26d2fe52ef6ddd17f166cbb52c9852c3def7a9e3ecf9c6",
+        "owner_training_feature_manifest_sha256": "ab81154c46e8ab7b175cc623a9450c570635bce0152ca0ab32bb37f9e21b6dab",
+        "decision_count": 1179,
+    },
+    "D": {
+        "package": PILOT_RESUME_PACKAGE,
+        "source_lock_sha256": PILOT_RESUME_SOURCE_LOCK_SHA256,
+        "training_package": PILOT_RESUME_PACKAGE,
+        "training_source_lock_sha256": PILOT_RESUME_SOURCE_LOCK_SHA256,
+        "progress_sha256": "7fa14a3f84a5eee388eedca3581a274f8a3992634b3e33f53ac2701cdbe6b550",
+        "receipt_sha256": "e14d221baedd162eeaf0ff7169e08add29687c040193f38cc7672ec9e4b55c41",
+        "model_sha256": "ee09957f86ec6d53ca3d90e0a67d7843b65a5b0e8b5ebc01783303d518470d7c",
+        "checkpoint_sha256": "604f4d28d2dbc8f94f4735cde09ec6b83be11fe84352709ec6fe5d4fb9ad96f8",
+        "model_digest": "69bf7cac6d05cfcbbbbc1d307eef9d23bbc44c42d58ea608c0f0b448ad47a4b1",
+        "owner_seed_sha256": "c531521816644d45ee26d2fe52ef6ddd17f166cbb52c9852c3def7a9e3ecf9c6",
+        "owner_training_feature_manifest_sha256": "2ca7af59991d236ae5023162864ac32a15aae1bcf3dfa7e15ffafc39f5f80af9",
+        "decision_count": 1115,
     },
 }
 PILOT_C_INTERRUPTED_ATTEMPT_PACKAGE = "1179b14dbed830ce915299e5ee63ab190d16e4a6"
@@ -679,8 +722,15 @@ def write_source_lock() -> dict[str, Any]:
     return {"source_lock_sha256": sha256(payload), "locked_code_files": len(lock["local_code_files"])}
 
 
-def refresh_source_lock(*, lock: Mapping[str, Any] | None = None, data_root: Path | None = None) -> dict[str, Any]:
-    """Archive the current lock before atomically binding an implementation repair."""
+def refresh_source_lock(
+    *, lock: Mapping[str, Any] | None = None, data_root: Path | None = None,
+    previous_package_commit: str | None = None,
+) -> dict[str, Any]:
+    """Archive the prior lock under its actual source-package commit.
+
+    Pass ``previous_package_commit`` when the code commit has advanced but the
+    existing lock still identifies the previously executed package.
+    """
     frozen = dict(lock) if lock is not None else make_source_lock()
     payload = canonical(frozen) + b"\n"
     path = SOURCE_LOCK_PATH
@@ -692,8 +742,11 @@ def refresh_source_lock(*, lock: Mapping[str, Any] | None = None, data_root: Pat
     if previous is not None:
         previous_sha = sha256(previous)
         root = Path(data_root) if data_root is not None else host_path(DATA_ROOT_WSL)
+        archive_package = package_commit() if previous_package_commit is None else previous_package_commit
+        if not re.fullmatch(r"[0-9a-f]{40}", archive_package):
+            raise ValueError("previous source-package commit must be a full Git SHA")
         archive = root / "artifacts" / "source-lock-history" / (
-            f"{package_commit()}-{previous_sha}.json"
+            f"{archive_package}-{previous_sha}.json"
         )
         write_once(archive, previous)
         if sha256(archive.read_bytes()) != previous_sha:
@@ -1562,7 +1615,7 @@ def _pilot_training_resume(
         "native_worker_wall_seconds": float(prior_summary["native_worker_wall_seconds"]),
         "evidence_origin": {
             "package_commit": predecessor,
-            "source_lock_sha256": PILOT_PREDECESSOR_LOCK_SHA256,
+            "source_lock_sha256": predecessor_lock_sha256,
             "artifact_root": carry_forward["artifact_root"],
             "manifest_sha256": carry_forward["manifest_sha256"],
         },
@@ -1840,7 +1893,10 @@ def pilot_actor_update(
     return receipt
 
 
-def fit_pilot_predictors(arm: str, rows: list[dict[str, Any]], *, root: Path, executor, package: str) -> dict[str, Any] | None:
+def fit_pilot_predictors(
+    arm: str, rows: list[dict[str, Any]], *, root: Path, executor, package: str,
+    training_root: Path, training_package: str,
+) -> dict[str, Any] | None:
     if arm not in {"D", "E", "F"}:
         return None
     receipt_path = root / "diagnostics" / "pilot-predictor-fit.json"
@@ -2303,7 +2359,10 @@ def run_pilot() -> dict[str, Any]:
                 progress["active_stage"] = "lagged-predictor-fit"
                 progress["active_arm"] = arm
                 backend.atomic_json(progress_path, progress)
-                fit = fit_pilot_predictors(arm, rows, root=root, executor=executor, package=package)
+                fit = fit_pilot_predictors(
+                    arm, rows, root=root, executor=executor, package=package,
+                    training_root=training_root, training_package=training_package,
+                )
                 progress["predictor_fits"][arm] = {
                     "status": fit["status"],
                     "fit": fit["fit"],
