@@ -617,12 +617,24 @@ def verify_preflight() -> dict[str, Any]:
     native = runtime.verify_native_module(config)
     if file_sha256(Path(native)) != NATIVE_SHA256:
         raise RuntimeError("loaded native module is not the source-locked binary")
-    runtime_probe = root / "issue73-runtime-probe"
-    _, _, _, runtime_identity = runtime.initialize_native_runtime(
+    runtime_probe = root / "issue73-runtime-probe" / source["sha256"]
+    runtime.initialize_native_runtime(
         runtime_probe, sampling=False, stage1_binding=None,
     )
-    if runtime_identity.get("optimizer_id") != "issue65-demand-driven-public-history-v1":
-        raise RuntimeError("pinned Issue 65 runtime optimizer did not initialize")
+    runtime_optimizer = importlib.import_module("public_history_execution")
+    optimizer_path = Path(runtime_optimizer.__file__).resolve(strict=True)
+    expected_optimizer_path = (
+        host_path(source["lock"]["issue73_source_snapshot"]["path"])
+        / ISSUE73_SOURCE_STUDY / "public_history_execution.py"
+    ).resolve(strict=True)
+    if optimizer_path != expected_optimizer_path:
+        raise RuntimeError("Issue 73 loaded the Issue 65 optimizer from an unlocked path")
+    optimizer_id = source["lock"]["issue73_source_snapshot"]["runtime_optimizer_id"]
+    optimizer_sha256 = file_sha256(optimizer_path)
+    if optimizer_id != "issue65-demand-driven-public-history-v1" or optimizer_sha256 != (
+        source["lock"]["issue73_source_snapshot"]["runtime_optimizer_sha256"]
+    ):
+        raise RuntimeError("pinned Issue 65 runtime optimizer identity differs after initialization")
     parent, parent_digest, parent_record = executor._load_model("pi12")
     if parent_digest != PARENT_MODEL_DIGEST or parent_record["checkpoint_sha256"] != PARENT_MODEL_SHA256:
         raise RuntimeError("#82 pi12 model failed exact hash/digest inheritance check")
@@ -644,8 +656,9 @@ def verify_preflight() -> dict[str, Any]:
         "issue73_lineage": issue73_lineage,
         "issue73_runtime_optimizer": {
             "status": "VERIFIED_NO_GAMES_STARTED",
-            "optimizer_id": runtime_identity["optimizer_id"],
-            "source_sha256": source["lock"]["issue73_source_snapshot"]["runtime_optimizer_sha256"],
+            "optimizer_id": optimizer_id,
+            "source_sha256": optimizer_sha256,
+            "loaded_path": optimizer_path.as_posix(),
         },
         "source_commit": backend.source_commit(),
         "native_module_sha256": file_sha256(Path(native)),
