@@ -1935,7 +1935,9 @@ def fit_pilot_predictors(
         "prior_block_indices": [0],
         "source_lock_sha256": file_sha256(SOURCE_LOCK_PATH),
         "package_commit": package,
-        "prior_block_feature_manifest_sha256": [owner_feature_manifest(rows, root=root, package=package)],
+        "prior_block_feature_manifest_sha256": [
+            owner_feature_manifest(rows, root=training_root, package=training_package)
+        ],
     }
 
     def history():

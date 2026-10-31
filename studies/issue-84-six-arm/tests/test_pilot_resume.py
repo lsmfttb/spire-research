@@ -106,7 +106,28 @@ class PilotResumeRepairTests(unittest.TestCase):
         row = {"owner_seed": 8_480_001, "unit_id": "TRAIN:8480001:D"}
         training_root = Path("/frozen/pilot/9be126a/D")
         training_package = driver.PILOT_RESUME_PACKAGE
+        current_package = "new-package"
         executor = types.SimpleNamespace()
+        manifest_lookups = []
+        prior_receipt = {
+            "training_features": {"sha256": "c" * 64},
+            "heart_victory": False,
+            "terminal_floor": 3.0,
+        }
+
+        def prior_package_only_success(root, _row, package):
+            manifest_lookups.append((Path(root), package))
+            if Path(root) == training_root and package == training_package:
+                return prior_receipt
+            return None
+
+        prior_only_backend = types.SimpleNamespace(existing_success=prior_package_only_success)
+
+        expected_manifest = driver.sha256(driver.canonical([{
+            "owner_seed": row["owner_seed"],
+            "feature_sha256": "c" * 64,
+            "reward": 3.0,
+        }]))
 
         def save_checkpoint(path, _state):
             path = Path(path)
@@ -122,13 +143,17 @@ class PilotResumeRepairTests(unittest.TestCase):
             def state_dict(self):
                 return {"seed": self.seed}
 
-        def build_cache(history, **_kwargs):
+        def build_cache(history, *, binding, **_kwargs):
             self.assertEqual(list(history), [(0, [outcome])])
+            self.assertEqual(binding["prior_block_feature_manifest_sha256"], [expected_manifest])
             return {"examples": 1}
 
         with tempfile.TemporaryDirectory() as temporary:
+            current_root = Path(temporary) / current_package
+            self.assertNotEqual(training_package, current_package)
+            self.assertFalse(current_root.exists(), "current package must not contain carried training receipts")
             with (
-                patch.object(driver, "owner_feature_manifest", return_value="b" * 64),
+                patch.object(driver, "BACKEND", prior_only_backend),
                 patch.object(driver, "file_sha256", return_value="a" * 64),
                 patch.object(driver, "load_training_outcomes", return_value=([], [outcome])) as load,
                 patch.object(driver, "write_json_once"),
@@ -142,14 +167,15 @@ class PilotResumeRepairTests(unittest.TestCase):
                 patch.object(predictors, "discard_predictor_cache"),
             ):
                 receipt = driver.fit_pilot_predictors(
-                    "D", [row], root=Path(temporary), executor=executor,
-                    package="new-package", training_root=training_root,
+                    "D", [row], root=current_root, executor=executor,
+                    package=current_package, training_root=training_root,
                     training_package=training_package,
                 )
 
         load.assert_called_once_with(
             [row], root=training_root, executor=executor, package=training_package,
         )
+        self.assertEqual(manifest_lookups, [(training_root, training_package)])
         self.assertEqual(receipt["status"], "SUCCEEDED")
 
     def test_source_lock_refresh_archives_the_explicit_predecessor_package(self):
