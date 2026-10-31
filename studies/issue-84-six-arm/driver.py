@@ -1418,6 +1418,7 @@ def _verify_predecessor_lock_compatibility(
     manifest = read_json(UPSTREAM_MANIFEST_PATH)
     manifest_file = manifest.get("files", {}).get(PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH, {})
     overlay = manifest.get("overlays", {}).get(PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH, {})
+    overlay_sha256 = overlay.get("sha256") if isinstance(overlay, Mapping) else None
     if (
         predecessor_lock.get("upstream_commit") != UPSTREAM_COMMIT
         or current_lock.get("upstream_commit") != UPSTREAM_COMMIT
@@ -1429,10 +1430,17 @@ def _verify_predecessor_lock_compatibility(
         or overlay.get("issue") != 84
         or overlay.get("base_commit") != UPSTREAM_COMMIT
         or overlay.get("base_sha256") != PILOT_CANDIDATE_COVERAGE_BASE_SHA256
-        or predecessor_files.get(PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH)
-        != PILOT_CANDIDATE_COVERAGE_BASE_SHA256
+        or not isinstance(overlay_sha256, str)
+        or len(overlay_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in overlay_sha256)
+        or (
+            predecessor_files.get(PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH)
+            != PILOT_CANDIDATE_COVERAGE_BASE_SHA256
+            and predecessor_files.get(PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH)
+            != overlay_sha256
+        )
         or current_files.get(PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH)
-        != overlay.get("sha256")
+        != overlay_sha256
         or any(
             predecessor_files[path] != current_files[path]
             for path in predecessor_files

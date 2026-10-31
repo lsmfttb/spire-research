@@ -347,6 +347,45 @@ class CarryForwardTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "differs beyond"):
                     driver._verify_predecessor_lock_compatibility(predecessor, changed, package=package)
 
+    def test_archived_cd_predecessor_already_contains_registered_overlay(self):
+        driver = issue84_driver
+        package = driver.PILOT_RESUME_PACKAGE
+        archive_path = (
+            host_path(driver.DATA_ROOT_WSL) / "artifacts" / "source-lock-history"
+            / f"{package}-{driver.PILOT_RESUME_SOURCE_LOCK_SHA256}.json"
+        )
+        self.assertTrue(archive_path.is_file(), "registered C/D predecessor lock archive is missing")
+        self.assertEqual(file_sha256(archive_path), driver.PILOT_RESUME_SOURCE_LOCK_SHA256)
+
+        predecessor = read_json(archive_path)
+        current = read_json(SOURCE_LOCK_PATH)
+        overlay_path = driver.PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH
+        self.assertEqual(
+            predecessor["upstream_files"][overlay_path],
+            current["upstream_files"][overlay_path],
+            "C/D predecessor should contain the same registered overlay as the current lock",
+        )
+        runtime_spec = next(
+            value for value in driver.PILOT_CARRY_FORWARD.values()
+            if value["package"] == package
+        )
+        with (
+            patch.object(
+                driver, "_historical_pilot_runtime_fingerprint",
+                return_value=runtime_spec["runtime_ast_sha256"],
+            ),
+            patch.object(
+                driver, "_pilot_runtime_fingerprint",
+                return_value=driver.PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
+            ),
+        ):
+            driver._verify_predecessor_lock_compatibility(predecessor, current, package=package)
+
+            changed = deepcopy(current)
+            changed["upstream_files"][overlay_path] = "0" * 64
+            with self.assertRaisesRegex(RuntimeError, "differs beyond"):
+                driver._verify_predecessor_lock_compatibility(predecessor, changed, package=package)
+
     def test_registered_c_owner_attempts_are_carried_and_resume_numbered_twenty(self):
         driver = issue84_driver
         source_package = driver.PILOT_C_INTERRUPTED_ATTEMPT_PACKAGE
