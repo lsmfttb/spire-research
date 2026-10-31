@@ -6,12 +6,19 @@ from pathlib import Path
 import subprocess
 import tempfile
 import sys
+from types import SimpleNamespace
 import unittest
 
 STUDY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(STUDY))
 
-from driver import T_REF, make_task_wall_forecast, save_preflight_receipt, seed_table_path
+from driver import (
+    T_REF,
+    bind_issue73_source_paths,
+    make_task_wall_forecast,
+    save_preflight_receipt,
+    seed_table_path,
+)
 from formal import paired_bootstrap
 
 
@@ -117,6 +124,38 @@ class FormalAnalysisTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+
+    def test_issue75_lineage_inputs_are_vendored_and_locked(self):
+        upstream = STUDY / "upstream"
+        manifest = json.loads(
+            (upstream / "upstream-manifest.json").read_text(encoding="utf-8")
+        )
+        for name in ("issue74-root-selection-lock.json", "root-provenance.json"):
+            relative = f"issue-75-no-expert-oracle/{name}"
+            path = upstream / relative
+            self.assertTrue(path.is_file(), relative)
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                manifest["files"][relative]["sha256"],
+            )
+
+    def test_issue73_source_binding_rebases_the_vendored_runtime_layout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            snapshot = Path(temporary)
+            runtime = SimpleNamespace()
+            preflight = SimpleNamespace()
+            bind_issue73_source_paths(runtime, preflight, snapshot)
+            issue73 = snapshot / "studies" / "issue-73-privileged-noncombat-oracle-stage0"
+            self.assertEqual(runtime.ISSUE73_DIR, issue73)
+            self.assertEqual(runtime.ISSUE73_RUNNER_PATH, issue73 / "runner.py")
+            self.assertEqual(runtime.ISSUE73_POLICY_PATH, issue73 / "policy.py")
+            self.assertEqual(runtime.PI_INIT_PATH, issue73 / "receipts/stage0/policies/pi_init.pt")
+            self.assertEqual(preflight.ROOTS, issue73 / "receipts/stage0/roots")
+            self.assertEqual(preflight.OWNER_RUNS, issue73 / "receipts/stage0/debug-owner-runs")
+            self.assertEqual(
+                preflight.SELECTION_PATH,
+                STUDY / "upstream" / "issue-75-no-expert-oracle" / "issue74-root-selection-lock.json",
+            )
 
     def test_seed_table_path_is_versioned_by_source_package(self):
         first = seed_table_path("6c30f045f3d308731561d22b3706d99520b7d0a2")

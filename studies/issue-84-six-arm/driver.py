@@ -31,6 +31,8 @@ SOURCE_LOCK_PATH = STUDY / "source-lock.json"
 UPSTREAM_MANIFEST_PATH = UPSTREAM / "upstream-manifest.json"
 
 DATA_ROOT_WSL = "/mnt/d/DeadlycatCoding/stsrl-data/issue84"
+SOURCE_REPO_WSL = "/mnt/d/DeadlycatCoding/spire-research"
+ISSUE73_SOURCE_STUDY = "studies/issue-73-privileged-noncombat-oracle-stage0"
 PARENT_ROOT_WSL = (
     "/mnt/d/DeadlycatCoding/stsrl-data/issue82/artifacts/formal/"
     "8f88f1554821707db6228d2de384f2334ec2615b"
@@ -149,6 +151,171 @@ def seed_table_path(package: str) -> Path:
     return host_path(DATA_ROOT_WSL) / "artifacts" / "seed-tables" / package / "seed-table.json"
 
 
+def _git_blob_sha1(payload: bytes) -> str:
+    return hashlib.sha1(b"blob " + str(len(payload)).encode("ascii") + b"\0" + payload).hexdigest()
+
+
+def _issue73_snapshot_paths(config: Mapping[str, Any]) -> tuple[str, ...]:
+    """List only the reviewed #73 inputs needed by the pinned #75 runtime."""
+    selection = read_json(UPSTREAM75 / "issue74-root-selection-lock.json")
+    rows = selection.get("selected_roots", [])
+    stage0 = config.get("stage0", {})
+    owners = [int(value) for value in stage0.get("historical_debug_owner_seeds", [])]
+    if len(rows) != 32 or len(set(owners)) != len(owners) or not owners:
+        raise RuntimeError("pinned Issue 75 selection inputs are incomplete")
+    if {int(row["owner_seed"]) for row in rows} != set(owners):
+        raise RuntimeError("pinned Issue 75 roots do not match the registered owner population")
+    paths = {
+        "runner.py",
+        "policy.py",
+        "source_lock_integrity.py",
+        "config.json",
+        "config.lock.sha256",
+        "receipts/gate-a-requalification-v5/source-lock.json",
+        "receipts/stage0/policies/pi_init.pt",
+    }
+    for row in rows:
+        root_id = str(row["root_id"])
+        if not re.fullmatch(r"root-[0-9]{9}-[0-9]{4}", root_id):
+            raise RuntimeError("pinned Issue 75 selection contains an invalid root ID")
+        paths.add(f"receipts/stage0/roots/{root_id}.json")
+    for owner in owners:
+        paths.add(f"receipts/stage0/debug-owner-runs/{owner}.json")
+    return tuple(sorted(paths))
+
+
+def issue73_source_identity() -> dict[str, Any]:
+    """Verify the minimal external snapshot against its immutable manifest and Git objects."""
+    config = read_json(UPSTREAM75 / "config.json")
+    source = config["source"]
+    commit = str(source["spire_reviewed_commit"])
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise RuntimeError("Issue 75 does not name a full locked Issue 73 commit")
+    repo = host_path(SOURCE_REPO_WSL)
+    if git_output(repo, "rev-parse", commit) != commit:
+        raise RuntimeError("pinned Issue 73 Git commit is unavailable in the source repository")
+    root_tree = str(source["issue73_root_tree_git_sha1"])
+    actual_root_tree = git_output(
+        repo, "rev-parse", f"{commit}:{ISSUE73_SOURCE_STUDY}/receipts/stage0/roots",
+    )
+    if actual_root_tree != root_tree:
+        raise RuntimeError("pinned Issue 73 root tree differs from the registered Git tree")
+
+    snapshot_wsl = f"{DATA_ROOT_WSL}/sources/issue73-{commit}"
+    snapshot = host_path(snapshot_wsl)
+    manifest_path = snapshot / "source-snapshot.json"
+    if not manifest_path.is_file():
+        raise RuntimeError(f"durable pinned Issue 73 source snapshot is missing: {snapshot_wsl}")
+    manifest = read_json(manifest_path)
+    expected_manifest = {
+        "schema_id": "issue84-locked-issue73-source-snapshot-v1",
+        "consumer": "issue-84-six-arm",
+        "issue73_source_commit": commit,
+        "issue73_root_tree_git_sha1": root_tree,
+        "issue74_selection_lock_source_commit": source["issue74_selection_lock_source_commit"],
+        "issue74_selection_lock_source_path": source["issue74_selection_lock_source_path"],
+        "issue74_selection_lock_sha256_lf": source["issue74_selection_lock_sha256_lf"],
+        "issue73_root_source_lock_sha256_lf": source["issue73_root_source_lock_sha256_lf"],
+        "issue73_pi_init_sha256": source["issue73_pi_init_sha256"],
+    }
+    for key, value in expected_manifest.items():
+        if manifest.get(key) != value:
+            raise RuntimeError(f"pinned Issue 73 snapshot manifest differs: {key}")
+    files = manifest.get("files")
+    required_paths = set(_issue73_snapshot_paths(config))
+    if not isinstance(files, dict) or set(files) != required_paths:
+        raise RuntimeError("pinned Issue 73 snapshot file list differs from the locked runtime inputs")
+
+    specs: list[str] = []
+    total_bytes = 0
+    file_hashes: dict[str, str] = {}
+    for relative in sorted(required_paths):
+        parts = Path(relative).parts
+        if Path(relative).is_absolute() or ".." in parts:
+            raise RuntimeError("pinned Issue 73 snapshot contains an unsafe relative path")
+        path = snapshot / ISSUE73_SOURCE_STUDY
+        for part in parts:
+            path = path / part
+        resolved = path.resolve(strict=True)
+        if not resolved.is_relative_to((snapshot / ISSUE73_SOURCE_STUDY).resolve(strict=True)):
+            raise RuntimeError("pinned Issue 73 snapshot path escaped its source root")
+        payload = resolved.read_bytes()
+        record = files[relative]
+        digest = hashlib.sha256(payload).hexdigest()
+        blob = _git_blob_sha1(payload)
+        if (
+            record.get("bytes") != len(payload)
+            or record.get("sha256") != digest
+            or record.get("git_blob_sha1") != blob
+        ):
+            raise RuntimeError(f"pinned Issue 73 snapshot file changed: {relative}")
+        total_bytes += len(payload)
+        file_hashes[relative] = digest
+        specs.append(f"{commit}:{ISSUE73_SOURCE_STUDY}/{relative}")
+
+    object_check = subprocess.run(
+        ["git", "-C", str(repo), "cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize)"],
+        input="\n".join(specs) + "\n", check=True, capture_output=True, text=True,
+    ).stdout.splitlines()
+    if len(object_check) != len(specs):
+        raise RuntimeError("Git did not return every pinned Issue 73 source object")
+    for relative, line in zip(sorted(required_paths), object_check, strict=True):
+        record = files[relative]
+        expected = f"{record['git_blob_sha1']} blob {record['bytes']}"
+        if line != expected:
+            raise RuntimeError(f"pinned Issue 73 source object mismatch: {relative}")
+
+    root_lock_path = snapshot / ISSUE73_SOURCE_STUDY / "receipts/gate-a-requalification-v5/source-lock.json"
+    pi_init_path = snapshot / ISSUE73_SOURCE_STUDY / "receipts/stage0/policies/pi_init.pt"
+    if file_sha256(root_lock_path) != source["issue73_root_source_lock_sha256_lf"]:
+        raise RuntimeError("pinned Issue 73 source lock differs from its registered normalized hash")
+    if file_sha256(pi_init_path) != source["issue73_pi_init_sha256"]:
+        raise RuntimeError("pinned Issue 73 pi_init checkpoint differs from its registered hash")
+    return {
+        "path": snapshot_wsl,
+        "source_repository": SOURCE_REPO_WSL,
+        "source_commit": commit,
+        "root_tree_git_sha1": root_tree,
+        "manifest_sha256": file_sha256(manifest_path),
+        "file_count": len(required_paths),
+        "total_bytes": total_bytes,
+        "files_sha256": file_hashes,
+    }
+
+
+def bind_issue73_source_paths(runtime: Any, preflight: Any, snapshot_root: Path) -> None:
+    """Rebase verbatim Issue 75 modules from their original repo layout to Issue 84 inputs."""
+    issue73 = snapshot_root / ISSUE73_SOURCE_STUDY
+    source_repo = host_path(SOURCE_REPO_WSL)
+    runtime.REPO_ROOT = source_repo
+    runtime.ISSUE73_DIR = issue73
+    runtime.ISSUE73_POLICY_PATH = issue73 / "policy.py"
+    runtime.ISSUE73_RUNNER_PATH = issue73 / "runner.py"
+    runtime.PI_INIT_PATH = issue73 / "receipts/stage0/policies/pi_init.pt"
+    preflight.ROOT = snapshot_root
+    def source_git(*args: str, cwd: Path | None = None) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=cwd or source_repo, check=True, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        return result.stdout.strip()
+
+    preflight.git = source_git
+    def source_git_blob_sha256(commit: str, relative_path: str) -> str:
+        result = subprocess.run(
+            ["git", "show", f"{commit}:{relative_path}"], cwd=source_repo,
+            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        return hashlib.sha256(result.stdout.replace(b"\r\n", b"\n")).hexdigest()
+
+    preflight.git_blob_sha256 = source_git_blob_sha256
+    preflight.ISSUE73_LOCK = issue73 / "receipts/gate-a-requalification-v5/source-lock.json"
+    preflight.ISSUE73_PI_INIT = issue73 / "receipts/stage0/policies/pi_init.pt"
+    preflight.ROOTS = issue73 / "receipts/stage0/roots"
+    preflight.OWNER_RUNS = issue73 / "receipts/stage0/debug-owner-runs"
+    preflight.SELECTION_PATH = UPSTREAM75 / "issue74-root-selection-lock.json"
+
+
 def _source_files() -> dict[str, str]:
     files: dict[str, str] = {}
     for path in sorted(STUDY.rglob("*")):
@@ -223,6 +390,7 @@ def make_source_lock() -> dict[str, Any]:
     upstream = _upstream_files()
     external = _external_identities()
     parent = _parent_identities()
+    issue73 = issue73_source_identity()
     expected_external = {
         "sts_lightspeed": (NATIVE_COMMIT, ""),
         "STSRL": (STSRL_COMMIT, ""),
@@ -250,6 +418,7 @@ def make_source_lock() -> dict[str, Any]:
         "contract_sha256": file_sha256(CONTRACT_PATH),
         "upstream_commit": UPSTREAM_COMMIT,
         "upstream_files": upstream,
+        "issue73_source_snapshot": issue73,
         "external_runtime": external,
         "parent": parent,
         "fixed_scales": {"t_ref": T_REF, "s_ref": S_REF},
@@ -280,6 +449,8 @@ def verify_source_lock(*, require_clean_worktree: bool) -> dict[str, Any]:
     upstream = _upstream_files()
     if lock.get("upstream_files") != upstream:
         raise RuntimeError("upstream source snapshot differs from source lock")
+    if lock.get("issue73_source_snapshot") != issue73_source_identity():
+        raise RuntimeError("pinned Issue 73 runtime source snapshot differs from source lock")
     if lock.get("external_runtime") != _external_identities():
         raise RuntimeError("native/STSRL/runtime identity differs from source lock")
     if lock.get("parent") != _parent_identities():
@@ -334,11 +505,14 @@ def load_modules(active_root: Path, *, pilot: bool):
     for path in (str(UPSTREAM75 / "stage1"), str(UPSTREAM75)):
         while path in sys.path:
             sys.path.remove(path)
-    for name in ("algorithm", "runtime", "model", "learning", "executor", "stage1_budget"):
+    for name in ("algorithm", "runtime", "model", "learning", "executor", "stage1_budget", "preflight"):
         sys.modules.pop(name, None)
     algorithm, runtime, model, learning, executor = BACKEND_ORIGINAL_LOAD_MODULES(
         Path(active_root), pilot=pilot,
     )
+    preflight = importlib.import_module("preflight")
+    snapshot = host_path(issue73_source_identity()["path"])
+    bind_issue73_source_paths(runtime, preflight, snapshot)
     # The vendored #75 config records an absolute path from the original host.
     # Preserve its source hash, but adapt only that machine-specific path to the
     # task's explicitly locked D:-backed WSL location and verify the same bytes.
@@ -416,6 +590,9 @@ def verify_preflight() -> dict[str, Any]:
     root = host_path(DATA_ROOT_WSL) / "artifacts" / "preflight"
     algorithm, runtime, model, learning, executor = load_modules(root, pilot=False)
     config = read_json(UPSTREAM75 / "config.json")
+    preflight = importlib.import_module("preflight")
+    issue73_lineage = preflight.verify_lineage(config)
+    preflight.verify_provenance_file(config, issue73_lineage)
     runtime.verify_source_repositories(config)
     native = runtime.verify_native_module(config)
     if file_sha256(Path(native)) != NATIVE_SHA256:
@@ -437,6 +614,8 @@ def verify_preflight() -> dict[str, Any]:
         "schema_id": "issue84-native-preflight-v1",
         "status": "SUCCEEDED_NO_GAMES_STARTED",
         "source_lock_sha256": source["sha256"],
+        "issue73_source_snapshot": source["lock"]["issue73_source_snapshot"],
+        "issue73_lineage": issue73_lineage,
         "source_commit": backend.source_commit(),
         "native_module_sha256": file_sha256(Path(native)),
         "parent_model_sha256": parent_record["checkpoint_sha256"],
