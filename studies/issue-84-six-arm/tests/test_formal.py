@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
+import subprocess
 import tempfile
 import sys
 import unittest
@@ -83,6 +86,37 @@ class FormalAnalysisTests(unittest.TestCase):
             with self.assertRaisesRegex(FileExistsError, "differs"):
                 save_preflight_receipt({**receipt, "native_module_sha256": "d" * 64}, data_root=Path(temporary))
             self.assertEqual(first["status"], "SUCCEEDED_NO_GAMES_STARTED")
+
+    def test_clean_worker_import_path_contains_locked_preflight_dependency(self):
+        upstream75 = STUDY / "upstream" / "issue-75-no-expert-oracle"
+        relative = "issue-75-no-expert-oracle/preflight.py"
+        manifest = json.loads(
+            (STUDY / "upstream" / "upstream-manifest.json").read_text(encoding="utf-8")
+        )
+        record = manifest["files"][relative]
+        module_path = upstream75 / "preflight.py"
+        self.assertEqual(
+            hashlib.sha256(module_path.read_bytes()).hexdigest(), record["sha256"],
+        )
+
+        # Worker subprocesses start with a clean interpreter and reconstruct the
+        # #75 import roots in load_modules; exercise that exact module lookup.
+        code = (
+            "import sys\n"
+            "from pathlib import Path\n"
+            "root = Path(sys.argv[1])\n"
+            "sys.path[:0] = [str(root), str(root / 'stage1')]\n"
+            "import preflight\n"
+            "assert Path(preflight.__file__).resolve() == (root / 'preflight.py').resolve()\n"
+            "assert preflight.load_json(preflight.CONFIG_PATH)\n"
+        )
+        subprocess.run(
+            [sys.executable, "-c", code, str(upstream75)],
+            cwd=STUDY,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
 
 
 if __name__ == "__main__":
