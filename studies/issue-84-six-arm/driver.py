@@ -111,12 +111,12 @@ PILOT_CARRY_FORWARD = {
     "E": {
         "package": "499d63adb89f8aab1e37d3600af02f60c8e4aef7",
         "source_lock_sha256": "c000a26edb1cb25805bb956a9a8289f8da5b9728597ea751b851fee426733b16",
-        "runtime_ast_sha256": PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
+        "runtime_ast_sha256": PILOT_RESUME_RUNTIME_AST_SHA256,
     },
     "F": {
         "package": "499d63adb89f8aab1e37d3600af02f60c8e4aef7",
         "source_lock_sha256": "c000a26edb1cb25805bb956a9a8289f8da5b9728597ea751b851fee426733b16",
-        "runtime_ast_sha256": PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
+        "runtime_ast_sha256": PILOT_RESUME_RUNTIME_AST_SHA256,
     },
 }
 PILOT_ACTOR_UPDATE_CARRY_FORWARD = {

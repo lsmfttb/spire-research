@@ -224,6 +224,11 @@ class PilotResumeRepairTests(unittest.TestCase):
             driver._pilot_runtime_fingerprint(),
             driver.PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
         )
+        for arm in ("E", "F"):
+            self.assertEqual(
+                driver.PILOT_CARRY_FORWARD[arm]["runtime_ast_sha256"],
+                driver.PILOT_RESUME_RUNTIME_AST_SHA256,
+            )
 
     def test_pilot_closes_clock_if_preflight_fails(self):
         events = []
