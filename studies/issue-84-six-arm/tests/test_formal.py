@@ -28,7 +28,7 @@ from driver import (
     seed_table_path,
     _preflight_optimizer_evidence,
     call_pinned_issue73_run_one,
-    install_issue84_evaluation_worker_dispatch,
+    install_issue84_evaluation_worker_load_hook,
     install_issue73_capture_limit_compat,
     refresh_source_lock,
     sha256,
@@ -307,6 +307,7 @@ class FormalAnalysisTests(unittest.TestCase):
         self.assertIsNotNone(spec.loader)
         executor = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = executor
+        self.addCleanup(sys.modules.pop, spec.name, None)
         with patch.object(sys, "path", [str(executor_path.parent), *sys.path]):
             spec.loader.exec_module(executor)
 
@@ -409,7 +410,11 @@ class FormalAnalysisTests(unittest.TestCase):
 
             executor._arm_policy = arm_policy
             executor._load_model = load_model
-            install_issue84_evaluation_worker_dispatch(executor)
+            backend = SimpleNamespace(
+                load_modules=lambda *_args, **_kwargs: (None, None, None, None, executor),
+            )
+            install_issue84_evaluation_worker_load_hook(backend)
+            self.assertIs(backend.load_modules(root, pilot=True)[-1], executor)
 
             row = {
                 "unit_id": "PILOT:EVAL:8490001:E",

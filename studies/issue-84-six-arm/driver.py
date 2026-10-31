@@ -454,6 +454,23 @@ def install_issue84_evaluation_worker_dispatch(executor) -> None:
     executor._issue84_evaluation_worker_dispatch_installed = True
 
 
+def install_issue84_evaluation_worker_load_hook(backend) -> None:
+    """Install the E dispatch adapter in each fresh pinned worker module load."""
+    if getattr(backend, "_issue84_evaluation_worker_load_hook_installed", False):
+        return
+    original_load_modules = backend.load_modules
+
+    def load_modules(*args, **kwargs):
+        modules = original_load_modules(*args, **kwargs)
+        if not isinstance(modules, tuple) or len(modules) != 5:
+            raise RuntimeError("pinned worker loader returned an unexpected module bundle")
+        install_issue84_evaluation_worker_dispatch(modules[-1])
+        return modules
+
+    backend.load_modules = load_modules
+    backend._issue84_evaluation_worker_load_hook_installed = True
+
+
 def install_issue73_capture_limit_compat(runtime) -> None:
     """Bridge the #75 root-limit keyword at the pinned #73 runtime boundary."""
     if getattr(runtime, "_issue84_capture_limit_compat_installed", False):
@@ -1025,6 +1042,7 @@ def configure_backend():
     BACKEND = module
     BACKEND_ORIGINAL_LOAD_MODULES = module.load_modules
     module.load_modules = load_modules
+    install_issue84_evaluation_worker_load_hook(module)
     return module
 
 
@@ -1179,7 +1197,6 @@ def load_modules(active_root: Path, *, pilot: bool):
     executor._load_model = load_model
     executor._arm_policy = arm_policy
     executor.STUDY_ID = "issue-84-six-arm"
-    install_issue84_evaluation_worker_dispatch(executor)
     return algorithm, runtime, model, learning, executor
 
 
