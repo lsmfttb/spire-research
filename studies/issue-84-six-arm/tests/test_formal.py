@@ -15,6 +15,10 @@ sys.path.insert(0, str(STUDY))
 
 from driver import (
     T_REF,
+    PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
+    _pilot_runtime_fingerprint,
+    _terminal_game_reward,
+    _validate_carried_attempt,
     _issue73_snapshot_paths,
     bind_issue73_source_paths,
     make_task_wall_forecast,
@@ -55,6 +59,85 @@ class FormalAnalysisTests(unittest.TestCase):
                 record["parent_optimizer_checkpoint_sha256"],
                 sha256(parent_optimizer_path.read_bytes()),
             )
+
+    def test_pilot_reward_manifest_uses_executor_terminal_fields(self):
+        self.assertEqual(
+            _terminal_game_reward({"heart_victory": True, "terminal_floor": 17}),
+            117.0,
+        )
+        self.assertEqual(
+            _terminal_game_reward({"heart_victory": False, "terminal_floor": 9}),
+            9.0,
+        )
+
+    def test_pilot_carry_forward_is_bound_to_reviewed_episode_adapter(self):
+        self.assertEqual(_pilot_runtime_fingerprint(), PILOT_PREDECESSOR_RUNTIME_AST_SHA256)
+
+    def test_carried_pilot_attempt_checks_seed_start_finish_and_feature_hashes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            row = {
+                "unit_id": "TRAIN-8480001-A", "owner_seed": 8_480_001,
+                "game_seed": 8_480_001, "paired_owner_key": "train-8480001",
+                "policy_source": {"source": "issue82-parent-pi12", "formal_use": True},
+            }
+            attempt = root / "units" / row["unit_id"] / "attempt-0001"
+            attempt.mkdir(parents=True)
+            feature_bytes = b'{"schema_id":"test-features"}'
+            import zlib
+            compressed = zlib.compress(feature_bytes)
+            (attempt / "training-features.json.zlib").write_bytes(compressed)
+            report = {
+                "status": "SUCCEEDED", "unit_id": row["unit_id"],
+                "owner_seed": row["owner_seed"], "phase": "training", "arm": "TRAIN",
+                "formal": False, "package_commit": "fbbcae6d55a505ce4c4a12968c7a09abb2f06f3d",
+                "runner_code_commit": "fbbcae6d55a505ce4c4a12968c7a09abb2f06f3d",
+                "source_lock_sha256": "d23bda9d60572814fbeef8d245246d1cccda74cf4ba565a87d0f1e98f7c49533",
+                "game_seed": row["game_seed"], "paired_owner_key": row["paired_owner_key"],
+                "policy_source": {
+                    "checkpoint_sha256": "6f72fdd60d684e4667f2357ba578f84f6e087a18d4d3944c65bf1e0aabd0cf19",
+                    "formal_use": True, "source": "issue82-parent-pi12",
+                },
+                "model_digest": "7c530520b5e107702575f9c8e612bff70e345b5c73715c33aa16eb75e00653ee",
+                "native_source_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+                "stsr_source_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+                "native_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+                "expert_decisions": 0, "terminal_outcome": "PLAYER_LOSS",
+                "training_features": {
+                    "compression": "zlib", "path": f"units/{row['unit_id']}/attempt-0001/training-features.json.zlib",
+                    "sha256": hashlib.sha256(compressed).hexdigest(),
+                    "uncompressed_sha256": hashlib.sha256(feature_bytes).hexdigest(),
+                },
+            }
+            result_path = attempt / "result.json"
+            result_path.write_text(json.dumps(report, sort_keys=True), encoding="utf-8")
+            result_sha = hashlib.sha256(result_path.read_bytes()).hexdigest()
+            (attempt / "started.json").write_text(json.dumps({
+                "unit_id": row["unit_id"], "owner_seed": row["owner_seed"],
+                "package_commit": report["package_commit"], "run_id": "attempt-1",
+                "seed_row_sha256": hashlib.sha256(json.dumps(
+                    row, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                    allow_nan=False,
+                ).encode("utf-8")).hexdigest(),
+            }, sort_keys=True), encoding="utf-8")
+            (attempt / "finished.json").write_text(json.dumps({
+                "unit_id": row["unit_id"], "run_id": "attempt-1",
+                "status": "SUCCEEDED", "result_sha256": result_sha,
+            }, sort_keys=True), encoding="utf-8")
+            artifact = _validate_carried_attempt(
+                row, root, report, result_path,
+                package=report["package_commit"], source_lock_sha256=report["source_lock_sha256"],
+            )
+            self.assertEqual(artifact["result_sha256"], result_sha)
+            started_path = attempt / "started.json"
+            started = json.loads(started_path.read_text(encoding="utf-8"))
+            started["seed_row_sha256"] = "0" * 64
+            started_path.write_text(json.dumps(started, sort_keys=True), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "start/finish receipts"):
+                _validate_carried_attempt(
+                    row, root, report, result_path,
+                    package=report["package_commit"], source_lock_sha256=report["source_lock_sha256"],
+                )
 
     def test_pinned_issue73_adapter_preserves_issue75_training_inputs_and_nested_runs(self):
         class Controller:
