@@ -10,6 +10,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import shutil
 import signal
 import statistics
@@ -41,6 +42,15 @@ ARMS = ("P0", "P1", "R", "J", "E")
 CONCURRENCY = 8
 ALLOWANCE_FACTOR = 1.75
 HEARTBEAT_SECONDS = 2.0
+ISSUE84_C_LINEAGE = {
+    "unit_id": "TRAIN:8480022:C",
+    "source_package_commit": "1179b14dbed830ce915299e5ee63ab190d16e4a6",
+    "source_lock_archive_sha256": "625b812e9e174c1cd52381820beae6ea6e402daeedc3180a3329b375878d93e4",
+    "seed_row_sha256": "7449f89ab7df2f7277680901627544fd82cda5286b1eec79c3771c8fec611b72",
+    "prior_attempt_count": 19,
+    "attempt_19_active_wall_tail": "UNKNOWN",
+    "resume_attempt_number": 20,
+}
 
 
 def canonical(value: object) -> bytes:
@@ -1100,6 +1110,186 @@ def worker_main(job_path: Path) -> int:
         return 1
 
 
+_RECOVERABLE_TRANSPORT_BOUNDARIES = {
+    "BrokenPipeError", "ConnectionAbortedError", "ConnectionResetError",
+}
+
+
+def classify_attempt_failure(value: object) -> dict:
+    """Classify only the exact witnessed semantic failure and known transport faults."""
+    if not isinstance(value, dict) or value.get("status") != "FAILED":
+        return {
+            "schema_id": "issue84-attempt-failure-classification-v1",
+            "category": "unresolved_failure",
+            "failure_boundary": "missing_or_malformed_result",
+            "failure_detail": "worker did not leave a valid FAILED result receipt",
+        }
+    boundary = str(value.get("failure_boundary") or "")
+    detail = str(value.get("failure_detail") or "")[:4096]
+    if "native projection does not support every live legal candidate" in detail:
+        category = "deterministic_semantic_coverage_failure"
+    elif boundary in _RECOVERABLE_TRANSPORT_BOUNDARIES:
+        category = "recoverable_transport_failure"
+    else:
+        category = "unresolved_failure"
+    signature = sha256(canonical({
+        "failure_boundary": boundary,
+        "failure_detail": detail,
+        "status": value.get("status"),
+    }))
+    return {
+        "schema_id": "issue84-attempt-failure-classification-v1",
+        "category": category,
+        "failure_boundary": boundary or "unknown",
+        "failure_detail": detail,
+        "failure_signature_sha256": signature,
+    }
+
+
+def _attempt_failure_history(base: Path, row: dict) -> tuple[list[dict], bool]:
+    """Read immutable attempt receipts; an unfinished prior attempt is unresolved."""
+    history = []
+    for attempt in sorted(base.glob("attempt-*")):
+        if not attempt.is_dir():
+            continue
+        result_path = attempt / "result.json"
+        finish_path = attempt / "finished.json"
+        started_path = attempt / "started.json"
+        if not result_path.is_file() or not finish_path.is_file() or not started_path.is_file():
+            return history, True
+        try:
+            value = read_json(result_path)
+            finished = read_json(finish_path)
+            started = read_json(started_path)
+        except (OSError, ValueError):
+            return history, True
+        if (
+            value.get("unit_id") != row.get("unit_id")
+            or value.get("owner_seed") != row.get("owner_seed")
+            or started.get("unit_id") != row.get("unit_id")
+            or started.get("owner_seed") != row.get("owner_seed")
+            or started.get("seed_row_sha256") != sha256(canonical(row))
+            or finished.get("unit_id") != row.get("unit_id")
+            or finished.get("run_id") != started.get("run_id")
+            or finished.get("run_id") != value.get("run_id")
+            or finished.get("status") != value.get("status")
+            or finished.get("result_sha256") != file_sha256(result_path)
+        ):
+            return history, True
+        if value.get("status") == "SUCCEEDED":
+            # `existing_success` already declined this receipt before this
+            # history scan. Do not launch a duplicate owner to replace an
+            # unaccepted success-shaped attempt.
+            return history, True
+        classification_path = attempt / "failure-classification.json"
+        if classification_path.is_file():
+            try:
+                classification = read_json(classification_path)
+            except (OSError, ValueError):
+                return history, True
+            if classification.get("schema_id") != "issue84-attempt-failure-classification-v1":
+                return history, True
+        else:
+            classification = classify_attempt_failure(value)
+        history.append(classification)
+    return history, False
+
+
+def _pause_kind(classification: dict) -> str:
+    category = classification.get("category")
+    if category == "deterministic_semantic_coverage_failure":
+        return "PILOT_PAUSED_DETERMINISTIC_FAILURE"
+    if category == "recoverable_transport_failure":
+        return "PILOT_PAUSED_REPEATED_TRANSPORT_FAILURE"
+    return "PILOT_PAUSED_UNRESOLVED_FAILURE"
+
+
+def _prior_attempt_offset(root: Path, row: dict, package_commit: str) -> int:
+    path = root / "execution-lineage" / f"{unit_key(str(row['unit_id']))}.json"
+    if not path.is_file():
+        return 0
+    lineage = read_json(path)
+    digest = lineage.get("manifest_sha256")
+    unhashed = dict(lineage)
+    unhashed.pop("manifest_sha256", None)
+    attempts = lineage.get("attempts")
+    if (
+        lineage.get("schema_id") != "issue84-prior-attempt-lineage-v1"
+        or lineage.get("package_commit") != package_commit
+        or lineage.get("source_lock_sha256") != source_lock_sha()
+        or str(row.get("unit_id")) != ISSUE84_C_LINEAGE["unit_id"]
+        or lineage.get("unit_id") != ISSUE84_C_LINEAGE["unit_id"]
+        or lineage.get("source_package_commit") != ISSUE84_C_LINEAGE["source_package_commit"]
+        or lineage.get("source_lock_archive_sha256") != ISSUE84_C_LINEAGE["source_lock_archive_sha256"]
+        or lineage.get("seed_row_sha256") != ISSUE84_C_LINEAGE["seed_row_sha256"]
+        or lineage.get("seed_row_sha256") != sha256(canonical(row))
+        or lineage.get("attempt_19_active_wall_tail") != "UNKNOWN"
+        or lineage.get("resume_attempt_number") != 20
+        or not isinstance(attempts, list)
+        or lineage.get("prior_attempt_count") != 19
+        or len(attempts) != 19
+        or [item.get("attempt_number") for item in attempts] != list(range(1, len(attempts) + 1))
+        or any(item.get("status") != "FAILED_DETERMINISTIC_COVERAGE" for item in attempts[:-1])
+        or attempts[-1].get("status") != "INCOMPLETE_UNKNOWN_TAIL"
+        or any(
+            not re.fullmatch(r"[0-9a-f]{64}", str(item.get("started_sha256", "")))
+            or not re.fullmatch(r"[0-9a-f]{64}", str(item.get("worker_job_sha256", "")))
+            for item in attempts
+        )
+        or any(
+            not re.fullmatch(r"[0-9a-f]{64}", str(item.get("result_sha256", "")))
+            or not re.fullmatch(r"[0-9a-f]{64}", str(item.get("finished_sha256", "")))
+            for item in attempts[:-1]
+        )
+        or attempts[-1].get("result_sha256") is not None
+        or attempts[-1].get("finished_sha256") is not None
+        or digest != sha256(canonical(unhashed))
+    ):
+        raise RuntimeError(f"prior attempt lineage is malformed or mismatched for {row['unit_id']}")
+    return len(attempts)
+
+
+def _apply_attempt_offsets(summary: dict, offsets: dict[str, int]) -> dict:
+    for unit_id, offset in offsets.items():
+        summary["tries"][unit_id] = int(summary["tries"].get(unit_id, 0)) + offset
+    return summary
+
+
+def _run_units_result_summary(
+    *, status: str, started: float, rows: list[dict], root: Path,
+    complete: dict[str, dict],
+) -> dict:
+    row_wall_seconds = {}
+    tries = {}
+    native_wall = {}
+    for row in rows:
+        base = root / "units" / unit_key(row["unit_id"])
+        durations = []
+        if base.exists():
+            for finish_path in base.glob("attempt-*/finished.json"):
+                finish = read_json(finish_path)
+                started_path = finish_path.parent / "started.json"
+                if started_path.exists() and finish.get("finished_monotonic") is not None:
+                    began = float(read_json(started_path)["started_monotonic"])
+                    durations.append(max(0.0, float(finish["finished_monotonic"]) - began))
+        row_wall_seconds[row["unit_id"]] = sum(durations)
+        tries[row["unit_id"]] = len(list(base.glob("attempt-*"))) if base.exists() else 0
+        report = complete.get(row["unit_id"])
+        if report is not None:
+            native_wall[row["unit_id"]] = float(
+                report.get("resource", {}).get("worker_wall_seconds", 0.0)
+            )
+    return {
+        "status": status,
+        "elapsed_seconds": time.monotonic() - started,
+        "completed": len(complete),
+        "row_wall_seconds": row_wall_seconds,
+        "native_wall_seconds_by_unit": native_wall,
+        "tries": tries,
+        "results": complete,
+    }
+
+
 def run_units(
     rows: list[dict], *, root: Path, pilot: bool, clock: ActiveClock | None,
     package_commit: str | None = None,
@@ -1110,7 +1300,12 @@ def run_units(
     complete: dict[str, dict] = {}
     durations: dict[str, float] = {}
     tries: dict[str, int] = {}
+    pause: tuple[dict, dict] | None = None
     registered_package_commit = package_commit or source_commit()
+    attempt_offsets = {
+        str(row["unit_id"]): _prior_attempt_offset(root, row, registered_package_commit)
+        for row in rows
+    }
     python = str(PINNED_PYTHON)
     env = os.environ.copy()
     for name in ("STS_LIGHTSPEED_SOURCE_DIR", "STSRL_SOURCE_DIR"):
@@ -1146,7 +1341,34 @@ def run_units(
                 "elapsed_seconds": time.monotonic() - started,
                 "completed": len(complete), "remaining": [row["unit_id"] for row in pending],
             }
-        while pending and len(active) < CONCURRENCY:
+        if pause is not None and not active:
+            blocker_row, classification = pause
+            remaining = sorted({str(row["unit_id"]) for row in pending})
+            pause_payload = {
+                "schema_id": "issue84-pilot-execution-pause-v1",
+                "package_commit": registered_package_commit,
+                "source_lock_sha256": source_lock_sha(),
+                "unit_id": str(blocker_row["unit_id"]),
+                "classification": classification,
+                "remaining_unit_ids": remaining,
+                "completed_in_call": sorted(complete),
+            }
+            pause_digest = sha256(canonical(pause_payload))[:20]
+            pause_path = (
+                root / "execution-pauses"
+                / f"{unit_key(str(blocker_row['unit_id']))}-{pause_digest}.json"
+            )
+            write_json_once(pause_path, pause_payload)
+            if clock is not None:
+                clock.set_processes(set())
+            summary = _run_units_result_summary(
+                status=_pause_kind(classification), started=started, rows=rows,
+                root=root, complete=complete,
+            )
+            summary["remaining"] = remaining
+            summary["pause_record"] = str(pause_path)
+            return _apply_attempt_offsets(summary, attempt_offsets)
+        while pause is None and pending and len(active) < CONCURRENCY:
             row = pending.pop(0)
             done = existing_success(root, row, registered_package_commit)
             if done is not None:
@@ -1154,7 +1376,36 @@ def run_units(
                 continue
             base = root / "units" / unit_key(row["unit_id"])
             base.mkdir(parents=True, exist_ok=True)
-            number = 1 + len(list(base.glob("attempt-*")))
+            history, incomplete_attempt = _attempt_failure_history(base, row)
+            if incomplete_attempt:
+                classification = {
+                    "schema_id": "issue84-attempt-failure-classification-v1",
+                    "category": "unresolved_failure",
+                    "failure_boundary": "unresolved_prior_attempt",
+                    "failure_detail": "a prior attempt cannot be certified as a source-bound success or failure",
+                }
+                pending.insert(0, row)
+                pause = (row, classification)
+                break
+            previous_blocker = next(
+                (item for item in history if item.get("category") != "recoverable_transport_failure"),
+                None,
+            )
+            if previous_blocker is not None:
+                pending.insert(0, row)
+                pause = (row, previous_blocker)
+                break
+            if len(history) > 1:
+                classification = {
+                    "schema_id": "issue84-attempt-failure-classification-v1",
+                    "category": "recoverable_transport_failure",
+                    "failure_boundary": "repeated_transport_failure",
+                    "failure_detail": "the same frozen owner row has repeated recoverable transport failures",
+                }
+                pending.insert(0, row)
+                pause = (row, classification)
+                break
+            number = attempt_offsets[str(row["unit_id"])] + 1 + len(list(base.glob("attempt-*")))
             attempt = base / f"attempt-{number:04d}"
             attempt.mkdir(parents=True, exist_ok=False)
             run_id = f"{row['unit_id']}-attempt-{number:04d}"
@@ -1173,11 +1424,24 @@ def run_units(
             job_path = attempt / "worker-job.json"
             write_json_once(job_path, worker_job)
             log = (attempt / "worker.log").open("ab")
-            process = subprocess.Popen(
-                [python, str(Path(__file__).resolve()), "--worker", str(job_path)],
-                cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT,
-                start_new_session=True,
-            )
+            try:
+                process = subprocess.Popen(
+                    [python, str(Path(__file__).resolve()), "--worker", str(job_path)],
+                    cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+            except OSError as exc:
+                log.close()
+                classification = {
+                    "schema_id": "issue84-attempt-failure-classification-v1",
+                    "category": "unresolved_failure",
+                    "failure_boundary": type(exc).__name__,
+                    "failure_detail": str(exc)[:4096],
+                }
+                write_json_once(attempt / "launch-failure.json", classification)
+                pending.insert(0, row)
+                pause = (row, classification)
+                break
             active[run_id] = (process, log, worker_job, time.monotonic())
             tries[row["unit_id"]] = number
             if clock is not None:
@@ -1193,46 +1457,43 @@ def run_units(
             row = job["row"]
             durations[row["unit_id"]] = durations.get(row["unit_id"], 0.0) + duration
             result_path = Path(job["result_path"])
-            value = read_json(result_path) if result_path.exists() else None
+            try:
+                value = read_json(result_path) if result_path.exists() else None
+            except (OSError, ValueError):
+                value = None
             del active[run_id]
             if value and value.get("status") == "SUCCEEDED":
                 complete[row["unit_id"]] = value
             else:
-                # Same registered owner and streams; preserve every failed receipt.
-                pending.append(row)
+                classification = classify_attempt_failure(value)
+                write_json_once(
+                    Path(job["attempt_dir"]) / "failure-classification.json",
+                    classification,
+                )
+                history, incomplete_attempt = _attempt_failure_history(
+                    root / "units" / unit_key(str(row["unit_id"])), row,
+                )
+                if (
+                    not incomplete_attempt
+                    and classification.get("category") == "recoverable_transport_failure"
+                    and len(history) == 1
+                    and history[0].get("failure_signature_sha256") == classification.get("failure_signature_sha256")
+                ):
+                    # Retry only this same frozen row after one positively
+                    # classified transport failure; recurrence pauses by type.
+                    pending.insert(0, row)
+                else:
+                    pending.insert(0, row)
+                    if pause is None:
+                        pause = (row, classification)
             if clock is not None:
                 clock.set_processes({item[0].pid for item in active.values()})
         if not observed_exit:
             time.sleep(0.25)
-    row_wall_seconds = {}
-    tries = {}
-    native_wall = {}
-    for row in rows:
-        base = root / "units" / unit_key(row["unit_id"])
-        durations = []
-        if base.exists():
-            for finish_path in base.glob("attempt-*/finished.json"):
-                finish = read_json(finish_path)
-                started_path = finish_path.parent / "started.json"
-                if started_path.exists() and finish.get("finished_monotonic") is not None:
-                    began = float(read_json(started_path)["started_monotonic"])
-                    durations.append(max(0.0, float(finish["finished_monotonic"]) - began))
-        row_wall_seconds[row["unit_id"]] = sum(durations)
-        tries[row["unit_id"]] = len(list(base.glob("attempt-*"))) if base.exists() else 0
-        report = complete.get(row["unit_id"])
-        if report is not None:
-            native_wall[row["unit_id"]] = float(
-                report.get("resource", {}).get("worker_wall_seconds", 0.0)
-            )
-    return {
-        "status": "SUCCEEDED",
-        "elapsed_seconds": time.monotonic() - started,
-        "completed": len(complete),
-        "row_wall_seconds": row_wall_seconds,
-        "native_wall_seconds_by_unit": native_wall,
-        "tries": tries,
-        "results": complete,
-    }
+    return _apply_attempt_offsets(_run_units_result_summary(
+        status="SUCCEEDED", started=started, rows=rows, root=root,
+        complete=complete,
+    ), attempt_offsets)
 
 
 def _training_examples(

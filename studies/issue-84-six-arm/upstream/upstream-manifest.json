@@ -74,5 +74,15 @@
     }
   },
   "upstream_commit": "ecb588e580c0226da3aabaf54d79f2c2267308e3",
+  "overlays": {
+    "issue-79-successor/driver.py": {
+      "issue": 84,
+      "base_commit": "ecb588e580c0226da3aabaf54d79f2c2267308e3",
+      "base_sha256": "d8e3f2540cd18c05f0545be713addd3b72469dd71de4bcca72cdc9d50e8966bb",
+      "sha256": "e485e35e2205e74bc683476d7e80d0832c811ae8c258ca9e4dfdb1587c2152ec",
+      "bytes": 109268,
+      "reason": "Issue 84: pause deterministic semantic coverage failures and retry only one classified transient transport failure"
+    }
+  },
   "upstream_ref": "origin/codex/issue83-pgonly-scale"
 }

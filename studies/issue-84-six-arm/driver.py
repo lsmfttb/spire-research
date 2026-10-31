@@ -70,9 +70,64 @@ S_REF = 5.360108706240238
 # remain byte/contract compatible.
 PILOT_PREDECESSOR_PACKAGE = "fbbcae6d55a505ce4c4a12968c7a09abb2f06f3d"
 PILOT_PREDECESSOR_LOCK_SHA256 = "d23bda9d60572814fbeef8d245246d1cccda74cf4ba565a87d0f1e98f7c49533"
-PILOT_PREDECESSOR_RUNTIME_AST_SHA256 = "47b9dda9e86843c760dffe9b3a548a6338cbda7fc095420e965282a24571e35a"
+PILOT_ORIGINAL_RUNTIME_AST_SHA256 = "47b9dda9e86843c760dffe9b3a548a6338cbda7fc095420e965282a24571e35a"
+PILOT_PREDECESSOR_RUNTIME_AST_SHA256 = "82d5be5820e8bfa35f79ab809834a4d4209eb941b30dad3953be2e9bcafe5bf4"
+PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH = "issue-79-successor/driver.py"
+PILOT_CANDIDATE_COVERAGE_BASE_SHA256 = "d8e3f2540cd18c05f0545be713addd3b72469dd71de4bcca72cdc9d50e8966bb"
+PILOT_CARRY_FORWARD = {
+    "A": {
+        "package": PILOT_PREDECESSOR_PACKAGE,
+        "source_lock_sha256": PILOT_PREDECESSOR_LOCK_SHA256,
+        "runtime_ast_sha256": PILOT_ORIGINAL_RUNTIME_AST_SHA256,
+    },
+    "B": {
+        "package": "1179b14dbed830ce915299e5ee63ab190d16e4a6",
+        "source_lock_sha256": "625b812e9e174c1cd52381820beae6ea6e402daeedc3180a3329b375878d93e4",
+        "runtime_ast_sha256": PILOT_ORIGINAL_RUNTIME_AST_SHA256,
+    },
+}
+PILOT_ACTOR_UPDATE_CARRY_FORWARD = {
+    "A": {
+        "package": "1179b14dbed830ce915299e5ee63ab190d16e4a6",
+        "source_lock_sha256": "625b812e9e174c1cd52381820beae6ea6e402daeedc3180a3329b375878d93e4",
+        "training_package": PILOT_PREDECESSOR_PACKAGE,
+        "training_source_lock_sha256": PILOT_PREDECESSOR_LOCK_SHA256,
+        "progress_sha256": "ea75cbc5725829e30ebdd10654fe40442b9e3955ba657d94fcf2870399574d92",
+        "receipt_sha256": "b97334afc6fdacc2ebd40770ecb061372adf620b8c7f6782515b0c7eceacb0c9",
+        "model_sha256": "5604149f55ceeb648242d54b9f407414bf9e40897a11283b88846433fa33e585",
+        "checkpoint_sha256": "11612f6c6be7869c00bd9abb57113c7863af2301e8433ab2edabb989b62677dc",
+        "model_digest": "0f5069385b35ca50a7376500f6f39a53a2beada1db24725765dedcb97e41cfda",
+        "owner_seed_sha256": "c531521816644d45ee26d2fe52ef6ddd17f166cbb52c9852c3def7a9e3ecf9c6",
+        "owner_training_feature_manifest_sha256": "63d069af7202fee5af1599229916e352ec021b863d6493b0cfdc87381d48a339",
+        "decision_count": 1220,
+    },
+    "B": {
+        "package": "1179b14dbed830ce915299e5ee63ab190d16e4a6",
+        "source_lock_sha256": "625b812e9e174c1cd52381820beae6ea6e402daeedc3180a3329b375878d93e4",
+        "training_package": "1179b14dbed830ce915299e5ee63ab190d16e4a6",
+        "training_source_lock_sha256": "625b812e9e174c1cd52381820beae6ea6e402daeedc3180a3329b375878d93e4",
+        "progress_sha256": "ea75cbc5725829e30ebdd10654fe40442b9e3955ba657d94fcf2870399574d92",
+        "receipt_sha256": "5b7d4891aaa10b608fd4db511280e7e165c77d40b482e2032c892e61072afaec",
+        "model_sha256": "1b08b409ef15fe75015b2ffbcbdfd38b5fcfe802523ab6ee81dea9e56702168f",
+        "checkpoint_sha256": "d39245ec28af767e42beac5f46464ca30d3a4641c13c9220fbb0cb251c3527c7",
+        "model_digest": "a05253324eac7b566c7704fd258b40a86945232057704b94352ea3cb7d197b75",
+        "owner_seed_sha256": "c531521816644d45ee26d2fe52ef6ddd17f166cbb52c9852c3def7a9e3ecf9c6",
+        "owner_training_feature_manifest_sha256": "7127b4dd127346e29fa26248ea3597dcf5cbfdcee86acfd7db3d2456b0de5dcf",
+        "decision_count": 1155,
+    },
+}
+PILOT_C_INTERRUPTED_ATTEMPT_PACKAGE = "1179b14dbed830ce915299e5ee63ab190d16e4a6"
+PILOT_C_INTERRUPTED_ATTEMPT_LOCK_SHA256 = "625b812e9e174c1cd52381820beae6ea6e402daeedc3180a3329b375878d93e4"
+PILOT_C_INTERRUPTED_ATTEMPT_ROW_SHA256 = "7449f89ab7df2f7277680901627544fd82cda5286b1eec79c3771c8fec611b72"
+PILOT_C_INTERRUPTED_ATTEMPT_COUNT = 19
+PILOT_C_COVERAGE_FAILURE_DETAIL = (
+    "TRAIN_8480022 is incomplete or invalid: "
+    "['native projection does not support every live legal candidate']"
+)
 
 sys.path.insert(0, str(STUDY))
+
+from candidate_coverage import CoverageRepairingEncoder
 
 
 def canonical(value: object) -> bytes:
@@ -195,6 +250,7 @@ def install_issue73_capture_limit_compat(runtime) -> None:
 
     def initialize_with_capture_limit_compat(*args, **kwargs):
         config, runner, module, encoder = original_initialize(*args, **kwargs)
+        encoder = CoverageRepairingEncoder(encoder)
         original_run_one = runner._run_one
 
         def run_one_with_capture_limit(*run_args, **run_kwargs):
@@ -491,13 +547,38 @@ def _upstream_files() -> dict[str, str]:
     manifest = read_json(UPSTREAM_MANIFEST_PATH)
     if manifest.get("upstream_commit") != UPSTREAM_COMMIT:
         raise RuntimeError("vendored upstream source commit differs from the registered pin")
+    overlays = manifest.get("overlays", {})
+    if not isinstance(overlays, Mapping):
+        raise RuntimeError("vendored upstream overlay manifest is malformed")
     observed: dict[str, str] = {}
     for relative, record in manifest["files"].items():
         path = UPSTREAM / relative
         digest = file_sha256(path)
-        if digest != record["sha256"]:
+        overlay = overlays.get(relative)
+        expected = record["sha256"]
+        if overlay is not None:
+            if (
+                not isinstance(overlay, Mapping)
+                or overlay.get("issue") != 84
+                or overlay.get("base_commit") != UPSTREAM_COMMIT
+                or overlay.get("base_sha256") != record.get("sha256")
+                or not isinstance(overlay.get("reason"), str)
+                or not overlay["reason"].strip()
+                or not isinstance(overlay.get("sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", overlay["sha256"])
+                or not isinstance(record.get("sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", record["sha256"])
+                or not isinstance(overlay.get("bytes"), int)
+            ):
+                raise RuntimeError(f"vendored upstream overlay provenance is invalid: {relative}")
+            expected = overlay.get("sha256")
+            if overlay.get("bytes") != path.stat().st_size:
+                raise RuntimeError(f"vendored upstream overlay size differs: {relative}")
+        if digest != expected:
             raise RuntimeError(f"vendored upstream file changed: {relative}")
         observed[relative] = digest
+    if set(overlays).difference(manifest["files"]):
+        raise RuntimeError("vendored upstream overlay names an unregistered file")
     return observed
 
 
@@ -694,6 +775,72 @@ def configure_backend():
     return module
 
 
+def _pilot_actor_update_model_path(active_root: Path, package: str) -> Path | None:
+    arm = Path(active_root).name
+    spec = PILOT_ACTOR_UPDATE_CARRY_FORWARD.get(arm)
+    pointer_path = Path(active_root) / "diagnostics" / "pilot-update-carry-forward.json"
+    if spec is None or not pointer_path.is_file():
+        return None
+
+    backend = configure_backend()
+    pointer = read_json(pointer_path)
+    pointer_hash = pointer.get("manifest_sha256")
+    unhashed = dict(pointer)
+    unhashed.pop("manifest_sha256", None)
+    expected_root = Path("pilot") / str(spec["package"]) / arm
+    expected = {
+        "schema_id": "issue84-pilot-actor-update-carry-forward-v1",
+        "current_package_commit": package,
+        "current_source_lock_sha256": file_sha256(SOURCE_LOCK_PATH),
+        "arm": arm,
+        "source_package_commit": spec["package"],
+        "source_lock_sha256": spec["source_lock_sha256"],
+        "source_progress_sha256": spec["progress_sha256"],
+        "source_receipt_sha256": spec["receipt_sha256"],
+        "source_artifact_root": expected_root.as_posix(),
+        "model_sha256": spec["model_sha256"],
+        "optimizer_checkpoint_sha256": spec["checkpoint_sha256"],
+        "model_digest": spec["model_digest"],
+        "owner_training_feature_manifest_sha256": spec["owner_training_feature_manifest_sha256"],
+    }
+    if (
+        set(pointer) != set(expected) | {"training_carry_forward_manifest_sha256", "manifest_sha256"}
+        or any(pointer.get(key) != value for key, value in expected.items())
+        or not isinstance(pointer.get("training_carry_forward_manifest_sha256"), str)
+        or not re.fullmatch(r"[0-9a-f]{64}", pointer["training_carry_forward_manifest_sha256"])
+        or package != package_commit()
+        or pointer_hash != sha256(canonical(unhashed))
+    ):
+        raise RuntimeError(f"pilot actor-update carry-forward pointer changed for arm {arm}")
+    source_root = (backend.ARTIFACTS / expected_root).resolve(strict=True)
+    try:
+        source_root.relative_to(backend.ARTIFACTS.resolve(strict=True))
+    except ValueError as exc:
+        raise RuntimeError("pilot actor-update carry-forward path escapes the artifact root") from exc
+    source_lock_path = backend.ARTIFACTS / "source-lock-history" / (
+        f"{spec['package']}-{spec['source_lock_sha256']}.json"
+    )
+    receipt_path = source_root / "diagnostics" / "pilot-update.json"
+    progress_path = source_root.parent / "pilot-progress.json"
+    model_path = source_root / "models" / "pi13.pt"
+    checkpoint_path = source_root / "models" / "blocks" / "pilot-block-00-step.pt"
+    try:
+        progress_path.resolve(strict=True).relative_to(source_root.parent)
+        for path in (receipt_path, model_path, checkpoint_path):
+            path.resolve(strict=True).relative_to(source_root)
+    except ValueError as exc:
+        raise RuntimeError("pilot actor-update evidence path escapes its source artifact root") from exc
+    if (
+        file_sha256(source_lock_path) != spec["source_lock_sha256"]
+        or file_sha256(progress_path) != spec["progress_sha256"]
+        or file_sha256(receipt_path) != spec["receipt_sha256"]
+        or file_sha256(model_path) != spec["model_sha256"]
+        or file_sha256(checkpoint_path) != spec["checkpoint_sha256"]
+    ):
+        raise RuntimeError(f"pilot actor-update carry-forward evidence changed for arm {arm}")
+    return model_path
+
+
 def load_modules(active_root: Path, *, pilot: bool):
     """Load the exact #75 API and bind it to this arm's durable data root."""
     backend = configure_backend()
@@ -730,6 +877,10 @@ def load_modules(active_root: Path, *, pilot: bool):
         if match and 12 <= int(match.group(1)) <= 28:
             if int(match.group(1)) == 12:
                 return host_path(PARENT_MODELS_WSL) / "pi12.pt"
+            if int(match.group(1)) == 13:
+                carried = _pilot_actor_update_model_path(Path(active_root), package_commit())
+                if carried is not None:
+                    return carried
             return Path(active_root) / "models" / f"{label}.pt"
         return old_model_path(label)
 
@@ -1052,6 +1203,7 @@ def _pilot_runtime_fingerprint() -> str:
         "bind_issue73_source_paths",
         "install_issue73_capture_limit_compat",
         "load_modules",
+        "_pilot_actor_update_model_path",
     }
     tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
     functions = [
@@ -1064,25 +1216,88 @@ def _pilot_runtime_fingerprint() -> str:
         node.name + "\0" + ast.dump(node, annotate_fields=True, include_attributes=False)
         for node in functions
     ).encode("utf-8")
+    payload += b"\0candidate_coverage.py\0" + file_sha256(STUDY / "candidate_coverage.py").encode("ascii")
     return sha256(payload)
+
+
+def _historical_pilot_runtime_fingerprint(package: str) -> str:
+    names = {
+        "bind_issue73_source_paths",
+        "install_issue73_capture_limit_compat",
+        "load_modules",
+    }
+    relative = "studies/issue-84-six-arm/driver.py"
+    source = subprocess.run(
+        ["git", "show", f"{package}:{relative}"], cwd=REPO, check=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    ).stdout
+    tree = ast.parse(source)
+    functions = [
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names
+    ]
+    if {node.name for node in functions} != names:
+        raise RuntimeError("pilot predecessor source lacks a complete runtime adapter")
+    payload = "\n".join(
+        node.name + "\0" + ast.dump(node, annotate_fields=True, include_attributes=False)
+        for node in functions
+    ).encode("utf-8")
+    return sha256(payload)
+
+
+def _pilot_update_algorithm_fingerprint(source: str) -> str:
+    names = {
+        "_terminal_game_reward",
+        "load_training_outcomes",
+        "owner_feature_manifest",
+        "pilot_actor_update",
+    }
+    tree = ast.parse(source)
+    functions = [
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names
+    ]
+    if {node.name for node in functions} != names:
+        raise RuntimeError("pilot actor-update lineage lacks a required training function")
+    payload = "\n".join(
+        node.name + "\0" + ast.dump(node, annotate_fields=True, include_attributes=False)
+        for node in functions
+    ).encode("utf-8")
+    return sha256(payload)
+
+
+def _verify_pilot_update_algorithm_unchanged(package: str) -> None:
+    relative = "studies/issue-84-six-arm/driver.py"
+    historical = subprocess.run(
+        ["git", "show", f"{package}:{relative}"], cwd=REPO, check=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    ).stdout
+    current = Path(__file__).read_text(encoding="utf-8")
+    if _pilot_update_algorithm_fingerprint(current) != _pilot_update_algorithm_fingerprint(historical):
+        raise RuntimeError("pilot actor-update inputs or optimizer algorithm differ from the source receipt")
 
 
 @contextmanager
 def _predecessor_source_lock(package: str):
     """Temporarily validate predecessor receipts against their archived lock."""
-    if package != PILOT_PREDECESSOR_PACKAGE:
+    lock_sha256 = next((
+        value["source_lock_sha256"]
+        for value in PILOT_CARRY_FORWARD.values()
+        if value["package"] == package
+    ), None)
+    if lock_sha256 is None:
         yield
         return
     backend = configure_backend()
     lock_path = backend.ARTIFACTS / "source-lock-history" / (
-        f"{package}-{PILOT_PREDECESSOR_LOCK_SHA256}.json"
+        f"{package}-{lock_sha256}.json"
     )
-    if not lock_path.is_file() or file_sha256(lock_path) != PILOT_PREDECESSOR_LOCK_SHA256:
+    if not lock_path.is_file() or file_sha256(lock_path) != lock_sha256:
         raise RuntimeError("pilot predecessor source-lock archive is missing or changed")
     previous_path = backend.SOURCE_LOCK
     backend.SOURCE_LOCK = lock_path
     try:
-        if backend.source_lock_sha() != PILOT_PREDECESSOR_LOCK_SHA256:
+        if backend.source_lock_sha() != lock_sha256:
             raise RuntimeError("pilot predecessor source-lock identity changed")
         yield
     finally:
@@ -1091,16 +1306,52 @@ def _predecessor_source_lock(package: str):
 
 def _verify_predecessor_lock_compatibility(
     predecessor_lock: Mapping[str, Any], current_lock: Mapping[str, Any],
+    *, package: str,
 ) -> None:
     compatible_fields = (
-        "contract_sha256", "upstream_commit", "upstream_files",
+        "contract_sha256", "upstream_commit",
         "issue73_source_snapshot", "external_runtime", "parent",
         "fixed_scales", "seed_derivation",
     )
     if any(predecessor_lock.get(key) != current_lock.get(key) for key in compatible_fields):
         raise RuntimeError("pilot predecessor changes a locked contract, runtime, or parent input")
+    predecessor_files = predecessor_lock.get("upstream_files")
+    current_files = current_lock.get("upstream_files")
+    manifest = read_json(UPSTREAM_MANIFEST_PATH)
+    manifest_file = manifest.get("files", {}).get(PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH, {})
+    overlay = manifest.get("overlays", {}).get(PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH, {})
+    if (
+        predecessor_lock.get("upstream_commit") != UPSTREAM_COMMIT
+        or current_lock.get("upstream_commit") != UPSTREAM_COMMIT
+        or not isinstance(predecessor_files, Mapping)
+        or not isinstance(current_files, Mapping)
+        or set(predecessor_files) != set(current_files)
+        or manifest_file.get("sha256") != PILOT_CANDIDATE_COVERAGE_BASE_SHA256
+        or not isinstance(overlay, Mapping)
+        or overlay.get("issue") != 84
+        or overlay.get("base_commit") != UPSTREAM_COMMIT
+        or overlay.get("base_sha256") != PILOT_CANDIDATE_COVERAGE_BASE_SHA256
+        or predecessor_files.get(PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH)
+        != PILOT_CANDIDATE_COVERAGE_BASE_SHA256
+        or current_files.get(PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH)
+        != overlay.get("sha256")
+        or any(
+            predecessor_files[path] != current_files[path]
+            for path in predecessor_files
+            if path != PILOT_CANDIDATE_COVERAGE_OVERLAY_PATH
+        )
+    ):
+        raise RuntimeError("pilot predecessor differs beyond the registered #84 scheduler overlay")
+    predecessor_spec = next((
+        value for value in PILOT_CARRY_FORWARD.values()
+        if value["package"] == package
+    ), None)
+    if predecessor_spec is None:
+        raise RuntimeError("pilot predecessor package has no registered carry-forward source lock")
+    if _historical_pilot_runtime_fingerprint(package) != predecessor_spec["runtime_ast_sha256"]:
+        raise RuntimeError("pilot predecessor episode-execution adapter differs from its registered source")
     if _pilot_runtime_fingerprint() != PILOT_PREDECESSOR_RUNTIME_AST_SHA256:
-        raise RuntimeError("pilot episode-execution adapter differs from its reviewed predecessor")
+        raise RuntimeError("current pilot adapter differs from the reviewed coverage-equivalence source")
 
 
 def _validate_carried_attempt(
@@ -1180,30 +1431,34 @@ def _pilot_training_resume(
     seed_table: Mapping[str, Any], current_lock: Mapping[str, Any],
 ) -> tuple[Path, str, dict[str, Any] | None, dict[str, Any] | None]:
     current_root = pilot_root / arm
-    if arm != "A" or package == PILOT_PREDECESSOR_PACKAGE:
+    predecessor_spec = PILOT_CARRY_FORWARD.get(arm)
+    if predecessor_spec is None or package == predecessor_spec["package"]:
         return current_root, package, None, None
 
     backend = configure_backend()
-    predecessor = PILOT_PREDECESSOR_PACKAGE
+    predecessor = str(predecessor_spec["package"])
+    predecessor_lock_sha256 = str(predecessor_spec["source_lock_sha256"])
     predecessor_root = pilot_root.parent / predecessor / arm
     predecessor_table_path = seed_table_path(predecessor)
     if not predecessor_table_path.is_file():
         raise RuntimeError("pilot predecessor seed table is missing; refusing to repeat completed games")
     predecessor_table = read_json(predecessor_table_path)
     if (
-        predecessor_table.get("source_lock_sha256") != PILOT_PREDECESSOR_LOCK_SHA256
+        predecessor_table.get("source_lock_sha256") != predecessor_lock_sha256
         or predecessor_table.get("rows") != seed_table.get("rows")
         or predecessor_table.get("rows_sha256") != sha256(canonical(predecessor_table.get("rows")))
     ):
         raise RuntimeError("pilot predecessor seed schedule differs; refusing to repeat completed games")
 
     lock_path = backend.ARTIFACTS / "source-lock-history" / (
-        f"{predecessor}-{PILOT_PREDECESSOR_LOCK_SHA256}.json"
+        f"{predecessor}-{predecessor_lock_sha256}.json"
     )
-    if not lock_path.is_file() or file_sha256(lock_path) != PILOT_PREDECESSOR_LOCK_SHA256:
+    if not lock_path.is_file() or file_sha256(lock_path) != predecessor_lock_sha256:
         raise RuntimeError("pilot predecessor source-lock archive is missing or changed")
     predecessor_lock = read_json(lock_path)
-    _verify_predecessor_lock_compatibility(predecessor_lock, current_lock)
+    _verify_predecessor_lock_compatibility(
+        predecessor_lock, current_lock, package=predecessor,
+    )
 
     prior_progress_path = pilot_root.parent / predecessor / "pilot-progress.json"
     if not prior_progress_path.is_file():
@@ -1212,13 +1467,13 @@ def _pilot_training_resume(
     prior_summary = prior_progress.get("training_runs", {}).get(arm)
     if (
         prior_progress.get("package_commit") != predecessor
-        or prior_progress.get("source_lock_sha256") != PILOT_PREDECESSOR_LOCK_SHA256
+        or prior_progress.get("source_lock_sha256") != predecessor_lock_sha256
         or not isinstance(prior_summary, dict)
         or prior_summary.get("status") != "SUCCEEDED"
         or prior_summary.get("completed") != len(rows)
         or len(rows) != 32
     ):
-        raise RuntimeError("pilot predecessor does not contain a complete arm-A training cohort")
+        raise RuntimeError(f"pilot predecessor does not contain a complete arm-{arm} training cohort")
 
     reports: dict[str, dict[str, Any]] = {}
     unit_manifest = []
@@ -1233,7 +1488,7 @@ def _pilot_training_resume(
             report, result_path = record
             unit_manifest.append(_validate_carried_attempt(
                 row, predecessor_root, report, result_path,
-                package=predecessor, source_lock_sha256=PILOT_PREDECESSOR_LOCK_SHA256,
+                package=predecessor, source_lock_sha256=predecessor_lock_sha256,
             ))
             reports[str(row["unit_id"])] = report
 
@@ -1259,9 +1514,11 @@ def _pilot_training_resume(
     manifest = {
         "schema_id": "issue84-pilot-carry-forward-v1",
         "source_package_commit": predecessor,
-        "source_lock_sha256": PILOT_PREDECESSOR_LOCK_SHA256,
+        "source_lock_sha256": predecessor_lock_sha256,
         "seed_table_rows_sha256": predecessor_table["rows_sha256"],
-        "runtime_adapter_fingerprint_sha256": PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
+        "predecessor_runtime_adapter_fingerprint_sha256": predecessor_spec["runtime_ast_sha256"],
+        "current_runtime_adapter_fingerprint_sha256": _pilot_runtime_fingerprint(),
+        "supported_projection_equivalence": "verified-by-coverage-adapter-and-locked-encoder-row-witness",
         "units": unit_manifest,
     }
     carry_forward = {
@@ -1280,6 +1537,124 @@ def _pilot_training_resume(
         },
     }
     return predecessor_root, predecessor, summary, carry_forward
+
+
+def _pilot_actor_update_resume(
+    *, arm: str, package: str, pilot_root: Path, training_root: Path,
+    training_package: str, training_carry_manifest: Mapping[str, Any] | None,
+    training_summary: Mapping[str, Any], current_lock: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    spec = PILOT_ACTOR_UPDATE_CARRY_FORWARD.get(arm)
+    if spec is None or package == spec["package"]:
+        return None
+    backend = configure_backend()
+    expected_training_root = Path("pilot") / str(spec["training_package"]) / arm
+    if (
+        training_package != spec["training_package"]
+        or training_carry_manifest is None
+        or training_carry_manifest.get("source_package_commit") != spec["training_package"]
+        or training_carry_manifest.get("source_lock_sha256") != spec["training_source_lock_sha256"]
+        or len(training_carry_manifest.get("units", [])) != 32
+        or training_summary.get("status") != "SUCCEEDED"
+        or training_summary.get("completed") != 32
+    ):
+        raise RuntimeError(f"pilot arm {arm} actor update is not bound to its retained training cohort")
+    try:
+        training_root.resolve(strict=True).relative_to(backend.ARTIFACTS.resolve(strict=True))
+    except ValueError as exc:
+        raise RuntimeError("pilot actor-update training root escapes the artifact root") from exc
+    if training_root.resolve(strict=True) != (backend.ARTIFACTS / expected_training_root).resolve(strict=True):
+        raise RuntimeError(f"pilot arm {arm} training root differs from its registered carry-forward source")
+
+    source_package = str(spec["package"])
+    source_lock_sha256 = str(spec["source_lock_sha256"])
+    lock_path = backend.ARTIFACTS / "source-lock-history" / (
+        f"{source_package}-{source_lock_sha256}.json"
+    )
+    if not lock_path.is_file() or file_sha256(lock_path) != source_lock_sha256:
+        raise RuntimeError(f"pilot arm {arm} actor-update source lock is missing or changed")
+    source_lock = read_json(lock_path)
+    _verify_predecessor_lock_compatibility(source_lock, current_lock, package=source_package)
+
+    source_root = backend.ARTIFACTS / "pilot" / source_package / arm
+    progress_path = source_root.parent / "pilot-progress.json"
+    receipt_path = source_root / "diagnostics" / "pilot-update.json"
+    model_path = source_root / "models" / "pi13.pt"
+    checkpoint_path = source_root / "models" / "blocks" / "pilot-block-00-step.pt"
+    if (
+        not source_root.is_dir()
+        or file_sha256(progress_path) != spec["progress_sha256"]
+        or file_sha256(receipt_path) != spec["receipt_sha256"]
+        or file_sha256(model_path) != spec["model_sha256"]
+        or file_sha256(checkpoint_path) != spec["checkpoint_sha256"]
+    ):
+        raise RuntimeError(f"pilot arm {arm} actor-update lineage bytes differ from the registered receipts")
+    receipt = read_json(receipt_path)
+    expected_receipt = {
+        "schema_id": "issue84-pilot-actor-update-v1",
+        "status": "SUCCEEDED",
+        "arm": arm,
+        "block_index": 0,
+        "owner_count": 32,
+        "owner_seed_sha256": spec["owner_seed_sha256"],
+        "owner_training_feature_manifest_sha256": spec["owner_training_feature_manifest_sha256"],
+        "source_model_digest": PARENT_MODEL_DIGEST,
+        "result_model_digest": spec["model_digest"],
+        "model_checkpoint": {
+            "model_digest": spec["model_digest"],
+            "path": "models/pi13.pt",
+            "sha256": spec["model_sha256"],
+        },
+        "model_checkpoint_sha256": spec["model_sha256"],
+        "optimizer_checkpoint_sha256": spec["checkpoint_sha256"],
+        "inherited_optimizer_steps": [64] * 6,
+        "result_optimizer_steps": [128] * 6,
+        "completed_steps": 64,
+        "pilot_nonformal": True,
+    }
+    if any(receipt.get(key) != value for key, value in expected_receipt.items()):
+        raise RuntimeError(f"pilot arm {arm} actor-update receipt does not match its registered source")
+    _verify_pilot_update_algorithm_unchanged(source_package)
+
+    artifact_root = source_root.relative_to(backend.ARTIFACTS).as_posix()
+    pointer = {
+        "schema_id": "issue84-pilot-actor-update-carry-forward-v1",
+        "current_package_commit": package,
+        "current_source_lock_sha256": file_sha256(SOURCE_LOCK_PATH),
+        "arm": arm,
+        "source_package_commit": source_package,
+        "source_lock_sha256": source_lock_sha256,
+        "source_progress_sha256": str(spec["progress_sha256"]),
+        "source_receipt_sha256": str(spec["receipt_sha256"]),
+        "source_artifact_root": artifact_root,
+        "training_carry_forward_manifest_sha256": training_carry_manifest["manifest_sha256"],
+        "model_sha256": str(spec["model_sha256"]),
+        "optimizer_checkpoint_sha256": str(spec["checkpoint_sha256"]),
+        "model_digest": str(spec["model_digest"]),
+        "owner_training_feature_manifest_sha256": str(spec["owner_training_feature_manifest_sha256"]),
+    }
+    carry_forward = {**pointer, "manifest_sha256": sha256(canonical(pointer))}
+    pointer_path = pilot_root / arm / "diagnostics" / "pilot-update-carry-forward.json"
+    write_json_once(pointer_path, carry_forward)
+    if read_json(pointer_path) != carry_forward:
+        raise RuntimeError(f"pilot arm {arm} actor-update pointer changed after persistence")
+    summary = {
+        "status": receipt["status"],
+        "completed_steps": int(receipt["completed_steps"]),
+        "elapsed_seconds": float(receipt["elapsed_seconds"]),
+        "model_digest": receipt["result_model_digest"],
+        "optimizer_steps": receipt["result_optimizer_steps"],
+        "checkpoint_sha256": receipt["optimizer_checkpoint_sha256"],
+        "evidence_origin": {
+            "package_commit": source_package,
+            "source_lock_sha256": source_lock_sha256,
+            "artifact_root": artifact_root,
+            "progress_sha256": str(spec["progress_sha256"]),
+            "receipt_sha256": str(spec["receipt_sha256"]),
+            "manifest_sha256": carry_forward["manifest_sha256"],
+        },
+    }
+    return summary, carry_forward
 
 
 def load_training_outcomes(rows: list[dict[str, Any]], *, root: Path, executor, package: str):
@@ -1587,6 +1962,143 @@ def discard_pilot_weights(
                 model_root.rmdir()
 
 
+def _pilot_c_attempt_lineage(
+    *, package: str, pilot_root: Path, rows: Sequence[Mapping[str, Any]],
+    seed_table: Mapping[str, Any], current_lock: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if package == PILOT_C_INTERRUPTED_ATTEMPT_PACKAGE:
+        return None
+    selected = [row for row in rows if row.get("unit_id") == "TRAIN:8480022:C"]
+    if len(selected) != 1:
+        raise RuntimeError("pilot C attempt lineage requires exactly the frozen TRAIN-8480022-C row")
+    row = dict(selected[0])
+    row_sha256 = sha256(canonical(row))
+    if row_sha256 != PILOT_C_INTERRUPTED_ATTEMPT_ROW_SHA256:
+        raise RuntimeError("pilot C interrupted attempts do not bind the registered frozen seed row")
+
+    backend = configure_backend()
+    source_package = PILOT_C_INTERRUPTED_ATTEMPT_PACKAGE
+    source_lock_sha256 = PILOT_C_INTERRUPTED_ATTEMPT_LOCK_SHA256
+    source_lock_path = backend.ARTIFACTS / "source-lock-history" / (
+        f"{source_package}-{source_lock_sha256}.json"
+    )
+    if not source_lock_path.is_file() or file_sha256(source_lock_path) != source_lock_sha256:
+        raise RuntimeError("pilot C attempt source-lock archive is missing or changed")
+    _verify_predecessor_lock_compatibility(
+        read_json(source_lock_path), current_lock, package=source_package,
+    )
+    predecessor_table_path = seed_table_path(source_package)
+    if not predecessor_table_path.is_file():
+        raise RuntimeError("pilot C interrupted-attempt seed table is missing")
+    predecessor_table = read_json(predecessor_table_path)
+    if (
+        predecessor_table.get("source_lock_sha256") != source_lock_sha256
+        or predecessor_table.get("rows") != seed_table.get("rows")
+        or predecessor_table.get("rows_sha256") != sha256(canonical(predecessor_table.get("rows")))
+        or seed_table.get("rows_sha256") != sha256(canonical(seed_table.get("rows")))
+    ):
+        raise RuntimeError("pilot C interrupted-attempt seed schedule differs from the frozen current schedule")
+
+    source_root = (backend.ARTIFACTS / "pilot" / source_package / "C").resolve(strict=True)
+    unit_root = source_root / "units" / "TRAIN-8480022-C"
+    attempt_dirs = sorted(unit_root.glob("attempt-*"))
+    expected_names = [f"attempt-{index:04d}" for index in range(1, PILOT_C_INTERRUPTED_ATTEMPT_COUNT + 1)]
+    if [path.name for path in attempt_dirs] != expected_names:
+        raise RuntimeError("pilot C interrupted-attempt lineage is not the exact registered 18+1 sequence")
+    records = []
+    for number, attempt in enumerate(attempt_dirs, start=1):
+        try:
+            attempt.resolve(strict=True).relative_to(unit_root.resolve(strict=True))
+        except ValueError as exc:
+            raise RuntimeError("pilot C attempt path escapes its frozen source root") from exc
+        start_path = attempt / "started.json"
+        job_path = attempt / "worker-job.json"
+        result_path = attempt / "result.json"
+        finish_path = attempt / "finished.json"
+        if not start_path.is_file() or not job_path.is_file():
+            raise RuntimeError(f"pilot C attempt {number} lacks its start or worker-job receipt")
+        started = read_json(start_path)
+        job = read_json(job_path)
+        expected_run_id = f"TRAIN:8480022:C-attempt-{number:04d}"
+        if (
+            started.get("schema_id") != "issue79-owner-attempt-start-v1"
+            or started.get("unit_id") != row["unit_id"]
+            or started.get("owner_seed") != row["owner_seed"]
+            or started.get("run_id") != expected_run_id
+            or started.get("package_commit") != source_package
+            or started.get("seed_row_sha256") != row_sha256
+            or job.get("schema_id") != "issue79-owner-worker-job-v1"
+            or job.get("unit_id") != row["unit_id"]
+            or job.get("run_id") != expected_run_id
+            or job.get("package_commit") != source_package
+            or job.get("source_lock_sha256") != source_lock_sha256
+            or job.get("row") != row
+        ):
+            raise RuntimeError(f"pilot C attempt {number} is not bound to the original frozen owner row/source")
+        record = {
+            "attempt_number": number,
+            "started_sha256": file_sha256(start_path),
+            "worker_job_sha256": file_sha256(job_path),
+        }
+        if number < PILOT_C_INTERRUPTED_ATTEMPT_COUNT:
+            if not result_path.is_file() or not finish_path.is_file():
+                raise RuntimeError(f"pilot C failed attempt {number} lacks its immutable result/finish pair")
+            result = read_json(result_path)
+            finished = read_json(finish_path)
+            if any(key in result for key in ("heart_victory", "terminal_floor", "terminal_outcome")):
+                raise RuntimeError("pilot C failed-attempt receipt unexpectedly contains terminal outcomes")
+            if (
+                result.get("schema_id") != "issue79-owner-attempt-result-v1"
+                or result.get("status") != "FAILED"
+                or result.get("unit_id") != row["unit_id"]
+                or result.get("owner_seed") != row["owner_seed"]
+                or result.get("run_id") != expected_run_id
+                or result.get("failure_boundary") != "StudyFailure"
+                or result.get("failure_detail") != PILOT_C_COVERAGE_FAILURE_DETAIL
+                or finished.get("schema_id") != "issue79-owner-attempt-finish-v1"
+                or finished.get("unit_id") != row["unit_id"]
+                or finished.get("run_id") != expected_run_id
+                or finished.get("status") != "FAILED"
+                or finished.get("result_sha256") != file_sha256(result_path)
+            ):
+                raise RuntimeError(f"pilot C failed attempt {number} does not match the witnessed coverage failure")
+            record.update({
+                "status": "FAILED_DETERMINISTIC_COVERAGE",
+                "result_sha256": file_sha256(result_path),
+                "finished_sha256": file_sha256(finish_path),
+            })
+        else:
+            if result_path.exists() or finish_path.exists():
+                raise RuntimeError("pilot C attempt 19 is no longer the recorded incomplete attempt")
+            record.update({
+                "status": "INCOMPLETE_UNKNOWN_TAIL",
+                "result_sha256": None,
+                "finished_sha256": None,
+            })
+        records.append(record)
+
+    payload = {
+        "schema_id": "issue84-prior-attempt-lineage-v1",
+        "package_commit": package,
+        "source_lock_sha256": file_sha256(SOURCE_LOCK_PATH),
+        "source_package_commit": source_package,
+        "source_lock_archive_sha256": source_lock_sha256,
+        "source_artifact_root": source_root.relative_to(backend.ARTIFACTS).as_posix(),
+        "unit_id": row["unit_id"],
+        "seed_row_sha256": row_sha256,
+        "prior_attempt_count": PILOT_C_INTERRUPTED_ATTEMPT_COUNT,
+        "attempts": records,
+        "attempt_19_active_wall_tail": "UNKNOWN",
+        "resume_attempt_number": PILOT_C_INTERRUPTED_ATTEMPT_COUNT + 1,
+    }
+    manifest = {**payload, "manifest_sha256": sha256(canonical(payload))}
+    path = pilot_root / "C" / "execution-lineage" / "TRAIN-8480022-C.json"
+    write_json_once(path, manifest)
+    if read_json(path) != manifest:
+        raise RuntimeError("pilot C prior-attempt lineage changed after persistence")
+    return manifest
+
+
 def run_pilot() -> dict[str, Any]:
     source = verify_source_lock(require_clean_worktree=True)
     backend = configure_backend()
@@ -1617,6 +2129,8 @@ def run_pilot() -> dict[str, Any]:
         "training_runs": {},
         "training_decision_counts": {},
         "actor_updates": {},
+        "actor_update_carry_forward_inputs": {},
+        "execution_lineage_inputs": {},
         "predictor_fits": {},
         "evaluation_runs": {},
     }
@@ -1624,6 +2138,8 @@ def run_pilot() -> dict[str, Any]:
         raise RuntimeError("pilot recovery state is bound to another source lock")
     progress.setdefault("training_decision_counts", {})
     progress.setdefault("carry_forward_inputs", {})
+    progress.setdefault("actor_update_carry_forward_inputs", {})
+    progress.setdefault("execution_lineage_inputs", {})
     clock = backend.ActiveClock("issue84-task", None)
     clock_start = clock.elapsed_before
     if "clock_elapsed_before" not in progress:
@@ -1667,6 +2183,20 @@ def run_pilot() -> dict[str, Any]:
                     backend.atomic_json(progress_path, progress)
             elif arm in progress["carry_forward_inputs"]:
                 raise RuntimeError(f"pilot progress has unexpected carry-forward provenance for arm {arm}")
+            if arm == "C":
+                lineage = _pilot_c_attempt_lineage(
+                    package=package, pilot_root=pilot_root, rows=rows,
+                    seed_table=table, current_lock=source["lock"],
+                )
+                if lineage is not None:
+                    recorded = progress["execution_lineage_inputs"].get(arm)
+                    if recorded is not None and recorded != lineage:
+                        raise RuntimeError("pilot C prior-attempt lineage changed during continuation")
+                    if recorded is None:
+                        progress["execution_lineage_inputs"][arm] = lineage
+                        backend.atomic_json(progress_path, progress)
+                elif arm in progress["execution_lineage_inputs"]:
+                    raise RuntimeError("pilot progress has unexpected C prior-attempt lineage")
             if arm not in progress["training_runs"]:
                 progress["active_stage"] = "training-games"
                 progress["active_arm"] = arm
@@ -1679,12 +2209,39 @@ def run_pilot() -> dict[str, Any]:
                     raise RuntimeError(f"pilot training games did not complete for arm {arm}: {summary['status']}")
                 progress["training_runs"][arm] = summary
                 backend.atomic_json(progress_path, progress)
+
+            actor_update_carry = _pilot_actor_update_resume(
+                arm=arm, package=package, pilot_root=pilot_root,
+                training_root=training_root, training_package=training_package,
+                training_carry_manifest=carry_manifest,
+                training_summary=progress["training_runs"][arm],
+                current_lock=source["lock"],
+            )
+            if actor_update_carry is not None:
+                carried_update, carry_manifest = actor_update_carry
+                recorded = progress["actor_update_carry_forward_inputs"].get(arm)
+                if recorded is not None and recorded != carry_manifest:
+                    raise RuntimeError(f"pilot actor-update carry-forward changed for arm {arm}")
+                if recorded is None:
+                    progress["actor_update_carry_forward_inputs"][arm] = carry_manifest
+                saved_update = progress["actor_updates"].get(arm)
+                if saved_update is not None and saved_update != carried_update:
+                    raise RuntimeError(f"pilot actor-update progress differs from retained receipt for arm {arm}")
+                if saved_update is None:
+                    progress["actor_updates"][arm] = carried_update
+                backend.atomic_json(progress_path, progress)
+            elif arm in progress["actor_update_carry_forward_inputs"]:
+                raise RuntimeError(f"pilot progress has unexpected actor-update carry-forward for arm {arm}")
+
             algorithm, runtime, model, learning, executor = load_modules(root, pilot=True)
-            with _predecessor_source_lock(training_package):
-                examples, outcomes = load_training_outcomes(
-                    rows, root=training_root, executor=executor, package=training_package,
-                )
-            decision_count = sum(len(outcome.decisions) for outcome in outcomes)
+            if actor_update_carry is not None:
+                decision_count = int(PILOT_ACTOR_UPDATE_CARRY_FORWARD[arm]["decision_count"])
+            else:
+                with _predecessor_source_lock(training_package):
+                    examples, outcomes = load_training_outcomes(
+                        rows, root=training_root, executor=executor, package=training_package,
+                    )
+                decision_count = sum(len(outcome.decisions) for outcome in outcomes)
             if arm in progress["training_decision_counts"]:
                 if int(progress["training_decision_counts"][arm]) != decision_count:
                     raise RuntimeError(f"pilot training feature count changed for arm {arm}")
@@ -1692,6 +2249,8 @@ def run_pilot() -> dict[str, Any]:
                 progress["training_decision_counts"][arm] = decision_count
                 backend.atomic_json(progress_path, progress)
             if arm not in progress["actor_updates"]:
+                if actor_update_carry is not None:
+                    raise RuntimeError(f"pilot actor update carry-forward was not recorded for arm {arm}")
                 progress["active_stage"] = "actor-update"
                 progress["active_arm"] = arm
                 backend.atomic_json(progress_path, progress)
@@ -1779,6 +2338,8 @@ def run_pilot() -> dict[str, Any]:
         "training_runs": progress["training_runs"],
         "evaluation_runs": progress["evaluation_runs"],
         "actor_updates": progress["actor_updates"],
+        "actor_update_carry_forward_inputs": progress["actor_update_carry_forward_inputs"],
+        "execution_lineage_inputs": progress["execution_lineage_inputs"],
         "lagged_predictor_fits": progress["predictor_fits"],
         "pilot_weights_discarded": True,
         "discarded_pilot_weights": discarded,
