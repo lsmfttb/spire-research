@@ -11,12 +11,12 @@ python evidence/issue-84-wall-reforecast/reforecast.py --self-test
 python evidence/issue-84-wall-reforecast/reforecast.py --repo-root . --artifacts-root 'D:\DeadlycatCoding\stsrl-data\issue84\artifacts'
 ```
 
-The second command is a read-only dry run. After this producer is committed, `--write` creates two **new** files with exclusive create semantics:
+The second command is a read-only dry run. After this producer is committed, `--write` creates two **new, versioned** files with exclusive create semantics:
 
-- `pilot/23b21a1205426e2a26ab65bc8535bcf48b89dcf0/task-wall-forecast-correction-v2.json`
-- `pilot/23b21a1205426e2a26ab65bc8535bcf48b89dcf0/pilot-weight-retention-v1.json`
+- `pilot/23b21a1205426e2a26ab65bc8535bcf48b89dcf0/task-wall-forecast-correction-v3.json`
+- `pilot/23b21a1205426e2a26ab65bc8535bcf48b89dcf0/pilot-weight-retention-v2.json`
 
-It refuses to replace existing different bytes. It verifies the locked pilot/report/forecast hashes and source lock before it calculates anything.
+The v2 forecast correction and v1 retention receipt already appended by the first producer are invalid JSON (their final bytes are a literal `\\n`). They remain preserved byte-for-byte; the producer verifies their exact hashes and records their invalid-JSON status before writing newly named replacements. It refuses to replace existing different bytes. JSON serialization is round-trip parsed before writing and each written file is parsed and hash-checked afterward. The producer also verifies the locked pilot/report/forecast hashes and source lock before it calculates anything.
 
 ## How the reforecast separates cost
 
@@ -27,6 +27,10 @@ The registered formal execution is estimated as sequential training then evaluat
 Predictor cost is split into model-fit and feature-cache build time. It scales with the registered 15,360 cumulative prior-owner presentations per model over all lagged blocks, at frozen `T_REF=36.6474609375`: four fits (D-V, E-V, E-Q, F-V) and three shared actor feature caches (D, E, F). This is an explicit linear-row assumption, not a new fit.
 
 The actual pilot cumulative wall clock is carried forward once. The v1 `legacy_unallocated_residual_seconds` is preserved but not scaled by game count: its old calculation subtracts summed invocation timers despite the pilot's concurrent training/evaluation intervals. Known deterministic C failures and PARENT pre-start failures are recorded as pilot-only recovery; C attempt-19 remains `UNKNOWN`. The final pilot closeout increment is used once as a future task-level proxy.
+
+The current standard session receipts union to 5,414.900210 seconds; the prior accounting correction contributes 177.328430 seconds already applied once. Against the 5,624.912292-second active clock, **32.683652 seconds remain unresolved** (rounded to microseconds). No immutable record isolates this difference. The receipt marks it unresolved, carries it in the measured pilot clock in every scenario, and identifies it within the task-level unallocatable-residual sensitivity. It is neither set to zero nor added a second time. Scenario fields show the unresolved portion of the residual sensitivity separately from the remainder as an accounting presentation split.
+
+Actual training/evaluation game-time overlap is now computed as the interval intersection of the merged training and evaluation attempt intervals. The separate sum-of-invocation-envelopes minus joint interval union is retained under a name that describes that calculation; it is not labeled as pure cross-phase overlap.
 
 ## Scenarios and limits
 

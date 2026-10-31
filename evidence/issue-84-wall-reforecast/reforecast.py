@@ -18,6 +18,10 @@ TREF = 36.6474609375
 TRAIN_GAMES, EVAL_GAMES = 12_288, 3_456
 TRAIN_BLOCKS, EVAL_INVOCATIONS = 96, 26
 PRIOR_OWNERS_PER_MODEL = 15_360
+SUPERSEDED_OUTPUTS = {
+    "task-wall-forecast-correction-v2.json": "ae6d14870e2709dbf1d4d7d1595246dd35538c8cda7abc966ef98d6b0037014f",
+    "pilot-weight-retention-v1.json": "f27fe5bf13ec42905f43ce8f09ff52ac7ed5c1bc44c6093a0eff08da29772e60",
+}
 
 
 def stop(message):
@@ -59,6 +63,34 @@ def union_seconds(intervals):
             result += (end - start).total_seconds()
             start, end = s, e
     return result + (end - start).total_seconds()
+
+
+def merged_intervals(intervals):
+    spans = sorted((s, e) for s, e in intervals if e > s)
+    if not spans:
+        return []
+    merged = [list(spans[0])]
+    for start, end in spans[1:]:
+        if start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return [(start, end) for start, end in merged]
+
+
+def intersection_seconds(left, right):
+    a, b = merged_intervals(left), merged_intervals(right)
+    i = j = 0
+    total = 0.0
+    while i < len(a) and j < len(b):
+        start, end = max(a[i][0], b[j][0]), min(a[i][1], b[j][1])
+        if end > start:
+            total += (end - start).total_seconds()
+        if a[i][1] <= b[j][1]:
+            i += 1
+        else:
+            j += 1
+    return total
 
 
 def secs(value):
@@ -265,7 +297,7 @@ def produce(repo, artifacts):
     if report.get("validation_or_test_started") is not False:
         stop("pilot receipt no longer confirms validation/test were not started")
 
-    trains, evals, all_game_intervals, game_hashes = {}, {}, [], []
+    trains, evals, train_game_intervals, eval_game_intervals, game_hashes = {}, {}, [], [], []
     train_env, train_timer, train_setup = 0.0, 0.0, 0.0
     eval_env, eval_timer, eval_setup = 0.0, 0.0, 0.0
     for arm in ARMS:
@@ -274,7 +306,7 @@ def produce(repo, artifacts):
             stop(f"training arm {arm} incomplete")
         root = artifacts / Path(run["evidence_origin"]["artifact_root"])
         spans, receipt_hashes = game_receipts(root, "TRAIN-", 32)
-        all_game_intervals.extend(spans)
+        train_game_intervals.extend(spans)
         game_hashes.extend(receipt_hashes)
         start, end = min(s for s, _ in spans), max(e for _, e in spans)
         env, timer = (end-start).total_seconds(), float(run["elapsed_seconds"])
@@ -291,7 +323,7 @@ def produce(repo, artifacts):
         if run.get("status") != "SUCCEEDED" or int(run.get("completed", 0)) != 8:
             stop(f"evaluation group {arm} incomplete")
         spans, receipt_hashes = game_receipts(current / arm, "EVAL-", 8)
-        all_game_intervals.extend(spans)
+        eval_game_intervals.extend(spans)
         game_hashes.extend(receipt_hashes)
         start, end = min(s for s, _ in spans), max(e for _, e in spans)
         env, timer = (end-start).total_seconds(), float(run["elapsed_seconds"])
@@ -306,7 +338,14 @@ def produce(repo, artifacts):
 
     pilot_clock = float(clock["elapsed_seconds"])
     sessions = session_summary(artifacts)
+    failures, lineage_hashes = failure_evidence(artifacts, current)
+    correction_seconds = float(failures["prior_accounting_correction"]["net_seconds_already_applied_once"])
+    unresolved_clock_difference = pilot_clock - float(sessions["timestamp_union_seconds"]) - correction_seconds
+    if unresolved_clock_difference < 0:
+        stop("session union plus applied correction exceeds the active clock")
+    all_game_intervals = train_game_intervals + eval_game_intervals
     game_union = union_seconds(all_game_intervals)
+    actual_phase_overlap = intersection_seconds(train_game_intervals, eval_game_intervals)
     actor = progress["actor_updates"]
     if set(actor) != set(ARMS) or any(x.get("status") != "SUCCEEDED" for x in actor.values()):
         stop("actor-update evidence changed")
@@ -329,7 +368,8 @@ def produce(repo, artifacts):
     legacy_stages = sum(float(old[k]) for k in (
         "pilot_game_stage_wall_seconds", "pilot_actor_update_wall_seconds", "pilot_predictor_fit_wall_seconds"))
     legacy_residual = max(0.0, float(old["pilot_task_cumulative_active_wall_seconds"])-legacy_stages)
-    failures, lineage_hashes = failure_evidence(artifacts, current)
+    if unresolved_clock_difference > legacy_residual:
+        stop("unresolved active-clock difference is not bounded by the legacy residual")
     scenario_specs = {"low": (0.0, 0.0), "base": (0.25, 0.25), "high": (1.0, 0.50)}
     scenarios = {}
     for name, (residual_fraction, margin_fraction) in scenario_specs.items():
@@ -343,6 +383,11 @@ def produce(repo, artifacts):
             "judgmental_margin_seconds": secs(margin),
             "legacy_task_residual_repeat_fraction": residual_fraction,
             "legacy_task_residual_repeated_once_at_task_level_seconds": secs(legacy_residual*residual_fraction),
+            "legacy_task_residual_repeat_components_seconds": {
+                "unresolved_active_clock_difference": secs(unresolved_clock_difference*residual_fraction),
+                "remainder_after_identifying_unresolved_difference": secs((legacy_residual-unresolved_clock_difference)*residual_fraction),
+                "interpretation": "presentation-only additive split of the whole legacy residual sensitivity; the unresolved difference remains in measured pilot wall too",
+            },
             "whole_task_active_wall_forecast_seconds": secs(whole),
             "whole_task_active_wall_forecast_hours": secs(whole/3600),
             "candidate_150pct_allowance_not_installed_seconds": secs(whole*1.5),
@@ -360,18 +405,31 @@ def produce(repo, artifacts):
         "correction_receipt": digest(correction_path),
         "complete_game_attempt_receipt_hash_set": hashlib.sha256("".join(sorted(game_hashes)).encode("ascii")).hexdigest(),
     }
+    superseded_records = {}
+    for filename, expected in SUPERSEDED_OUTPUTS.items():
+        path = current / filename
+        if not path.is_file() or digest(path) != expected:
+            stop(f"superseded invalid receipt missing or changed: {path}")
+        try:
+            json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            superseded_records[filename] = {"sha256": expected, "json_parse_status": "INVALID_JSON_PRESERVED"}
+        else:
+            stop(f"expected preserved invalid JSON receipt, found parseable file: {path}")
+        report_hashes[f"superseded_{filename}"] = expected
     producer = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
                               check=True, capture_output=True, text=True).stdout.strip()
     script = Path(__file__).resolve()
     assumptions = script.with_name("ASSUMPTIONS.md")
     receipts = {
-        "schema_id": "issue84-source-locked-wall-reforecast-v2",
+        "schema_id": "issue84-source-locked-wall-reforecast-v3",
         "status": "EVIDENCE_ONLY_PENDING_INDEPENDENT_REVIEW_AND_PLANNER_FEASIBILITY",
         "study_only": True, "formal_seeds_authorized": False, "formal_seeds_started": False,
         "source_lock_sha256": LOCK, "pilot_package_commit": PACKAGE, "producer_commit": producer,
         "producer_file_sha256": {str(script.relative_to(repo)): digest(script),
                                  str(assumptions.relative_to(repo)): digest(assumptions)},
         "input_sha256": report_hashes,
+        "superseded_invalid_json_receipts": superseded_records,
         "immutable_original_receipts": {
             "report_sha256": REPORT_SHA, "progress_sha256": PROGRESS_SHA, "forecast_sha256": FORECAST_SHA,
             "forecast_modified": False, "active_clock_allowance_seconds": clock.get("allowance_seconds"),
@@ -381,6 +439,12 @@ def produce(repo, artifacts):
             "clock_seconds_before_final_closeout": secs(progress["clock_elapsed_before"]),
             "final_incremental_closeout_proxy_seconds": secs(closeout_proxy),
             "active_wall_session_receipts": sessions,
+            "session_union_correction_reconciliation": {
+                "session_receipt_timestamp_union_seconds": sessions["timestamp_union_seconds"],
+                "prior_accounting_correction_seconds_already_applied_once": secs(correction_seconds),
+                "unresolved_active_clock_difference_seconds": secs(unresolved_clock_difference),
+                "treatment": "UNRESOLVED; included in cumulative active clock and named within the task-level unallocatable-residual sensitivity; not zeroed or added a second time",
+            },
             "complete_game_interval_union_seconds": secs(game_union),
             "wall_counter_minus_game_union_seconds": secs(max(0.0, pilot_clock-game_union)),
             "legacy_unallocated_residual_seconds": secs(legacy_residual),
@@ -397,7 +461,8 @@ def produce(repo, artifacts):
             "training_groups": trains, "evaluation_groups": evals,
             "game_attempt_interval_union_seconds": secs(game_union),
             "separate_training_and_evaluation_invocation_envelopes_seconds": secs(train_env+eval_env),
-            "cross_phase_interval_overlap_seconds": secs(train_env+eval_env-game_union),
+            "training_vs_evaluation_game_interval_intersection_seconds": secs(actual_phase_overlap),
+            "sum_of_per_invocation_envelopes_minus_joint_game_interval_union_seconds": secs(train_env+eval_env-game_union),
             "pilot_training_run_timer_sum_seconds": secs(train_timer),
             "pilot_training_game_envelopes_sum_seconds": secs(train_env),
             "pilot_training_launch_setup_seconds": secs(train_setup),
@@ -423,10 +488,11 @@ def produce(repo, artifacts):
         ],
     }
     retention = {
-        "schema_id": "issue84-pilot-weight-retention-v1",
+        "schema_id": "issue84-pilot-weight-retention-v2",
         "status": "CHECKPOINTS_HASH_VERIFIED_AS_IMMUTABLE_PROVENANCE",
         "pilot_package_commit": PACKAGE, "source_lock_sha256": LOCK, "producer_commit": producer,
         "producer_file_sha256": receipts["producer_file_sha256"], "input_sha256": report_hashes,
+        "superseded_invalid_json_receipt": superseded_records["pilot-weight-retention-v1.json"],
         "retention_policy": {
             "discard_means": "exclude from formal initialization, selection, evaluation, and promotion; do not delete",
             "current_package_local_discard_inventory": 0,
@@ -446,7 +512,10 @@ def produce(repo, artifacts):
 
 
 def encode(obj):
-    return (json.dumps(obj, ensure_ascii=False, sort_keys=True, indent=2) + "\\n").encode("utf-8")
+    encoded = (json.dumps(obj, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+    if json.loads(encoded.decode("utf-8")) != obj:
+        stop("serialized JSON does not round-trip to the source object")
+    return encoded
 
 
 def write_once(path, content):
@@ -463,7 +532,12 @@ def self_test():
     t = datetime(2026, 1, 1, tzinfo=timezone.utc)
     assert union_seconds([(t,t+timedelta(seconds=10)),(t+timedelta(seconds=5),t+timedelta(seconds=15))]) == 15
     assert union_seconds([(t,t+timedelta(seconds=10)),(t+timedelta(seconds=10),t+timedelta(seconds=15))]) == 15
-    print("self-test passed: concurrent intervals are counted once")
+    assert intersection_seconds([(t,t+timedelta(seconds=10)),(t+timedelta(seconds=20),t+timedelta(seconds=30))],
+                                [(t+timedelta(seconds=5),t+timedelta(seconds=25))]) == 10
+    payload = {"serialization": "json", "value": [0, 1.25]}
+    encoded = encode(payload)
+    assert encoded.endswith(b"\n") and json.loads(encoded) == payload
+    print("self-test passed: interval union/intersection and JSON round-trip")
 
 
 def main():
@@ -481,8 +555,8 @@ def main():
     repo, artifacts = args.repo_root.resolve(), args.artifacts_root.resolve()
     forecast, retention = produce(repo, artifacts)
     outroot = artifacts / PILOT
-    outputs = [(outroot/"task-wall-forecast-correction-v2.json", encode(forecast)),
-               (outroot/"pilot-weight-retention-v1.json", encode(retention))]
+    outputs = [(outroot/"task-wall-forecast-correction-v3.json", encode(forecast)),
+               (outroot/"pilot-weight-retention-v2.json", encode(retention))]
     subtotal = forecast["formal_component_estimates_seconds"]["measured_formal_subtotal"]
     print("Issue 84 evidence-only reforecast; no formal seeds/games/training/fitting.")
     print(f"measured formal subtotal: {subtotal:.3f} s ({subtotal/3600:.3f} h)")
@@ -496,7 +570,11 @@ def main():
     if args.write:
         for path, data in outputs:
             write_once(path, data)
-        print("new receipts appended; original receipts/checkpoints/clock unchanged")
+            actual = path.read_bytes()
+            json.loads(actual.decode("utf-8"))
+            if actual != data or hashlib.sha256(actual).hexdigest() != hashlib.sha256(data).hexdigest():
+                stop(f"written receipt verification mismatch: {path}")
+        print("new parseable receipts appended; original receipts/checkpoints/clock unchanged")
     else:
         print("dry run only; no files written")
     return 0
