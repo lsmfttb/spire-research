@@ -332,6 +332,19 @@ def load_modules(active_root: Path, *, pilot: bool):
     algorithm, runtime, model, learning, executor = BACKEND_ORIGINAL_LOAD_MODULES(
         Path(active_root), pilot=pilot,
     )
+    # The vendored #75 config records an absolute path from the original host.
+    # Preserve its source hash, but adapt only that machine-specific path to the
+    # task's explicitly locked D:-backed WSL location and verify the same bytes.
+    def verify_locked_native_module(config: Mapping[str, Any]) -> Path:
+        source = config.get("source", {})
+        if source.get("native_module_sha256") != NATIVE_SHA256:
+            raise RuntimeError("vendored config native digest differs from the Issue 84 source lock")
+        native_path = host_path(NATIVE_WSL).resolve(strict=True)
+        if not native_path.is_file() or file_sha256(native_path) != NATIVE_SHA256:
+            raise RuntimeError("D:-backed native module bytes differ from the Issue 84 source lock")
+        return native_path
+
+    runtime.verify_native_module = verify_locked_native_module
     old_model_path = executor._model_path
     old_load_model = executor._load_model
 
