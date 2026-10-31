@@ -1,0 +1,2631 @@
+"""Stage 1 source binding, CPU ledger, and Linux process-tree watchdog."""
+from __future__ import annotations
+from dataclasses import dataclass
+import ctypes
+import errno
+import fcntl
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import resource
+import signal
+import subprocess
+import threading
+import time
+from typing import Any, Mapping, Sequence
+
+COST_MODEL_BUILDER_LIMIT = 170_000
+COST_MODEL_ALL_IN_LIMIT = 180_000
+RESOURCE_BUDGET_AMENDMENT = {
+    "schema_id": "issue75-resource-budget-amendment-v1",
+    "planner_decision_comment_id": 6461623049,
+    "base_package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+    "base_source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+    "previous_limits_cpu_seconds": {
+        "builder": COST_MODEL_BUILDER_LIMIT,
+        "reviewer_protected": 10_000,
+        "all_in": COST_MODEL_ALL_IN_LIMIT,
+    },
+    "limits_cpu_seconds": {
+        "builder": 180_000,
+        "reviewer_protected": 10_000,
+        "all_in": 190_000,
+    },
+    "search_call_cpu_cap_seconds": 32,
+    "search_call_started_attempt_cap": 16,
+}
+BUILDER_LIMIT = RESOURCE_BUDGET_AMENDMENT["limits_cpu_seconds"]["builder"]
+REVIEWER_LIMIT = RESOURCE_BUDGET_AMENDMENT["limits_cpu_seconds"]["reviewer_protected"]
+ALL_IN_LIMIT = RESOURCE_BUDGET_AMENDMENT["limits_cpu_seconds"]["all_in"]
+PRIOR_USE_CPU_ACCOUNTING = {
+    "observed_unledgered_builder_cpu_seconds_approx": 18.0,
+    "conservative_allowance_cpu_seconds": 20.0,
+    "ledger_event_added": False,
+}
+PRIOR_USE_CPU_ALLOWANCE_SECONDS = float(
+    PRIOR_USE_CPU_ACCOUNTING["conservative_allowance_cpu_seconds"]
+)
+PRIOR_USE_CPU_ACCOUNTING_AMENDMENT = {
+    "schema_id": "issue75-prior-use-cpu-accounting-v1",
+    "review_comment_id": 6462545745,
+    "base_package_commit": "217eb80567c88460b6ce5d6c02fd7a4d262a5d19",
+    "base_source_lock_sha256": "315913d54f0dec754b24dec4e45194dfcbd751250df497ff03a447dc66e1450e",
+    "accounting": PRIOR_USE_CPU_ACCOUNTING,
+}
+SEARCH_CPU_CAP_SECONDS = 32.0
+SEARCH_ATTEMPT_CAP = 16
+PR_SET_CHILD_SUBREAPER = 36
+PR_GET_CHILD_SUBREAPER = 37
+STUDY = Path(__file__).resolve().parent
+STAGE1 = STUDY / "stage1"
+LOCKED_PACKAGE_FILES = (
+    "config.json",
+    "algorithm.py",
+    "learning.py",
+    "model.py",
+    "native_negative.py",
+    "preflight.py",
+    "runtime.py",
+    "stage0.py",
+    "test_issue75_contract.py",
+    "planning/build_stage1_cost_model.py",
+    "planning/stage1-cost-model.json",
+    "planning/stage1-cost-model.md",
+    "stage1_budget.py",
+    "stage1/config.json",
+    "stage1/preflight-proxy.json",
+    "stage1/seed-table.json",
+    "stage1/budget.json",
+    "stage1/prepare.py",
+    "stage1/executor.py",
+    "stage1/test_activation.py",
+    "stage1/test_executor.py",
+    "stage1/block0-repair-lineage.json",
+    "stage1/block0-decoder-compatibility.json",
+    "stage1/update0-seed-failure-continuation.json",
+)
+LOCKED_REPOSITORY_DEPENDENCIES = (
+    "studies/issue-73-privileged-noncombat-oracle-stage0/runner.py",
+    "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
+)
+
+
+def canonical(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
+
+
+def sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def artifact_bytes_for_hash(path: Path, value: bytes) -> bytes:
+    # Normalize text receipts to LF while preserving binary checkpoint bytes.
+    if Path(path).suffix.lower() in {".json", ".jsonl", ".txt"}:
+        return value.replace(b"\r\n", b"\n")
+    return value
+
+
+def artifact_sha256(path: Path, value: bytes | None = None) -> str:
+    path = Path(path)
+    if value is None and path.suffix.lower() not in {".json", ".jsonl", ".txt"}:
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+        return digest.hexdigest()
+    data = path.read_bytes() if value is None else value
+    return sha256_bytes(artifact_bytes_for_hash(path, data))
+
+
+def _normalized_file_sha256(path: Path) -> str:
+    return sha256_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
+
+
+def normalized_file_sha256(path: Path) -> str:
+    return _normalized_file_sha256(path)
+
+
+def verify_stage1_package() -> dict[str, Any]:
+    """Verify the registered source package and its explicit executable phase set."""
+    lock_path = STAGE1 / "source-lock.json"
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    if (
+        lock.get("schema_id") != "issue75-stage1-source-lock-v1"
+        or lock.get("study_id") != "issue-75-no-expert-oracle"
+        or lock.get("scope") != "STUDY_ONLY"
+        or lock.get("execution_authorized") is not True
+        or lock.get("package_status") not in {
+            "PREFLIGHT_ONLY_ENABLED", "FORMAL_TRAINING_ENABLED", "FORMAL_EXECUTION_ENABLED",
+        }
+        or lock.get("formal_seeds_or_games_consumed") != 0
+        or lock.get("native_sampling_performed") is not False
+        or lock.get("model_training_performed") is not False
+    ):
+        raise PermissionError("Stage 1 source lock is not a valid registered executable package")
+    if lock.get("resource_budget_amendment") != RESOURCE_BUDGET_AMENDMENT:
+        raise PermissionError("Stage 1 source lock does not bind the approved one-time resource-cap amendment")
+    if lock.get("prior_use_cpu_accounting_amendment") != PRIOR_USE_CPU_ACCOUNTING_AMENDMENT:
+        raise PermissionError("Stage 1 source lock does not bind the reviewed prior-use CPU allowance")
+
+    files = lock.get("locked_files_sha256_lf")
+    if not isinstance(files, dict) or set(files) != set(LOCKED_PACKAGE_FILES):
+        raise PermissionError("Stage 1 lock does not cover the exact registered package file set")
+    for relative, expected in files.items():
+        path = (STUDY / relative).resolve()
+        if not path.is_relative_to(STUDY.resolve()) or not path.is_file():
+            raise PermissionError(f"locked Stage 1 package file is unavailable: {relative}")
+        if not isinstance(expected, str) or _normalized_file_sha256(path) != expected:
+            raise PermissionError(f"Stage 1 package source lock mismatch: {relative}")
+
+    repository_dependencies = lock.get("locked_repository_dependencies_sha256_lf")
+    if not isinstance(repository_dependencies, dict) or set(repository_dependencies) != set(LOCKED_REPOSITORY_DEPENDENCIES):
+        raise PermissionError("Stage 1 lock does not cover the exact Issue 73 runtime dependencies")
+    repository_root = STUDY.parents[1].resolve()
+    for relative, expected in repository_dependencies.items():
+        path = (repository_root / relative).resolve()
+        if not path.is_relative_to(repository_root) or not path.is_file():
+            raise PermissionError(f"Stage 1 repository dependency is unavailable: {relative}")
+        if not isinstance(expected, str) or _normalized_file_sha256(path) != expected:
+            raise PermissionError(f"Stage 1 repository dependency source-lock mismatch: {relative}")
+
+    config = json.loads((STAGE1 / "config.json").read_text(encoding="utf-8"))
+    budget_config = json.loads((STAGE1 / "budget.json").read_text(encoding="utf-8"))
+    if budget_config.get("prior_unledgered_builder_cpu_use") != PRIOR_USE_CPU_ACCOUNTING:
+        raise PermissionError("Stage 1 budget config does not match its reviewed prior-use CPU allowance")
+    execution = config.get("execution")
+    resources = config.get("resources")
+    if not isinstance(resources, dict) or {
+        "builder_process_tree_cpu_hard_seconds": resources.get("builder_process_tree_cpu_hard_seconds"),
+        "reviewer_cpu_protected_seconds": resources.get("reviewer_cpu_protected_seconds"),
+        "all_in_cpu_hard_seconds": resources.get("all_in_cpu_hard_seconds"),
+    } != {
+        "builder_process_tree_cpu_hard_seconds": BUILDER_LIMIT,
+        "reviewer_cpu_protected_seconds": REVIEWER_LIMIT,
+        "all_in_cpu_hard_seconds": ALL_IN_LIMIT,
+    }:
+        raise PermissionError("Stage 1 config does not match the amended resource hard limits")
+    if not isinstance(execution, dict):
+        raise PermissionError("Stage 1 package has no execution phase declaration")
+    stage1_enabled = execution.get("stage1_execution_authorized")
+    preflight_enabled = execution.get("nonformal_preflight_enabled")
+    native_enabled = execution.get("native_sampling_enabled")
+    training_enabled = execution.get("formal_training_enabled")
+    evaluation_enabled = execution.get("formal_evaluation_enabled")
+    if any(type(value) is not bool for value in (
+        stage1_enabled, preflight_enabled, native_enabled, training_enabled, evaluation_enabled,
+    )):
+        raise PermissionError("Stage 1 execution flags must be explicit booleans")
+    expected_phases = []
+    if stage1_enabled and preflight_enabled and native_enabled:
+        expected_phases.append("preflight")
+    if stage1_enabled and training_enabled:
+        expected_phases.append("train")
+    if stage1_enabled and evaluation_enabled:
+        expected_phases.append("evaluate")
+    if not expected_phases or expected_phases[0] != "preflight" or (
+        evaluation_enabled and not training_enabled
+    ) or execution.get("authorized_phases") != expected_phases:
+        raise PermissionError("Stage 1 package execution phase list is invalid")
+    expected_status = (
+        "PREFLIGHT_ONLY_ENABLED" if expected_phases == ["preflight"] else
+        "FORMAL_TRAINING_ENABLED" if expected_phases == ["preflight", "train"] else
+        "FORMAL_EXECUTION_ENABLED" if expected_phases == ["preflight", "train", "evaluate"] else None
+    )
+    if expected_status is None or execution.get("package_status") != expected_status or lock.get("package_status") != expected_status:
+        raise PermissionError("Stage 1 package status does not match its enabled execution phases")
+
+    for relative, field in (
+        ("stage1/config.json", "stage1_config_sha256"),
+        ("stage1/seed-table.json", "seed_table_sha256"),
+        ("stage1/budget.json", "budget_config_sha256"),
+    ):
+        if lock.get(field) != _normalized_file_sha256(STUDY / relative):
+            raise PermissionError(f"Stage 1 lock does not bind its registered input: {relative}")
+    table = json.loads((STAGE1 / "seed-table.json").read_text(encoding="utf-8"))
+    rows = table.get("rows", [])
+    units = [row.get("unit_id") for row in rows]
+    if (
+        len(rows) != 1032 or len(set(units)) != 1032 or any(not unit for unit in units)
+        or table.get("counts") != {
+            "training_owners": 512, "heldout_owner_arm_rows": 480,
+            "preflight_owner_arm_rows": 40, "preflight_arm_schedule": ["P0", "P1", "R", "J", "E"],
+            "preflight_is_nonformal_and_never_enters_efficacy": True,
+        }
+    ):
+        raise PermissionError("Stage 1 package has an incomplete or changed owner/arm schedule")
+    budget = json.loads((STAGE1 / "budget.json").read_text(encoding="utf-8"))
+    if (
+        budget.get("stage1_execution_authorized") is not True
+        or budget.get("ledger_status") != "PREFLIGHT_COMPLETE_ACCEPTED_FORMAL_PROSPECTIVE"
+        or budget.get("limits_cpu_seconds") != {
+            "builder": BUILDER_LIMIT, "reviewer_protected": REVIEWER_LIMIT, "all_in": ALL_IN_LIMIT,
+        }
+        or budget.get("reviewer_reserve_transferable_to_builder") is not False
+        or budget.get("search_call_cpu_cap_seconds") != SEARCH_CPU_CAP_SECONDS
+        or budget.get("search_call_started_attempt_cap") != SEARCH_ATTEMPT_CAP
+        or type(budget.get("concurrent_stage1_process_trees")) is not int
+        or budget.get("concurrent_stage1_process_trees") != 1
+        or execution.get("max_concurrent_owner_process_trees") != 1
+        or execution.get("torch_intraop_threads") != 1
+        or execution.get("torch_interop_threads") != 1
+    ):
+        raise PermissionError("Stage 1 budget does not match the registered hard limits")
+    sidecar = (STAGE1 / "source-lock.sha256").read_text(encoding="ascii").split()
+    lock_digest = _normalized_file_sha256(lock_path)
+    if not sidecar or sidecar[0] != lock_digest:
+        raise PermissionError("Stage 1 source-lock sidecar mismatch")
+    return lock
+
+
+def verify_stage1_phase(phase: str) -> None:
+    """Refuse any phase not explicitly enabled by the locked Stage 1 package.
+
+    Owner jobs use canonical seed-table phases internally. CLI phase names remain
+    the registered short aliases so launcher behavior and the scientific roster
+    are unchanged.
+    """
+    phase = {"training": "train", "heldout": "evaluate"}.get(phase, phase)
+    if phase not in {"preflight", "train", "evaluate", "update"}:
+        raise ValueError(f"unknown Stage 1 phase: {phase}")
+    config = json.loads((STAGE1 / "config.json").read_text(encoding="utf-8"))
+    execution = config["execution"]
+    target = "train" if phase == "update" else phase
+    if target not in execution["authorized_phases"]:
+        raise PermissionError(f"Stage 1 phase is not enabled by the locked package: {phase}")
+
+
+@dataclass(frozen=True)
+class PackageBinding:
+    package_commit: str
+    source_lock_sha256: str
+
+
+def _current_package_binding() -> tuple[str, str]:
+    """Lock executable inputs while permitting only append-only tracked ledger events."""
+    verify_stage1_package()
+    ledger_relative = "studies/issue-75-no-expert-oracle/stage1/artifacts/ledger/events.jsonl"
+    repository_root = STUDY.parents[1].resolve(strict=True)
+    ledger_path = repository_root
+    parts = Path(ledger_relative).parts
+    for index, part in enumerate(parts):
+        ledger_path = ledger_path / part
+        if ledger_path.is_symlink():
+            raise PermissionError("tracked Stage 1 ledger path contains a symlink")
+        if index < len(parts) - 1 and not ledger_path.is_dir():
+            raise PermissionError("tracked Stage 1 ledger parent directory is missing or replaced")
+    if not ledger_path.is_file():
+        raise PermissionError("tracked Stage 1 ledger file is missing or replaced")
+    try:
+        resolved_ledger_path = ledger_path.resolve(strict=True)
+    except OSError as exc:
+        raise PermissionError("tracked Stage 1 ledger file cannot be resolved") from exc
+    if resolved_ledger_path != ledger_path or not resolved_ledger_path.is_relative_to(repository_root):
+        raise PermissionError("tracked Stage 1 ledger resolves outside its exact repository path")
+
+    tracked_index = subprocess.run(
+        ["git", "ls-files", "--stage", "--", ledger_relative],
+        cwd=repository_root, check=False, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True,
+    )
+    if tracked_index.returncode != 0 or not isinstance(tracked_index.stdout, str):
+        raise PermissionError("Stage 1 ledger is not one exact tracked repository file")
+    index_rows = [line for line in tracked_index.stdout.splitlines() if line]
+    if len(index_rows) != 1:
+        raise PermissionError("Stage 1 ledger is not one exact tracked repository file")
+    index_metadata, separator, index_path = index_rows[0].partition("\t")
+    index_fields = index_metadata.split()
+    if (
+        not separator or index_path.replace("\\", "/") != ledger_relative
+        or len(index_fields) != 3 or index_fields[0] != "100644" or index_fields[2] != "0"
+    ):
+        raise PermissionError("Stage 1 ledger is missing, replaced, or not a regular tracked file")
+
+    working_tree = subprocess.run(
+        ["git", "diff", "--no-ext-diff", "--no-renames", "--name-status", "HEAD", "--", "."],
+        cwd=repository_root, check=False, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True,
+    )
+    if working_tree.returncode != 0 or not isinstance(working_tree.stdout, str):
+        raise PermissionError("cannot verify Stage 1 source immutability")
+    changes = []
+    for line in working_tree.stdout.splitlines():
+        status, separator, path = line.partition("\t")
+        if not separator:
+            raise PermissionError("cannot parse tracked Stage 1 working-tree changes")
+        changes.append((status, path.replace("\\", "/")))
+    if changes:
+        if changes != [("M", ledger_relative)]:
+            raise PermissionError("Stage 1 tracked changes include immutable code/config or non-ledger artifacts")
+        baseline = subprocess.run(
+            ["git", "show", f"HEAD:{ledger_relative}"], cwd=repository_root,
+            check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        if baseline.returncode != 0:
+            raise PermissionError("cannot read the committed Stage 1 ledger baseline")
+        current_ledger = ledger_path.read_bytes().replace(b"\r\n", b"\n")
+        baseline_ledger = baseline.stdout.replace(b"\r\n", b"\n")
+        if not current_ledger.startswith(baseline_ledger):
+            raise PermissionError("tracked Stage 1 ledger history was changed or truncated")
+        try:
+            _events(ledger_path)
+        except (LedgerCorrupt, OSError) as exc:
+            raise PermissionError("tracked Stage 1 ledger append is malformed") from exc
+    current = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=STUDY, check=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    ).stdout.strip()
+    if len(current) != 40 or any(char not in "0123456789abcdef" for char in current):
+        raise PermissionError("current package checkout has no valid Git commit SHA")
+    lock_path = STAGE1 / "source-lock.json"
+    lock_digest = _normalized_file_sha256(lock_path)
+    sidecar = (STAGE1 / "source-lock.sha256").read_text(encoding="ascii").split()
+    if not sidecar or sidecar[0] != lock_digest:
+        raise PermissionError("current Stage 1 source-lock digest does not match its checked-in sidecar")
+    return current, lock_digest
+
+
+def validate_worker_package_binding(binding: PackageBinding) -> PackageBinding:
+    """Validate a child source identity against the current locked checkout."""
+    if not isinstance(binding, PackageBinding):
+        raise PermissionError("Stage 1 worker must use the source binding from its reserved ledger")
+    current = PackageBinding(*_current_package_binding())
+    if binding != current:
+        raise PermissionError("worker package binding does not match the current source-locked checkout")
+    return current
+
+
+class ResourceBlocked(RuntimeError): pass
+class LedgerCorrupt(RuntimeError): pass
+class DuplicateRun(RuntimeError): pass
+class CheckpointMismatch(RuntimeError): pass
+
+
+class BudgetOverrun(RuntimeError):
+    def __init__(self, message: str, charged_cpu_seconds: float):
+        super().__init__(message)
+        self.charged_cpu_seconds = charged_cpu_seconds
+
+
+def _events(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    try:
+        raw = path.read_bytes()
+        if raw and not raw.endswith(b"\n"):
+            raise LedgerCorrupt("torn final ledger event; stop and preserve the full reservation")
+        return [json.loads(line) for line in raw.splitlines()]
+    except (OSError, json.JSONDecodeError) as exc:
+        raise LedgerCorrupt("cannot parse append-only budget ledger") from exc
+
+
+def _state(events: Sequence[Mapping[str, Any]]) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]]]:
+    runs: dict[str, dict[str, Any]] = {}
+    units: dict[str, list[str]] = {}
+    for e in events:
+        if e.get("schema_id") != "issue75-stage1-budget-event-v2":
+            raise LedgerCorrupt("unsupported budget ledger event schema")
+        if e.get("event") == "reserve":
+            rid, uid = e.get("run_id"), e.get("unit_id")
+            if not isinstance(rid, str) or not rid or rid in runs or not isinstance(uid, str) or not uid:
+                raise LedgerCorrupt("duplicate/empty run id or unit id")
+            runs[rid] = {"reservation": dict(e), "finish": None, "scheduler_recoveries": []}
+            units.setdefault(uid, []).append(rid)
+        elif e.get("event") == "finish":
+            rid = e.get("run_id")
+            if rid not in runs or runs[rid]["finish"] is not None:
+                raise LedgerCorrupt("orphan or duplicate finish event")
+            runs[rid]["finish"] = dict(e)
+        elif e.get("event") == "scheduler_recovery":
+            rid = e.get("run_id")
+            run = runs.get(rid)
+            upper_bound = e.get("prior_cpu_upper_bound_seconds")
+            if (
+                run is None or run["finish"] is not None
+                or run["reservation"].get("unit_id") != "SCHEDULER:TRAIN"
+                or rid != SCHEDULER_TRAIN_RECOVERY_RUN_ID
+                or e.get("unit_id") != "SCHEDULER:TRAIN"
+                or run.setdefault("scheduler_recoveries", [])
+                or not isinstance(upper_bound, (int, float))
+                or not math.isfinite(float(upper_bound))
+                or not 0 < float(upper_bound) < SCHEDULER_TRAIN_RECOVERY_CAP
+                or e.get("accounting_basis") != "reservation retained at full cap; prior CPU bounded by source-bound event timestamps"
+                or not isinstance(e.get("package_commit"), str)
+                or len(e["package_commit"]) != 40
+                or not isinstance(e.get("source_lock_sha256"), str)
+                or len(e["source_lock_sha256"]) != 64
+                or not isinstance(e.get("created_at_ns"), int)
+            ):
+                raise LedgerCorrupt("orphan or duplicate Stage 1 scheduler recovery marker")
+            run["scheduler_recoveries"].append(dict(e))
+        else:
+            raise LedgerCorrupt(f"unknown event {e.get('event')!r}")
+    return runs, units
+
+
+PRE_GAME_START_RETRY_UNIT_ID = "TRAIN:7500001"
+PRE_GAME_START_RETRY_RUN_ID = "TRAIN:7500001-5afd7b3277ee47a7"
+PRE_GAME_START_RETRY_PACKAGE_COMMIT = "e0161453ba1dd96e18326fdac2fb9c75a234049a"
+PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256 = "932a9ecf39794e5b6f284914ded91eb153ac59cd19bb490a64af2d9744abe30d"
+PRE_GAME_START_FAILURE_RECEIPT_SHA256 = "1c60d8c4e5e4fa64802089d5c7c337186ff53194ec43b4b7a75f64d79dd0acea"
+PRE_GAME_START_WORKER_JOB_SHA256 = "098d19dd2149bea16e66fb7274bfdf38fdae760186f86d003dc17d27e19d8db3"
+PRE_GAME_START_RETRY_REASON = "PRE_GAME_START_INFRA_FAILURE"
+PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS = 165.9459124477378
+PRE_GAME_START_RETRY_MEASURED_CPU_SECONDS = 0.03347004399999998
+PRE_GAME_START_RETRY_WALL_SECONDS = 0.6596911649999999
+PRE_GAME_START_RETRY_RESERVED_AT_NS = 1793049822031952961
+PRE_GAME_START_RETRY_FINISHED_AT_NS = 1793049822696986726
+TRAIN_7500129_RETRY_UNIT_ID = "TRAIN:7500129"
+TRAIN_7500129_RETRY_RUN_ID = "TRAIN:7500129-eaf9d4a813c44c2b"
+TRAIN_7500129_RETRY_PACKAGE_COMMIT = "e7c4f93b41ec3f6e2feb5fbe2ecbe65d13fe71b8"
+TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256 = "5df84e3aef5e2076dd9b5a414fd4695ff651449c75e419fada5a12bdcb4fc129"
+TRAIN_7500129_FAILURE_RECEIPT_SHA256 = "555b467bf0faa2bb45b510be114953ae020d9040df019a27da0217348ccb4198"
+TRAIN_7500129_WORKER_JOB_SHA256 = "bdc75d447df4e8f14d7b3a8f11bb376b0428f3de9bd6e42da90b57b011de9df1"
+TRAIN_7500129_WORKER_LOG_SHA256 = "2cdc389d4d105065e9b98bf0629b57963f0010b67e002fe9994109f8044c8c2f"
+TRAIN_7500129_RESERVED_CPU_SECONDS = 165.9459124477378
+TRAIN_7500129_MEASURED_CPU_SECONDS = 3.6495236630000005
+TRAIN_7500129_WALL_SECONDS = 5.403732783000123
+TRAIN_7500129_RESERVED_AT_NS = 1793184440169844215
+TRAIN_7500129_FINISHED_AT_NS = 1793184445581056191
+PRE_GAME_START_PROOF_SCHEMA = "issue75-pre-game-start-infra-proof-v1"
+SCHEDULER_TRAIN_RECOVERY_RUN_ID = "SCHEDULER:TRAIN-3e416101548944b3"
+SCHEDULER_TRAIN_RECOVERY_RESERVED_AT_NS = 1793049822021316152
+SCHEDULER_TRAIN_RECOVERY_CAP = 120.0
+SCHEDULER_RECOVERY_EXIT_MARGIN_SECONDS = 1.0
+BLOCK0_PHASE_REPAIR_REASON = "BLOCK0_PHASE_MISMATCH_INTERVENTION_NOT_DELIVERED"
+BLOCK0_DECODER_REPAIR_REASON = "COMPRESSED_FEATURE_DECODE_ORDER_ONLY"
+UPDATE0_RETRY_REASON = "UPDATE0_FAILED_BEFORE_OPTIMIZER"
+BLOCK0_ORIGINAL_PACKAGE_COMMIT = "482c5b3b87e38066c8738d6f102906f965b9d0ae"
+BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256 = "ed54abb587d28661968544cbca31eabfb4dc8fad77696bcf726911b06fc01735"
+BLOCK0_REPAIR_OWNER_RANGE = (7_500_001, 7_500_128)
+UPDATE0_SEED_FAILURE_RUN_ID = "UPDATE:0-25e99c84541b4dac"
+UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID = "UPDATE:0-86e384596b684093"
+UPDATE0_SEED_FAILURE_PACKAGE_COMMIT = "aa7d9db3824894d2e1ed87963db6abb618c7dd9d"
+UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256 = "f4a8e2942dca010cdad32ce40d76e7f4c96a4c35ba1d92c4ebdd577e1fcc6f2a"
+UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS = 3837.4562621977375
+UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS = 44.12528176000001
+UPDATE0_SEED_FAILURE_MANIFEST = "update0-seed-failure-continuation.json"
+UPDATE0_RECONSTRUCTION_REASON = "ORIGINAL_CHECKPOINT_LOST_RECOMPUTATION"
+UPDATE0_RECONSTRUCTION_LOST_RUN_ID = "UPDATE:0-e3aa5e8338044be1"
+UPDATE0_RECONSTRUCTION_MAX_CPU_SECONDS = 3837.4562621977375
+UPDATE0_HISTORICAL_COMPATIBILITY = {
+    # Independently reviewed durable artifact bundle, Reviewer comment #6461521816.
+    "review_comment_id": 6461521816,
+    "retention_manifest_sha256": "a0c161b4df4fe753ddd39b86a0f8c30ca79c9ea098c34fef6858ce5fd49aedd0",
+    "run_id": "UPDATE:0-4db46e9573a4405a",
+    "package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+    "source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+    "result_path": "units/UPDATE-0/result-UPDATE:0-4db46e9573a4405a.json",
+    "result_sha256": "71e79487df8a28c6759dca42ea4df080293d25b4e41b55e569065891dc1e7cef",
+    "reservation": {
+        "attempt_cap": None, "checkpoint_sha256": None,
+        "created_at_ns": 1793164287443687581, "event": "reserve",
+        "package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+        "pre_game_start_proof": None, "pre_game_start_proof_sha256": None,
+        "previous_run_id": "UPDATE:0-e3aa5e8338044be1",
+        "repair_manifest_sha256": "1722bcaa93c78497fc788dc6a1bca86a56290989f5f3466a839d4da387a892b7",
+        "repair_predecessor_receipt_sha256": "62f52bf15436fd0953e57f2471b9a9a364f83c5094a612c7db8244ec9853aa76",
+        "repair_predecessor_run_id": "UPDATE:0-e3aa5e8338044be1",
+        "repair_reason": "ORIGINAL_CHECKPOINT_LOST_RECOMPUTATION",
+        "reserved_cpu_seconds": 3837.4562621977375, "retry_reason": None,
+        "role": "builder", "run_id": "UPDATE:0-4db46e9573a4405a",
+        "schema_id": "issue75-stage1-budget-event-v2",
+        "source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+        "unit_id": "UPDATE:0", "unit_kind": "training_update",
+    },
+    "finish": {
+        "checkpoint_sha256": None, "event": "finish",
+        "finished_at_ns": 1793164542484198585, "measured_cpu_seconds": 298.957140816,
+        "package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+        "reserved_cpu_seconds": 3837.4562621977375,
+        "result_sha256": "71e79487df8a28c6759dca42ea4df080293d25b4e41b55e569065891dc1e7cef",
+        "run_id": "UPDATE:0-4db46e9573a4405a",
+        "schema_id": "issue75-stage1-budget-event-v2",
+        "source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+        "started_attempts": 0, "status": "succeeded", "unit_id": "UPDATE:0",
+    },
+    "result_fields": {
+        "schema_id": "issue75-stage1-unit-result-v1", "status": "SUCCEEDED",
+        "unit_id": "UPDATE:0", "ledger_run_id": "UPDATE:0-4db46e9573a4405a",
+        "source_commit": "00d6405ba9090878d3016400706aeaa645446689",
+        "package_commit": "00d6405ba9090878d3016400706aeaa645446689",
+        "source_lock_sha256": "5ac14ed76661e477c2206dc1e29a0bef1e9262d8b7ba2deacd6e2be49ab28665",
+        "block_index": 0, "owner_count": 128, "completed_steps": 64,
+        "block_order_seed": 948217156, "expert_decisions": 0,
+        "source_model_digest": "38fe80665067f4ba931f825c882985e73dda1dd95fe19105754d55e8308dfeaf",
+        "result_model_digest": "33b3d3d891e53b7434919318ccb1c8411a0bebe1e2e48616ef040206261db557",
+        "model_checkpoint": {
+            "path": "models/pi1.pt",
+            "sha256": "d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21978",
+            "model_digest": "33b3d3d891e53b7434919318ccb1c8411a0bebe1e2e48616ef040206261db557",
+        },
+        "optimizer_checkpoint": {
+            "path": "models/block-0-step.pt",
+            "sha256": "7bdff6bdd14d8bf5bdcd1cf286e687b5a6df4ef6c11f80bad1ee18787e40f514",
+            "schema_id": "issue75-policy-block-step-checkpoint-v1",
+            "block_index": 0, "completed_steps": 64,
+        },
+        "probe_features_sha256": "67ff80625288bbada9089fcf758a286cb2e7c132b0138975fd92fc4192b9094f",
+        "probe_state_count": 128,
+    },
+    "artifacts": {
+        "models/pi1.pt": "d36577e18b175930a275b4151ba2a93ca6c8fe1e3422512453d4017000c21978",
+        "models/block-0-step.pt": "7bdff6bdd14d8bf5bdcd1cf286e687b5a6df4ef6c11f80bad1ee18787e40f514",
+        "policy-probe-features.json": "67ff80625288bbada9089fcf758a286cb2e7c132b0138975fd92fc4192b9094f",
+    },
+}
+
+
+def _load_block0_repair_manifest(artifacts_root: Path) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
+    path = STAGE1 / "block0-repair-lineage.json"
+    raw = path.read_bytes()
+    manifest = json.loads(raw)
+    owners = manifest.get("owners")
+    expected_seeds = list(range(*BLOCK0_REPAIR_OWNER_RANGE[:1], BLOCK0_REPAIR_OWNER_RANGE[1] + 1))
+    if (
+        manifest.get("schema_id") != "issue75-block0-intervention-repair-lineage-v1"
+        or manifest.get("study_id") != "issue-75-no-expert-oracle"
+        or manifest.get("scope") != "STUDY_ONLY"
+        or manifest.get("block_index") != 0
+        or manifest.get("registered_training_phase") != "training"
+        or manifest.get("original_dispatched_worker_phase") != "train"
+        or manifest.get("cause") != "UNIFORM_PHASE_MISMATCH_INTERVENTION_NOT_DELIVERED"
+        or manifest.get("planner_disposition_comment_id") != 6431275271
+        or manifest.get("owner_seed_range") != list(BLOCK0_REPAIR_OWNER_RANGE)
+        or manifest.get("registered_owner_count") != 128
+        or manifest.get("replace_every_registered_owner_once") is not True
+        or manifest.get("required_treatment") != "J search with captured training features; old results remain immutable and excluded from training"
+        or not isinstance(owners, list) or len(owners) != 128
+        or [item.get("owner_seed") for item in owners] != expected_seeds
+    ):
+        raise ResourceBlocked("the locked block-0 lineage manifest does not match the single authorized repair")
+    by_unit = {}
+    for item in owners:
+        seed = int(item["owner_seed"])
+        unit_id = f"TRAIN:{seed}"
+        history = item.get("history")
+        if (
+            item.get("unit_id") != unit_id
+            or not isinstance(history, list) or not history
+            or item.get("replacement_predecessor_run_id") != history[-1].get("run_id")
+            or item.get("replacement_predecessor_result_sha256") != history[-1].get("result_sha256")
+            or not isinstance(item.get("replacement_reservation_cpu_seconds"), (int, float))
+            or not 0 < float(item["replacement_reservation_cpu_seconds"]) <= BUILDER_LIMIT
+        ):
+            raise ResourceBlocked("the block-0 lineage row is malformed")
+        by_unit[unit_id] = item
+    return manifest, artifact_sha256(path, raw), by_unit
+
+
+def _validate_block0_originals(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]],
+) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
+    manifest, manifest_sha, by_unit = _load_block0_repair_manifest(artifacts_root)
+    common_model_digest = None
+    for unit_id, item in by_unit.items():
+        expected_history = item["history"]
+        actual_history = list(units.get(unit_id, ()))
+        expected_ids = [record["run_id"] for record in expected_history]
+        if actual_history[:len(expected_ids)] != expected_ids or len(actual_history) not in {
+            len(expected_ids), len(expected_ids) + 1,
+        }:
+            raise ResourceBlocked(f"original block-0 lineage changed or has more than one replacement: {unit_id}")
+        for expected in expected_history:
+            run = runs.get(expected["run_id"])
+            if not isinstance(run, Mapping):
+                raise ResourceBlocked(f"original block-0 owner reservation is missing: {unit_id}")
+            reservation, finish = run.get("reservation"), run.get("finish")
+            if (
+                not isinstance(reservation, Mapping)
+                or reservation.get("unit_id") != unit_id
+                or reservation.get("unit_kind") != "owner_arm"
+                or reservation.get("role") != "builder"
+                or reservation.get("package_commit") != expected.get("package_commit")
+                or reservation.get("source_lock_sha256") != expected.get("source_lock_sha256")
+                or not isinstance(finish, Mapping)
+                or finish.get("status") != expected.get("status")
+                or finish.get("result_sha256") != expected.get("result_sha256")
+            ):
+                raise ResourceBlocked(f"original block-0 owner receipt changed: {unit_id}")
+        final = expected_history[-1]
+        if (
+            final.get("status") != "succeeded"
+            or final.get("package_commit") != BLOCK0_ORIGINAL_PACKAGE_COMMIT
+            or final.get("source_lock_sha256") != BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256
+            or not isinstance(final.get("result_sha256"), str)
+        ):
+            raise ResourceBlocked(f"original block-0 owner lacks the reviewed successful source binding: {unit_id}")
+        result_path = Path(artifacts_root) / "units" / unit_id.replace(":", "-") / "result.json"
+        try:
+            result_bytes = result_path.read_bytes()
+            result = json.loads(result_bytes)
+        except (OSError, ValueError) as exc:
+            raise ResourceBlocked(f"original immutable block-0 result is unavailable: {unit_id}") from exc
+        if (
+            artifact_sha256(result_path, result_bytes) != final["result_sha256"]
+            or result.get("status") != "SUCCEEDED"
+            or result.get("unit_id") != unit_id
+            or result.get("phase") != "train"
+            or result.get("formal") is not True
+            or result.get("arm") != "TRAIN"
+            or result.get("owner_seed") != item["owner_seed"]
+            or result.get("package_commit") != BLOCK0_ORIGINAL_PACKAGE_COMMIT
+            or result.get("source_lock_sha256") != BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256
+            or result.get("search") != []
+            or result.get("training_features") is not None
+            or result.get("expert_decisions") != 0
+        ):
+            raise ResourceBlocked(f"original block-0 row does not show the uniform missing intervention: {unit_id}")
+        model_digest = result.get("model_digest")
+        if not isinstance(model_digest, str) or (common_model_digest is not None and model_digest != common_model_digest):
+            raise ResourceBlocked("block-0 original receipts do not share the same initial model digest")
+        common_model_digest = model_digest
+        added = actual_history[len(expected_ids):]
+        if added:
+            run_id = added[0]
+            run = runs.get(run_id)
+            reservation = None if not isinstance(run, Mapping) else run.get("reservation")
+            if (
+                not isinstance(reservation, Mapping)
+                or reservation.get("repair_reason") != BLOCK0_PHASE_REPAIR_REASON
+                or reservation.get("repair_manifest_sha256") != manifest_sha
+                or reservation.get("repair_predecessor_run_id") != expected_ids[-1]
+                or reservation.get("repair_predecessor_receipt_sha256") != final["result_sha256"]
+                or reservation.get("package_commit") is None
+                or reservation.get("source_lock_sha256") is None
+            ):
+                raise ResourceBlocked(f"block-0 replacement is not the single manifest-bound attempt: {unit_id}")
+    update = manifest.get("update_retry")
+    if (
+        not isinstance(update, Mapping)
+        or update.get("unit_id") != "UPDATE:0"
+        or update.get("failed_predecessor_run_id") != "UPDATE:0-8c7ee939e4924cc6"
+        or update.get("retry_once_after_all_replacements") is not True
+        or update.get("failed_before_optimizer") is not True
+        or update.get("no_model_checkpoint") is not True
+    ):
+        raise ResourceBlocked("the block-0 optimizer retry record is malformed")
+    return manifest, manifest_sha, by_unit
+
+
+def _load_block0_decoder_compatibility(
+    artifacts_root: Path,
+) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    path = STAGE1 / "block0-decoder-compatibility.json"
+    try:
+        raw = path.read_bytes()
+        manifest = json.loads(raw)
+        _, repair_sha, original_by_unit = _load_block0_repair_manifest(artifacts_root)
+    except (OSError, ValueError) as exc:
+        raise ResourceBlocked("the source-locked block-0 decoder compatibility manifest is unavailable") from exc
+    expected_seeds = list(range(BLOCK0_REPAIR_OWNER_RANGE[0], BLOCK0_REPAIR_OWNER_RANGE[1] + 1))
+    owners = manifest.get("owners")
+    if (
+        manifest.get("schema_id") != "issue75-block0-decoder-compatibility-v1"
+        or manifest.get("study_id") != "issue-75-no-expert-oracle"
+        or manifest.get("scope") != "STUDY_ONLY"
+        or manifest.get("block_index") != 0
+        or manifest.get("owner_count") != 128
+        or manifest.get("owner_seed_range") != list(BLOCK0_REPAIR_OWNER_RANGE)
+        or manifest.get("repair_reason") != BLOCK0_DECODER_REPAIR_REASON
+        or manifest.get("semantics") != "decompress the serialized f32le matrix, then check its registered byte size and SHA-256; preserve exact matrix bytes"
+        or manifest.get("block0_repair_manifest_sha256") != repair_sha
+        or not isinstance(owners, list) or len(owners) != 128
+        or [item.get("owner_seed") for item in owners] != expected_seeds
+        or manifest.get("predecessor_package_commit") != "6b8f3970333f8c0e0bb6aaa4832e7719f0634f24"
+        or manifest.get("predecessor_source_lock_sha256") != "7498cbef87a5c23907a58c6c1099f7b08258ee4241eb428a3424373673b854fa"
+    ):
+        raise ResourceBlocked("the decoder compatibility manifest differs from the reviewed source and exact 128-owner scope")
+
+    by_compatibility = {}
+    for seed, item in zip(expected_seeds, owners):
+        unit_id = f"TRAIN:{seed}"
+        original = original_by_unit[unit_id]["history"][-1]
+        run_id = item.get("run_id")
+        expected_feature_path = f"units/{unit_id.replace(':', '-')}/runs/{run_id}/training-features.json"
+        if (
+            item.get("unit_id") != unit_id
+            or not isinstance(run_id, str) or not run_id.startswith(unit_id + "-")
+            or not isinstance(item.get("result_sha256"), str) or len(item["result_sha256"]) != 64
+            or item.get("training_features_path") != expected_feature_path
+            or not isinstance(item.get("training_features_sha256"), str)
+            or len(item["training_features_sha256"]) != 64
+            or unit_id in by_compatibility
+            or not isinstance(original.get("result_sha256"), str)
+        ):
+            raise ResourceBlocked(f"the decoder compatibility owner row is malformed: {unit_id}")
+        by_compatibility[unit_id] = item
+
+    update = manifest.get("update0_preoptimizer_failure")
+    old_update = json.loads((STAGE1 / "block0-repair-lineage.json").read_text(encoding="utf-8")).get("update_retry")
+    if (
+        not isinstance(update, Mapping) or not isinstance(old_update, Mapping)
+        or update.get("schema_id") != "issue75-update0-decoder-retry-failure-v1"
+        or update.get("unit_id") != "UPDATE:0"
+        or update.get("intermediate_failed_run_id") != "UPDATE:0-86e384596b684093"
+        or update.get("original_predecessor_run_id") != old_update.get("failed_predecessor_run_id")
+        or update.get("previous_run_id") != old_update.get("failed_predecessor_run_id")
+        or update.get("repair_reason") != UPDATE0_RETRY_REASON
+        or update.get("repair_manifest_sha256") != repair_sha
+        or update.get("repair_predecessor_run_id") != old_update.get("failed_predecessor_run_id")
+        or update.get("repair_predecessor_receipt_sha256") != old_update.get("failure_receipt_sha256")
+        or update.get("package_commit") != manifest.get("predecessor_package_commit")
+        or update.get("source_lock_sha256") != manifest.get("predecessor_source_lock_sha256")
+        or update.get("finish_status") != "failed"
+        or update.get("no_model_checkpoint") is not True
+        or update.get("boundary") != "worker_returned_nonzero"
+        or update.get("error_type") != "ValueError"
+        or update.get("measured_cpu_seconds") != 3.7899244960000003
+        or update.get("reserved_cpu_seconds") != old_update.get("replacement_reservation_cpu_seconds")
+    ):
+        raise ResourceBlocked("the intermediate UPDATE:0 decoder failure is not bound to its exact source and original failure")
+    return manifest, artifact_sha256(path, raw), original_by_unit, by_compatibility
+
+
+def _compatibility_artifact_bytes(
+    artifacts_root: Path, relative: Any, expected_sha256: Any,
+) -> bytes:
+    if not isinstance(relative, str) or Path(relative).is_absolute() or ".." in Path(relative).parts:
+        raise ResourceBlocked("the decoder compatibility artifact path is unsafe")
+    root = Path(artifacts_root).resolve(strict=True)
+    try:
+        path = (root / relative).resolve(strict=True)
+        if not path.is_relative_to(root) or not path.is_file():
+            raise ResourceBlocked("a decoder compatibility artifact is outside the locked study evidence")
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise ResourceBlocked("a decoder compatibility artifact is unavailable") from exc
+    normalized = artifact_bytes_for_hash(path, raw)
+    if not isinstance(expected_sha256, str) or sha256_bytes(normalized) != expected_sha256:
+        raise ResourceBlocked("a decoder compatibility artifact changed after source registration")
+    return normalized
+
+
+def _validate_block0_decoder_compatibility_owner(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]], original_by_unit: Mapping[str, Mapping[str, Any]],
+    compatibility: Mapping[str, Any], compatibility_by_unit: Mapping[str, Mapping[str, Any]],
+    unit_id: str,
+) -> dict[str, Any] | None:
+    item = original_by_unit.get(unit_id)
+    replacement = compatibility_by_unit.get(unit_id)
+    if not isinstance(item, Mapping) or not isinstance(replacement, Mapping):
+        raise ResourceBlocked(f"the decoder compatibility manifest lacks its registered owner: {unit_id}")
+    expected_history = [row["run_id"] for row in item["history"]]
+    history = list(units.get(unit_id, ()))
+    if history == expected_history:
+        return None
+    if (
+        history != expected_history + [replacement["run_id"]]
+        or replacement.get("owner_seed") != item.get("owner_seed")
+    ):
+        raise ResourceBlocked(f"the block-0 replacement history differs from its exact decoder compatibility row: {unit_id}")
+    run_id = str(replacement["run_id"])
+    run = runs.get(run_id)
+    reservation = None if not isinstance(run, Mapping) else run.get("reservation")
+    finish = None if not isinstance(run, Mapping) else run.get("finish")
+    manifest_sha = str(compatibility["block0_repair_manifest_sha256"])
+    package_commit = str(compatibility["predecessor_package_commit"])
+    lock_sha = str(compatibility["predecessor_source_lock_sha256"])
+    if (
+        not isinstance(reservation, Mapping) or reservation.get("run_id") != run_id
+        or reservation.get("unit_id") != unit_id or reservation.get("unit_kind") != "owner_arm"
+        or reservation.get("role") != "builder"
+        or reservation.get("repair_reason") != BLOCK0_PHASE_REPAIR_REASON
+        or reservation.get("repair_manifest_sha256") != manifest_sha
+        or reservation.get("repair_predecessor_run_id") != expected_history[-1]
+        or reservation.get("repair_predecessor_receipt_sha256") != item["history"][-1]["result_sha256"]
+        or reservation.get("package_commit") != package_commit
+        or reservation.get("source_lock_sha256") != lock_sha
+        or reservation.get("previous_run_id") is not None
+        or reservation.get("checkpoint_sha256") is not None
+        or not isinstance(finish, Mapping) or finish.get("status") != "succeeded"
+        or finish.get("unit_id") != unit_id or finish.get("result_sha256") != replacement["result_sha256"]
+        or finish.get("package_commit") != package_commit or finish.get("source_lock_sha256") != lock_sha
+    ):
+        raise ResourceBlocked(f"the block-0 replacement reservation or finish differs from its compatibility lineage: {unit_id}")
+
+    result_rel = f"units/{unit_id.replace(':', '-')}/runs/{run_id}/result.json"
+    result_bytes = _compatibility_artifact_bytes(artifacts_root, result_rel, replacement["result_sha256"])
+    try:
+        result = json.loads(result_bytes)
+    except ValueError as exc:
+        raise ResourceBlocked(f"the block-0 replacement result is malformed: {unit_id}") from exc
+    feature_path = replacement["training_features_path"]
+    feature_sha = replacement["training_features_sha256"]
+    pointer = result.get("training_features")
+    if (
+        result.get("schema_id") != "issue75-stage1-unit-result-v1"
+        or result.get("status") != "SUCCEEDED" or result.get("study_id") != "issue-75-no-expert-oracle"
+        or result.get("unit_id") != unit_id or result.get("phase") != "training"
+        or result.get("formal") is not True or result.get("arm") != "TRAIN"
+        or result.get("owner_seed") != item["owner_seed"] or result.get("game_seed") != item["owner_seed"]
+        or result.get("paired_owner_key") != f"train-{item['owner_seed']}"
+        or result.get("package_commit") != package_commit or result.get("source_lock_sha256") != lock_sha
+        or not isinstance(pointer, Mapping) or pointer.get("path") != feature_path
+        or pointer.get("sha256") != feature_sha
+        or not isinstance(result.get("resource"), Mapping)
+        or result["resource"].get("ledger_run_id") != run_id
+    ):
+        raise ResourceBlocked(f"the block-0 replacement result does not match its exact registered owner and feature row: {unit_id}")
+    feature_bytes = _compatibility_artifact_bytes(artifacts_root, feature_path, feature_sha)
+    try:
+        features = json.loads(feature_bytes)
+    except ValueError as exc:
+        raise ResourceBlocked(f"the block-0 replacement training features are malformed: {unit_id}") from exc
+    if (
+        features.get("schema_id") != "issue75-stage1-training-features-v1"
+        or features.get("unit_id") != unit_id or features.get("owner_seed") != item["owner_seed"]
+        or features.get("package_commit") != package_commit or features.get("source_lock_sha256") != lock_sha
+    ):
+        raise ResourceBlocked(f"the block-0 replacement feature artifact differs from its compatibility binding: {unit_id}")
+    return {
+        **dict(replacement),
+        "package_commit": package_commit,
+        "source_lock_sha256": lock_sha,
+        "result_path": result_rel,
+    }
+
+
+def _load_update0_seed_failure_continuation(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
+) -> tuple[dict[str, Any], str]:
+    path = STAGE1 / UPDATE0_SEED_FAILURE_MANIFEST
+    try:
+        raw = path.read_bytes()
+        manifest = json.loads(raw)
+    except (OSError, ValueError) as exc:
+        raise ResourceBlocked("the source-locked UPDATE:0 seed-failure continuation is unavailable") from exc
+    if not isinstance(manifest, Mapping):
+        raise ResourceBlocked("the UPDATE:0 continuation manifest is malformed")
+    repair_path = STAGE1 / "block0-repair-lineage.json"
+    compatibility_path = STAGE1 / "block0-decoder-compatibility.json"
+    repair_sha = artifact_sha256(repair_path)
+    compatibility_sha = artifact_sha256(compatibility_path)
+    required = {
+        "schema_id": "issue75-update0-seed-failure-continuation-v1",
+        "study_id": "issue-75-no-expert-oracle",
+        "scope": "STUDY_ONLY",
+        "planner_decision_comment_id": 6444577814,
+        "block0_repair_manifest_sha256": repair_sha,
+        "block0_decoder_compatibility_manifest_sha256": compatibility_sha,
+        "original_failure_run_id": "UPDATE:0-8c7ee939e4924cc6",
+        "decoder_failure_run_id": UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID,
+        "latest_failure_run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "attempt_history": [
+            "UPDATE:0-8c7ee939e4924cc6",
+            UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID,
+            UPDATE0_SEED_FAILURE_RUN_ID,
+        ],
+    }
+    latest = manifest.get("latest_failure")
+    retry = manifest.get("authorized_retry")
+    if (
+        set(manifest) != set(required) | {"latest_failure", "authorized_retry"}
+        or any(manifest.get(key) != value for key, value in required.items())
+        or not isinstance(latest, Mapping)
+        or not isinstance(retry, Mapping)
+    ):
+        raise ResourceBlocked("the UPDATE:0 continuation manifest differs from the reviewed source lineage")
+    required_latest = {
+        "run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "package_commit": UPDATE0_SEED_FAILURE_PACKAGE_COMMIT,
+        "source_lock_sha256": UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256,
+        "reserved_cpu_seconds": UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS,
+        "measured_cpu_seconds": UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS,
+        "started_attempts": 0,
+        "checkpoint_sha256": None,
+        "result_sha256": None,
+        "previous_run_id": UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID,
+        "repair_reason": UPDATE0_RETRY_REASON,
+        "repair_manifest_sha256": "3c864646741682e900eb6352e0357b2650f28e3aec38519e0a2704b2ccdd542f",
+        "repair_predecessor_run_id": "UPDATE:0-8c7ee939e4924cc6",
+        "repair_predecessor_receipt_sha256": "fe5b847ba808b394e65a96257992e2bdc88ad42ca1eff4d394f8220bd8601de0",
+        "reservation_sha256": "53353bff151b637262bbc4ec7c39a903028bde98be679d60264590ea2cddfd86",
+        "finish_sha256": "a2c8d6a1b16d020adce67ce5ec24dfe4a704b753ffef134be1eaacbe7852a9cf",
+        "failure_receipt_path": "units/UPDATE-0/failure-UPDATE:0-25e99c84541b4dac.json",
+        "failure_receipt_sha256": "201f6a148be945dfb5123e8723c7170155e12dea8a4190dfe8802679717119b5",
+        "worker_job_path": "units/UPDATE-0/worker-job-UPDATE:0-25e99c84541b4dac.json",
+        "worker_job_sha256": "cc3d00772dfc31155c2c87a313a1046793637c1fa8dbecb9eea282c3eb74b746",
+        "worker_log_path": "units/UPDATE-0/worker-log-UPDATE:0-25e99c84541b4dac.txt",
+        "worker_log_sha256": "93e15acf26eec37df15ba9d5e44684946b6a597d6c6c1b42d6617e36af8fb411",
+    }
+    required_retry = {
+        "one_fresh_attempt_only": True,
+        "retry_previous_run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "repair_predecessor_run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "repair_predecessor_receipt_sha256": required_latest["failure_receipt_sha256"],
+        "reserved_cpu_seconds": UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS,
+        "block_index": 0,
+        "owner_seed": 7500001,
+        "steps": 64,
+    }
+    if (
+        set(latest) != set(required_latest)
+        or any(latest.get(key) != value for key, value in required_latest.items())
+        or set(retry) != set(required_retry)
+        or any(retry.get(key) != value for key, value in required_retry.items())
+    ):
+        raise ResourceBlocked("the UPDATE:0 seed-failure evidence or authorized retry limit changed")
+    run = runs.get(UPDATE0_SEED_FAILURE_RUN_ID)
+    reservation = None if not isinstance(run, Mapping) else run.get("reservation")
+    finish = None if not isinstance(run, Mapping) else run.get("finish")
+    if (
+        not isinstance(reservation, Mapping) or not isinstance(finish, Mapping)
+        or sha256_bytes(canonical(reservation)) != latest["reservation_sha256"]
+        or sha256_bytes(canonical(finish)) != latest["finish_sha256"]
+    ):
+        raise ResourceBlocked("the latest UPDATE:0 failure ledger events differ from the immutable continuation")
+    expected_reservation = {
+        "run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "unit_id": "UPDATE:0",
+        "unit_kind": "training_update",
+        "role": "builder",
+        "package_commit": UPDATE0_SEED_FAILURE_PACKAGE_COMMIT,
+        "source_lock_sha256": UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256,
+        "reserved_cpu_seconds": UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS,
+        "previous_run_id": UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID,
+        "repair_reason": UPDATE0_RETRY_REASON,
+        "repair_manifest_sha256": required_latest["repair_manifest_sha256"],
+        "repair_predecessor_run_id": required_latest["repair_predecessor_run_id"],
+        "repair_predecessor_receipt_sha256": required_latest["repair_predecessor_receipt_sha256"],
+        "attempt_cap": None,
+        "checkpoint_sha256": None,
+        "retry_reason": None,
+        "pre_game_start_proof": None,
+        "pre_game_start_proof_sha256": None,
+    }
+    expected_finish = {
+        "run_id": UPDATE0_SEED_FAILURE_RUN_ID,
+        "unit_id": "UPDATE:0",
+        "status": "failed",
+        "package_commit": UPDATE0_SEED_FAILURE_PACKAGE_COMMIT,
+        "source_lock_sha256": UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256,
+        "reserved_cpu_seconds": UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS,
+        "measured_cpu_seconds": UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS,
+        "started_attempts": 0,
+        "checkpoint_sha256": None,
+        "result_sha256": None,
+    }
+    if (
+        any(reservation.get(key) != value for key, value in expected_reservation.items())
+        or any(finish.get(key) != value for key, value in expected_finish.items())
+    ):
+        raise ResourceBlocked("the latest UPDATE:0 failure is not the exact zero-start source-bound receipt")
+    failure = json.loads(_compatibility_artifact_bytes(
+        artifacts_root, latest["failure_receipt_path"], latest["failure_receipt_sha256"],
+    ))
+    job = json.loads(_compatibility_artifact_bytes(
+        artifacts_root, latest["worker_job_path"], latest["worker_job_sha256"],
+    ))
+    log = json.loads(_compatibility_artifact_bytes(
+        artifacts_root, latest["worker_log_path"], latest["worker_log_sha256"],
+    ))
+    if not all(isinstance(item, Mapping) for item in (failure, job, log)):
+        raise ResourceBlocked("the latest UPDATE:0 worker evidence is malformed")
+    if (
+        failure.get("schema_id") != "issue75-stage1-unit-result-v1"
+        or failure.get("unit_id") != "UPDATE:0"
+        or failure.get("run_id") != UPDATE0_SEED_FAILURE_RUN_ID
+        or failure.get("status") != "FAILED"
+        or failure.get("boundary") != "worker_returned_nonzero"
+        or failure.get("reserved_cpu_seconds") != UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS
+        or failure.get("measured_cpu_seconds") != UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS
+        or failure.get("checkpoint_sha256") is not None
+        or job.get("schema_id") != "issue75-stage1-worker-job-v1"
+        or job.get("unit_id") != "UPDATE:0"
+        or job.get("run_id") != UPDATE0_SEED_FAILURE_RUN_ID
+        or job.get("phase") != "update"
+        or job.get("package_commit") != UPDATE0_SEED_FAILURE_PACKAGE_COMMIT
+        or job.get("source_lock_sha256") != UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256
+        or job.get("previous_run_id") != UPDATE0_SEED_FAILURE_PREVIOUS_RUN_ID
+        or job.get("repair_reason") != UPDATE0_RETRY_REASON
+        or job.get("repair_manifest_sha256") != required_latest["repair_manifest_sha256"]
+        or job.get("repair_predecessor_run_id") != required_latest["repair_predecessor_run_id"]
+        or job.get("repair_predecessor_receipt_sha256") != required_latest["repair_predecessor_receipt_sha256"]
+        or job.get("checkpoint_sha256") is not None
+        or log.get("error_type") != "PermissionError"
+        or log.get("status") != "STAGE1_WORKER_FAILED"
+    ):
+        raise ResourceBlocked("the latest UPDATE:0 worker artifacts differ from the immutable failure")
+    return dict(manifest), artifact_sha256(path, raw)
+
+
+def _validate_update0_retry_state(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]], current_binding: tuple[str, str], *,
+    allow_post_reconstruction_artifacts: bool = False,
+) -> tuple[dict[str, Any], str]:
+    try:
+        actual_binding = _current_package_binding()
+    except (PermissionError, ValueError, OSError) as exc:
+        raise ResourceBlocked("the current locked Stage 1 package is not verified") from exc
+    if current_binding != actual_binding:
+        raise ResourceBlocked("UPDATE:0 repair cannot use a caller-supplied package binding")
+
+    manifest, manifest_sha, original_by_unit = _load_block0_repair_manifest(artifacts_root)
+    compatibility, compatibility_sha, _, compatibility_by_unit = _load_block0_decoder_compatibility(artifacts_root)
+    for unit_id, owner in original_by_unit.items():
+        expected = [entry["run_id"] for entry in owner["history"]]
+        history = list(units.get(unit_id, ()))
+        if history != expected + [compatibility_by_unit[unit_id]["run_id"]]:
+            raise ResourceBlocked(f"UPDATE:0 requires all 128 exact decoder-compatible replacements: {unit_id}")
+        _validate_block0_decoder_compatibility_owner(
+            artifacts_root, runs, units, original_by_unit,
+            compatibility, compatibility_by_unit, unit_id,
+        )
+
+    update = manifest["update_retry"]
+    unit_id = str(update["unit_id"])
+    predecessor = str(update["failed_predecessor_run_id"])
+    history = list(units.get(unit_id, ()))
+    prior = compatibility["update0_preoptimizer_failure"]
+    intermediate_run_id = str(prior["intermediate_failed_run_id"])
+    if not history or history[0] != predecessor or len(history) < 2 or history[1] != intermediate_run_id:
+        raise ResourceBlocked("UPDATE:0 history differs from its original and decoder-failure lineage")
+    original = runs[predecessor]
+    reservation, finish = original["reservation"], original["finish"]
+    expected_reserved = float(update["failed_predecessor_reservation_cpu_seconds"])
+    expected_measured = float(update["failed_predecessor_measured_cpu_seconds"])
+    if (
+        reservation.get("unit_id") != unit_id
+        or reservation.get("unit_kind") != "training_update"
+        or reservation.get("role") != "builder"
+        or reservation.get("package_commit") != BLOCK0_ORIGINAL_PACKAGE_COMMIT
+        or reservation.get("source_lock_sha256") != BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256
+        or reservation.get("reserved_cpu_seconds") != expected_reserved
+        or finish is None or finish.get("status") != "failed"
+        or finish.get("started_attempts") != 0
+        or finish.get("measured_cpu_seconds") != expected_measured
+        or finish.get("checkpoint_sha256") is not None or finish.get("result_sha256") is not None
+    ):
+        raise ResourceBlocked("original UPDATE:0 failure differs from the immutable pre-optimizer record")
+    for relative, digest_key in (
+        (update["failure_receipt_path"], "failure_receipt_sha256"),
+        (update["worker_job_path"], "worker_job_sha256"),
+        (update["worker_log_path"], "worker_log_sha256"),
+    ):
+        _compatibility_artifact_bytes(artifacts_root, relative, update[digest_key])
+    failure = json.loads((Path(artifacts_root) / update["failure_receipt_path"]).read_text())
+    job = json.loads((Path(artifacts_root) / update["worker_job_path"]).read_text())
+    if (
+        failure.get("unit_id") != unit_id or failure.get("run_id") != predecessor
+        or failure.get("status") != "FAILED" or failure.get("checkpoint_sha256") is not None
+        or failure.get("measured_cpu_seconds") != expected_measured
+        or failure.get("reserved_cpu_seconds") != expected_reserved
+        or job.get("unit_id") != unit_id or job.get("run_id") != predecessor
+        or job.get("phase") != "update"
+        or job.get("package_commit") != BLOCK0_ORIGINAL_PACKAGE_COMMIT
+        or job.get("source_lock_sha256") != BLOCK0_ORIGINAL_SOURCE_LOCK_SHA256
+        or job.get("previous_run_id") is not None or job.get("checkpoint_sha256") is not None
+    ):
+        raise ResourceBlocked("original UPDATE:0 artifacts do not prove a pre-optimizer failure")
+
+    run = runs.get(intermediate_run_id)
+    retry = None if not isinstance(run, Mapping) else run.get("reservation")
+    terminal = None if not isinstance(run, Mapping) else run.get("finish")
+    if (
+        not isinstance(retry, Mapping) or retry.get("run_id") != intermediate_run_id
+        or retry.get("unit_id") != unit_id or retry.get("unit_kind") != "training_update"
+        or retry.get("role") != "builder" or retry.get("previous_run_id") != predecessor
+        or retry.get("repair_reason") != UPDATE0_RETRY_REASON
+        or retry.get("repair_manifest_sha256") != manifest_sha
+        or retry.get("repair_predecessor_run_id") != predecessor
+        or retry.get("repair_predecessor_receipt_sha256") != update["failure_receipt_sha256"]
+        or retry.get("package_commit") != prior["package_commit"]
+        or retry.get("source_lock_sha256") != prior["source_lock_sha256"]
+        or retry.get("reserved_cpu_seconds") != prior["reserved_cpu_seconds"]
+        or retry.get("attempt_cap") is not None
+        or retry.get("checkpoint_sha256") is not None
+        or retry.get("retry_reason") is not None
+        or retry.get("pre_game_start_proof") is not None
+        or retry.get("pre_game_start_proof_sha256") is not None
+        or sha256_bytes(canonical(retry)) != prior["reservation_sha256"]
+        or not isinstance(terminal, Mapping) or terminal.get("status") != "failed"
+        or terminal.get("measured_cpu_seconds") != prior["measured_cpu_seconds"]
+        or terminal.get("started_attempts") != 0
+        or terminal.get("checkpoint_sha256") is not None or terminal.get("result_sha256") is not None
+        or terminal.get("package_commit") != prior["package_commit"]
+        or terminal.get("source_lock_sha256") != prior["source_lock_sha256"]
+        or sha256_bytes(canonical(terminal)) != prior["finish_sha256"]
+    ):
+        raise ResourceBlocked("the intermediate UPDATE:0 serialization failure differs from its locked evidence")
+    failure_bytes = _compatibility_artifact_bytes(
+        artifacts_root, prior["failure_receipt_path"], prior["failure_receipt_sha256"],
+    )
+    job_bytes = _compatibility_artifact_bytes(
+        artifacts_root, prior["worker_job_path"], prior["worker_job_sha256"],
+    )
+    log_bytes = _compatibility_artifact_bytes(
+        artifacts_root, prior["worker_log_path"], prior["worker_log_sha256"],
+    )
+    failure = json.loads(failure_bytes)
+    job = json.loads(job_bytes)
+    log = json.loads(log_bytes)
+    if (
+        failure.get("unit_id") != unit_id or failure.get("run_id") != intermediate_run_id
+        or failure.get("status") != "FAILED" or failure.get("boundary") != prior["boundary"]
+        or failure.get("checkpoint_sha256") is not None
+        or failure.get("measured_cpu_seconds") != prior["measured_cpu_seconds"]
+        or failure.get("reserved_cpu_seconds") != prior["reserved_cpu_seconds"]
+        or job.get("unit_id") != unit_id or job.get("run_id") != intermediate_run_id
+        or job.get("phase") != "update" or job.get("previous_run_id") != predecessor
+        or job.get("package_commit") != prior["package_commit"]
+        or job.get("source_lock_sha256") != prior["source_lock_sha256"]
+        or job.get("repair_reason") != prior["repair_reason"]
+        or job.get("repair_manifest_sha256") != prior["repair_manifest_sha256"]
+        or job.get("repair_predecessor_run_id") != prior["repair_predecessor_run_id"]
+        or job.get("repair_predecessor_receipt_sha256") != prior["repair_predecessor_receipt_sha256"]
+        or job.get("checkpoint_sha256") is not None
+        or log.get("error_type") != prior["error_type"]
+        or log.get("status") != "STAGE1_WORKER_FAILED"
+    ):
+        raise ResourceBlocked("the intermediate UPDATE:0 failure artifacts differ from their exact locked receipt")
+
+    continuation, continuation_sha = _load_update0_seed_failure_continuation(artifacts_root, runs)
+    if continuation["block0_decoder_compatibility_manifest_sha256"] != compatibility_sha:
+        raise ResourceBlocked("the UPDATE:0 continuation is detached from its decoder-compatibility source")
+    latest = continuation["latest_failure"]
+    retry = continuation["authorized_retry"]
+    if len(history) < 3 or history[2] != latest["run_id"]:
+        raise ResourceBlocked("UPDATE:0 lineage does not include the exact latest seed-failure receipt")
+    info = {
+        "repair_reason": UPDATE0_RETRY_REASON,
+        "repair_manifest_sha256": continuation_sha,
+        "repair_predecessor_run_id": retry["repair_predecessor_run_id"],
+        "repair_predecessor_receipt_sha256": retry["repair_predecessor_receipt_sha256"],
+        "reserved_cpu_seconds": float(retry["reserved_cpu_seconds"]),
+        "retry_previous_run_id": retry["retry_previous_run_id"],
+        "retry_available": len(history) == 3,
+    }
+    if len(history) == 3:
+        if not allow_post_reconstruction_artifacts:
+            for name in ("pi1.pt", "block-0-step.pt"):
+                if (Path(artifacts_root) / "models" / name).exists():
+                    raise ResourceBlocked("UPDATE:0 has an optimizer checkpoint and cannot start a fresh retry")
+        return info, continuation_sha
+
+    previous = latest["run_id"]
+    for index, run_id in enumerate(history[3:]):
+        current = runs.get(run_id)
+        if not isinstance(current, Mapping):
+            raise ResourceBlocked("a corrected UPDATE:0 attempt is missing from the ledger")
+        retry_reservation, terminal = current["reservation"], current["finish"]
+        first = index == 0
+        if (
+            retry_reservation.get("repair_reason") != info["repair_reason"]
+            or retry_reservation.get("repair_manifest_sha256") != continuation_sha
+            or retry_reservation.get("repair_predecessor_run_id") != info["repair_predecessor_run_id"]
+            or retry_reservation.get("repair_predecessor_receipt_sha256") != info["repair_predecessor_receipt_sha256"]
+            or retry_reservation.get("package_commit") != current_binding[0]
+            or retry_reservation.get("source_lock_sha256") != current_binding[1]
+            or retry_reservation.get("unit_kind") != "training_update"
+            or retry_reservation.get("role") != "builder"
+            or float(retry_reservation.get("reserved_cpu_seconds", info["reserved_cpu_seconds"] + 1)) > info["reserved_cpu_seconds"]
+            or retry_reservation.get("previous_run_id") != previous
+            or (first and retry_reservation.get("checkpoint_sha256") is not None)
+            or (not first and (
+                runs[previous]["finish"] is None
+                or runs[previous]["finish"].get("status") != "incomplete"
+                or retry_reservation.get("checkpoint_sha256") != runs[previous]["finish"].get("checkpoint_sha256")
+            ))
+            or (terminal is not None and terminal.get("status") not in {"succeeded", "incomplete", "failed"})
+        ):
+            raise ResourceBlocked("corrected UPDATE:0 attempt/resume chain differs from its exact repair lineage")
+        if terminal is not None and terminal.get("status") in {"succeeded", "failed"} and index != len(history[3:]) - 1:
+            raise ResourceBlocked("UPDATE:0 has work after a terminal corrected attempt")
+        previous = run_id
+    return info, continuation_sha
+
+def _load_update0_reconstruction_manifest() -> tuple[dict[str, Any], str]:
+    manifest = {
+        "schema_id": "issue75-update0-lost-checkpoint-reconstruction-v1",
+        "planner_decision_comment_id": 6459123910,
+        "scope": "STUDY_ONLY",
+        "original_history": [
+            "UPDATE:0-8c7ee939e4924cc6", "UPDATE:0-86e384596b684093",
+            "UPDATE:0-25e99c84541b4dac", UPDATE0_RECONSTRUCTION_LOST_RUN_ID,
+        ],
+        "lost_run_id": UPDATE0_RECONSTRUCTION_LOST_RUN_ID,
+        "lost_run_package_commit": "4f0706b92ddee59651385bf0e54d2f13a1f48ece",
+        "lost_run_source_lock_sha256": "0ce4571d54785f21ee17358a083198243f1862a4052413b135e76030e4bf21e5",
+        "lost_reservation_sha256": "c5c5856db85893dfa1d05c67fb34a81a3b2c316cfdce3681a349b4ad6ed8453f",
+        "lost_result_path": "units/UPDATE-0/result-UPDATE:0-e3aa5e8338044be1.json",
+        "lost_result_sha256": "62f52bf15436fd0953e57f2471b9a9a364f83c5094a612c7db8244ec9853aa76",
+        "lost_worker_job_path": "units/UPDATE-0/worker-job-UPDATE:0-e3aa5e8338044be1.json",
+        "lost_worker_job_sha256": "ead83124d804d4a764ca7064c18c3ae0ca63cf19969c91d8abbf6b675bf7c780",
+    }
+    return manifest, sha256_bytes(canonical(manifest))
+
+
+def _validate_update0_reconstruction_state(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]], current_binding: tuple[str, str],
+    *, run_id: str | None = None,
+) -> dict[str, Any]:
+    manifest, manifest_sha = _load_update0_reconstruction_manifest()
+    unit_id = "UPDATE:0"
+    history = list(units.get(unit_id, ()))
+    original_history = list(manifest["original_history"])
+    if history[:4] != original_history:
+        raise ResourceBlocked("UPDATE:0 reconstruction does not preserve the exact original run history")
+
+    # Reuse the existing validator for the three pre-optimizer failures and all
+    # 128 immutable owner feature/source receipts.
+    original_units = dict(units)
+    original_units[unit_id] = original_history[:3]
+    prior, _ = _validate_update0_retry_state(
+        artifacts_root, runs, original_units, current_binding,
+        allow_post_reconstruction_artifacts=True,
+    )
+    lost_id = UPDATE0_RECONSTRUCTION_LOST_RUN_ID
+    lost = runs.get(lost_id)
+    reservation = None if not isinstance(lost, Mapping) else lost.get("reservation")
+    if (
+        prior.get("retry_previous_run_id") != original_history[2]
+        or not isinstance(reservation, Mapping)
+        or lost.get("finish") is not None
+        or reservation.get("unit_id") != unit_id
+        or reservation.get("run_id") != lost_id
+        or reservation.get("unit_kind") != "training_update"
+        or reservation.get("role") != "builder"
+        or reservation.get("package_commit") != manifest["lost_run_package_commit"]
+        or reservation.get("source_lock_sha256") != manifest["lost_run_source_lock_sha256"]
+        or reservation.get("reserved_cpu_seconds") != UPDATE0_RECONSTRUCTION_MAX_CPU_SECONDS
+        or reservation.get("previous_run_id") != original_history[2]
+        or reservation.get("checkpoint_sha256") is not None
+        or reservation.get("repair_reason") != UPDATE0_RETRY_REASON
+        or sha256_bytes(canonical(reservation)) != manifest["lost_reservation_sha256"]
+    ):
+        raise ResourceBlocked("the original UPDATE:0 reservation is not the exact preserved open, charged run")
+    for path_key, digest_key in (("lost_result_path", "lost_result_sha256"),
+                                 ("lost_worker_job_path", "lost_worker_job_sha256")):
+        _compatibility_artifact_bytes(artifacts_root, manifest[path_key], manifest[digest_key])
+
+    common = {
+        "repair_reason": UPDATE0_RECONSTRUCTION_REASON,
+        "repair_manifest_sha256": manifest_sha,
+        "repair_predecessor_run_id": lost_id,
+        "repair_predecessor_receipt_sha256": manifest["lost_result_sha256"],
+        "reserved_cpu_seconds": UPDATE0_RECONSTRUCTION_MAX_CPU_SECONDS,
+        "retry_previous_run_id": lost_id,
+    }
+    suffix = history[4:]
+    if not suffix:
+        for name in ("pi1.pt", "block-0-step.pt", "policy-probe-features.json"):
+            path = Path(artifacts_root) / (Path("models") / name if name.endswith(".pt") else Path(name))
+            if path.exists():
+                raise ResourceBlocked("UPDATE:0 artifacts exist without the authorized reconstruction reservation")
+        if run_id is not None:
+            raise ResourceBlocked("UPDATE:0 reconstruction run has not been reserved")
+        return {**common, "can_start": True, "state": "READY", "latest_run_id": None}
+
+    previous_id, previous_finish = lost_id, None
+    for index, current_id in enumerate(suffix):
+        current = runs.get(current_id)
+        current_reservation = None if not isinstance(current, Mapping) else current.get("reservation")
+        current_finish = None if not isinstance(current, Mapping) else current.get("finish")
+        if (
+            not isinstance(current_reservation, Mapping)
+            or current_reservation.get("run_id") != current_id
+            or current_reservation.get("unit_id") != unit_id
+            or current_reservation.get("unit_kind") != "training_update"
+            or current_reservation.get("role") != "builder"
+            or current_reservation.get("package_commit") != current_binding[0]
+            or current_reservation.get("source_lock_sha256") != current_binding[1]
+            or current_reservation.get("previous_run_id") != previous_id
+            or current_reservation.get("repair_reason") != common["repair_reason"]
+            or current_reservation.get("repair_manifest_sha256") != manifest_sha
+            or current_reservation.get("repair_predecessor_run_id") != lost_id
+            or current_reservation.get("repair_predecessor_receipt_sha256") != common["repair_predecessor_receipt_sha256"]
+            or current_reservation.get("retry_reason") is not None
+            or current_reservation.get("pre_game_start_proof") is not None
+            or not isinstance(current_reservation.get("reserved_cpu_seconds"), (int, float))
+            or not 0 < float(current_reservation["reserved_cpu_seconds"]) <= UPDATE0_RECONSTRUCTION_MAX_CPU_SECONDS
+            or (current_finish is not None and current_finish.get("status") not in {"succeeded", "incomplete", "failed"})
+            or (index < len(suffix) - 1 and (current_finish is None or current_finish.get("status") != "incomplete"))
+            or (previous_finish is None and current_reservation.get("checkpoint_sha256") is not None)
+            or (previous_finish is not None and (
+                previous_finish.get("status") != "incomplete"
+                or current_reservation.get("checkpoint_sha256") != previous_finish.get("checkpoint_sha256")
+            ))
+        ):
+            raise ResourceBlocked("UPDATE:0 differs from the one authorized fixed-input reconstruction/resume chain")
+        if current_finish is not None and current_finish.get("status") == "incomplete":
+            checkpoint = Path(artifacts_root) / "models" / "block-0-step.pt"
+            checkpoint_sha = current_finish.get("checkpoint_sha256")
+            if not isinstance(checkpoint_sha, str) or len(checkpoint_sha) != 64 or not checkpoint.is_file() or _file_sha256(checkpoint) != checkpoint_sha:
+                raise ResourceBlocked("UPDATE:0 may resume only its exact surviving optimizer checkpoint")
+        previous_id, previous_finish = current_id, current_finish
+
+    latest_id = suffix[-1]
+    if run_id is not None and run_id != latest_id:
+        raise ResourceBlocked("UPDATE:0 worker is not the latest reconstruction reservation")
+    latest_finish = runs[latest_id]["finish"]
+    return {
+        **common,
+        "can_start": False,
+        "state": "OPEN" if latest_finish is None else str(latest_finish["status"]).upper(),
+        "latest_run_id": latest_id,
+        "checkpoint_sha256": None if latest_finish is None else latest_finish.get("checkpoint_sha256"),
+    }
+
+
+def _pre_game_start_failure_proof(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]], units: Mapping[str, Sequence[str]],
+    *, predecessor_run_id: str, require_pristine: bool,
+) -> dict[str, Any]:
+    """Prove the one reviewed failed row stopped before native owner execution."""
+    unit_id = PRE_GAME_START_RETRY_UNIT_ID
+    history = list(units.get(unit_id, ()))
+    if (predecessor_run_id != PRE_GAME_START_RETRY_RUN_ID or not history
+            or history[0] != predecessor_run_id or len(history) > 2):
+        raise ResourceBlocked("the one-row pre-game-start exception does not match its immutable predecessor")
+    run = runs.get(predecessor_run_id)
+    if not isinstance(run, Mapping):
+        raise ResourceBlocked("the reviewed pre-game-start predecessor is absent")
+    reservation, finish = run.get("reservation"), run.get("finish")
+    expected_reservation = {
+        "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
+        "run_id": PRE_GAME_START_RETRY_RUN_ID, "unit_id": unit_id,
+        "role": "builder", "unit_kind": "owner_arm", "attempt_cap": None,
+        "previous_run_id": None, "checkpoint_sha256": None,
+        "reserved_cpu_seconds": PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS,
+        "package_commit": PRE_GAME_START_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256,
+        "created_at_ns": PRE_GAME_START_RETRY_RESERVED_AT_NS,
+    }
+    expected_finish = {
+        "event": "finish", "schema_id": "issue75-stage1-budget-event-v2",
+        "run_id": PRE_GAME_START_RETRY_RUN_ID, "unit_id": unit_id,
+        "status": "failed", "measured_cpu_seconds": PRE_GAME_START_RETRY_MEASURED_CPU_SECONDS,
+        "reserved_cpu_seconds": PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS,
+        "started_attempts": 0, "checkpoint_sha256": None, "result_sha256": None,
+        "package_commit": PRE_GAME_START_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256,
+        "finished_at_ns": PRE_GAME_START_RETRY_FINISHED_AT_NS,
+    }
+    if not isinstance(reservation, Mapping) or any(reservation.get(k) != v for k, v in expected_reservation.items()):
+        raise ResourceBlocked("the original registered row reservation differs from the reviewed failure")
+    if not isinstance(finish, Mapping) or any(finish.get(k) != v for k, v in expected_finish.items()):
+        raise ResourceBlocked("the original failure is not the exact reviewed zero-start ledger finish")
+
+    units_root = Path(artifacts_root) / "units" / "TRAIN-7500001"
+    failure_path = units_root / f"failure-{PRE_GAME_START_RETRY_RUN_ID}.json"
+    job_path = units_root / f"worker-job-{PRE_GAME_START_RETRY_RUN_ID}.json"
+    try:
+        failure_bytes, job_bytes = failure_path.read_bytes(), job_path.read_bytes()
+    except OSError as exc:
+        raise ResourceBlocked("the immutable pre-game-start failure evidence is missing") from exc
+    if sha256_bytes(failure_bytes) != PRE_GAME_START_FAILURE_RECEIPT_SHA256:
+        raise ResourceBlocked("the original failed-row receipt bytes changed")
+    if sha256_bytes(job_bytes) != PRE_GAME_START_WORKER_JOB_SHA256:
+        raise ResourceBlocked("the original failed-row worker job bytes changed")
+    try:
+        failure, job = json.loads(failure_bytes), json.loads(job_bytes)
+    except json.JSONDecodeError as exc:
+        raise ResourceBlocked("the reviewed failure evidence is not valid JSON") from exc
+    if (
+        failure.get("schema_id") != "issue75-stage1-unit-result-v1"
+        or failure.get("status") != "FAILED" or failure.get("boundary") != "PermissionError"
+        or failure.get("unit_id") != unit_id or failure.get("run_id") != predecessor_run_id
+        or failure.get("measured_cpu_seconds") != PRE_GAME_START_RETRY_MEASURED_CPU_SECONDS
+        or failure.get("wall_seconds") != PRE_GAME_START_RETRY_WALL_SECONDS
+        or failure.get("reserved_cpu_seconds") != PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS
+        or failure.get("checkpoint_sha256") is not None
+        or job.get("schema_id") != "issue75-stage1-worker-job-v1"
+        or job.get("run_id") != predecessor_run_id or job.get("unit_id") != unit_id
+        or job.get("phase") != "train" or job.get("package_commit") != PRE_GAME_START_RETRY_PACKAGE_COMMIT
+        or job.get("source_lock_sha256") != PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256
+        or job.get("row", {}).get("formal") is not True
+        or job.get("row", {}).get("unit_id") != unit_id
+        or job.get("row", {}).get("owner_seed") != 7_500_001
+        or job.get("row", {}).get("game_seed") != 7_500_001
+        or job.get("row", {}).get("arm") != "TRAIN"
+    ):
+        raise ResourceBlocked("the original failure/job no longer prove the reviewed pre-game-start boundary")
+
+    run_id = PRE_GAME_START_RETRY_RUN_ID
+    absence = {
+        "worker_result_absent": not (units_root / "result.json").exists(),
+        "worker_log_absent": not (units_root / f"worker-log-{run_id}.txt").exists(),
+        "native_output_absent": not (units_root / "native").exists(),
+        "runtime_root_absent": not (units_root / "runtime" / run_id).exists(),
+        "search_output_absent": not (Path(artifacts_root) / "search" / "TRAIN-7500001").exists(),
+    }
+    if require_pristine and not all(absence.values()):
+        raise ResourceBlocked("the original owner worker may have entered native/game execution")
+    proof = {
+        "schema_id": PRE_GAME_START_PROOF_SCHEMA,
+        "unit_id": unit_id,
+        "predecessor_run_id": predecessor_run_id,
+        "package_commit": PRE_GAME_START_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256,
+        "failure_boundary": "PermissionError",
+        "started_attempts": 0,
+        "worker_wall_seconds": PRE_GAME_START_RETRY_WALL_SECONDS,
+        "failure_receipt_sha256": PRE_GAME_START_FAILURE_RECEIPT_SHA256,
+        "worker_job_sha256": PRE_GAME_START_WORKER_JOB_SHA256,
+        **absence,
+    }
+    return proof
+
+
+def _train_7500129_pre_game_start_failure_proof(
+    artifacts_root: Path, runs: Mapping[str, Mapping[str, Any]], units: Mapping[str, Sequence[str]],
+    *, predecessor_run_id: str, require_pristine: bool, successor_run_id: str | None = None,
+) -> dict[str, Any]:
+    """Prove the exact immutable TRAIN:7500129 failure stopped before game/search start."""
+    unit_id = TRAIN_7500129_RETRY_UNIT_ID
+    history = list(units.get(unit_id, ()))
+    expected_history = [TRAIN_7500129_RETRY_RUN_ID]
+    if successor_run_id is not None:
+        expected_history.append(successor_run_id)
+    if predecessor_run_id != TRAIN_7500129_RETRY_RUN_ID or history != expected_history:
+        raise ResourceBlocked("TRAIN:7500129 retry must follow its exact zero-start predecessor exactly once")
+    run = runs.get(predecessor_run_id)
+    if not isinstance(run, Mapping):
+        raise ResourceBlocked("the reviewed TRAIN:7500129 predecessor is absent")
+    reservation, finish = run.get("reservation"), run.get("finish")
+    expected_reservation = {
+        "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
+        "run_id": TRAIN_7500129_RETRY_RUN_ID, "unit_id": unit_id,
+        "role": "builder", "unit_kind": "owner_arm", "attempt_cap": None,
+        "previous_run_id": None, "checkpoint_sha256": None,
+        "reserved_cpu_seconds": TRAIN_7500129_RESERVED_CPU_SECONDS,
+        "package_commit": TRAIN_7500129_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256,
+        "created_at_ns": TRAIN_7500129_RESERVED_AT_NS,
+    }
+    expected_finish = {
+        "event": "finish", "schema_id": "issue75-stage1-budget-event-v2",
+        "run_id": TRAIN_7500129_RETRY_RUN_ID, "unit_id": unit_id,
+        "status": "failed", "measured_cpu_seconds": TRAIN_7500129_MEASURED_CPU_SECONDS,
+        "reserved_cpu_seconds": TRAIN_7500129_RESERVED_CPU_SECONDS,
+        "started_attempts": 0, "checkpoint_sha256": None, "result_sha256": None,
+        "package_commit": TRAIN_7500129_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256,
+        "finished_at_ns": TRAIN_7500129_FINISHED_AT_NS,
+    }
+    if not isinstance(reservation, Mapping) or any(reservation.get(k) != v for k, v in expected_reservation.items()):
+        raise ResourceBlocked("TRAIN:7500129 reservation differs from its immutable reviewed failure")
+    if not isinstance(finish, Mapping) or any(finish.get(k) != v for k, v in expected_finish.items()):
+        raise ResourceBlocked("TRAIN:7500129 finish does not prove the exact zero-start failure")
+
+    units_root = Path(artifacts_root) / "units" / "TRAIN-7500129"
+    failure_path = units_root / f"failure-{TRAIN_7500129_RETRY_RUN_ID}.json"
+    job_path = units_root / f"worker-job-{TRAIN_7500129_RETRY_RUN_ID}.json"
+    log_path = units_root / f"worker-log-{TRAIN_7500129_RETRY_RUN_ID}.txt"
+    try:
+        failure_bytes, job_bytes, log_bytes = failure_path.read_bytes(), job_path.read_bytes(), log_path.read_bytes()
+    except OSError as exc:
+        raise ResourceBlocked("TRAIN:7500129 immutable failure, job, or worker-log evidence is missing") from exc
+    if (
+        artifact_sha256(failure_path, failure_bytes) != TRAIN_7500129_FAILURE_RECEIPT_SHA256
+        or artifact_sha256(job_path, job_bytes) != TRAIN_7500129_WORKER_JOB_SHA256
+        or artifact_sha256(log_path, log_bytes) != TRAIN_7500129_WORKER_LOG_SHA256
+    ):
+        raise ResourceBlocked("TRAIN:7500129 predecessor evidence bytes differ from the reviewed receipts")
+    try:
+        failure, job, worker_log = json.loads(failure_bytes), json.loads(job_bytes), json.loads(log_bytes)
+    except json.JSONDecodeError as exc:
+        raise ResourceBlocked("TRAIN:7500129 predecessor evidence is not valid JSON") from exc
+    row = job.get("row")
+    if (
+        failure.get("schema_id") != "issue75-stage1-unit-result-v1"
+        or failure.get("status") != "FAILED" or failure.get("boundary") != "worker_returned_nonzero"
+        or failure.get("unit_id") != unit_id or failure.get("run_id") != predecessor_run_id
+        or failure.get("measured_cpu_seconds") != TRAIN_7500129_MEASURED_CPU_SECONDS
+        or failure.get("wall_seconds") != TRAIN_7500129_WALL_SECONDS
+        or failure.get("reserved_cpu_seconds") != TRAIN_7500129_RESERVED_CPU_SECONDS
+        or failure.get("checkpoint_sha256") is not None
+        or job.get("schema_id") != "issue75-stage1-worker-job-v1"
+        or job.get("run_id") != predecessor_run_id or job.get("unit_id") != unit_id
+        or job.get("phase") != "training"
+        or job.get("package_commit") != TRAIN_7500129_RETRY_PACKAGE_COMMIT
+        or job.get("source_lock_sha256") != TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256
+        or not isinstance(row, Mapping) or row.get("formal") is not True
+        or row.get("unit_id") != unit_id or row.get("arm") != "TRAIN"
+        or row.get("phase") != "training" or row.get("block_index") != 1
+        or row.get("owner_seed") != 7500129 or row.get("game_seed") != 7500129
+        or row.get("paired_owner_key") != "train-7500129"
+        or row.get("policy_rng_seed") != 235643749
+        or row.get("search_invocation_seeds") != [931671957, 2098887910, 1706439549, 1707978817]
+        or worker_log != {"error_type": "RuntimeError", "status": "STAGE1_WORKER_FAILED"}
+    ):
+        raise ResourceBlocked("TRAIN:7500129 failure/job/log no longer prove the registered zero-start row")
+
+    run_root = units_root / "runs" / predecessor_run_id
+    absence = {
+        "worker_result_absent": not (units_root / "result.json").exists(),
+        "run_result_absent": not (run_root / "result.json").exists(),
+        "native_output_absent": not (run_root / "native").exists() and not (units_root / "native").exists(),
+        "runtime_root_absent": not (units_root / "runtime" / predecessor_run_id).exists(),
+        "search_output_absent": not (Path(artifacts_root) / "search" / "TRAIN-7500129").exists(),
+    }
+    if require_pristine and not all(absence.values()):
+        raise ResourceBlocked("TRAIN:7500129 predecessor has game, search, or result artifacts")
+    return {
+        "schema_id": PRE_GAME_START_PROOF_SCHEMA, "unit_id": unit_id,
+        "predecessor_run_id": predecessor_run_id,
+        "package_commit": TRAIN_7500129_RETRY_PACKAGE_COMMIT,
+        "source_lock_sha256": TRAIN_7500129_RETRY_SOURCE_LOCK_SHA256,
+        "failure_boundary": "worker_returned_nonzero", "worker_error_type": "RuntimeError",
+        "started_attempts": 0, "worker_wall_seconds": TRAIN_7500129_WALL_SECONDS,
+        "failure_receipt_sha256": TRAIN_7500129_FAILURE_RECEIPT_SHA256,
+        "worker_job_sha256": TRAIN_7500129_WORKER_JOB_SHA256,
+        "worker_log_sha256": TRAIN_7500129_WORKER_LOG_SHA256, **absence,
+    }
+
+
+def _validate_train_7500129_retry_reservation(
+    reservation: Mapping[str, Any], runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]], artifacts_root: Path, *, require_pristine: bool,
+) -> dict[str, Any]:
+    unit_id = str(reservation.get("unit_id", ""))
+    run_id = str(reservation.get("run_id", ""))
+    predecessor = str(reservation.get("previous_run_id", ""))
+    history = list(units.get(unit_id, ()))
+    suffix = run_id.rsplit("-", 1)[-1]
+    if (
+        unit_id != TRAIN_7500129_RETRY_UNIT_ID
+        or len(history) != 2 or history != [TRAIN_7500129_RETRY_RUN_ID, run_id]
+        or not run_id.startswith(unit_id + "-") or len(suffix) != 16
+        or any(char not in "0123456789abcdef" for char in suffix)
+        or predecessor != TRAIN_7500129_RETRY_RUN_ID
+        or reservation.get("role") != "builder" or reservation.get("unit_kind") != "owner_arm"
+        or reservation.get("attempt_cap") is not None or reservation.get("checkpoint_sha256") is not None
+        or reservation.get("retry_reason") != PRE_GAME_START_RETRY_REASON
+        or not isinstance(reservation.get("reserved_cpu_seconds"), (int, float))
+        or not 0 < float(reservation["reserved_cpu_seconds"]) <= TRAIN_7500129_RESERVED_CPU_SECONDS
+    ):
+        raise ResourceBlocked("TRAIN:7500129 reservation is not the one exact authorized successor")
+    proof = _train_7500129_pre_game_start_failure_proof(
+        artifacts_root, runs, units, predecessor_run_id=predecessor,
+        require_pristine=require_pristine, successor_run_id=run_id,
+    )
+    if (
+        reservation.get("pre_game_start_proof") != proof
+        or reservation.get("pre_game_start_proof_sha256") != sha256_bytes(canonical(proof))
+    ):
+        raise ResourceBlocked("TRAIN:7500129 retry is not bound to its preserved predecessor evidence")
+    return proof
+
+
+def _validate_pre_game_start_retry_reservation(
+    reservation: Mapping[str, Any], runs: Mapping[str, Mapping[str, Any]],
+    units: Mapping[str, Sequence[str]], artifacts_root: Path, *, require_pristine: bool,
+) -> dict[str, Any]:
+    unit_id = str(reservation.get("unit_id", ""))
+    if unit_id == TRAIN_7500129_RETRY_UNIT_ID:
+        return _validate_train_7500129_retry_reservation(
+            reservation, runs, units, artifacts_root, require_pristine=require_pristine,
+        )
+    predecessor = str(reservation.get("previous_run_id", ""))
+    history = units.get(unit_id, ())
+    if (
+        unit_id != PRE_GAME_START_RETRY_UNIT_ID or len(history) != 2
+        or list(history) != [PRE_GAME_START_RETRY_RUN_ID, reservation.get("run_id")]
+        or predecessor != PRE_GAME_START_RETRY_RUN_ID
+        or reservation.get("role") != "builder" or reservation.get("unit_kind") != "owner_arm"
+        or reservation.get("attempt_cap") is not None or reservation.get("checkpoint_sha256") is not None
+        or reservation.get("retry_reason") != PRE_GAME_START_RETRY_REASON
+        or not isinstance(reservation.get("reserved_cpu_seconds"), (int, float))
+        or not 0 < float(reservation["reserved_cpu_seconds"]) <= PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS
+    ):
+        raise ResourceBlocked("the new row attempt is not the single authorized pre-game-start retry")
+    proof = _pre_game_start_failure_proof(
+        artifacts_root, runs, units, predecessor_run_id=predecessor,
+        require_pristine=require_pristine,
+    )
+    if reservation.get("pre_game_start_proof") != proof or reservation.get("pre_game_start_proof_sha256") != sha256_bytes(canonical(proof)):
+        raise ResourceBlocked("the retry reservation is not bound to its verified pre-game-start evidence")
+    return proof
+
+
+def _scheduler_train_recovery_cpu_upper_bound(
+    runs: Mapping[str, Mapping[str, Any]], units: Mapping[str, Sequence[str]], artifacts_root: Path,
+) -> float:
+    """Bound pre-repair scheduler CPU from recorded wall timestamps and keep a shutdown margin."""
+    scheduler_history = list(units.get("SCHEDULER:TRAIN", ()))
+    if scheduler_history != [SCHEDULER_TRAIN_RECOVERY_RUN_ID]:
+        raise ResourceBlocked("open training scheduler is not the exact original reservation")
+    scheduler_run = runs[SCHEDULER_TRAIN_RECOVERY_RUN_ID]
+    reservation = scheduler_run["reservation"]
+    if (
+        scheduler_run["finish"] is not None
+        or reservation.get("unit_kind") != "scheduler" or reservation.get("role") != "builder"
+        or reservation.get("reserved_cpu_seconds") != SCHEDULER_TRAIN_RECOVERY_CAP
+        or reservation.get("package_commit") != PRE_GAME_START_RETRY_PACKAGE_COMMIT
+        or reservation.get("source_lock_sha256") != PRE_GAME_START_RETRY_SOURCE_LOCK_SHA256
+        or reservation.get("created_at_ns") != SCHEDULER_TRAIN_RECOVERY_RESERVED_AT_NS
+    ):
+        raise ResourceBlocked("open scheduler reservation differs from its immutable original receipt")
+    proof = _pre_game_start_failure_proof(
+        artifacts_root, runs, units, predecessor_run_id=PRE_GAME_START_RETRY_RUN_ID,
+        require_pristine=True,
+    )
+    if proof.get("started_attempts") != 0:
+        raise ResourceBlocked("scheduler recovery requires the exact zero-start predecessor")
+    failure = runs[PRE_GAME_START_RETRY_RUN_ID]["finish"]
+    elapsed = (int(failure["finished_at_ns"]) - int(reservation["created_at_ns"])) / 1_000_000_000
+    if elapsed < float(proof["worker_wall_seconds"]):
+        raise ResourceBlocked("scheduler recovery timestamps do not cover the worker's measured monotonic wall interval")
+    upper_bound = elapsed + SCHEDULER_RECOVERY_EXIT_MARGIN_SECONDS
+    if not math.isfinite(upper_bound) or elapsed < 0 or upper_bound >= SCHEDULER_TRAIN_RECOVERY_CAP:
+        raise ResourceBlocked("the original scheduler reserve cannot safely fund recovery")
+    return upper_bound
+
+
+def _charge(run: Mapping[str, Any]) -> float:
+    reservation, done = run["reservation"], run["finish"]
+    if reservation.get("run_id") == UPDATE0_SEED_FAILURE_RUN_ID:
+        if (
+            reservation.get("unit_id") != "UPDATE:0"
+            or reservation.get("role") != "builder"
+            or reservation.get("package_commit") != UPDATE0_SEED_FAILURE_PACKAGE_COMMIT
+            or reservation.get("source_lock_sha256") != UPDATE0_SEED_FAILURE_SOURCE_LOCK_SHA256
+            or reservation.get("reserved_cpu_seconds") != UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS
+            or not isinstance(done, Mapping)
+            or done.get("status") != "failed"
+            or done.get("measured_cpu_seconds") != UPDATE0_SEED_FAILURE_MEASURED_CPU_SECONDS
+            or done.get("started_attempts") != 0
+            or done.get("checkpoint_sha256") is not None
+            or done.get("result_sha256") is not None
+        ):
+            raise LedgerCorrupt("the reviewed UPDATE:0 failure no longer matches its conservative reservation charge")
+        return UPDATE0_SEED_FAILURE_RESERVED_CPU_SECONDS
+    return float(reservation["reserved_cpu_seconds"] if done is None else done["measured_cpu_seconds"])
+
+
+class Stage1Ledger:
+    """Append-only accounting; every reservation is bound to the locked package and CPU limits."""
+    def __init__(self, directory: Path):
+        self._initialize(directory, PackageBinding(*_current_package_binding()))
+
+    def _initialize(self, directory: Path, binding: PackageBinding) -> None:
+        self.binding = binding
+        self.directory = Path(directory)
+        self.events_path = self.directory / "events.jsonl"
+        self.lock_path = self.directory / "events.lock"
+        self.thread_lock = threading.RLock()
+
+    @classmethod
+    def open_reserved_worker(
+        cls, directory: Path, *, run_id: str, unit_id: str,
+    ) -> "Stage1Ledger":
+        """Open only a live parent reservation bound to the current locked package."""
+        current_binding = _current_package_binding()
+        ledger = cls.__new__(cls)
+        ledger._initialize(directory, PackageBinding(*current_binding))
+        runs, _ = _state(_events(ledger.events_path))
+        run = runs.get(str(run_id))
+        if run is None or run["finish"] is not None:
+            raise PermissionError("worker has no open write-ahead ledger reservation")
+        reservation = run["reservation"]
+        if reservation.get("unit_id") != str(unit_id):
+            raise PermissionError("worker reservation does not match its registered unit")
+        if (
+            reservation.get("package_commit") != current_binding[0]
+            or reservation.get("source_lock_sha256") != current_binding[1]
+        ):
+            raise PermissionError("worker reservation belongs to a different package or source lock")
+        ledger.require_open_reservation(run_id=run_id, unit_id=unit_id)
+        return ledger
+
+    def _tx(self, operation):
+        self.directory.mkdir(parents=True, exist_ok=True)
+        fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            with self.thread_lock:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                rows = _events(self.events_path)
+                result, event = operation(rows)
+                if event is not None:
+                    events = event if isinstance(event, list) else [event]
+                    data = b"".join(canonical(item) + b"\n" for item in events)
+                    out = os.open(self.events_path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
+                    try:
+                        if os.write(out, data) != len(data):
+                            raise OSError("short append to CPU ledger")
+                        os.fsync(out)
+                    finally:
+                        os.close(out)
+                return result
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+
+    def require_open_reservation(self, *, run_id: str, unit_id: str, role: str = "builder") -> dict[str, Any]:
+        """Confirm a worker is the exact source-bound child of a live ledger reservation."""
+        runs, units = _state(_events(self.events_path))
+        run = runs.get(str(run_id))
+        if run is None or run["finish"] is not None:
+            raise PermissionError("worker has no open write-ahead ledger reservation")
+        reservation = run["reservation"]
+        if (
+            reservation.get("unit_id") != str(unit_id)
+            or reservation.get("role") != str(role)
+            or reservation.get("package_commit") != self.binding.package_commit
+            or reservation.get("source_lock_sha256") != self.binding.source_lock_sha256
+        ):
+            raise PermissionError("worker reservation does not match its unit and active package binding")
+        if reservation.get("retry_reason") == PRE_GAME_START_RETRY_REASON:
+            _validate_pre_game_start_retry_reservation(
+                reservation, runs, units, self.directory.parent, require_pristine=True,
+            )
+        elif reservation.get("repair_reason") == BLOCK0_PHASE_REPAIR_REASON:
+            manifest, manifest_sha, by_unit = _validate_block0_originals(
+                self.directory.parent, runs, units,
+            )
+            owner = by_unit.get(str(unit_id))
+            original_ids = [] if owner is None else [entry["run_id"] for entry in owner["history"]]
+            if (
+                owner is None or list(units.get(str(unit_id), ())) != original_ids + [str(run_id)]
+                or reservation.get("repair_manifest_sha256") != manifest_sha
+                or reservation.get("repair_predecessor_run_id") != original_ids[-1]
+                or reservation.get("repair_predecessor_receipt_sha256") != owner["replacement_predecessor_result_sha256"]
+                or reservation.get("package_commit") != self.binding.package_commit
+                or reservation.get("source_lock_sha256") != self.binding.source_lock_sha256
+                or reservation.get("unit_kind") != "owner_arm" or reservation.get("role") != "builder"
+                or reservation.get("previous_run_id") is not None
+                or reservation.get("checkpoint_sha256") is not None
+            ):
+                raise PermissionError("owner worker reservation differs from its authorized block-0 replacement")
+        elif reservation.get("repair_reason") == UPDATE0_RETRY_REASON:
+            info = self.validate_update0_retry_state()
+            if any(reservation.get(key) != info.get(key) for key in (
+                "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
+                "repair_predecessor_receipt_sha256",
+            )) or reservation.get("package_commit") != self.binding.package_commit or reservation.get("source_lock_sha256") != self.binding.source_lock_sha256:
+                raise PermissionError("UPDATE:0 worker reservation differs from the one-time failure-repair lineage")
+        elif reservation.get("repair_reason") == UPDATE0_RECONSTRUCTION_REASON:
+            info = self.update0_reconstruction_info(run_id=run_id)
+            if info.get("state") != "OPEN" or any(reservation.get(key) != info.get(key) for key in (
+                "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
+                "repair_predecessor_receipt_sha256",
+            )):
+                raise PermissionError("UPDATE:0 worker reservation differs from the one-time lost-checkpoint reconstruction lineage")
+            job_path = self.directory.parent / "units" / "UPDATE-0" / f"worker-job-{run_id}.json"
+            try:
+                job = json.loads(job_path.read_bytes())
+            except (OSError, ValueError) as exc:
+                raise PermissionError("UPDATE:0 reconstruction worker job is missing or malformed") from exc
+            if any(job.get(key) != value for key, value in {
+                "run_id": run_id,
+                "unit_id": "UPDATE:0",
+                "phase": "update",
+                "package_commit": self.binding.package_commit,
+                "source_lock_sha256": self.binding.source_lock_sha256,
+                "previous_run_id": reservation.get("previous_run_id"),
+                "checkpoint_sha256": reservation.get("checkpoint_sha256"),
+                "repair_reason": info["repair_reason"],
+                "repair_manifest_sha256": info["repair_manifest_sha256"],
+                "repair_predecessor_run_id": info["repair_predecessor_run_id"],
+                "repair_predecessor_receipt_sha256": info["repair_predecessor_receipt_sha256"],
+            }.items()):
+                raise PermissionError("UPDATE:0 reconstruction worker job differs from its exact ledger lineage")
+        elif any(reservation.get(key) is not None for key in (
+            "retry_reason", "pre_game_start_proof", "pre_game_start_proof_sha256",
+            "repair_reason", "repair_manifest_sha256", "repair_predecessor_run_id",
+            "repair_predecessor_receipt_sha256",
+        )):
+            raise PermissionError("worker reservation contains an unrecognized retry claim")
+        return dict(reservation)
+
+    def pre_game_start_retry_info(self, *, unit_id: str, predecessor_run_id: str) -> dict[str, Any]:
+        """Return proof only for the one fixed immutable pre-game-start predecessor."""
+        runs, units = _state(_events(self.events_path))
+        if unit_id == PRE_GAME_START_RETRY_UNIT_ID and predecessor_run_id == PRE_GAME_START_RETRY_RUN_ID:
+            if units.get(unit_id) != [predecessor_run_id] or runs[predecessor_run_id]["finish"] is None:
+                raise ResourceBlocked("pre-game-start retry predecessor has changed")
+            return _pre_game_start_failure_proof(
+                self.directory.parent, runs, units, predecessor_run_id=predecessor_run_id,
+                require_pristine=True,
+            )
+        if unit_id == TRAIN_7500129_RETRY_UNIT_ID and predecessor_run_id == TRAIN_7500129_RETRY_RUN_ID:
+            if units.get(unit_id) != [predecessor_run_id] or runs[predecessor_run_id]["finish"] is None:
+                raise ResourceBlocked("TRAIN:7500129 retry predecessor has changed")
+            return _train_7500129_pre_game_start_failure_proof(
+                self.directory.parent, runs, units, predecessor_run_id=predecessor_run_id,
+                require_pristine=True,
+            )
+        raise ResourceBlocked("no pre-game-start retry exception is registered for this unit")
+
+    def validate_block0_phase_repair_state(self) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
+        """Validate all original and any single append-only replacement receipts."""
+        runs, units = _state(_events(self.events_path))
+        return _validate_block0_originals(self.directory.parent, runs, units)
+
+    def block0_phase_repair_info(self, *, unit_id: str) -> dict[str, Any]:
+        """Return the exact one-time replacement lineage for a missing block-0 intervention."""
+        runs, units = _state(_events(self.events_path))
+        manifest, manifest_sha, by_unit = _validate_block0_originals(
+            self.directory.parent, runs, units,
+        )
+        owner = by_unit.get(unit_id)
+        if owner is None:
+            raise ResourceBlocked("no block-0 intervention replacement is registered for this owner")
+        original_ids = [entry["run_id"] for entry in owner["history"]]
+        if list(units.get(unit_id, ())) != original_ids:
+            raise ResourceBlocked("this registered block-0 owner already has its one replacement reservation")
+        return {
+            "repair_reason": BLOCK0_PHASE_REPAIR_REASON,
+            "repair_manifest_sha256": manifest_sha,
+            "repair_predecessor_run_id": original_ids[-1],
+            "repair_predecessor_receipt_sha256": owner["replacement_predecessor_result_sha256"],
+            "reserved_cpu_seconds": float(owner["replacement_reservation_cpu_seconds"]),
+            "scope": manifest["scope"],
+        }
+
+    def validate_update0_retry_state(self) -> dict[str, Any]:
+        runs, units = _state(_events(self.events_path))
+        info, manifest_sha = _validate_update0_retry_state(
+            self.directory.parent, runs, units,
+            (self.binding.package_commit, self.binding.source_lock_sha256),
+        )
+        return {**info, "repair_manifest_sha256": manifest_sha}
+
+    def update0_reconstruction_info(self, *, run_id: str | None = None) -> dict[str, Any]:
+        """Validate the one authorized fixed-input reconstruction and exact checkpoint resumes."""
+        runs, units = _state(_events(self.events_path))
+        return _validate_update0_reconstruction_state(
+            self.directory.parent, runs, units,
+            (self.binding.package_commit, self.binding.source_lock_sha256),
+            run_id=run_id,
+        )
+
+    def block0_decoder_compatibility_records(self) -> dict[str, dict[str, Any]]:
+        """Validate the exact registered replacement receipts once before loading block 0."""
+        runs, units = _state(_events(self.events_path))
+        _, _, original_by_unit = _validate_block0_originals(self.directory.parent, runs, units)
+        compatibility, _, _, compatibility_by_unit = _load_block0_decoder_compatibility(self.directory.parent)
+        records = {}
+        for unit_id in original_by_unit:
+            record = _validate_block0_decoder_compatibility_owner(
+                self.directory.parent, runs, units, original_by_unit,
+                compatibility, compatibility_by_unit, unit_id,
+            )
+            if record is None:
+                raise ResourceBlocked(f"the registered block-0 replacement is missing: {unit_id}")
+            records[unit_id] = record
+        return records
+
+    def block0_decoder_compatibility_record(self, unit_id: str, run_id: str) -> dict[str, Any] | None:
+        """Validate and return one exact prior block-0 replacement receipt under its old package."""
+        record = self.block0_decoder_compatibility_records().get(unit_id)
+        if record is not None and record.get("run_id") != run_id:
+            raise ResourceBlocked("the requested block-0 receipt is not the source-locked compatibility run")
+        return record
+
+    def update0_retry_info(self) -> dict[str, Any]:
+        info = self.validate_update0_retry_state()
+        runs, units = _state(_events(self.events_path))
+        history = list(units.get("UPDATE:0", ()))
+        if (
+            info.get("retry_available") is not True
+            or len(history) != 3
+            or history[-1] != info.get("retry_previous_run_id")
+        ):
+            raise ResourceBlocked("the one corrected UPDATE:0 attempt is unavailable or already consumed")
+        return info
+
+    def recover_open_training_scheduler(self) -> dict[str, Any]:
+        """Mark and reuse the exact original 120 CPU-s allocation once, without a second reserve."""
+        def operation(rows):
+            runs, units = _state(rows)
+            run = runs.get(SCHEDULER_TRAIN_RECOVERY_RUN_ID)
+            if run is None or run["finish"] is not None or run.get("scheduler_recoveries"):
+                raise ResourceBlocked("the original training scheduler reservation is already recovered or unavailable")
+            upper_bound = _scheduler_train_recovery_cpu_upper_bound(runs, units, self.directory.parent)
+            event = {
+                "event": "scheduler_recovery", "schema_id": "issue75-stage1-budget-event-v2",
+                "run_id": SCHEDULER_TRAIN_RECOVERY_RUN_ID, "unit_id": "SCHEDULER:TRAIN",
+                "prior_cpu_upper_bound_seconds": upper_bound,
+                "accounting_basis": "reservation retained at full cap; prior CPU bounded by source-bound event timestamps",
+                "package_commit": self.binding.package_commit,
+                "source_lock_sha256": self.binding.source_lock_sha256,
+                "created_at_ns": time.time_ns(),
+            }
+            return event, event
+        return self._tx(operation)
+
+    @staticmethod
+    def _charges(runs):
+        result = {"builder": 0.0, "reviewer": 0.0}
+        for run in runs.values():
+            role = run["reservation"].get("role")
+            if role not in result:
+                raise LedgerCorrupt("unknown ledger role")
+            result[role] += _charge(run)
+        return result
+
+    def _reservation_event(self, rows, *, run_id: str, unit_id: str, role: str,
+                           reserved_cpu_seconds: float, unit_kind: str,
+                           attempt_cap: int | None = None,
+                           previous_run_id: str | None = None,
+                           checkpoint_sha256: str | None = None,
+                           retry_reason: str | None = None,
+                           pre_game_start_proof: Mapping[str, Any] | None = None,
+                           repair_reason: str | None = None,
+                           repair_manifest_sha256: str | None = None,
+                           repair_predecessor_run_id: str | None = None,
+                           repair_predecessor_receipt_sha256: str | None = None):
+        cap = float(reserved_cpu_seconds)
+        if role not in {"builder", "reviewer"} or not run_id or not unit_id or not math.isfinite(cap) or cap <= 0:
+            raise ValueError("invalid run, unit, role, or CPU reservation")
+        if unit_kind == "search_invocation":
+            if cap > SEARCH_CPU_CAP_SECONDS or attempt_cap is None or not 1 <= attempt_cap <= SEARCH_ATTEMPT_CAP:
+                raise ValueError("search reservation exceeds 32 CPU-s / 16 started-attempt lock")
+        elif attempt_cap is not None:
+            raise ValueError("attempt_cap is only valid for a search invocation")
+        if checkpoint_sha256 is not None and (
+            len(checkpoint_sha256) != 64 or any(c not in "0123456789abcdef" for c in checkpoint_sha256)
+        ):
+            raise ValueError("invalid checkpoint digest")
+        repair_fields = {
+            "repair_reason": repair_reason,
+            "repair_manifest_sha256": repair_manifest_sha256,
+            "repair_predecessor_run_id": repair_predecessor_run_id,
+            "repair_predecessor_receipt_sha256": repair_predecessor_receipt_sha256,
+        }
+        runs, units = _state(rows)
+        if run_id in runs:
+            raise DuplicateRun(run_id)
+        history = units.get(unit_id, [])
+        if history:
+            last = runs[history[-1]]
+            done = last["finish"]
+            if done is None:
+                if unit_id == "UPDATE:0" and repair_reason == UPDATE0_RECONSTRUCTION_REASON:
+                    info = self.update0_reconstruction_info()
+                    if (
+                        info.get("can_start") is not True
+                        or previous_run_id != info.get("retry_previous_run_id")
+                        or checkpoint_sha256 is not None
+                        or unit_kind != "training_update" or role != "builder"
+                        or cap > info["reserved_cpu_seconds"]
+                        or any(repair_fields.get(key) != info.get(key) for key in (
+                            "repair_reason", "repair_manifest_sha256",
+                            "repair_predecessor_run_id", "repair_predecessor_receipt_sha256",
+                        ))
+                        or retry_reason is not None or pre_game_start_proof is not None
+                    ):
+                        raise ResourceBlocked("UPDATE:0 may cross its preserved open original reservation only for the one exact reconstruction")
+                else:
+                    raise ResourceBlocked(f"unresolved reservation remains charged at full cap: {unit_id}")
+            elif done.get("status") == "incomplete":
+                if retry_reason is not None or pre_game_start_proof is not None:
+                    raise CheckpointMismatch("checkpoint resume cannot claim the pre-game-start exception")
+                prior_reason = last["reservation"].get("repair_reason")
+                if unit_id == "UPDATE:0" and prior_reason == UPDATE0_RECONSTRUCTION_REASON:
+                    info = self.update0_reconstruction_info()
+                elif unit_id == "UPDATE:0" and prior_reason == UPDATE0_RETRY_REASON:
+                    info = self.validate_update0_retry_state()
+                else:
+                    info = None
+                if info is not None:
+                    lineage_fields = (
+                        "repair_reason", "repair_manifest_sha256",
+                        "repair_predecessor_run_id", "repair_predecessor_receipt_sha256",
+                    )
+                    if (cap > info["reserved_cpu_seconds"]
+                        or any(last["reservation"].get(key) != info.get(key) for key in lineage_fields)
+                        or any(repair_fields.get(key) != info.get(key) for key in lineage_fields)):
+                        raise CheckpointMismatch("UPDATE:0 checkpoint resume changed its original repair lineage/cap")
+                elif any(value is not None for value in repair_fields.values()):
+                    raise CheckpointMismatch("checkpoint resume carries unregistered repair metadata")
+                if float(done.get("measured_cpu_seconds", 0.0)) > float(done.get("reserved_cpu_seconds", 0.0)):
+                    raise ResourceBlocked("an incomplete unit exceeded its immutable reservation and cannot be resumed")
+                if (previous_run_id != history[-1] or not done.get("checkpoint_sha256")
+                        or checkpoint_sha256 != done["checkpoint_sha256"]
+                        or role != last["reservation"]["role"]):
+                    raise CheckpointMismatch("resume needs the exact prior incomplete run and checkpoint digest")
+            elif done.get("status") == "failed":
+                if unit_id == "UPDATE:0" and repair_reason == UPDATE0_RETRY_REASON:
+                    info = self.update0_retry_info()
+                    if (
+                        previous_run_id != info["retry_previous_run_id"]
+                        or checkpoint_sha256 is not None
+                        or repair_manifest_sha256 != info["repair_manifest_sha256"]
+                        or repair_predecessor_run_id != info["repair_predecessor_run_id"]
+                        or repair_predecessor_receipt_sha256 != info["repair_predecessor_receipt_sha256"]
+                        or retry_reason is not None or pre_game_start_proof is not None
+                        or unit_kind != "training_update" or role != "builder"
+                        or cap > info["reserved_cpu_seconds"]
+                    ):
+                        raise ResourceBlocked("UPDATE:0 retry differs from its exact registered repair cap/lineage")
+                elif history == [TRAIN_7500129_RETRY_RUN_ID] and unit_id == TRAIN_7500129_RETRY_UNIT_ID:
+                    run_suffix = run_id.rsplit("-", 1)[-1]
+                    if (
+                        previous_run_id != TRAIN_7500129_RETRY_RUN_ID or checkpoint_sha256 is not None
+                        or not run_id.startswith(unit_id + "-") or len(run_suffix) != 16
+                        or any(char not in "0123456789abcdef" for char in run_suffix)
+                    ):
+                        raise ResourceBlocked("TRAIN:7500129 retry must link its exact failed predecessor and a new run id")
+                    if retry_reason != PRE_GAME_START_RETRY_REASON:
+                        raise ResourceBlocked("TRAIN:7500129 retry lacks the explicit pre-game-start failure reason")
+                    proof = _train_7500129_pre_game_start_failure_proof(
+                        self.directory.parent, runs, units, predecessor_run_id=previous_run_id,
+                        require_pristine=True,
+                    )
+                    if pre_game_start_proof != proof:
+                        raise ResourceBlocked("TRAIN:7500129 proof differs from the verified original failure")
+                    if unit_kind != "owner_arm" or role != "builder" or cap > TRAIN_7500129_RESERVED_CPU_SECONDS:
+                        raise ResourceBlocked("TRAIN:7500129 retry changed its registered row or CPU ceiling")
+                elif history == [PRE_GAME_START_RETRY_RUN_ID] and unit_id == PRE_GAME_START_RETRY_UNIT_ID:
+                    if previous_run_id != PRE_GAME_START_RETRY_RUN_ID or checkpoint_sha256 is not None:
+                        raise ResourceBlocked("the one-row exception must link its exact failed predecessor")
+                    if retry_reason != PRE_GAME_START_RETRY_REASON:
+                        raise ResourceBlocked("failed owner row lacks the explicit pre-game-start failure reason")
+                    proof = _pre_game_start_failure_proof(
+                        self.directory.parent, runs, units, predecessor_run_id=previous_run_id,
+                        require_pristine=True,
+                    )
+                    if pre_game_start_proof != proof:
+                        raise ResourceBlocked("retry proof differs from the verified original failure evidence")
+                    if unit_kind != "owner_arm" or role != "builder" or cap > PRE_GAME_START_RETRY_RESERVED_CPU_SECONDS:
+                        raise ResourceBlocked("pre-game-start retry changed the registered owner row or CPU ceiling")
+                else:
+                    raise ResourceBlocked(f"failed unit is immutable and cannot be replayed: {unit_id}")
+            elif done.get("status") == "succeeded":
+                if not unit_id.startswith("TRAIN:") or repair_reason != BLOCK0_PHASE_REPAIR_REASON:
+                    raise DuplicateRun(f"terminal unit cannot be replayed: {unit_id}")
+                manifest, manifest_sha, by_unit = _validate_block0_originals(
+                    self.directory.parent, runs, units,
+                )
+                owner = by_unit.get(unit_id)
+                if owner is None:
+                    raise ResourceBlocked("replacement is outside the one registered block-0 owner cohort")
+                original_ids = [entry["run_id"] for entry in owner["history"]]
+                if (
+                    history != original_ids
+                    or previous_run_id is not None or checkpoint_sha256 is not None
+                    or retry_reason is not None or pre_game_start_proof is not None
+                    or repair_manifest_sha256 != manifest_sha
+                    or repair_predecessor_run_id != original_ids[-1]
+                    or repair_predecessor_receipt_sha256 != owner["replacement_predecessor_result_sha256"]
+                    or unit_kind != "owner_arm" or role != "builder"
+                    or cap > float(owner["replacement_reservation_cpu_seconds"])
+                ):
+                    raise ResourceBlocked("block-0 replacement differs from its exact immutable lineage and cap")
+            else:
+                raise DuplicateRun(f"terminal unit cannot be replayed: {unit_id}")
+        elif (previous_run_id is not None or checkpoint_sha256 is not None
+              or retry_reason is not None or pre_game_start_proof is not None
+              or repair_reason is not None or repair_manifest_sha256 is not None
+              or repair_predecessor_run_id is not None or repair_predecessor_receipt_sha256 is not None):
+            raise CheckpointMismatch("resume/retry metadata supplied for a new unit")
+        charges = self._charges(runs)
+        builder_with_prior_use = charges["builder"] + PRIOR_USE_CPU_ALLOWANCE_SECONDS
+        if role == "builder":
+            if builder_with_prior_use + cap > BUILDER_LIMIT:
+                raise ResourceBlocked("Builder CPU cap including unledgered prior use would be exceeded")
+            if builder_with_prior_use + cap + max(REVIEWER_LIMIT, charges["reviewer"]) > ALL_IN_LIMIT:
+                raise ResourceBlocked("all-in cap or protected Reviewer reserve would be breached")
+        else:
+            if charges["reviewer"] + cap > REVIEWER_LIMIT:
+                raise ResourceBlocked("protected Reviewer CPU reserve would be exceeded")
+            if builder_with_prior_use + charges["reviewer"] + cap > ALL_IN_LIMIT:
+                raise ResourceBlocked("all-in CPU cap including unledgered prior use would be exceeded")
+        return {
+            "event": "reserve", "schema_id": "issue75-stage1-budget-event-v2",
+            "run_id": run_id, "unit_id": unit_id, "role": role, "unit_kind": unit_kind,
+            "reserved_cpu_seconds": cap, "attempt_cap": attempt_cap,
+            "previous_run_id": previous_run_id, "checkpoint_sha256": checkpoint_sha256,
+            "retry_reason": retry_reason,
+            "repair_reason": repair_reason,
+            "repair_manifest_sha256": repair_manifest_sha256,
+            "repair_predecessor_run_id": repair_predecessor_run_id,
+            "repair_predecessor_receipt_sha256": repair_predecessor_receipt_sha256,
+            "pre_game_start_proof": None if pre_game_start_proof is None else dict(pre_game_start_proof),
+            "pre_game_start_proof_sha256": None if pre_game_start_proof is None else sha256_bytes(canonical(pre_game_start_proof)),
+            "package_commit": self.binding.package_commit,
+            "source_lock_sha256": self.binding.source_lock_sha256,
+            "created_at_ns": time.time_ns(),
+        }
+
+    def reserve_many(self, reservations: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+        """Append a batch of write-ahead reservations under one ledger lock."""
+        specs = [dict(spec) for spec in reservations]
+        if not specs:
+            raise ValueError("reserve_many requires at least one reservation")
+
+        def operation(rows):
+            projected = list(rows)
+            events = []
+            for spec in specs:
+                event = self._reservation_event(projected, **spec)
+                events.append(event)
+                projected.append(event)
+            return events, events
+
+        return self._tx(operation)
+
+    def reserve(self, *, run_id: str, unit_id: str, role: str,
+                reserved_cpu_seconds: float, unit_kind: str,
+                attempt_cap: int | None = None,
+                previous_run_id: str | None = None,
+                checkpoint_sha256: str | None = None,
+                retry_reason: str | None = None,
+                pre_game_start_proof: Mapping[str, Any] | None = None,
+                repair_reason: str | None = None,
+                repair_manifest_sha256: str | None = None,
+                repair_predecessor_run_id: str | None = None,
+                repair_predecessor_receipt_sha256: str | None = None) -> dict[str, Any]:
+        return self.reserve_many([{
+            "run_id": run_id, "unit_id": unit_id, "role": role,
+            "reserved_cpu_seconds": reserved_cpu_seconds, "unit_kind": unit_kind,
+            "attempt_cap": attempt_cap, "previous_run_id": previous_run_id,
+            "checkpoint_sha256": checkpoint_sha256, "retry_reason": retry_reason,
+            "pre_game_start_proof": pre_game_start_proof,
+            "repair_reason": repair_reason,
+            "repair_manifest_sha256": repair_manifest_sha256,
+            "repair_predecessor_run_id": repair_predecessor_run_id,
+            "repair_predecessor_receipt_sha256": repair_predecessor_receipt_sha256,
+        }])[0]
+
+    def finish(
+        self, *, run_id: str, measured_cpu_seconds: float, status: str,
+        checkpoint_sha256: str | None = None, started_attempts: int = 0,
+        result_sha256: str | None = None,
+    ) -> dict[str, Any]:
+        measured = float(measured_cpu_seconds)
+        if not math.isfinite(measured) or measured < 0 or status not in {"succeeded", "failed", "incomplete"}:
+            raise ValueError("invalid measured CPU or attempt status")
+        if not isinstance(started_attempts, int) or started_attempts < 0:
+            raise ValueError("started_attempts must be a nonnegative integer")
+        if status == "incomplete":
+            if not checkpoint_sha256 or len(checkpoint_sha256) != 64 or any(c not in "0123456789abcdef" for c in checkpoint_sha256):
+                raise ValueError("incomplete work requires a durable checkpoint SHA256")
+        elif checkpoint_sha256 is not None:
+            raise ValueError("only incomplete work may carry a resume checkpoint")
+        if status == "succeeded":
+            if not isinstance(result_sha256, str) or len(result_sha256) != 64 or any(
+                c not in "0123456789abcdef" for c in result_sha256
+            ):
+                raise ValueError("successful work requires its immutable result SHA256")
+        elif result_sha256 is not None:
+            raise ValueError("only succeeded work may carry a result SHA256")
+
+        def operation(rows):
+            runs, _ = _state(rows)
+            run = runs.get(run_id)
+            if run is None or run["finish"] is not None:
+                raise DuplicateRun(f"no open reservation: {run_id}")
+            reservation = run["reservation"]
+            event = {
+                "event": "finish", "schema_id": "issue75-stage1-budget-event-v2",
+                "run_id": run_id, "unit_id": reservation["unit_id"], "status": status,
+                "measured_cpu_seconds": measured, "reserved_cpu_seconds": reservation["reserved_cpu_seconds"],
+                "started_attempts": started_attempts, "checkpoint_sha256": checkpoint_sha256,
+                "result_sha256": result_sha256,
+                "finished_at_ns": time.time_ns(), "package_commit": self.binding.package_commit,
+                "source_lock_sha256": self.binding.source_lock_sha256,
+            }
+            return (event, reservation), event
+        event, reservation = self._tx(operation)
+        if measured > float(reservation["reserved_cpu_seconds"]) or (
+            reservation["unit_kind"] == "search_invocation" and
+            started_attempts > int(reservation["attempt_cap"])
+        ):
+            raise BudgetOverrun(f"actual work exceeded its recorded reservation: {run_id}", measured)
+        return event
+
+    def forecast(
+        self, *, expected_unit_ids: Sequence[str], future_builder_cpu_seconds: Mapping[str, float],
+        allowed_completed_unit_ids: Sequence[str] = (),
+        allowed_open_reservation_unit_ids: Sequence[str] = (),
+    ):
+        expected = list(expected_unit_ids)
+        allowed = set(allowed_completed_unit_ids)
+        allowed_open = set(allowed_open_reservation_unit_ids)
+        if (not expected or len(set(expected)) != len(expected)
+                or set(expected) != set(future_builder_cpu_seconds)
+                or allowed & set(expected) or not allowed_open <= set(expected)
+                or not allowed_open <= {"SCHEDULER:TRAIN"}):
+            raise ValueError("forecast must include each exact registered unit once")
+        estimates = {unit: float(future_builder_cpu_seconds[unit]) for unit in expected}
+        if any(not math.isfinite(value) or value < 0 for value in estimates.values()):
+            raise ValueError("forecast costs must be finite and nonnegative")
+
+        def operation(rows):
+            runs, units = _state(rows)
+            charges = self._charges(runs)
+            future = 0.0
+            blocked = []
+            for unit, history in units.items():
+                if unit not in set(expected) and (
+                    unit not in allowed or runs[history[-1]]["finish"] is None
+                    or runs[history[-1]]["finish"]["status"] != "succeeded"
+                ):
+                    blocked.append(unit)
+            carried_open = []
+            retry_units = []
+            for unit in expected:
+                history = units.get(unit, [])
+                if not history:
+                    future += estimates[unit]
+                    continue
+                last = runs[history[-1]]
+                done = last["finish"]
+                if done is None:
+                    if unit in allowed_open and unit == "SCHEDULER:TRAIN":
+                        if last.get("scheduler_recoveries"):
+                            blocked.append(unit)
+                            continue
+                        try:
+                            _scheduler_train_recovery_cpu_upper_bound(runs, units, self.directory.parent)
+                        except ResourceBlocked:
+                            blocked.append(unit)
+                            continue
+                        if float(last["reservation"].get("reserved_cpu_seconds", -1)) != estimates[unit]:
+                            blocked.append(unit)
+                            continue
+                        carried_open.append(unit)
+                    else:
+                        blocked.append(unit)
+                elif done.get("status") == "failed":
+                    if unit == TRAIN_7500129_RETRY_UNIT_ID and history == [TRAIN_7500129_RETRY_RUN_ID]:
+                        try:
+                            _train_7500129_pre_game_start_failure_proof(
+                                self.directory.parent, runs, units,
+                                predecessor_run_id=TRAIN_7500129_RETRY_RUN_ID, require_pristine=True,
+                            )
+                        except ResourceBlocked:
+                            blocked.append(unit)
+                            continue
+                        future += estimates[unit]
+                        retry_units.append(unit)
+                    elif unit == PRE_GAME_START_RETRY_UNIT_ID and history == [PRE_GAME_START_RETRY_RUN_ID]:
+                        try:
+                            _pre_game_start_failure_proof(
+                                self.directory.parent, runs, units,
+                                predecessor_run_id=PRE_GAME_START_RETRY_RUN_ID, require_pristine=True,
+                            )
+                        except ResourceBlocked:
+                            blocked.append(unit)
+                            continue
+                        future += estimates[unit]
+                        retry_units.append(unit)
+                    else:
+                        blocked.append(unit)
+                elif done.get("status") == "incomplete":
+                    future += estimates[unit]
+            if blocked:
+                raise ResourceBlocked("forecast stops on unresolved/failed units: " + ", ".join(blocked[:8]))
+            builder = charges["builder"] + PRIOR_USE_CPU_ALLOWANCE_SECONDS + future
+            all_in = builder + max(REVIEWER_LIMIT, charges["reviewer"])
+            result = {
+                "status": "FITS" if builder <= BUILDER_LIMIT and all_in <= ALL_IN_LIMIT else "RESOURCE_BLOCKED",
+                "registered_units": len(expected),
+                "completed_units": sum(
+                    bool(units.get(unit)) and runs[units[unit][-1]]["finish"] is not None
+                    and runs[units[unit][-1]]["finish"]["status"] == "succeeded" for unit in expected
+                ),
+                "builder_cpu_charged": charges["builder"],
+                "unledgered_prior_builder_cpu_allowance_seconds": PRIOR_USE_CPU_ALLOWANCE_SECONDS,
+                "builder_cpu_counted_including_prior_use": builder - future,
+                "reviewer_cpu_charged": charges["reviewer"],
+                "future_builder_cpu_forecast": future, "projected_builder_cpu": builder,
+                "projected_all_in_with_reviewer_reserve": all_in,
+                "carried_open_reservation_unit_ids": carried_open,
+                "authorized_pre_game_start_retry_unit_ids": retry_units,
+                "builder_cpu_remaining": BUILDER_LIMIT - builder, "all_in_cpu_remaining": ALL_IN_LIMIT - all_in,
+                "package_commit": self.binding.package_commit,
+                "source_lock_sha256": self.binding.source_lock_sha256,
+            }
+            if result["status"] != "FITS":
+                raise ResourceBlocked(canonical(result).decode())
+            return result, None
+        return self._tx(operation)
+
+    def read_events(self):
+        return self._tx(lambda rows: (_state(rows) and rows, None))
+
+
+def open_stage1_ledger(directory: Path) -> Stage1Ledger:
+    """Open the cumulative ledger after validating the locked package and source binding."""
+    return Stage1Ledger(directory)
+
+
+def open_reserved_stage1_worker_ledger(
+    directory: Path, *, run_id: str, unit_id: str,
+) -> Stage1Ledger:
+    """Validate a durable parent reservation without refetching GitHub in every worker."""
+    return Stage1Ledger.open_reserved_worker(directory, run_id=run_id, unit_id=unit_id)
+
+
+class ProcessTreeSafetyError(RuntimeError): pass
+
+
+class ProcessTreeTimeout(TimeoutError):
+    def __init__(self, cpu_seconds: float, timeout_seconds: float):
+        super().__init__(f"worker wall timeout after {cpu_seconds:.6f} process-tree CPU seconds")
+        self.cpu_seconds, self.timeout_seconds = cpu_seconds, timeout_seconds
+
+
+class ProcessTreeBudgetExceeded(RuntimeError):
+    def __init__(self, cpu_seconds: float, cap_seconds: float, returncode: int | None,
+                 controller_cpu_seconds: float = 0.0):
+        super().__init__(f"process tree stopped at {cpu_seconds:.6f}s under {cap_seconds:.6f}s cap")
+        self.cpu_seconds, self.cap_seconds, self.returncode = cpu_seconds, cap_seconds, returncode
+        self.controller_cpu_seconds = controller_cpu_seconds
+
+
+@dataclass(frozen=True)
+class ProcessRun:
+    argv: tuple[str, ...]
+    returncode: int
+    cpu_seconds: float
+    wall_seconds: float
+    stdout_path: str | None
+    controller_cpu_seconds: float = 0.0
+
+
+@dataclass(frozen=True)
+class _Proc:
+    pid: int
+    ppid: int
+    start: int
+    ticks: int
+    state: str
+
+
+def _parse_stat(pid: int, raw: str) -> _Proc:
+    close = raw.rfind(")")
+    fields = raw[close + 1:].split()
+    if close < 0 or len(fields) < 20 or int(raw[:raw.find(" ")]) != pid:
+        raise ValueError("invalid /proc stat")
+    utime, stime = int(fields[11]), int(fields[12])
+    cutime, cstime = int(fields[13]), int(fields[14])
+    return _Proc(pid, int(fields[1]), int(fields[19]),
+                 sum(max(0, value) for value in (utime, stime, cutime, cstime)), fields[0])
+
+
+def _table() -> dict[int, _Proc]:
+    result = {}
+    try:
+        entries = list(Path("/proc").iterdir())
+    except OSError as exc:
+        raise ProcessTreeSafetyError("cannot enumerate Linux /proc") from exc
+    for entry in entries:
+        if entry.name.isdigit():
+            try:
+                result[int(entry.name)] = _parse_stat(int(entry.name), (entry / "stat").read_text())
+            except FileNotFoundError:
+                continue
+            except PermissionError as exc:
+                raise ProcessTreeSafetyError(f"cannot inspect process {entry.name}") from exc
+            except (ValueError, OSError):
+                continue
+    return result
+
+
+def _snapshot(root: int, root_start: int | None, controller: int, baseline: set[tuple[int, int]]):
+    table = _table()
+    root_proc = table.get(root)
+    if root_proc and root_start is not None and root_proc.start != root_start:
+        raise ProcessTreeSafetyError("worker PID was reused")
+    selected: dict[int, _Proc] = {}
+    pending = []
+    if root_proc and (root_start is None or root_proc.start == root_start):
+        selected[root] = root_proc
+        pending.append(root)
+    for process in table.values():
+        if process.ppid == controller and (process.pid, process.start) not in baseline and process.pid != root:
+            selected[process.pid] = process
+            pending.append(process.pid)
+    while pending:
+        parent = pending.pop()
+        for process in table.values():
+            if process.ppid == parent and process.pid not in selected:
+                selected[process.pid] = process
+                pending.append(process.pid)
+    identities = {(proc.pid, proc.start) for proc in selected.values()}
+    cpu = sum(proc.ticks for proc in selected.values()) / os.sysconf("SC_CLK_TCK")
+    live = sum(proc.state not in {"Z", "X"} for proc in selected.values())
+    return cpu, identities, live
+
+
+def _set_subreaper(enabled: bool) -> int:
+    libc = ctypes.CDLL(None, use_errno=True)
+    prior = ctypes.c_int()
+    if libc.prctl(37, ctypes.byref(prior), 0, 0, 0) != 0:
+        raise ProcessTreeSafetyError("cannot query child-subreaper state")
+    if libc.prctl(36, 1 if enabled else 0, 0, 0, 0) != 0:
+        raise ProcessTreeSafetyError("cannot enable child-subreaper CPU accounting")
+    return prior.value
+
+
+def _reap(identities: set[tuple[int, int]], root: int):
+    for pid, _ in identities:
+        if pid != root:
+            try:
+                os.wait4(pid, os.WNOHANG)
+            except ChildProcessError:
+                pass
+            except OSError as exc:
+                if exc.errno not in {errno.ECHILD, errno.EINTR}:
+                    raise ProcessTreeSafetyError(f"cannot reap adopted process {pid}") from exc
+
+
+def _signal(identities: set[tuple[int, int]], root: int, hard: bool):
+    signum = signal.SIGKILL if hard else signal.SIGTERM
+    try:
+        os.killpg(root, signum)
+    except ProcessLookupError:
+        pass
+    table = _table()
+    for pid, start in identities:
+        current = table.get(pid)
+        if current and current.start == start:
+            try:
+                os.kill(pid, signum)
+            except ProcessLookupError:
+                pass
+            except PermissionError as exc:
+                raise ProcessTreeSafetyError(f"cannot signal process {pid}") from exc
+
+
+def _self_cpu():
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    return usage.ru_utime + usage.ru_stime
+
+
+def _children_cpu():
+    usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return usage.ru_utime + usage.ru_stime
+
+
+class ProcessTreeWatchdog:
+    """One serialized subprocess tree, sampled and killed before its reserved CPU cap."""
+    def __init__(self, *, poll_seconds: float = 0.005, terminate_grace: float = 0.05, safety_margin: float = 0.10):
+        if not 0.001 <= poll_seconds <= 0.1 or not 0 <= terminate_grace <= 1 or not 0 < safety_margin <= 5:
+            raise ValueError("invalid watchdog polling, termination, or safety-margin setting")
+        self.poll_seconds, self.terminate_grace, self.safety_margin = poll_seconds, terminate_grace, safety_margin
+
+    @staticmethod
+    def _within_worktree(path: Path):
+        task_root = Path(__file__).resolve().parents[2]
+        result = Path(path).resolve(strict=False)
+        try:
+            result.relative_to(task_root)
+        except ValueError as exc:
+            raise ValueError("watchdog cwd/output must stay inside the Issue 75 task worktree") from exc
+        return result
+
+    def _stop(self, proc, root_start, controller, baseline, identities):
+        deadline = time.monotonic() + self.terminate_grace
+        hard = False
+        while True:
+            _, current, live = _snapshot(proc.pid, root_start, controller, baseline)
+            identities.update(current)
+            _signal(identities, proc.pid, hard)
+            _reap(identities, proc.pid)
+            code = proc.poll()
+            if code is not None and live == 0:
+                return
+            if not hard and time.monotonic() >= deadline:
+                hard = True
+                deadline = time.monotonic() + max(0.2, self.terminate_grace)
+            elif hard and time.monotonic() >= deadline:
+                raise ProcessTreeSafetyError("a worker descendant survived SIGKILL")
+            time.sleep(min(self.poll_seconds, 0.01))
+
+    def run(
+        self, argv: Sequence[str], *, reserved_cpu_seconds: float, cwd: Path,
+        env: Mapping[str, str] | None = None, stdout_path: Path | None = None,
+        wall_timeout_seconds: float | None = None,
+    ) -> ProcessRun:
+        cap = float(reserved_cpu_seconds)
+        if not argv or not math.isfinite(cap) or cap <= 0.05:
+            raise ValueError("argv and a finite CPU cap above 0.05 seconds are required")
+        if wall_timeout_seconds is not None and (not math.isfinite(wall_timeout_seconds) or wall_timeout_seconds <= 0):
+            raise ValueError("wall timeout must be finite and positive")
+        workdir = self._within_worktree(cwd)
+        output = self._within_worktree(stdout_path) if stdout_path is not None else None
+        controller = os.getpid()
+        before_table = _table()
+        baseline = {(p.pid, p.start) for p in before_table.values() if p.ppid == controller}
+        prior_subreaper = _set_subreaper(True)
+        self_before, children_before = _self_cpu(), _children_cpu()
+        started = time.monotonic()
+        stream = None
+        proc = None
+        root_start = None
+        maximum_cpu = 0.0
+        identities: set[tuple[int, int]] = set()
+        prior_wall, prior_cpu, peak_rate = started, 0.0, 0.0
+        try:
+            if output is not None:
+                output.parent.mkdir(parents=True, exist_ok=True)
+                stream = os.fdopen(os.open(output, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), "wb")
+            child_env = os.environ.copy()
+            if env:
+                child_env.update({str(k): str(v) for k, v in env.items()})
+            proc = subprocess.Popen(
+                [str(arg) for arg in argv], cwd=workdir, env=child_env,
+                stdin=subprocess.DEVNULL, stdout=stream or subprocess.DEVNULL,
+                stderr=subprocess.STDOUT if stream else subprocess.DEVNULL,
+                close_fds=True, start_new_session=True,
+            )
+            while root_start is None:
+                root = _table().get(proc.pid)
+                if root:
+                    root_start = root.start
+                elif proc.poll() is not None:
+                    break
+                else:
+                    time.sleep(self.poll_seconds)
+
+            while True:
+                now = time.monotonic()
+                sample, seen, live = _snapshot(proc.pid, root_start, controller, baseline)
+                maximum_cpu = max(maximum_cpu, sample)
+                identities.update(seen)
+                dt = now - prior_wall
+                if dt > 0:
+                    peak_rate = max(peak_rate, max(0.0, sample - prior_cpu) / dt)
+                self_delta = max(0.0, _self_cpu() - self_before)
+                child_delta = max(0.0, _children_cpu() - children_before)
+                measured = max(maximum_cpu, child_delta) + self_delta
+                response = self.poll_seconds + self.terminate_grace
+                margin = min(cap * 0.25, max(self.safety_margin, peak_rate * response))
+                if measured + peak_rate * response >= cap - margin:
+                    self._stop(proc, root_start, controller, baseline, identities)
+                    actual = max(maximum_cpu, max(0.0, _children_cpu() - children_before))
+                    actual += max(0.0, _self_cpu() - self_before)
+                    raise ProcessTreeBudgetExceeded(actual, cap, proc.returncode, max(0.0, _self_cpu() - self_before))
+                if wall_timeout_seconds is not None and now - started >= wall_timeout_seconds:
+                    self._stop(proc, root_start, controller, baseline, identities)
+                    actual = max(maximum_cpu, max(0.0, _children_cpu() - children_before))
+                    actual += max(0.0, _self_cpu() - self_before)
+                    raise ProcessTreeTimeout(actual, wall_timeout_seconds)
+                code = proc.poll()
+                _reap(identities, proc.pid)
+                if code is not None:
+                    # Reap of the root may just have caused its orphaned worker
+                    # to be adopted by this subreaper. Take one post-wait scan
+                    # before concluding the process tree is empty.
+                    after, adopted, after_live = _snapshot(
+                        proc.pid, root_start, controller, baseline,
+                    )
+                    maximum_cpu = max(maximum_cpu, after)
+                    identities.update(adopted)
+                    _reap(identities, proc.pid)
+                    if after_live == 0:
+                        break
+                prior_wall, prior_cpu = now, sample
+                time.sleep(self.poll_seconds)
+
+            actual = max(maximum_cpu, max(0.0, _children_cpu() - children_before))
+            actual += max(0.0, _self_cpu() - self_before)
+            if actual > cap:
+                raise ProcessTreeBudgetExceeded(actual, cap, proc.returncode, max(0.0, _self_cpu() - self_before))
+            return ProcessRun(tuple(map(str, argv)), int(proc.returncode or 0), actual,
+                              time.monotonic() - started, str(output) if output else None,
+                              max(0.0, _self_cpu() - self_before))
+        finally:
+            try:
+                if proc is not None and proc.poll() is None:
+                    try:
+                        self._stop(proc, root_start, controller, baseline, identities)
+                    except BaseException as stop_error:
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        try:
+                            proc.wait(timeout=1.0)
+                        except BaseException:
+                            pass
+                        raise ProcessTreeSafetyError("watchdog could not prove the process tree stopped") from stop_error
+            finally:
+                try:
+                    if stream is not None:
+                        stream.close()
+                finally:
+                    _set_subreaper(bool(prior_subreaper))

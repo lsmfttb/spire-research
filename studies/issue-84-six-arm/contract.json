@@ -1,0 +1,120 @@
+{
+  "schema_id": "issue84-six-arm-contract-v1",
+  "study_id": "issue-84-six-arm",
+  "scope": "STUDY_ONLY",
+  "population": "complete natural standard-start Ironclad A20 Heart games in the privileged native surrogate",
+  "mechanics_owner": "lsmfttb/sts_lightspeed",
+  "native_branch": "stsrl/main",
+  "native_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+  "stsr_source_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+  "parent": {
+    "study_execution_commit": "8f88f1554821707db6228d2de384f2334ec2615b",
+    "model": "pi12",
+    "model_sha256": "6f72fdd60d684e4667f2357ba578f84f6e087a18d4d3944c65bf1e0aabd0cf19",
+    "model_digest": "7c530520b5e107702575f9c8e612bff70e345b5c73715c33aa16eb75e00653ee",
+    "optimizer_checkpoint": "block-11-step.pt",
+    "optimizer_sha256": "96a5599f389be0a90adfab2a245b88359a166b5b859101688200a492be893993",
+    "update_receipt_sha256": "60fc4ebbefb5ee88cd4dbe25407567e8fd38b7e38bf8e10d1fa3287a0bab9441",
+    "optimizer_step": 64,
+    "train_owner_range": [8200001, 8201024],
+    "train_owner_count": 1024,
+    "train_feature_receipt_manifest_sha256": "376948ed54207dd55011da8d2d65c9437af0e57903147ddd3f71b72d7ce213b0"
+  },
+  "fixed_scales": {
+    "t_ref": {
+      "value": 36.6474609375,
+      "formula": "arithmetic mean of len(base.decisions) across all 1024 complete #82 TRAIN owners",
+      "range": [8, 103],
+      "strictly_positive": true
+    },
+    "s_ref": {
+      "value": 5.360108706240238,
+      "formula": "population standard deviation (ddof=0) of R=100*heart_victory+terminal_floor across all 1024 complete #82 TRAIN owners",
+      "return_mean": 13.2841796875,
+      "return_range": [3, 40],
+      "strictly_positive": true
+    }
+  },
+  "unchanged_actor_and_environment": {
+    "actor": "2048-dimensional signed-hash semantic encoder and existing 128->64->1 action-conditioned actor",
+    "learning_rate": 0.0003,
+    "optimizer": "AdamW",
+    "betas": [0.9, 0.999],
+    "epsilon": 1e-8,
+    "weight_decay": 0.0,
+    "actor_gradient_norm_clip": 1.0,
+    "entropy_coefficient": 0.01,
+    "minibatch_owners": 32,
+    "owners_per_formal_block": 128,
+    "actor_updates_per_block": 64,
+    "first_block_optimizer_steps": [64, 128],
+    "later_block_optimizer_steps": [0, 64],
+    "battle_controller": "frozen Battle Search-v2@400",
+    "reward": "100*HeartWin+terminal_floor",
+    "prohibited": ["Expert", "online J/R", "PPO", "fake starts", "changed game rules", "native/STSRL changes"]
+  },
+  "arms": {
+    "A": "legacy per-owner mean chosen logp; block mean/population-SD standardized reward advantage clipped to [-3,3]",
+    "B": "A with the realized trajectory decision-count divisor replaced only by fixed T_REF",
+    "C": "trajectory sum(logp)/T_REF times unclipped (R_i-LOO_other_127_returns)/S_REF",
+    "D": "C with each reached-state reward residual R_i-V(h_t), using arm-local one-block-lagged V; block 1 V=0",
+    "E": "D plus detached arm-local one-block-lagged Q(h,a) correction over every ordered legal occurrence; Q labels are actual R from prior chosen actions only",
+    "F": "D plus coefficient 1.0 mean reached-state KL(pi_behavior||pi_current), behavior is the frozen block-generating actor"
+  },
+  "auxiliary_predictors": {
+    "architecture": "2048->64->1 MLP with ReLU",
+    "input_v": "mean of source-qualified candidate feature rows across every ordered legal occurrence at the current reached state",
+    "input_q": "source-qualified feature row for the actually chosen legal occurrence",
+    "output_initialization": "zero final layer; V and Q initially predict zero",
+    "target": "actual whole-game R=100*HeartWin+terminal_floor from that arm's completed prior training blocks",
+    "optimizer": "separate persistent AdamW per predictor",
+    "learning_rate": 0.0003,
+    "betas": [0.9, 0.999],
+    "epsilon": 1e-8,
+    "weight_decay": 0.0,
+    "loss": "mean squared error",
+    "gradient_norm_clip": 1.0,
+    "fit_schedule": "before block k, one deterministic shuffled epoch (batch 256) over all completed blocks with index < k; freeze during block k",
+    "rng": "SHA256-derived from issue84-aux-v1|arm|zero_based_block_index|V-or-Q",
+    "no_current_or_future_block_fit": true,
+    "no_cross_arm_or_heldout_labels": true,
+    "q_uses_only_actual_chosen_actions": true
+  },
+  "rosters": {
+    "pilot_training_owner_range": [8480001, 8480032],
+    "pilot_training_owner_count_per_arm": 32,
+    "pilot_evaluation_owner_range": [8490001, 8490008],
+    "pilot_evaluation_arms": ["PARENT", "A", "B", "C", "D", "E", "F"],
+    "formal_training_owner_range": [8400001, 8402048],
+    "formal_training_owner_count_per_arm": 2048,
+    "formal_training_blocks_per_arm": 16,
+    "validation_owner_range": [8460001, 8460064],
+    "validation_games": 1216,
+    "validation_policies": ["PARENT", "A512", "A1024", "A2048", "B512", "B1024", "B2048", "C512", "C1024", "C2048", "D512", "D1024", "D2048", "E512", "E1024", "E2048", "F512", "F1024", "F2048"],
+    "test_owner_range": [8470001, 8470320],
+    "test_games": 2240,
+    "test_policies": ["PARENT", "A", "B", "C", "D", "E", "F"]
+  },
+  "inference": {
+    "primary": "E_final-D_final mean paired terminal_floor on 320 TEST owners",
+    "bootstrap_replicates": 20000,
+    "bootstrap_interval": "percentile 95% owner-paired",
+    "secondary_intervals": "prespecified and unadjusted for multiple comparisons",
+    "validation_use": "diagnostic curves only; no selection, early stop, tuning, or promotion"
+  },
+  "execution": {
+    "formal_complete_games": 15744,
+    "pilot_complete_games": 248,
+    "maximum_concurrency": 8,
+    "one_global_accumulated_active_wall_allowance": true,
+    "allowance_factor": 1.75,
+    "pilot_weights_discarded": true,
+    "retained_data_root": "D:/DeadlycatCoding/stsrl-data/issue84"
+  },
+  "limitations": [
+    "one trained lineage per arm does not establish independent-training replicate stability or scaling",
+    "privileged native-surrogate training does not establish public-information or live-client efficacy",
+    "a CI spanning zero does not establish equivalence",
+    "secondary intervals are unadjusted"
+  ]
+}

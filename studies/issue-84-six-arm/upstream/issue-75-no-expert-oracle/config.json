@@ -1,0 +1,185 @@
+{
+  "schema_id": "issue75-no-expert-joint-oracle-config-v1",
+  "study_id": "issue-75-no-expert-oracle",
+  "study_scope": "STUDY_ONLY",
+  "authorization": {
+    "stage0_nonformal_authorized": true,
+    "formal_training_enabled": false,
+    "formal_evaluation_enabled": false,
+    "formal_owner_seed_table_present": false,
+    "native_sampling_blocked_until_reviewer_pass": true,
+    "reviewer_gate": {
+      "owner_login": "lsmfttb",
+      "required_identity_mode": "configured_owner_account_independent_reviewer_role",
+      "required_github_user_type": "User"
+    }
+  },
+  "source": {
+    "spire_reviewed_commit": "40191f365d9b64390dab0025c77ea9c1c2915175",
+    "spire_reviewed_branch": "codex/issue-73-review-repair-20261025",
+    "issue73_root_tree_git_sha1": "50f0c18a84c4ff11d68ad0584b6faf24331ea3bc",
+    "issue73_root_source_lock_sha256_lf": "cb88b92f3e207329d5986b340c82fc356fc55d6ac6d628966bee1829bf47af22",
+    "issue74_selection_lock_source_commit": "a5ea866b55422167454cb45c8070c7dc5ba937df",
+    "issue74_selection_lock_source_path": "studies/issue-74-oracle-feasibility/selection-lock.json",
+    "issue74_selection_lock_sha256_lf": "e55149de194820308450b45eb6f25cb3bf50bf2c4816a67226e821ef9d154025",
+    "issue74_selection_source_code_commit": "fae49ddc727665898d426a98c7d2f4c43baa2526",
+    "issue73_stage1_source_commit": "40191f365d9b64390dab0025c77ea9c1c2915175",
+    "issue73_pi_init_sha256": "185382c7764535b409e8b096e262f2ea655fb0c07abebfabef078c22bbdd8f61",
+    "sts_lightspeed_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+    "stsr_source_commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "native_module_path": "/home/lsmft/stsrl-spikes/build-issue71-8ded-py313/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "native_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad",
+    "python_version": "3.13.13",
+    "numpy_version": "2.4.6",
+    "torch_version": "2.12.0+cpu",
+    "pinned_executor": "sts_combat_rl.sim.controlled_run.execute_controlled_run"
+  },
+  "stage0": {
+    "historical_debug_owner_seeds": [
+      173730001,
+      173730002,
+      173730003,
+      173730004,
+      173730005,
+      173730006,
+      173730007,
+      173730008
+    ],
+    "locked_roots_per_owner": 4,
+    "planned_source_root_per_owner": 1,
+    "planned_source_root_selection": "first file-hash-valid member in issue74 locked selection_rank order; stop for that owner if the selected root fails native prefix/state/legal-occurrence qualification; no outcome-based replacement",
+    "root_ids": [
+      "root-173730001-0007",
+      "root-173730002-0014",
+      "root-173730003-0013",
+      "root-173730004-0007",
+      "root-173730005-0000",
+      "root-173730006-0035",
+      "root-173730007-0003",
+      "root-173730008-0022"
+    ],
+    "root_attempt_limit": 8,
+    "roots_per_natural_base_game_max": 4,
+    "debug_scope": "conditional-on-fixed-historical-debug-root continuation; roots were visited under the historical Issue 73 source policy, not under pi0; not standard-start on-policy evidence",
+    "historical_prefix_policy": "exact Issue 73 P0 controller replay under the pinned source and old owner seed; replay stops before the target native action and keeps its checkpoint only in memory"
+  },
+  "policy": {
+    "information_regime": "full_native_training_oracle_only",
+    "model_input": "native_privileged_projection_and_native_ordered_candidate_semantics",
+    "candidate_identity_is_not_a_model_feature": true,
+    "encoder_source": "Issue 73 SemanticHashEncoder exact reviewed source",
+    "actor_layers": [
+      2048,
+      128,
+      64,
+      1
+    ],
+    "activation": "tanh",
+    "actor_final_weight_std": 0.01,
+    "actor_final_bias": 0.0,
+    "initial_model_seed": 73507501,
+    "no_expert_calls_in_algorithm_paths": true,
+    "battle_search": {
+      "api": "native_battle_search_v2",
+      "simulations": 400,
+      "include_potions": true,
+      "root_selection_rule": "highest_mean",
+      "policy_prior": null,
+      "learned_leaf_value": null
+    }
+  },
+  "search": {
+    "search_invocation_cpu_cap_seconds": 32,
+    "search_invocation_started_attempt_cap": 16,
+    "r_root_trial_cap": 16,
+    "j_root_trial_cap": 8,
+    "j_later_mutation_trial_cap": 8,
+    "j_completed_trajectory_portfolio_cap": 4,
+    "training_base_game_root_opportunity_cap": 4,
+    "evaluation_rj_root_opportunity_cap": 7,
+    "root_action_schedule": "deterministic seed-derived rotation of locked native legal occurrence order; then cyclic",
+    "later_mutation_schedule": "highest-ranked completed parent with an unused later multi-choice mutation occurrence; earliest reached eligible later state; seed-derived alternative occurrence",
+    "terminal_rank": [
+      "heart_victory_desc",
+      "native_terminal_floor_desc",
+      "attempt_index_asc"
+    ],
+    "no_complete_trajectory_fallback": "current frozen pi_k",
+    "native_future_rng": "same restored native RNG state/path; only policy RNG varies; no claim of new hidden-world draw"
+  },
+  "learning": {
+    "loss": "L_pg + L_elite - 0.01*H",
+    "policy_gradient": {
+      "utility_for_normalization": "100*heart_win + native_terminal_floor",
+      "reward_shaping": false,
+      "block_centered": true,
+      "scale_denominator": "max(block_standard_deviation,1)",
+      "advantage_clip": [
+        -3.0,
+        3.0
+      ],
+      "owner_log_probability_normalization": "sum_over_genuine_multichoice_decisions / decision_count"
+    },
+    "elite": {
+      "source": "best strictly superior completed J trajectory per original owner/root",
+      "rank": [
+        "heart_victory_desc",
+        "native_terminal_floor_desc"
+      ],
+      "incomplete_or_tied_labels": false,
+      "loss": "per-owner mean cross-entropy over actual elite legal decisions; zero if no superior completed J trajectory"
+    },
+    "optimizer": {
+      "name": "AdamW",
+      "learning_rate": 0.0003,
+      "weight_decay": 0.0,
+      "betas": [
+        0.9,
+        0.999
+      ],
+      "epsilon": 1e-08,
+      "gradient_norm_clip": 1.0,
+      "formal_steps_per_block": 64,
+      "formal_batch_owners": 32,
+      "formal_block_count": 4,
+      "formal_owner_count_per_block": 128,
+      "stage0_diagnostic_steps": 1,
+      "stage0_diagnostic_batch_size": 8,
+      "formal_execution_enabled": false,
+      "block_standard_deviation_ddof": 0
+    }
+  },
+  "resources": {
+    "builder_process_tree_cpu_hard_seconds": 50000,
+    "reviewer_protected_cpu_seconds": 10000,
+    "all_in_cpu_hard_seconds": 60000,
+    "native_root_checkpoint_terminal_cpu_hard_seconds": 30000,
+    "formal_stage1_cpu_reservation_seconds": 0,
+    "formal_stage1_authorized": false,
+    "stage0_native_prefix_base_and_search_worst_case_cpu_seconds": 1024,
+    "stage0_root_and_search_proposal_max_cpu_seconds": 512,
+    "stage0_root_worker_process_cpu_hard_seconds": 160,
+    "stage0_source_preflight_conservative_cpu_reserve_seconds": 1200,
+    "pre_issue75_builder_cpu_carryover_seconds": 0,
+    "pre_issue75_reviewer_cpu_carryover_seconds": 0,
+    "stage0_root_worker_worst_case_cpu_seconds": 1280
+  },
+  "formal_stage1_proposal_only": {
+    "training_owner_count": 512,
+    "held_out_owner_count": 96,
+    "held_out_arms": [
+      "P0",
+      "P1",
+      "R",
+      "J",
+      "E"
+    ],
+    "training_blocks": 4,
+    "owners_per_block": 128,
+    "adamw_steps_per_block": 64,
+    "formal_seed_table_included": false,
+    "execution_enabled": false,
+    "maximum_search_cpu_seconds_only": 108544,
+    "planner_activation_required": true
+  }
+}

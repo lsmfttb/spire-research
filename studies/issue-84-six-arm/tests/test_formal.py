@@ -1,0 +1,73 @@
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+import unittest
+
+STUDY = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(STUDY))
+
+from driver import T_REF, make_task_wall_forecast
+from formal import paired_bootstrap
+
+
+class FormalAnalysisTests(unittest.TestCase):
+    def test_owner_paired_bootstrap_is_deterministic_and_interpolates(self):
+        left = {
+            "seed-1": {"owner_seed": 1, "terminal_floor": 5},
+            "seed-2": {"owner_seed": 2, "terminal_floor": 9},
+            "seed-3": {"owner_seed": 3, "terminal_floor": 3},
+        }
+        right = {
+            "seed-1": {"owner_seed": 1, "terminal_floor": 2},
+            "seed-2": {"owner_seed": 2, "terminal_floor": 8},
+            "seed-3": {"owner_seed": 3, "terminal_floor": 1},
+        }
+        first = paired_bootstrap(left, right, label="E-D", seed=184, replicates=500)
+        second = paired_bootstrap(left, right, label="E-D", seed=184, replicates=500)
+        self.assertEqual(first, second)
+        self.assertEqual(first["mean_difference_terminal_floor"], 2.0)
+        self.assertEqual(first["paired_owner_count"], 3)
+        self.assertEqual(first["bootstrap_replicates"], 500)
+        self.assertLessEqual(first["ci95"][0], first["ci95"][1])
+        self.assertEqual([row["difference"] for row in first["per_owner_differences"]], [3.0, 1.0, 2.0])
+
+    def test_owner_paired_bootstrap_rejects_unmatched_sets_and_seed_mismatch(self):
+        left = {"owner": {"owner_seed": 1, "terminal_floor": 5}}
+        with self.assertRaises(ValueError):
+            paired_bootstrap(left, {}, label="E-D", seed=1, replicates=10)
+        right = {"owner": {"owner_seed": 2, "terminal_floor": 4}}
+        with self.assertRaises(ValueError):
+            paired_bootstrap(left, right, label="E-D", seed=1, replicates=10)
+
+    def test_full_task_forecast_includes_all_pilot_stages_and_one_global_margin(self):
+        progress = {
+            "training_runs": {arm: {"elapsed_seconds": 2.0} for arm in "ABCDEF"},
+            "evaluation_runs": {group: {"elapsed_seconds": 1.0} for group in ("PARENT", *"ABCDEF")},
+            "actor_updates": {arm: {"elapsed_seconds": 0.5} for arm in "ABCDEF"},
+            "predictor_fits": {
+                "D": {"fit": {
+                    "feature_cache_build_elapsed_seconds": 0.1,
+                    "value": {"examples": 100, "elapsed_seconds": 0.2},
+                }},
+                "E": {"fit": {"value": {"examples": 100, "elapsed_seconds": 0.2}, "action_value": {"examples": 100, "elapsed_seconds": 0.2}}},
+                "F": {"fit": {"value": {"examples": 100, "elapsed_seconds": 0.2}}},
+            },
+            "clock_elapsed_before": 0.0,
+        }
+        forecast = make_task_wall_forecast(
+            progress, task_wall=20.0, source_lock_sha256="a" * 64, package="b" * 40,
+        )
+        expected_predictor_rows = round(T_REF * 15_360 * 4)
+        self.assertEqual(forecast["formal_predictor_training_rows_estimated_from_t_ref"], expected_predictor_rows)
+        self.assertEqual(forecast["pilot_predictor_cache_build_wall_seconds"], 0.1)
+        self.assertAlmostEqual(forecast["pilot_predictor_fit_wall_seconds"], 0.9)
+        self.assertGreater(forecast["estimated_all_in_active_wall_seconds"], 20.0)
+        self.assertEqual(
+            forecast["one_task_active_wall_allowance_seconds"],
+            forecast["estimated_all_in_active_wall_seconds"] * 1.75,
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
