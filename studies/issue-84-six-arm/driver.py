@@ -62,6 +62,11 @@ UPSTREAM_COMMIT = "ecb588e580c0226da3aabaf54d79f2c2267308e3"
 
 ARMS = ("A", "B", "C", "D", "E", "F")
 ISSUE84_EVALUATION_ARMS = frozenset(("PARENT", *ARMS))
+# The pinned #75 executor reserves the literal evaluation arm "E" for its
+# isolated Expert branch before calling the pinned #73 runner adapter. The
+# private dispatch label routes Issue 84's E actor around that earlier branch;
+# it is translated back to canonical E before provenance or receipts escape.
+ISSUE84_EVALUATION_E_DISPATCH_ARM = "ISSUE84_EVAL_E_DISPATCH"
 CONCURRENCY = 8
 T_REF = 36.6474609375
 S_REF = 5.360108706240238
@@ -289,7 +294,11 @@ def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
     training_features = kwargs.pop("capture_training_features", None)
     policy_rng_seed = kwargs.pop("policy_rng_seed", None)
     requested_arm = kwargs.get("arm")
-    issue84_eval_arm = requested_arm if requested_arm in ISSUE84_EVALUATION_ARMS else None
+    issue84_eval_arm = (
+        "E" if requested_arm == ISSUE84_EVALUATION_E_DISPATCH_ARM
+        else requested_arm if requested_arm in ISSUE84_EVALUATION_ARMS
+        else None
+    )
     if issue84_eval_arm is not None:
         if type(policy_rng_seed) is not int or policy_rng_seed < 0:
             raise ValueError("Issue 84 evaluation requires its frozen policy RNG seed")
@@ -297,6 +306,12 @@ def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
         # Issue 84 PARENT/A-F labels. Construct through its ordinary actor arm,
         # then install a namespaced label before any decisions are made.
         kwargs["arm"] = "P0"
+        if requested_arm == ISSUE84_EVALUATION_E_DISPATCH_ARM:
+            purpose = kwargs.get("purpose")
+            if isinstance(purpose, str):
+                kwargs["purpose"] = purpose.replace(
+                    ISSUE84_EVALUATION_E_DISPATCH_ARM, issue84_eval_arm,
+                )
     if training_features is not None and type(training_features) is not bool:
         raise ValueError("capture_training_features must be boolean when supplied")
     if training_features is not None and bool(training_features) != bool(kwargs.get("capture_trace", True)):
@@ -386,6 +401,57 @@ def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
         return result
     finally:
         controller_class.__init__ = original_init
+
+
+def install_issue84_evaluation_worker_dispatch(executor) -> None:
+    """Keep Issue 84 evaluation E on its actor path through #75 dispatch.
+
+    The pinned #75 worker reserves arm E for an isolated Expert before the
+    #73 runner adapter can translate Issue 84's labels. Route only Issue 84's
+    registered evaluation-E rows through a private non-E dispatch label, then
+    restore the canonical arm in the report and reject any Expert provenance.
+    """
+    if getattr(executor, "_issue84_evaluation_worker_dispatch_installed", False):
+        return
+    original_worker_owner = executor._worker_owner
+
+    def worker_owner(job, ledger):
+        if str(job.get("phase", "")) != "evaluation":
+            return original_worker_owner(job, ledger)
+        row = job.get("row")
+        if not isinstance(row, Mapping) or str(row.get("arm", "")) != "E":
+            return original_worker_owner(job, ledger)
+        label = row.get("issue84_policy_label")
+        if not isinstance(label, str) or not re.fullmatch(r"pi(?:1[2-9]|2[0-8])", label):
+            raise ValueError("Issue 84 evaluation E row lacks a registered actor checkpoint")
+
+        dispatch_arm = ISSUE84_EVALUATION_E_DISPATCH_ARM
+        dispatch_job = dict(job)
+        dispatch_row = dict(row)
+        dispatch_row["arm"] = dispatch_arm
+        dispatch_job["row"] = dispatch_row
+        report = original_worker_owner(dispatch_job, ledger)
+        if not isinstance(report, dict) or report.get("arm") != dispatch_arm:
+            raise RuntimeError("Issue 84 evaluation E worker did not preserve its private dispatch label")
+        expected_source = "issue82-parent-pi12" if label == "pi12" else f"issue84-{label}"
+        policy_source = report.get("policy_source")
+        if not isinstance(policy_source, Mapping) or policy_source.get("source") != expected_source:
+            raise RuntimeError("Issue 84 evaluation E did not load its registered actor checkpoint")
+        if type(report.get("expert_decisions")) is not int or report["expert_decisions"] != 0:
+            raise RuntimeError("Issue 84 evaluation E reported an Expert decision")
+
+        canonical_report = dict(report)
+        canonical_report["arm"] = "E"
+        search = canonical_report.get("search")
+        if not isinstance(search, list):
+            raise RuntimeError("Issue 84 evaluation E worker returned malformed search receipts")
+        for receipt in search:
+            if isinstance(receipt, dict) and receipt.get("arm") == dispatch_arm:
+                receipt["arm"] = "E"
+        return canonical_report
+
+    executor._worker_owner = worker_owner
+    executor._issue84_evaluation_worker_dispatch_installed = True
 
 
 def install_issue73_capture_limit_compat(runtime) -> None:
@@ -1113,6 +1179,7 @@ def load_modules(active_root: Path, *, pilot: bool):
     executor._load_model = load_model
     executor._arm_policy = arm_policy
     executor.STUDY_ID = "issue-84-six-arm"
+    install_issue84_evaluation_worker_dispatch(executor)
     return algorithm, runtime, model, learning, executor
 
 

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
 import tempfile
 import sys
+import types
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -26,6 +28,7 @@ from driver import (
     seed_table_path,
     _preflight_optimizer_evidence,
     call_pinned_issue73_run_one,
+    install_issue84_evaluation_worker_dispatch,
     install_issue73_capture_limit_compat,
     refresh_source_lock,
     sha256,
@@ -294,6 +297,159 @@ class FormalAnalysisTests(unittest.TestCase):
         self.assertEqual(training["arm"], "TRAIN")
         self.assertEqual(training["controller"].arm, "TRAIN")
         self.assertTrue(training["policy_training_row"])
+
+    def test_issue84_e_evaluation_worker_loads_actor_before_expert_dispatch(self):
+        executor_path = (
+            STUDY / "upstream" / "issue-75-no-expert-oracle" / "stage1" / "executor.py"
+        )
+        spec = importlib.util.spec_from_file_location("issue84_test_pinned_executor", executor_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        executor = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = executor
+        with patch.object(sys, "path", [str(executor_path.parent), *sys.path]):
+            spec.loader.exec_module(executor)
+
+        actor = object()
+        observations = {"loaded_labels": [], "constructor_arm": None, "controller": None}
+
+        class Provenance:
+            def __init__(self, kind, name, config, schema_version=1):
+                self.kind = kind
+                self.name = name
+                self.config = dict(config)
+                self.schema_version = schema_version
+
+        class Controller:
+            def __init__(self, **kwargs):
+                observations["constructor_arm"] = kwargs["arm"]
+                self.arm = kwargs["arm"]
+                self.model = kwargs["model"]
+                self.expert = object() if self.arm in {"E", "SUFFIX"} else None
+                self.provenance = Provenance(
+                    "issue73", f"issue73_{self.arm.lower()}", {"arm": self.arm},
+                )
+                self.rng = SimpleNamespace(
+                    manual_seed=lambda value: setattr(self, "policy_seed", value),
+                )
+                self.purpose = kwargs["purpose"]
+                observations["controller"] = self
+
+        class Runner:
+            StudyController = Controller
+
+        runner = Runner()
+
+        def fake_run_one(**kwargs):
+            controller = runner.StudyController(**kwargs)
+            return {
+                "arm": kwargs["arm"],
+                "controller": controller,
+                "terminal": {
+                    "outcome": "MOCKED_NO_GAME",
+                    "terminal_floor": 0,
+                    "terminal_act": 0,
+                    "heart_victory": False,
+                    "act2_plus": False,
+                    "act3_plus": False,
+                    "act4_reached": False,
+                },
+                "completed_transitions": 0,
+                "expert_decisions": 0,
+                "cpu_seconds": 0.0,
+                "wall_seconds": 0.0,
+            }
+
+        def initialize_native_runtime(output, *, sampling, stage1_binding):
+            self.assertTrue(sampling)
+            self.assertIsNotNone(stage1_binding)
+            runner._run_one = lambda *args, **kwargs: call_pinned_issue73_run_one(
+                runner, fake_run_one, *args, **kwargs,
+            )
+            return (
+                {"source": {
+                    "sts_lightspeed_commit": "a" * 40,
+                    "stsr_source_commit": "b" * 40,
+                    "native_module_sha256": "c" * 64,
+                }},
+                runner,
+                object(),
+                object(),
+            )
+
+        algorithm = types.ModuleType("algorithm")
+        algorithm.InvocationBudget = object
+        algorithm.SEARCH_CPU_CAP_SECONDS = 1.0
+        algorithm.SEARCH_CPU_STOP_MARGIN_SECONDS = 0.0
+        algorithm.run_search = lambda *args, **kwargs: None
+        algorithm.derive_attempt_seed = lambda *args, **kwargs: 0
+        algorithm.write_immutable_json = lambda *args, **kwargs: None
+        runtime = types.ModuleType("runtime")
+        runtime.PolicyAdapter = lambda policy: SimpleNamespace(policy=policy)
+        runtime.initialize_native_runtime = initialize_native_runtime
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "artifacts"
+            executor.ARTIFACT_ROOT = root
+            executor.STUDY_ID = "issue-84-six-arm"
+
+            def arm_policy(phase, arm, row):
+                self.assertEqual(phase, "evaluation")
+                self.assertEqual(row["arm"], "ISSUE84_EVAL_E_DISPATCH")
+                return row["issue84_policy_label"], False
+
+            def load_model(label, *, proxy=False):
+                observations["loaded_labels"].append(label)
+                self.assertFalse(proxy)
+                return actor, "actor-digest", {
+                    "source": f"issue84-{label}",
+                    "checkpoint_sha256": "d" * 64,
+                    "formal_use": True,
+                }
+
+            executor._arm_policy = arm_policy
+            executor._load_model = load_model
+            install_issue84_evaluation_worker_dispatch(executor)
+
+            row = {
+                "unit_id": "PILOT:EVAL:8490001:E",
+                "arm": "E",
+                "game_seed": 8_490_001,
+                "paired_owner_key": "pilot-eval-8490001",
+                "formal": False,
+                "policy_rng_seed": 123456,
+                "issue84_policy_label": "pi28",
+            }
+            job = {
+                "phase": "evaluation",
+                "row": row,
+                "output_dir": str(root / "units" / "mock" / "native"),
+                "run_id": "mock-run",
+            }
+            with patch.dict(sys.modules, {"algorithm": algorithm, "runtime": runtime}):
+                report = executor._worker_owner(
+                    job,
+                    SimpleNamespace(binding=SimpleNamespace(
+                        package_commit="e" * 40,
+                        source_lock_sha256="f" * 64,
+                    )),
+                )
+
+        self.assertEqual(observations["loaded_labels"], ["pi28"])
+        self.assertEqual(observations["constructor_arm"], "P0")
+        controller = observations["controller"]
+        self.assertIsNotNone(controller.model)
+        self.assertIs(controller.model.policy, actor)
+        self.assertIsNone(controller.expert)
+        self.assertEqual(controller.arm, "ISSUE84_EVAL_E")
+        self.assertEqual(controller.policy_seed, 123456)
+        self.assertEqual(controller.purpose, "stage1-evaluation-E-8490001")
+        self.assertEqual(controller.provenance.name, "issue84_eval_e_actor_v1")
+        self.assertEqual(controller.provenance.config["issue84_evaluation_arm"], "E")
+        self.assertEqual(report["arm"], "E")
+        self.assertEqual(report["policy_source"]["source"], "issue84-pi28")
+        self.assertEqual(report["expert_decisions"], 0)
+        self.assertEqual(job["row"]["arm"], "E")
 
     def test_owner_paired_bootstrap_is_deterministic_and_interpolates(self):
         left = {
