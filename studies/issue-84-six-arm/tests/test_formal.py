@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+import tempfile
 import sys
 import unittest
 
 STUDY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(STUDY))
 
-from driver import T_REF, make_task_wall_forecast
+from driver import T_REF, make_task_wall_forecast, save_preflight_receipt
 from formal import paired_bootstrap
 
 
@@ -67,6 +68,21 @@ class FormalAnalysisTests(unittest.TestCase):
             forecast["one_task_active_wall_allowance_seconds"],
             forecast["estimated_all_in_active_wall_seconds"] * 1.75,
         )
+
+    def test_preflight_receipt_is_immutable_and_idempotent(self):
+        receipt = {
+            "schema_id": "issue84-native-preflight-v1",
+            "status": "SUCCEEDED_NO_GAMES_STARTED",
+            "source_commit": "a" * 40,
+            "source_lock_sha256": "b" * 64,
+            "native_module_sha256": "c" * 64,
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            first = save_preflight_receipt(receipt, data_root=Path(temporary))
+            self.assertEqual(save_preflight_receipt(receipt, data_root=Path(temporary)), first)
+            with self.assertRaisesRegex(FileExistsError, "differs"):
+                save_preflight_receipt({**receipt, "native_module_sha256": "d" * 64}, data_root=Path(temporary))
+            self.assertEqual(first["status"], "SUCCEEDED_NO_GAMES_STARTED")
 
 
 if __name__ == "__main__":

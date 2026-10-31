@@ -441,6 +441,29 @@ def verify_preflight() -> dict[str, Any]:
     }
 
 
+def save_preflight_receipt(result: Mapping[str, Any], *, data_root: Path | None = None) -> dict[str, Any]:
+    """Persist one immutable no-game preflight receipt under the external data root."""
+    commit = str(result.get("source_commit", ""))
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("preflight result has no exact package commit")
+    if result.get("status") != "SUCCEEDED_NO_GAMES_STARTED":
+        raise ValueError("only a successful no-game preflight can be receipted")
+    root = Path(data_root) if data_root is not None else host_path(DATA_ROOT_WSL)
+    path = root / "artifacts" / "preflight" / commit / "preflight-receipt.json"
+    if path.is_file():
+        existing = read_json(path)
+        stable = {key: value for key, value in existing.items() if key != "recorded_utc"}
+        if stable != dict(result):
+            raise FileExistsError("existing immutable preflight receipt differs from current verification")
+        return existing
+    receipt = {
+        **dict(result),
+        "recorded_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    write_json_once(path, receipt)
+    return receipt
+
+
 def derive_seed(*parts: object) -> int:
     payload = "issue84-v1|" + "|".join(str(part) for part in parts)
     return int.from_bytes(hashlib.sha256(payload.encode("utf-8")).digest()[:4], "big") & 0x7FFFFFFF
