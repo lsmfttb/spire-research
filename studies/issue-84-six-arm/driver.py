@@ -1929,17 +1929,6 @@ def fit_pilot_predictors(
         action_value_model = ScalarPredictor(seed=derive_seed("pilot", arm, "Q"))
         action_value_optimizer = new_predictor_optimizer(action_value_model)
     cache_started = time.monotonic()
-    binding = {
-        "arm": arm,
-        "current_block_index": 1,
-        "prior_block_indices": [0],
-        "source_lock_sha256": file_sha256(SOURCE_LOCK_PATH),
-        "package_commit": package,
-        "prior_block_feature_manifest_sha256": [
-            owner_feature_manifest(rows, root=training_root, package=training_package)
-        ],
-    }
-
     def history():
         for row in sorted(rows, key=lambda item: int(item["owner_seed"])):
             _, owner_outcomes = load_training_outcomes(
@@ -1950,7 +1939,20 @@ def fit_pilot_predictors(
             yield 0, owner_outcomes
 
     cache_path = root / "predictor-cache" / f"pilot-{arm}"
-    cache_manifest = build_predictor_cache(history(), cache_path=cache_path, binding=binding)
+    with _predecessor_source_lock(training_package):
+        binding = {
+            "arm": arm,
+            "current_block_index": 1,
+            "prior_block_indices": [0],
+            "source_lock_sha256": file_sha256(SOURCE_LOCK_PATH),
+            "package_commit": package,
+            "prior_block_feature_manifest_sha256": [
+                owner_feature_manifest(rows, root=training_root, package=training_package)
+            ],
+        }
+        # history() is lazy, so keep the predecessor lock active until the cache
+        # builder has consumed every carried training receipt.
+        cache_manifest = build_predictor_cache(history(), cache_path=cache_path, binding=binding)
     cache_elapsed = time.monotonic() - cache_started
     fit = fit_cached_prior_block_predictors(
         arm=arm, current_block_index=1, cache_path=cache_path, cache_manifest=cache_manifest,

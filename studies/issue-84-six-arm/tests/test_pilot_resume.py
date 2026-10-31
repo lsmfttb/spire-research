@@ -109,19 +109,39 @@ class PilotResumeRepairTests(unittest.TestCase):
         current_package = "new-package"
         executor = types.SimpleNamespace()
         manifest_lookups = []
+        history_lookups = []
+        predecessor_lock_sha = driver.PILOT_RESUME_SOURCE_LOCK_SHA256
+        current_lock_sha = "a" * 64
         prior_receipt = {
             "training_features": {"sha256": "c" * 64},
             "heart_victory": False,
             "terminal_floor": 3.0,
+            "source_lock_sha256": predecessor_lock_sha,
         }
 
+        def load_current_lock(path):
+            return predecessor_lock_sha if Path(path) == predecessor_lock else current_lock_sha
+
         def prior_package_only_success(root, _row, package):
-            manifest_lookups.append((Path(root), package))
-            if Path(root) == training_root and package == training_package:
+            active_lock_sha = backend.source_lock_sha()
+            manifest_lookups.append((Path(root), package, active_lock_sha))
+            if (
+                Path(root) == training_root
+                and package == training_package
+                and active_lock_sha == prior_receipt["source_lock_sha256"]
+            ):
                 return prior_receipt
             return None
 
-        prior_only_backend = types.SimpleNamespace(existing_success=prior_package_only_success)
+        def load_outcomes(rows, *, root, executor, package):
+            active_lock_sha = backend.source_lock_sha()
+            history_lookups.append((Path(root), package, active_lock_sha))
+            self.assertEqual(active_lock_sha, predecessor_lock_sha)
+            self.assertEqual(Path(root), training_root)
+            self.assertEqual(package, training_package)
+            self.assertEqual(rows, [row])
+            self.assertIsNotNone(executor)
+            return [], [outcome]
 
         expected_manifest = driver.sha256(driver.canonical([{
             "owner_seed": row["owner_seed"],
@@ -150,12 +170,27 @@ class PilotResumeRepairTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             current_root = Path(temporary) / current_package
+            archive_root = Path(temporary) / "artifacts"
+            predecessor_lock = (
+                archive_root / "source-lock-history"
+                / f"{training_package}-{predecessor_lock_sha}.json"
+            )
+            predecessor_lock.parent.mkdir(parents=True)
+            predecessor_lock.write_text("predecessor lock fixture", encoding="utf-8")
+            backend = types.SimpleNamespace(
+                ARTIFACTS=archive_root,
+                SOURCE_LOCK=driver.SOURCE_LOCK_PATH,
+                existing_success=prior_package_only_success,
+            )
+            backend.source_lock_sha = lambda: load_current_lock(backend.SOURCE_LOCK)
+
             self.assertNotEqual(training_package, current_package)
             self.assertFalse(current_root.exists(), "current package must not contain carried training receipts")
             with (
-                patch.object(driver, "BACKEND", prior_only_backend),
-                patch.object(driver, "file_sha256", return_value="a" * 64),
-                patch.object(driver, "load_training_outcomes", return_value=([], [outcome])) as load,
+                patch.object(driver, "BACKEND", backend),
+                patch.object(driver, "configure_backend", return_value=backend),
+                patch.object(driver, "file_sha256", side_effect=load_current_lock),
+                patch.object(driver, "load_training_outcomes", side_effect=load_outcomes) as load,
                 patch.object(driver, "write_json_once"),
                 patch.object(gradients, "ScalarPredictor", FakePredictor),
                 patch.object(predictors, "new_predictor_optimizer", return_value=types.SimpleNamespace(state_dict=lambda: {})),
@@ -166,16 +201,21 @@ class PilotResumeRepairTests(unittest.TestCase):
                 ),
                 patch.object(predictors, "discard_predictor_cache"),
             ):
+                self.assertIsNone(backend.existing_success(training_root, row, training_package))
+                with self.assertRaisesRegex(RuntimeError, "owner lacks an immutable training-feature receipt"):
+                    driver.owner_feature_manifest([row], root=training_root, package=training_package)
+                manifest_lookups.clear()
+
                 receipt = driver.fit_pilot_predictors(
                     "D", [row], root=current_root, executor=executor,
                     package=current_package, training_root=training_root,
                     training_package=training_package,
                 )
 
-        load.assert_called_once_with(
-            [row], root=training_root, executor=executor, package=training_package,
-        )
-        self.assertEqual(manifest_lookups, [(training_root, training_package)])
+        load.assert_called_once_with([row], root=training_root, executor=executor, package=training_package)
+        self.assertEqual(manifest_lookups, [(training_root, training_package, predecessor_lock_sha)])
+        self.assertEqual(history_lookups, [(training_root, training_package, predecessor_lock_sha)])
+        self.assertEqual(backend.SOURCE_LOCK, driver.SOURCE_LOCK_PATH)
         self.assertEqual(receipt["status"], "SUCCEEDED")
 
     def test_source_lock_refresh_archives_the_explicit_predecessor_package(self):
