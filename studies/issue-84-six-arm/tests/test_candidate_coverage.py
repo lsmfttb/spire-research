@@ -34,6 +34,11 @@ import driver as issue84_driver  # noqa: E402
 
 NATIVE_COMMIT = "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2"
 UNSUPPORTED_REASON = "Dead Adventurer phase has no native reward entry"
+RETAINED_NATIVE_COVERAGE_WITNESS = host_path(
+    "/mnt/d/DeadlycatCoding/stsrl-data/issue84/diagnostics/"
+    "native-coverage-witness/TRAIN-8480022-C-118624dc8840/"
+    "native-coverage-witness.json"
+)
 
 
 def observed_projection() -> dict:
@@ -83,7 +88,6 @@ def observed_projection() -> dict:
         },
         "candidates": [
             {
-                "native_legal_occurrence_index": 0,
                 "coverage_status": "unsupported",
                 "reason": UNSUPPORTED_REASON,
                 "candidate_binding": binding(0, "event", 0, "game.event idx1=0 idx2=0 idx3=0"),
@@ -97,7 +101,6 @@ def observed_projection() -> dict:
                 },
             },
             {
-                "native_legal_occurrence_index": 1,
                 "coverage_status": "supported",
                 "candidate_binding": binding(1, "event", 1, "game.event idx1=1 idx2=0 idx3=0"),
                 "features": {
@@ -113,7 +116,6 @@ def observed_projection() -> dict:
                 },
             },
             {
-                "native_legal_occurrence_index": 2,
                 "coverage_status": "supported",
                 "candidate_binding": binding(2, "game_potion_discard", 0, "potion discard"),
                 "features": {
@@ -209,6 +211,33 @@ class CandidateCoverageTests(unittest.TestCase):
             witness["candidate_bindings_after_sha256"],
         )
         self.assertTrue(witness["candidate_order_and_duplicates_preserved"])
+
+    def test_retained_witness_encodes_without_redundant_candidate_ordinal(self):
+        if not RETAINED_NATIVE_COVERAGE_WITNESS.is_file():
+            self.skipTest("retained Issue 84 runtime witness is not present on this host")
+        witness = read_json(RETAINED_NATIVE_COVERAGE_WITNESS)
+        projection = witness.get("privileged_projection_at_failure")
+        self.assertIsInstance(projection, dict)
+        self.assertNotIn("native_legal_occurrence_index", projection["candidates"][0])
+        self.assertEqual(
+            projection["candidates"][0]["candidate_binding"]["value"]["candidate_index"],
+            0,
+        )
+        before = deepcopy(projection)
+        supported_candidates = deepcopy(projection["candidates"][1:])
+
+        matrix, audit = CoverageRepairingEncoder(locked_semantic_encoder()).encode(
+            projection, 3,
+        )
+
+        self.assertEqual(matrix.shape, (3, 2048))
+        self.assertEqual(projection, before)
+        self.assertEqual(projection["candidates"][1:], supported_candidates)
+        self.assertTrue(audit["coverage_repair"]["supported_candidate_features_equal"])
+        self.assertEqual(
+            audit["coverage_repair"]["supported_candidate_matrix_sha256"],
+            audit["coverage_repair"]["supported_only_matrix_sha256"],
+        )
 
     def test_already_supported_projection_delegates_without_mutation(self):
         projection = supported_projection()
@@ -447,8 +476,22 @@ class RetryPauseTests(unittest.TestCase):
         cls.backend = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = cls.backend
         spec.loader.exec_module(cls.backend)
+        issue84_driver.install_failure_classification_receipt_check(cls.backend)
 
-    def _run(self, outcomes):
+    def test_configured_backend_installs_failure_receipt_check(self):
+        with (
+            patch.object(issue84_driver, "BACKEND", None),
+            patch.object(issue84_driver, "BACKEND_ORIGINAL_LOAD_MODULES", None),
+            patch.object(issue84_driver, "package_commit", return_value="c" * 40),
+        ):
+            backend = issue84_driver.configure_backend()
+            self.assertTrue(getattr(
+                backend._attempt_failure_history,
+                "_issue84_failure_classification_receipt_check",
+                False,
+            ))
+
+    def _run(self, outcomes, *, prior_attempt=None):
         backend = self.backend
         row = {
             "unit_id": "TRAIN-8480001-C", "owner_seed": 8_480_001,
@@ -500,6 +543,38 @@ class RetryPauseTests(unittest.TestCase):
         try:
             root = Path(temporary_context.name) / "pilot" / "C"
             root.mkdir(parents=True)
+            if prior_attempt is not None:
+                attempt = (
+                    root / "units" / backend.unit_key(row["unit_id"]) / "attempt-0001"
+                )
+                attempt.mkdir(parents=True)
+                run_id = f"{row['unit_id']}-attempt-0001"
+                backend.write_json_once(attempt / "started.json", {
+                    "schema_id": "issue79-owner-attempt-start-v1",
+                    "unit_id": row["unit_id"], "owner_seed": row["owner_seed"],
+                    "run_id": run_id, "started_monotonic": 1.0,
+                    "package_commit": "c" * 40,
+                    "seed_row_sha256": backend.sha256(backend.canonical(row)),
+                })
+                prior_result = {
+                    "schema_id": "issue79-owner-attempt-result-v1",
+                    "unit_id": row["unit_id"], "owner_seed": row["owner_seed"],
+                    "run_id": run_id, "phase": "training", "arm": "TRAIN",
+                    **deepcopy(prior_attempt["outcome"]),
+                }
+                result_path = attempt / "result.json"
+                backend.write_json_once(result_path, prior_result)
+                backend.write_json_once(attempt / "finished.json", {
+                    "schema_id": "issue79-owner-attempt-finish-v1",
+                    "unit_id": row["unit_id"], "run_id": run_id,
+                    "status": prior_result["status"], "finished_monotonic": 2.0,
+                    "result_sha256": backend.file_sha256(result_path),
+                })
+                classification = backend.classify_attempt_failure(prior_result)
+                classification["category"] = prior_attempt["classification_category"]
+                backend.write_json_once(
+                    attempt / "failure-classification.json", classification,
+                )
             patches = (
                 patch.object(backend, "source_commit", return_value="a" * 40),
                 patch.object(backend, "source_lock_sha", return_value="b" * 64),
@@ -533,6 +608,23 @@ class RetryPauseTests(unittest.TestCase):
         self.assertEqual(len(jobs), 1)
         self.assertEqual(len(attempts), 1)
         self.assertTrue((attempts[0] / "failure-classification.json").is_file())
+        self.assertTrue(Path(result["pause_record"]).is_file())
+
+    def test_resume_with_mismatched_failure_sidecar_pauses_without_starting_worker(self):
+        result, jobs, attempts = self._run([], prior_attempt={
+            "outcome": {
+                "status": "FAILED", "failure_boundary": "ProjectionError",
+                "failure_detail": "native projection does not support every live legal candidate",
+            },
+            "classification_category": "recoverable_transport_failure",
+        })
+        self.assertEqual(result["status"], "PILOT_PAUSED_UNRESOLVED_FAILURE")
+        self.assertEqual(result["completed"], 0)
+        self.assertEqual(jobs, [])
+        self.assertEqual(len(attempts), 1)
+        recorded = self.backend.read_json(attempts[0] / "failure-classification.json")
+        self.assertEqual(recorded["schema_id"], "issue84-attempt-failure-classification-v1")
+        self.assertEqual(recorded["category"], "recoverable_transport_failure")
         self.assertTrue(Path(result["pause_record"]).is_file())
 
     def test_one_identified_transport_fault_retries_same_frozen_row(self):

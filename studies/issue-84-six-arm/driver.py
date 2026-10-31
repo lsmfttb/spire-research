@@ -743,6 +743,36 @@ BACKEND = None
 BACKEND_ORIGINAL_LOAD_MODULES = None
 
 
+def install_failure_classification_receipt_check(backend) -> None:
+    """Fail closed if a persisted failure sidecar differs from its result."""
+    original = backend._attempt_failure_history
+    if getattr(original, "_issue84_failure_classification_receipt_check", False):
+        return
+
+    def checked_history(base: Path, row: dict) -> tuple[list[dict], bool]:
+        history, incomplete = original(base, row)
+        if incomplete:
+            return history, True
+        for attempt in sorted(Path(base).glob("attempt-*")):
+            if not attempt.is_dir():
+                continue
+            classification_path = attempt / "failure-classification.json"
+            if not classification_path.is_file():
+                continue
+            try:
+                recorded = backend.read_json(classification_path)
+                result = backend.read_json(attempt / "result.json")
+                expected = backend.classify_attempt_failure(result)
+            except (OSError, ValueError):
+                return [], True
+            if recorded != expected:
+                return [], True
+        return history, False
+
+    checked_history._issue84_failure_classification_receipt_check = True
+    backend._attempt_failure_history = checked_history
+
+
 def configure_backend():
     global BACKEND, BACKEND_ORIGINAL_LOAD_MODULES
     if BACKEND is not None:
@@ -769,6 +799,7 @@ def configure_backend():
     module.CONCURRENCY = CONCURRENCY
     module.__file__ = str(STUDY / "driver.py")
     module.source_commit = package_commit
+    install_failure_classification_receipt_check(module)
     BACKEND = module
     BACKEND_ORIGINAL_LOAD_MODULES = module.load_modules
     module.load_modules = load_modules

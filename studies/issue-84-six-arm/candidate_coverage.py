@@ -102,7 +102,11 @@ def repair_known_dead_adventurer_search_gap(
         return projection, None
     features = candidate.get("features")
     binding = candidate.get("candidate_binding")
-    action = binding.get("value", {}).get("candidate_action") if isinstance(binding, Mapping) else None
+    binding_value = binding.get("value") if isinstance(binding, Mapping) else None
+    action = (
+        binding_value.get("candidate_action")
+        if isinstance(binding_value, Mapping) else None
+    )
     event = features.get("event") if isinstance(features, Mapping) else None
     choice = features.get("choice") if isinstance(features, Mapping) else None
     expected_action = {
@@ -110,7 +114,6 @@ def repair_known_dead_adventurer_search_gap(
     }
     if (
         candidate.get("coverage_status") != "unsupported"
-        or candidate.get("native_legal_occurrence_index") != 0
         or candidate.get("reason") != UNSUPPORTED_REASON
         or unsupported_item.get("candidate_index") != 0
         or unsupported_item.get("kind") != "event"
@@ -119,8 +122,8 @@ def repair_known_dead_adventurer_search_gap(
         or binding.get("availability") != "available"
         or binding.get("visibility") != "oracle_only"
         or binding.get("source") != ACTION_BINDING_SOURCE
-        or not isinstance(binding.get("value"), Mapping)
-        or binding["value"].get("candidate_index") != 0
+        or not isinstance(binding_value, Mapping)
+        or binding_value.get("candidate_index") != 0
         or not isinstance(action, Mapping)
         or any(action.get(key) != value for key, value in expected_action.items())
         or not isinstance(event, Mapping)
