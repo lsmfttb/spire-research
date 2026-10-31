@@ -11,7 +11,7 @@ import unittest
 STUDY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(STUDY))
 
-from driver import T_REF, make_task_wall_forecast, save_preflight_receipt
+from driver import T_REF, make_task_wall_forecast, save_preflight_receipt, seed_table_path
 from formal import paired_bootstrap
 
 
@@ -117,6 +117,13 @@ class FormalAnalysisTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+
+    def test_seed_table_path_is_versioned_by_source_package(self):
+        first = seed_table_path("6c30f045f3d308731561d22b3706d99520b7d0a2")
+        repaired = seed_table_path("a0d6a6a4e26688db12a40f8d261ec55a88bb5631")
+        self.assertNotEqual(first, repaired)
+        self.assertEqual(repaired.name, "seed-table.json")
+        self.assertIn("a0d6a6a4e26688db12a40f8d261ec55a88bb5631", repaired.parts)
 
 
 if __name__ == "__main__":

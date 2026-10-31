@@ -142,6 +142,13 @@ def package_commit() -> str:
     return value
 
 
+def seed_table_path(package: str) -> Path:
+    """Keep each source-locked seed schedule immutable under its package SHA."""
+    if not re.fullmatch(r"[0-9a-f]{40}", package):
+        raise ValueError("seed-table package must be a full commit SHA")
+    return host_path(DATA_ROOT_WSL) / "artifacts" / "seed-tables" / package / "seed-table.json"
+
+
 def _source_files() -> dict[str, str]:
     files: dict[str, str] = {}
     for path in sorted(STUDY.rglob("*")):
@@ -305,7 +312,7 @@ def configure_backend():
     module.STAGE1 = UPSTREAM75 / "stage1"
     module.RETAINED = host_path(PARENT_MODELS_WSL)
     module.ARTIFACTS = host_path(DATA_ROOT_WSL) / "artifacts"
-    module.SEED_TABLE = host_path(DATA_ROOT_WSL) / "seed-table.json"
+    module.SEED_TABLE = seed_table_path(package_commit())
     module.SOURCE_LOCK = SOURCE_LOCK_PATH
     module.PINNED_PYTHON = Path(PYTHON_WSL)
     module.PILOT_TRAINING = tuple(range(8_480_001, 8_480_033))
