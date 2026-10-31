@@ -61,6 +61,7 @@ PARENT_UPDATE_SHA256 = "60fc4ebbefb5ee88cd4dbe25407567e8fd38b7e38bf8e10d1fa3287a
 UPSTREAM_COMMIT = "ecb588e580c0226da3aabaf54d79f2c2267308e3"
 
 ARMS = ("A", "B", "C", "D", "E", "F")
+ISSUE84_EVALUATION_ARMS = frozenset(("PARENT", *ARMS))
 CONCURRENCY = 8
 T_REF = 36.6474609375
 S_REF = 5.360108706240238
@@ -103,6 +104,19 @@ PILOT_CARRY_FORWARD = {
         "package": PILOT_RESUME_PACKAGE,
         "source_lock_sha256": PILOT_RESUME_SOURCE_LOCK_SHA256,
         "runtime_ast_sha256": PILOT_RESUME_RUNTIME_AST_SHA256,
+    },
+    # E and F completed in the reviewed 499 pilot package before its first
+    # evaluation row exposed the legacy runner's reserved arm-label mismatch.
+    # Carry those owner games forward by reference; do not replay them.
+    "E": {
+        "package": "499d63adb89f8aab1e37d3600af02f60c8e4aef7",
+        "source_lock_sha256": "c000a26edb1cb25805bb956a9a8289f8da5b9728597ea751b851fee426733b16",
+        "runtime_ast_sha256": PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
+    },
+    "F": {
+        "package": "499d63adb89f8aab1e37d3600af02f60c8e4aef7",
+        "source_lock_sha256": "c000a26edb1cb25805bb956a9a8289f8da5b9728597ea751b851fee426733b16",
+        "runtime_ast_sha256": PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
     },
 }
 PILOT_ACTOR_UPDATE_CARRY_FORWARD = {
@@ -162,6 +176,57 @@ PILOT_ACTOR_UPDATE_CARRY_FORWARD = {
         "owner_training_feature_manifest_sha256": "2ca7af59991d236ae5023162864ac32a15aae1bcf3dfa7e15ffafc39f5f80af9",
         "decision_count": 1115,
     },
+    "E": {
+        "package": "499d63adb89f8aab1e37d3600af02f60c8e4aef7",
+        "source_lock_sha256": "c000a26edb1cb25805bb956a9a8289f8da5b9728597ea751b851fee426733b16",
+        "training_package": "499d63adb89f8aab1e37d3600af02f60c8e4aef7",
+        "training_source_lock_sha256": "c000a26edb1cb25805bb956a9a8289f8da5b9728597ea751b851fee426733b16",
+        "progress_sha256": "ce745ba41b934360e6d6a78d7d4faee597ebed236c64a12f215eea0db9c62310",
+        "receipt_sha256": "6aed2252d1c55bc3199fc05959107d7fdee580a7f09a6a8011ca375d4f8a84e5",
+        "model_sha256": "999503c7294f6be3297f02a5e0290de9c746c613e4a13538462aa31b8ea523ba",
+        "checkpoint_sha256": "6546fc676f04ed7a89c9a60ff884cc7838ef44bad869afc7309074d23404993d",
+        "model_digest": "c6a785d5ba3d7a1d6e93ad7836c903c50605e949059deadbf99a8a0368e7f2bc",
+        "owner_seed_sha256": "c531521816644d45ee26d2fe52ef6ddd17f166cbb52c9852c3def7a9e3ecf9c6",
+        "owner_training_feature_manifest_sha256": "09d1b3162c29698abac2867df8e4d86fd067926b90d2af9a3915d95f03f38d45",
+        "decision_count": 1184,
+    },
+    "F": {
+        "package": "499d63adb89f8aab1e37d3600af02f60c8e4aef7",
+        "source_lock_sha256": "c000a26edb1cb25805bb956a9a8289f8da5b9728597ea751b851fee426733b16",
+        "training_package": "499d63adb89f8aab1e37d3600af02f60c8e4aef7",
+        "training_source_lock_sha256": "c000a26edb1cb25805bb956a9a8289f8da5b9728597ea751b851fee426733b16",
+        "progress_sha256": "ce745ba41b934360e6d6a78d7d4faee597ebed236c64a12f215eea0db9c62310",
+        "receipt_sha256": "d25418890c76fe995ddbdada9ebb6e39bea58f14724799a4a7fe14bdb382f045",
+        "model_sha256": "33d3ed431ec7476ab9b93a6c6e54932023f2e4eca406092a0d6fdf908601f85e",
+        "checkpoint_sha256": "b3097c6a11aa13b032b53b92689b1b70e9b08cf7a184346143d3fdc2695597b2",
+        "model_digest": "dfd5ec787afa0946540602cd8232f428ece3a2f4d25040ed29dd45b568ee370c",
+        "owner_seed_sha256": "c531521816644d45ee26d2fe52ef6ddd17f166cbb52c9852c3def7a9e3ecf9c6",
+        "owner_training_feature_manifest_sha256": "6cfe0a923b92269040092104527e44c0d921a54f5ea2724d761070a1fd0e9c64",
+        "decision_count": 1206,
+    },
+}
+PILOT_PREDICTOR_CARRY_FORWARD = {
+    arm: {
+        "package": "499d63adb89f8aab1e37d3600af02f60c8e4aef7",
+        "source_lock_sha256": "c000a26edb1cb25805bb956a9a8289f8da5b9728597ea751b851fee426733b16",
+        "progress_sha256": "ce745ba41b934360e6d6a78d7d4faee597ebed236c64a12f215eea0db9c62310",
+        "receipt_sha256": receipt_sha,
+        "checkpoint_sha256": checkpoint_sha,
+    }
+    for arm, receipt_sha, checkpoint_sha in (
+        ("D", "ed65953bcfa778563411b15f236de63c1320bde5aa30a423ebb6942108f7eaf6", "ac1a21cb4433c44fc4a165402409dc02cb0093fc2bd8672f197c35bd3d8e9e30"),
+        ("E", "e9fad45ceecd54630838c992f917b2da2d5f6457eb36ec3e77e68b9b7175772f", "7d781888d286f427089497d1a449d702566aa9aeb7c6c59e34db84c952cb3e1c"),
+        ("F", "1847567a294d1ee151b050dc6c250097631128552a0da4ce090f43e5771602b3", "d43b64a9f87dbb6981fe6b0f0749017a7d34f0d05117f27a9b6ff3f88989a1b2"),
+    )
+}
+PILOT_EVALUATION_PRESTART_FAILURE_CARRY_FORWARD = {
+    "package": "499d63adb89f8aab1e37d3600af02f60c8e4aef7",
+    "source_lock_sha256": "c000a26edb1cb25805bb956a9a8289f8da5b9728597ea751b851fee426733b16",
+    "arm": "PARENT",
+    "owners": tuple(range(8_490_001, 8_490_009)),
+    "failure_boundary": "ValueError",
+    "failure_detail": "unknown study arm PARENT",
+    "failure_classification_sha256": "21a82b119593b1244b14b109c6c20a76383dedab62fa22a9a035d821769ccbaf",
 }
 PILOT_C_INTERRUPTED_ATTEMPT_PACKAGE = "1179b14dbed830ce915299e5ee63ab190d16e4a6"
 PILOT_C_INTERRUPTED_ATTEMPT_LOCK_SHA256 = "625b812e9e174c1cd52381820beae6ea6e402daeedc3180a3329b375878d93e4"
@@ -223,11 +288,23 @@ def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
     root_limit = kwargs.pop("capture_root_limit", None)
     training_features = kwargs.pop("capture_training_features", None)
     policy_rng_seed = kwargs.pop("policy_rng_seed", None)
+    requested_arm = kwargs.get("arm")
+    issue84_eval_arm = requested_arm if requested_arm in ISSUE84_EVALUATION_ARMS else None
+    if issue84_eval_arm is not None:
+        if type(policy_rng_seed) is not int or policy_rng_seed < 0:
+            raise ValueError("Issue 84 evaluation requires its frozen policy RNG seed")
+        # The pinned #73 API reserves E for its Expert policy and rejects the
+        # Issue 84 PARENT/A-F labels. Construct through its ordinary actor arm,
+        # then install a namespaced label before any decisions are made.
+        kwargs["arm"] = "P0"
     if training_features is not None and type(training_features) is not bool:
         raise ValueError("capture_training_features must be boolean when supplied")
     if training_features is not None and bool(training_features) != bool(kwargs.get("capture_trace", True)):
         raise ValueError("pinned #73 trace capture is the source of #75 training features")
-    if root_limit is None and policy_rng_seed is None and training_features is not True:
+    if (
+        issue84_eval_arm is None and root_limit is None
+        and policy_rng_seed is None and training_features is not True
+    ):
         return original_run_one(*args, **kwargs)
     if root_limit is not None:
         if type(root_limit) is not int or root_limit <= 0:
@@ -257,6 +334,21 @@ def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
             return
         owner_pending = False
         owner_controllers.append(controller)
+        if issue84_eval_arm is not None:
+            controller.arm = f"ISSUE84_EVAL_{issue84_eval_arm}"
+            previous = controller.provenance
+            config = dict(previous.config)
+            config.update({
+                "arm": controller.arm,
+                "issue84_evaluation_arm": issue84_eval_arm,
+                "issue73_actor_constructor_alias": "P0",
+            })
+            controller.provenance = type(previous)(
+                kind=previous.kind,
+                name=f"issue84_eval_{issue84_eval_arm.lower()}_actor_v1",
+                config=config,
+                schema_version=previous.schema_version,
+            )
         if root_limit is not None:
             controller.capture_all_roots = _RootCaptureLimit(controller.roots, root_limit)
         if policy_rng_seed is not None:
@@ -265,6 +357,13 @@ def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
     controller_class.__init__ = initialize_with_root_limit
     try:
         result = original_run_one(*args, **kwargs)
+        if issue84_eval_arm is not None:
+            if not isinstance(result, dict):
+                raise TypeError("pinned #73 evaluation result must be a dictionary")
+            # Keep the #75 worker's nested result label aligned with its frozen
+            # Issue 84 seed-table row; the external worker receipt also records
+            # that original row and its policy label.
+            result["arm"] = issue84_eval_arm
         if training_features:
             if len(owner_controllers) != 1:
                 raise RuntimeError("pinned #73 did not initialize exactly one owner controller")
@@ -1763,6 +1862,263 @@ def _pilot_actor_update_resume(
     return summary, carry_forward
 
 
+def _pilot_predictor_fit_fingerprint(source: str) -> str:
+    tree = ast.parse(source)
+    functions = [
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "fit_pilot_predictors"
+    ]
+    if len(functions) != 1:
+        raise RuntimeError("pilot predictor lineage lacks its registered fit function")
+    payload = b"fit_pilot_predictors\0" + ast.dump(
+        functions[0], annotate_fields=True, include_attributes=False,
+    ).encode("utf-8")
+    return sha256(payload)
+
+
+def _pilot_predictor_fit_resume(
+    *, arm: str, package: str, pilot_root: Path,
+    current_lock: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    spec = PILOT_PREDICTOR_CARRY_FORWARD.get(arm)
+    if spec is None or package == spec["package"]:
+        return None
+    backend = configure_backend()
+    source_package = str(spec["package"])
+    source_lock_sha256 = str(spec["source_lock_sha256"])
+    source_lock_path = backend.ARTIFACTS / "source-lock-history" / (
+        f"{source_package}-{source_lock_sha256}.json"
+    )
+    if (
+        not source_lock_path.is_file()
+        or file_sha256(source_lock_path) != source_lock_sha256
+    ):
+        raise RuntimeError(f"pilot arm {arm} predictor source lock is missing or changed")
+    source_lock = read_json(source_lock_path)
+    _verify_predecessor_lock_compatibility(
+        source_lock, current_lock, package=source_package,
+    )
+
+    source_root = backend.ARTIFACTS / "pilot" / source_package / arm
+    progress_path = source_root.parent / "pilot-progress.json"
+    receipt_path = source_root / "diagnostics" / "pilot-predictor-fit.json"
+    model_path = source_root / "models" / "predictors" / "pilot-after-block-00.pt"
+    if (
+        file_sha256(progress_path) != spec["progress_sha256"]
+        or file_sha256(receipt_path) != spec["receipt_sha256"]
+        or file_sha256(model_path) != spec["checkpoint_sha256"]
+    ):
+        raise RuntimeError(f"pilot arm {arm} predictor lineage bytes differ from the registered receipts")
+    prior_progress = read_json(progress_path)
+    prior_fit = prior_progress.get("predictor_fits", {}).get(arm)
+    prior_training = prior_progress.get("training_runs", {}).get(arm)
+    prior_update = prior_progress.get("actor_updates", {}).get(arm)
+    if (
+        prior_progress.get("package_commit") != source_package
+        or prior_progress.get("source_lock_sha256") != source_lock_sha256
+        or not isinstance(prior_fit, dict)
+        or prior_fit.get("status") != "SUCCEEDED"
+        or prior_fit.get("checkpoint_sha256") != spec["checkpoint_sha256"]
+        or not isinstance(prior_training, dict)
+        or prior_training.get("status") != "SUCCEEDED"
+        or prior_training.get("completed") != 32
+        or not isinstance(prior_update, dict)
+        or prior_update.get("status") != "SUCCEEDED"
+    ):
+        raise RuntimeError(f"pilot arm {arm} predecessor predictor progress is incomplete")
+    receipt = read_json(receipt_path)
+    if (
+        receipt.get("status") != "SUCCEEDED"
+        or receipt.get("arm") != arm
+        or receipt.get("package_commit") != source_package
+        or receipt.get("source_lock_sha256") != source_lock_sha256
+        or receipt.get("checkpoint_sha256") != spec["checkpoint_sha256"]
+        or receipt.get("fit") != prior_fit.get("fit")
+    ):
+        raise RuntimeError(f"pilot arm {arm} predictor receipt differs from its progress summary")
+    current_source = Path(__file__).read_text(encoding="utf-8")
+    historical_source = _show_source_commit_file(
+        source_package, "studies/issue-84-six-arm/driver.py",
+    )
+    if _pilot_predictor_fit_fingerprint(current_source) != _pilot_predictor_fit_fingerprint(historical_source):
+        raise RuntimeError(f"pilot arm {arm} predictor fitting code differs from its retained fit")
+
+    artifact_root = source_root.relative_to(backend.ARTIFACTS).as_posix()
+    pointer = {
+        "schema_id": "issue84-pilot-predictor-fit-carry-forward-v1",
+        "current_package_commit": package,
+        "current_source_lock_sha256": file_sha256(SOURCE_LOCK_PATH),
+        "arm": arm,
+        "source_package_commit": source_package,
+        "source_lock_sha256": source_lock_sha256,
+        "source_progress_sha256": str(spec["progress_sha256"]),
+        "source_receipt_sha256": str(spec["receipt_sha256"]),
+        "source_artifact_root": artifact_root,
+        "checkpoint_sha256": str(spec["checkpoint_sha256"]),
+        "predictor_fit_fingerprint_sha256": _pilot_predictor_fit_fingerprint(current_source),
+        "training_evidence_origin": prior_training.get("evidence_origin"),
+        "actor_update_evidence_origin": prior_update.get("evidence_origin"),
+    }
+    carry_forward = {**pointer, "manifest_sha256": sha256(canonical(pointer))}
+    pointer_path = pilot_root / arm / "diagnostics" / "pilot-predictor-fit-carry-forward.json"
+    write_json_once(pointer_path, carry_forward)
+    if read_json(pointer_path) != carry_forward:
+        raise RuntimeError(f"pilot arm {arm} predictor carry-forward pointer changed after persistence")
+    summary = {
+        "status": prior_fit["status"],
+        "fit": prior_fit["fit"],
+        "checkpoint_sha256": spec["checkpoint_sha256"],
+        "evidence_origin": {
+            "package_commit": source_package,
+            "source_lock_sha256": source_lock_sha256,
+            "artifact_root": artifact_root,
+            "progress_sha256": str(spec["progress_sha256"]),
+            "receipt_sha256": str(spec["receipt_sha256"]),
+            "manifest_sha256": carry_forward["manifest_sha256"],
+        },
+    }
+    return summary, carry_forward
+
+
+def _pilot_evaluation_prestart_failure_resume(
+    *, package: str, pilot_root: Path, rows: Sequence[Mapping[str, Any]],
+    seed_table: Mapping[str, Any], current_lock: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    spec = PILOT_EVALUATION_PRESTART_FAILURE_CARRY_FORWARD
+    source_package = str(spec["package"])
+    source_lock_sha256 = str(spec["source_lock_sha256"])
+    if package == source_package:
+        return None
+    expected_owners = tuple(int(value) for value in spec["owners"])
+    ordered_rows = sorted((dict(row) for row in rows), key=lambda row: int(row["owner_seed"]))
+    if (
+        len(ordered_rows) != len(expected_owners)
+        or tuple(int(row["owner_seed"]) for row in ordered_rows) != expected_owners
+        or any(row.get("arm") != spec["arm"] or row.get("phase") != "evaluation" for row in ordered_rows)
+    ):
+        raise RuntimeError("Issue 84 pre-start failure lineage does not match the frozen PARENT evaluation cohort")
+
+    backend = configure_backend()
+    lock_path = backend.ARTIFACTS / "source-lock-history" / (
+        f"{source_package}-{source_lock_sha256}.json"
+    )
+    if not lock_path.is_file() or file_sha256(lock_path) != source_lock_sha256:
+        raise RuntimeError("Issue 84 pre-start failure source-lock archive is missing or changed")
+    _verify_predecessor_lock_compatibility(
+        read_json(lock_path), current_lock, package=source_package,
+    )
+    prior_table_path = seed_table_path(source_package)
+    if not prior_table_path.is_file():
+        raise RuntimeError("Issue 84 pre-start failure seed table is missing")
+    prior_table = read_json(prior_table_path)
+    if (
+        prior_table.get("source_lock_sha256") != source_lock_sha256
+        or prior_table.get("rows") != seed_table.get("rows")
+        or prior_table.get("rows_sha256") != seed_table.get("rows_sha256")
+        or prior_table.get("rows_sha256") != sha256(canonical(prior_table.get("rows")))
+    ):
+        raise RuntimeError("Issue 84 pre-start failure seed schedule differs from the frozen cohort")
+    prior_root = backend.ARTIFACTS / "pilot" / source_package
+    prior_progress_path = prior_root / "pilot-progress.json"
+    if file_sha256(prior_progress_path) != "ce745ba41b934360e6d6a78d7d4faee597ebed236c64a12f215eea0db9c62310":
+        raise RuntimeError("Issue 84 pre-start failure progress record is missing or changed")
+    prior_progress = read_json(prior_progress_path)
+    if (
+        prior_progress.get("package_commit") != source_package
+        or prior_progress.get("source_lock_sha256") != source_lock_sha256
+        or prior_progress.get("evaluation_runs", {}).get(str(spec["arm"])) is not None
+    ):
+        raise RuntimeError("Issue 84 predecessor already records a PARENT evaluation result")
+
+    units = []
+    for row in ordered_rows:
+        unit_id = str(row["unit_id"])
+        if unit_id != f"EVAL:{int(row['owner_seed'])}:PARENT":
+            raise RuntimeError("Issue 84 PARENT pre-start failure has an unexpected frozen unit identity")
+        unit_key = getattr(backend, "unit_key", None)
+        if not callable(unit_key):
+            raise RuntimeError("Issue 84 predecessor backend lacks its registered unit-key function")
+        unit_root = prior_root / str(spec["arm"]) / "units" / unit_key(unit_id)
+        attempt_dirs = sorted(path for path in unit_root.glob("attempt-*") if path.is_dir())
+        if len(attempt_dirs) != 1 or attempt_dirs[0].name != "attempt-0001":
+            raise RuntimeError(f"Issue 84 PARENT pre-start failure has unexpected attempts for {unit_id}")
+        attempt = attempt_dirs[0]
+        started_path = attempt / "started.json"
+        result_path = attempt / "result.json"
+        finished_path = attempt / "finished.json"
+        classification_path = attempt / "failure-classification.json"
+        if any(not path.is_file() for path in (started_path, result_path, finished_path, classification_path)):
+            raise RuntimeError(f"Issue 84 PARENT pre-start failure receipts are incomplete for {unit_id}")
+        started = read_json(started_path)
+        result = read_json(result_path)
+        finished = read_json(finished_path)
+        classification = read_json(classification_path)
+        if (
+            started.get("unit_id") != unit_id
+            or started.get("owner_seed") != row.get("owner_seed")
+            or started.get("arm") != spec["arm"]
+            or started.get("package_commit") != source_package
+            or started.get("seed_row_sha256") != sha256(canonical(row))
+            or result.get("status") != "FAILED"
+            or result.get("unit_id") != unit_id
+            or result.get("owner_seed") != row.get("owner_seed")
+            or result.get("arm") != spec["arm"]
+            or result.get("failure_boundary") != spec["failure_boundary"]
+            or result.get("failure_detail") != spec["failure_detail"]
+            or result.get("run_id") != started.get("run_id")
+            or finished.get("status") != "FAILED"
+            or finished.get("unit_id") != unit_id
+            or finished.get("run_id") != started.get("run_id")
+            or finished.get("result_sha256") != file_sha256(result_path)
+            or classification.get("schema_id") != "issue84-attempt-failure-classification-v1"
+            or classification.get("category") != "unresolved_failure"
+            or classification.get("failure_boundary") != spec["failure_boundary"]
+            or classification.get("failure_detail") != spec["failure_detail"]
+            or file_sha256(classification_path) != spec["failure_classification_sha256"]
+        ):
+            raise RuntimeError(f"Issue 84 PARENT failure receipt does not bind the exact frozen pre-start error for {unit_id}")
+        traceback = str(result.get("traceback", ""))
+        if (
+            "unknown study arm PARENT" not in traceback
+            or "line 727, in __init__" not in traceback
+            or any(key in result for key in (
+                "terminal_outcome", "terminal_floor", "terminal_act",
+                "heart_victory", "act2_plus", "act3_plus", "act4_reached",
+            ))
+            or (attempt / "runs").exists()
+            or (attempt / "progress").exists()
+            or (attempt / "runtime-metrics.jsonl").exists()
+        ):
+            raise RuntimeError(f"Issue 84 PARENT failure is not proven to have occurred before game creation for {unit_id}")
+        units.append({
+            "unit_id": unit_id,
+            "seed_row_sha256": started["seed_row_sha256"],
+            "started_sha256": file_sha256(started_path),
+            "result_sha256": file_sha256(result_path),
+            "finished_sha256": file_sha256(finished_path),
+            "failure_classification_sha256": file_sha256(classification_path),
+            "failure_boundary": str(spec["failure_boundary"]),
+            "failure_detail": str(spec["failure_detail"]),
+            "game_created": False,
+        })
+    lineage = {
+        "schema_id": "issue84-pilot-prestart-evaluation-failure-carry-forward-v1",
+        "source_package_commit": source_package,
+        "source_lock_sha256": source_lock_sha256,
+        "seed_table_rows_sha256": str(prior_table["rows_sha256"]),
+        "failed_arm": str(spec["arm"]),
+        "classification": "deterministic runner-constructor label mismatch before native adapter/game creation",
+        "units": units,
+    }
+    receipt = {**lineage, "manifest_sha256": sha256(canonical(lineage))}
+    receipt_path = pilot_root / "lineage" / "previous-parent-prestart-failures.json"
+    write_json_once(receipt_path, receipt)
+    if read_json(receipt_path) != receipt:
+        raise RuntimeError("Issue 84 PARENT pre-start failure lineage changed after persistence")
+    return receipt
+
+
 def load_training_outcomes(rows: list[dict[str, Any]], *, root: Path, executor, package: str):
     from gradients import OwnerOutcome
 
@@ -2257,6 +2613,8 @@ def run_pilot() -> dict[str, Any]:
         "actor_update_carry_forward_inputs": {},
         "execution_lineage_inputs": {},
         "predictor_fits": {},
+        "predictor_fit_carry_forward_inputs": {},
+        "evaluation_prestart_failure_carry_forward": None,
         "evaluation_runs": {},
     }
     if progress.get("package_commit") != package or progress.get("source_lock_sha256") != source["sha256"]:
@@ -2265,11 +2623,32 @@ def run_pilot() -> dict[str, Any]:
     progress.setdefault("carry_forward_inputs", {})
     progress.setdefault("actor_update_carry_forward_inputs", {})
     progress.setdefault("execution_lineage_inputs", {})
+    progress.setdefault("predictor_fit_carry_forward_inputs", {})
     clock_start = clock.elapsed_before
     if "clock_elapsed_before" not in progress:
         progress["clock_elapsed_before"] = clock.elapsed_before
         backend.atomic_json(progress_path, progress)
     try:
+        parent_eval_rows = [
+            row for row in seed_table_rows(
+                table, phase="evaluation", formal=False,
+                owners=range(8_490_001, 8_490_009),
+            )
+            if row.get("arm") == "PARENT"
+        ]
+        prestart_failure_carry = _pilot_evaluation_prestart_failure_resume(
+            package=package, pilot_root=pilot_root, rows=parent_eval_rows,
+            seed_table=table, current_lock=source["lock"],
+        )
+        if prestart_failure_carry is not None:
+            saved_failure_carry = progress.get("evaluation_prestart_failure_carry_forward")
+            if saved_failure_carry is not None and saved_failure_carry != prestart_failure_carry:
+                raise RuntimeError("pilot PARENT pre-start failure lineage changed during continuation")
+            progress["evaluation_prestart_failure_carry_forward"] = prestart_failure_carry
+            backend.atomic_json(progress_path, progress)
+        elif progress.get("evaluation_prestart_failure_carry_forward") is not None:
+            raise RuntimeError("pilot progress has unexpected PARENT pre-start failure lineage")
+
         for arm in ARMS:
             root = pilot_root / arm
             rows = [
@@ -2392,20 +2771,38 @@ def run_pilot() -> dict[str, Any]:
                     "checkpoint_sha256": update["optimizer_checkpoint_sha256"],
                 }
                 backend.atomic_json(progress_path, progress)
-            if arm in {"D", "E", "F"} and arm not in progress["predictor_fits"]:
-                progress["active_stage"] = "lagged-predictor-fit"
-                progress["active_arm"] = arm
-                backend.atomic_json(progress_path, progress)
-                fit = fit_pilot_predictors(
-                    arm, rows, root=root, executor=executor, package=package,
-                    training_root=training_root, training_package=training_package,
+            if arm in {"D", "E", "F"}:
+                predictor_carry = _pilot_predictor_fit_resume(
+                    arm=arm, package=package, pilot_root=pilot_root,
+                    current_lock=source["lock"],
                 )
-                progress["predictor_fits"][arm] = {
-                    "status": fit["status"],
-                    "fit": fit["fit"],
-                    "checkpoint_sha256": fit["checkpoint_sha256"],
-                }
-                backend.atomic_json(progress_path, progress)
+                if predictor_carry is not None:
+                    carried_fit, predictor_manifest = predictor_carry
+                    recorded = progress["predictor_fit_carry_forward_inputs"].get(arm)
+                    if recorded is not None and recorded != predictor_manifest:
+                        raise RuntimeError(f"pilot predictor carry-forward changed for arm {arm}")
+                    saved_fit = progress["predictor_fits"].get(arm)
+                    if saved_fit is not None and saved_fit != carried_fit:
+                        raise RuntimeError(f"pilot predictor progress differs from retained receipt for arm {arm}")
+                    progress["predictor_fit_carry_forward_inputs"][arm] = predictor_manifest
+                    progress["predictor_fits"][arm] = carried_fit
+                    backend.atomic_json(progress_path, progress)
+                elif arm in progress["predictor_fit_carry_forward_inputs"]:
+                    raise RuntimeError(f"pilot progress has unexpected predictor carry-forward for arm {arm}")
+                if arm not in progress["predictor_fits"]:
+                    progress["active_stage"] = "lagged-predictor-fit"
+                    progress["active_arm"] = arm
+                    backend.atomic_json(progress_path, progress)
+                    fit = fit_pilot_predictors(
+                        arm, rows, root=root, executor=executor, package=package,
+                        training_root=training_root, training_package=training_package,
+                    )
+                    progress["predictor_fits"][arm] = {
+                        "status": fit["status"],
+                        "fit": fit["fit"],
+                        "checkpoint_sha256": fit["checkpoint_sha256"],
+                    }
+                    backend.atomic_json(progress_path, progress)
 
         for group in ("PARENT", *ARMS):
             root = (pilot_root / "PARENT") if group == "PARENT" else (pilot_root / group)
@@ -2469,6 +2866,8 @@ def run_pilot() -> dict[str, Any]:
         "actor_update_carry_forward_inputs": progress["actor_update_carry_forward_inputs"],
         "execution_lineage_inputs": progress["execution_lineage_inputs"],
         "lagged_predictor_fits": progress["predictor_fits"],
+        "predictor_fit_carry_forward_inputs": progress["predictor_fit_carry_forward_inputs"],
+        "evaluation_prestart_failure_carry_forward": progress["evaluation_prestart_failure_carry_forward"],
         "pilot_weights_discarded": True,
         "discarded_pilot_weights": discarded,
         "discarded_pilot_weight_count": len(discarded),

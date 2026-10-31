@@ -25,6 +25,7 @@ from driver import (
     save_preflight_receipt,
     seed_table_path,
     _preflight_optimizer_evidence,
+    call_pinned_issue73_run_one,
     install_issue73_capture_limit_compat,
     refresh_source_lock,
     sha256,
@@ -227,6 +228,72 @@ class FormalAnalysisTests(unittest.TestCase):
         self.assertEqual(decisions[1]["candidate_features"], [[3.0], [4.0]])
         self.assertNotIn("matrix", decisions[0])
         self.assertIs(Controller.__init__, original_init)
+
+    def test_issue84_evaluation_arms_use_namespaced_nonexpert_actor_path(self):
+        class Provenance:
+            def __init__(self, kind, name, config, schema_version=1):
+                self.kind = kind
+                self.name = name
+                self.config = dict(config)
+                self.schema_version = schema_version
+
+        class Controller:
+            def __init__(
+                self, *, module, arm, model, model_digest, encoder, seed,
+                capture_checkpoints=False, checkpoint_screens=None,
+                forced_root=None, sampling_purpose="policy", capture_trace=True,
+                capture_all_roots=False, suffix_random_seed=None,
+                expert_random_seed=None, root_callback=None,
+            ):
+                if arm not in {"TRAIN", "BRANCH", "P0", "P1", "E", "SUFFIX"}:
+                    raise ValueError(f"unknown study arm {arm}")
+                self.arm = arm
+                self.expert = object() if arm in {"E", "SUFFIX"} else None
+                self.provenance = Provenance("issue73", f"issue73_{arm.lower()}", {"arm": arm})
+                self.rng = SimpleNamespace(manual_seed=lambda value: setattr(self, "policy_seed", value))
+
+        class Runner:
+            StudyController = Controller
+
+        runner = Runner()
+
+        def run_one(**kwargs):
+            controller = runner.StudyController(
+                module=None, arm=kwargs["arm"], model=object(), model_digest="model",
+                encoder=None, seed=kwargs["seed"], sampling_purpose=kwargs["purpose"],
+            )
+            controller.run_id = "evaluation"
+            return {
+                "arm": kwargs["arm"],
+                "controller": controller,
+                "policy_training_row": controller.arm in {"TRAIN", "P0", "P1", "BRANCH"},
+            }
+
+        runner._run_one = lambda *args, **kwargs: call_pinned_issue73_run_one(
+            runner, run_one, *args, **kwargs,
+        )
+        for index, arm in enumerate(("PARENT", "A", "B", "C", "D", "E", "F")):
+            with self.subTest(arm=arm):
+                result = runner._run_one(
+                    arm=arm, seed=8_490_001 + index, purpose=f"stage1-heldout-{arm}",
+                    policy_rng_seed=100 + index, capture_trace=False,
+                )
+                controller = result["controller"]
+                self.assertEqual(result["arm"], arm)
+                self.assertEqual(controller.arm, f"ISSUE84_EVAL_{arm}")
+                self.assertIsNone(controller.expert)
+                self.assertFalse(result["policy_training_row"])
+                self.assertEqual(controller.policy_seed, 100 + index)
+                self.assertEqual(controller.provenance.config["issue84_evaluation_arm"], arm)
+                self.assertEqual(controller.provenance.config["issue73_actor_constructor_alias"], "P0")
+
+        training = runner._run_one(
+            arm="TRAIN", seed=8_480_001, purpose="stage1-training",
+            policy_rng_seed=777, capture_trace=True,
+        )
+        self.assertEqual(training["arm"], "TRAIN")
+        self.assertEqual(training["controller"].arm, "TRAIN")
+        self.assertTrue(training["policy_training_row"])
 
     def test_owner_paired_bootstrap_is_deterministic_and_interpolates(self):
         left = {

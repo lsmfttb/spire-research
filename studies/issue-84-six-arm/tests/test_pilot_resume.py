@@ -17,6 +17,200 @@ import predictors  # noqa: E402
 
 
 class PilotResumeRepairTests(unittest.TestCase):
+    def test_parent_prestart_failures_are_bound_without_reading_terminal_outcomes(self):
+        source_package = driver.PILOT_EVALUATION_PRESTART_FAILURE_CARRY_FORWARD["package"]
+        lock_sha256 = driver.PILOT_EVALUATION_PRESTART_FAILURE_CARRY_FORWARD["source_lock_sha256"]
+        expected_progress_sha256 = "ce745ba41b934360e6d6a78d7d4faee597ebed236c64a12f215eea0db9c62310"
+        owners = range(8_490_001, 8_490_009)
+        rows = [
+            {
+                "unit_id": f"EVAL:{owner}:PARENT",
+                "owner_seed": owner,
+                "phase": "evaluation",
+                "arm": "PARENT",
+                "formal": False,
+            }
+            for owner in owners
+        ]
+        rows_sha256 = driver.sha256(driver.canonical(rows))
+        seed_table = {"rows": rows, "rows_sha256": rows_sha256}
+
+        def write_json(path, value):
+            path = Path(path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(driver.canonical(value) + b"\n")
+            return path
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            artifacts = root / "artifacts"
+            pilot_root = artifacts / "pilot" / ("a" * 40)
+            prior_root = artifacts / "pilot" / source_package
+            lock_path = artifacts / "source-lock-history" / f"{source_package}-{lock_sha256}.json"
+            progress_path = prior_root / "pilot-progress.json"
+            table_path = root / "seed-table.json"
+            write_json(lock_path, {"schema_id": "fixture"})
+            write_json(progress_path, {
+                "package_commit": source_package,
+                "source_lock_sha256": lock_sha256,
+                "evaluation_runs": {},
+            })
+            write_json(table_path, {
+                "source_lock_sha256": lock_sha256,
+                "rows_sha256": rows_sha256,
+                "rows": rows,
+            })
+            for row in rows:
+                unit_id = row["unit_id"]
+                attempt = prior_root / "PARENT" / "units" / unit_id.replace(":", "-") / "attempt-0001"
+                started = {
+                    "unit_id": unit_id,
+                    "owner_seed": row["owner_seed"],
+                    "arm": "PARENT",
+                    "package_commit": source_package,
+                    "seed_row_sha256": driver.sha256(driver.canonical(row)),
+                    "run_id": f"{unit_id}-attempt-0001",
+                }
+                result = {
+                    "status": "FAILED",
+                    "unit_id": unit_id,
+                    "owner_seed": row["owner_seed"],
+                    "arm": "PARENT",
+                    "failure_boundary": "ValueError",
+                    "failure_detail": "unknown study arm PARENT",
+                    "run_id": started["run_id"],
+                    "traceback": "ValueError: unknown study arm PARENT\n  line 727, in __init__",
+                }
+                result_path = write_json(attempt / "result.json", result)
+                write_json(attempt / "started.json", started)
+                write_json(attempt / "finished.json", {
+                    "status": "FAILED",
+                    "unit_id": unit_id,
+                    "run_id": started["run_id"],
+                    "result_sha256": driver.file_sha256(result_path),
+                })
+                write_json(attempt / "failure-classification.json", {
+                    "schema_id": "issue84-attempt-failure-classification-v1",
+                    "category": "unresolved_failure",
+                    "failure_boundary": "ValueError",
+                    "failure_detail": "unknown study arm PARENT",
+                    "failure_signature_sha256": "cfc57887ac2bee8628d099bf6f8f36246ea1e11ebcff4feec666a4e228702980",
+                })
+
+            backend = types.SimpleNamespace(
+                ARTIFACTS=artifacts,
+                unit_key=lambda unit_id: "".join(
+                    character if character.isalnum() or character in "-_" else "-"
+                    for character in unit_id
+                ),
+            )
+            actual_file_sha256 = driver.file_sha256
+
+            def fixture_hash(path):
+                path = Path(path)
+                if path == lock_path:
+                    return lock_sha256
+                if path == progress_path:
+                    return expected_progress_sha256
+                if path.name == "failure-classification.json":
+                    return driver.PILOT_EVALUATION_PRESTART_FAILURE_CARRY_FORWARD["failure_classification_sha256"]
+                return actual_file_sha256(path)
+
+            with (
+                patch.object(driver, "configure_backend", return_value=backend),
+                patch.object(driver, "seed_table_path", return_value=table_path),
+                patch.object(driver, "file_sha256", side_effect=fixture_hash),
+                patch.object(driver, "_verify_predecessor_lock_compatibility"),
+            ):
+                receipt = driver._pilot_evaluation_prestart_failure_resume(
+                    package="a" * 40,
+                    pilot_root=pilot_root,
+                    rows=rows,
+                    seed_table=seed_table,
+                    current_lock={"schema_id": "fixture"},
+                )
+
+            self.assertEqual(len(receipt["units"]), 8)
+            self.assertTrue(all(unit["game_created"] is False for unit in receipt["units"]))
+            self.assertTrue(all(unit["unit_id"].startswith("EVAL:") for unit in receipt["units"]))
+            self.assertTrue((pilot_root / "lineage" / "previous-parent-prestart-failures.json").is_file())
+
+    def test_predictor_fits_can_be_carried_by_hash_bound_pointer(self):
+        for arm in ("D", "E", "F"):
+            spec = driver.PILOT_PREDICTOR_CARRY_FORWARD[arm]
+            with self.subTest(arm=arm), tempfile.TemporaryDirectory() as temporary:
+                artifacts = Path(temporary) / "artifacts"
+                source_root = artifacts / "pilot" / spec["package"] / arm
+                current_package = "a" * 40
+                pilot_root = artifacts / "pilot" / current_package
+                source_lock = artifacts / "source-lock-history" / (
+                    f"{spec['package']}-{spec['source_lock_sha256']}.json"
+                )
+                progress_path = source_root.parent / "pilot-progress.json"
+                receipt_path = source_root / "diagnostics" / "pilot-predictor-fit.json"
+                checkpoint_path = source_root / "models" / "predictors" / "pilot-after-block-00.pt"
+                source_lock.parent.mkdir(parents=True)
+                source_lock.write_text('{"schema_id":"fixture"}', encoding="utf-8")
+                checkpoint_path.parent.mkdir(parents=True)
+                checkpoint_path.write_bytes(b"predictor checkpoint fixture")
+                fit = {"value": {"examples": 32}}
+                training_origin = {"package_commit": spec["package"], "source_lock_sha256": spec["source_lock_sha256"]}
+                update_origin = {"package_commit": spec["package"], "source_lock_sha256": spec["source_lock_sha256"]}
+                progress = {
+                    "package_commit": spec["package"],
+                    "source_lock_sha256": spec["source_lock_sha256"],
+                    "predictor_fits": {arm: {
+                        "status": "SUCCEEDED",
+                        "fit": fit,
+                        "checkpoint_sha256": spec["checkpoint_sha256"],
+                    }},
+                    "training_runs": {arm: {"status": "SUCCEEDED", "completed": 32, "evidence_origin": training_origin}},
+                    "actor_updates": {arm: {"status": "SUCCEEDED", "evidence_origin": update_origin}},
+                }
+                receipt = {
+                    "status": "SUCCEEDED",
+                    "arm": arm,
+                    "package_commit": spec["package"],
+                    "source_lock_sha256": spec["source_lock_sha256"],
+                    "checkpoint_sha256": spec["checkpoint_sha256"],
+                    "fit": fit,
+                }
+                for path, value in ((progress_path, progress), (receipt_path, receipt)):
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(driver.canonical(value))
+
+                backend = types.SimpleNamespace(ARTIFACTS=artifacts)
+                actual_file_sha256 = driver.file_sha256
+                hashes = {
+                    source_lock: spec["source_lock_sha256"],
+                    progress_path: spec["progress_sha256"],
+                    receipt_path: spec["receipt_sha256"],
+                    checkpoint_path: spec["checkpoint_sha256"],
+                }
+
+                def fixture_hash(path):
+                    path = Path(path)
+                    if path in hashes:
+                        return hashes[path]
+                    return actual_file_sha256(path)
+
+                current_source = Path(driver.__file__).read_text(encoding="utf-8")
+                with (
+                    patch.object(driver, "configure_backend", return_value=backend),
+                    patch.object(driver, "file_sha256", side_effect=fixture_hash),
+                    patch.object(driver, "_verify_predecessor_lock_compatibility"),
+                    patch.object(driver, "_show_source_commit_file", return_value=current_source),
+                ):
+                    carried, manifest = driver._pilot_predictor_fit_resume(
+                        arm=arm, package=current_package, pilot_root=pilot_root,
+                        current_lock={"schema_id": "fixture"},
+                    )
+
+                self.assertEqual(carried["status"], "SUCCEEDED")
+                self.assertEqual(carried["checkpoint_sha256"], spec["checkpoint_sha256"])
+                self.assertEqual(manifest["source_package_commit"], spec["package"])
+                self.assertTrue((pilot_root / arm / "diagnostics" / "pilot-predictor-fit-carry-forward.json").is_file())
+
     def test_resume_runtime_fingerprint_is_source_qualified_and_distinct(self):
         self.assertEqual(
             driver.PILOT_CARRY_FORWARD["C"]["runtime_ast_sha256"],
