@@ -49,6 +49,11 @@ def _restore_predictors(state: Mapping[str, Any], arm: str, value, value_optimiz
 
 
 def _new_predictors(arm: str):
+    arm = arm.upper()
+    if arm not in {"A", "B", "C", "D", "E", "F"}:
+        raise ValueError(f"unknown Issue 84 arm: {arm}")
+    if arm in {"A", "B", "C"}:
+        return None, None, None, None
     value = ScalarPredictor(seed=d.derive_seed("formal", arm, "V"))
     value_optimizer = new_predictor_optimizer(value)
     action_value = action_optimizer = None
@@ -98,8 +103,8 @@ def _iter_predictor_history(arm: str, block: int, *, root: Path, executor, packa
 
 def _predictor_state(value, value_optimizer, action_value, action_optimizer) -> dict[str, Any]:
     return {
-        "value_model_state_dict": value.state_dict(),
-        "value_optimizer_state_dict": value_optimizer.state_dict(),
+        "value_model_state_dict": None if value is None else value.state_dict(),
+        "value_optimizer_state_dict": None if value_optimizer is None else value_optimizer.state_dict(),
         "action_value_model_state_dict": None if action_value is None else action_value.state_dict(),
         "action_value_optimizer_state_dict": None if action_optimizer is None else action_optimizer.state_dict(),
     }
@@ -108,7 +113,21 @@ def _predictor_state(value, value_optimizer, action_value, action_optimizer) -> 
 def _prepare_predictors(
     arm: str, block: int, *, root: Path, executor, package: str,
     value, value_optimizer, action_value, action_optimizer,
-) -> tuple[dict[str, Any], str]:
+) -> tuple[dict[str, Any], str | None]:
+    arm = arm.upper()
+    if arm in {"A", "B", "C"}:
+        if any(item is not None for item in (value, value_optimizer, action_value, action_optimizer)):
+            raise RuntimeError(f"arm {arm} must not create auxiliary predictors")
+        return {
+            "schema_id": "issue84-no-auxiliary-predictor-v1",
+            "status": "NOT_APPLICABLE",
+            "arm": arm,
+            "current_block_index": block,
+            "prior_block_indices": list(range(block)),
+            "source_lock_sha256": d.file_sha256(d.SOURCE_LOCK_PATH),
+            "package_commit": package,
+        }, None
+
     predictor_dir = root / "models" / "predictors"
     predictor_path = predictor_dir / f"block-{block:02d}-before.pt"
     prior_manifests = []
@@ -307,10 +326,7 @@ def _train_actor_block(
             "python_rng_state": rng_state,
             "owner_order": [int(index) for index in order],
             "diagnostics": list(diagnostics),
-            "value_model_state_dict": value.state_dict(),
-            "value_optimizer_state_dict": value_optimizer.state_dict(),
-            "action_value_model_state_dict": None if action_value is None else action_value.state_dict(),
-            "action_value_optimizer_state_dict": None if action_optimizer is None else action_optimizer.state_dict(),
+            **_predictor_state(value, value_optimizer, action_value, action_optimizer),
             "behavior_actor_state_dict": None if behavior_actor is None else behavior_actor.state_dict(),
             "predictor_checkpoint_sha256": predictor_sha,
             "source_lock_sha256": d.file_sha256(d.SOURCE_LOCK_PATH),

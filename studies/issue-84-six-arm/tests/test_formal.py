@@ -36,7 +36,46 @@ from driver import (
     sha256,
 )
 import driver as driver_module
-from formal import paired_bootstrap
+from formal import _new_predictors, _prepare_predictors, _predictor_state, paired_bootstrap
+
+
+class FormalPredictorLifecycleTests(unittest.TestCase):
+    def test_legacy_arms_skip_auxiliary_predictor_creation_and_fitting(self):
+        with tempfile.TemporaryDirectory() as temporary, patch(
+            "formal.fit_cached_prior_block_predictors",
+        ) as fit_predictors:
+            root = Path(temporary)
+            for arm in "ABC":
+                predictors = _new_predictors(arm)
+                self.assertEqual(predictors, (None, None, None, None))
+                fit, checkpoint_sha = _prepare_predictors(
+                    arm, 0, root=root, executor=None, package="test-package",
+                    value=predictors[0], value_optimizer=predictors[1],
+                    action_value=predictors[2], action_optimizer=predictors[3],
+                )
+                self.assertEqual(fit["schema_id"], "issue84-no-auxiliary-predictor-v1")
+                self.assertEqual(fit["status"], "NOT_APPLICABLE")
+                self.assertEqual(fit["arm"], arm)
+                self.assertIsNone(checkpoint_sha)
+                self.assertEqual(_predictor_state(*predictors), {
+                    "value_model_state_dict": None,
+                    "value_optimizer_state_dict": None,
+                    "action_value_model_state_dict": None,
+                    "action_value_optimizer_state_dict": None,
+                })
+            fit_predictors.assert_not_called()
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_auxiliary_arms_keep_their_registered_predictor_models(self):
+        for arm in "DEF":
+            value, value_optimizer, action_value, action_optimizer = _new_predictors(arm)
+            self.assertIsNotNone(value)
+            self.assertIsNotNone(value_optimizer)
+            self.assertEqual(action_value is not None, arm == "E")
+            self.assertEqual(action_optimizer is not None, arm == "E")
+            self.assertIsNotNone(_predictor_state(
+                value, value_optimizer, action_value, action_optimizer,
+            )["value_model_state_dict"])
 
 
 class FormalAnalysisTests(unittest.TestCase):
