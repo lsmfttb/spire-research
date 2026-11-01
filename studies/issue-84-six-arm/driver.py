@@ -13,6 +13,7 @@ from contextlib import contextmanager
 import hashlib
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -71,6 +72,8 @@ S_REF = 5.360108706240238
 PILOT_PREDECESSOR_PACKAGE = "fbbcae6d55a505ce4c4a12968c7a09abb2f06f3d"
 PILOT_PREDECESSOR_LOCK_SHA256 = "d23bda9d60572814fbeef8d245246d1cccda74cf4ba565a87d0f1e98f7c49533"
 PILOT_PREDECESSOR_RUNTIME_AST_SHA256 = "47b9dda9e86843c760dffe9b3a548a6338cbda7fc095420e965282a24571e35a"
+FORMAL_PREDECESSOR_PACKAGE = "1179b14dbed830ce915299e5ee63ab190d16e4a6"
+FORMAL_PREDECESSOR_LOCK_SHA256 = "625b812e9e174c1cd52381820beae6ea6e402daeedc3180a3329b375878d93e4"
 
 sys.path.insert(0, str(STUDY))
 
@@ -1070,20 +1073,25 @@ def _pilot_runtime_fingerprint() -> str:
 @contextmanager
 def _predecessor_source_lock(package: str):
     """Temporarily validate predecessor receipts against their archived lock."""
-    if package != PILOT_PREDECESSOR_PACKAGE:
+    lock_by_package = {
+        PILOT_PREDECESSOR_PACKAGE: PILOT_PREDECESSOR_LOCK_SHA256,
+        FORMAL_PREDECESSOR_PACKAGE: FORMAL_PREDECESSOR_LOCK_SHA256,
+    }
+    expected_sha256 = lock_by_package.get(package)
+    if expected_sha256 is None:
         yield
         return
     backend = configure_backend()
     lock_path = backend.ARTIFACTS / "source-lock-history" / (
-        f"{package}-{PILOT_PREDECESSOR_LOCK_SHA256}.json"
+        f"{package}-{expected_sha256}.json"
     )
-    if not lock_path.is_file() or file_sha256(lock_path) != PILOT_PREDECESSOR_LOCK_SHA256:
-        raise RuntimeError("pilot predecessor source-lock archive is missing or changed")
+    if not lock_path.is_file() or file_sha256(lock_path) != expected_sha256:
+        raise RuntimeError("predecessor source-lock archive is missing or changed")
     previous_path = backend.SOURCE_LOCK
     backend.SOURCE_LOCK = lock_path
     try:
-        if backend.source_lock_sha() != PILOT_PREDECESSOR_LOCK_SHA256:
-            raise RuntimeError("pilot predecessor source-lock identity changed")
+        if backend.source_lock_sha() != expected_sha256:
+            raise RuntimeError("predecessor source-lock identity changed")
         yield
     finally:
         backend.SOURCE_LOCK = previous_path
@@ -1105,7 +1113,7 @@ def _verify_predecessor_lock_compatibility(
 
 def _validate_carried_attempt(
     row: Mapping[str, Any], root: Path, report: Mapping[str, Any], result_path: Path,
-    *, package: str, source_lock_sha256: str,
+    *, package: str, source_lock_sha256: str, formal: bool = False,
 ) -> dict[str, str]:
     unit_id = str(row["unit_id"])
     if (
@@ -1114,7 +1122,7 @@ def _validate_carried_attempt(
         or report.get("owner_seed") != row.get("owner_seed")
         or report.get("phase") != "training"
         or report.get("arm") != "TRAIN"
-        or report.get("formal") is not False
+        or report.get("formal") is not formal
         or report.get("package_commit") != package
         or report.get("runner_code_commit") != package
         or report.get("source_lock_sha256") != source_lock_sha256
@@ -1132,7 +1140,7 @@ def _validate_carried_attempt(
         or report.get("expert_decisions") != 0
         or report.get("terminal_outcome") is None
     ):
-        raise RuntimeError(f"pilot predecessor receipt violates the registered owner/source binding: {unit_id}")
+        raise RuntimeError(f"predecessor receipt violates the registered owner/source binding: {unit_id}")
 
     attempt_dir = result_path.parent
     started_path = attempt_dir / "started.json"
@@ -1149,29 +1157,389 @@ def _validate_carried_attempt(
         or finished.get("status") != "SUCCEEDED"
         or finished.get("result_sha256") != file_sha256(result_path)
     ):
-        raise RuntimeError(f"pilot predecessor start/finish receipts do not bind the frozen seed row: {unit_id}")
+        raise RuntimeError(f"predecessor start/finish receipts do not bind the frozen seed row: {unit_id}")
 
     pointer = report.get("training_features")
     if not isinstance(pointer, Mapping) or pointer.get("compression") != "zlib":
-        raise RuntimeError(f"pilot predecessor lacks lossless training features: {unit_id}")
+        raise RuntimeError(f"predecessor lacks lossless training features: {unit_id}")
     feature_path = (root / str(pointer["path"])).resolve(strict=True)
     try:
         feature_path.relative_to(root.resolve())
     except ValueError as exc:
-        raise RuntimeError(f"pilot predecessor feature path escapes its artifact root: {unit_id}") from exc
+        raise RuntimeError(f"predecessor feature path escapes its artifact root: {unit_id}") from exc
     compressed = feature_path.read_bytes()
     if sha256(compressed) != pointer.get("sha256"):
-        raise RuntimeError(f"pilot predecessor compressed feature bytes changed: {unit_id}")
+        raise RuntimeError(f"predecessor compressed feature bytes changed: {unit_id}")
     import zlib
     raw = zlib.decompress(compressed)
     if sha256(raw) != pointer.get("uncompressed_sha256"):
-        raise RuntimeError(f"pilot predecessor feature content changed: {unit_id}")
+        raise RuntimeError(f"predecessor feature content changed: {unit_id}")
     return {
         "unit_id": unit_id,
         "result_sha256": file_sha256(result_path),
         "started_sha256": file_sha256(started_path),
         "finished_sha256": file_sha256(finished_path),
         "training_features_sha256": str(pointer["sha256"]),
+    }
+
+
+def _formal_unknown_pilot_tails(backend) -> list[dict[str, Any]]:
+    """Hash incomplete C pilot attempts without assigning their unknown time."""
+    records = []
+    pilot_root = backend.ARTIFACTS / "pilot"
+    if not pilot_root.is_dir():
+        return records
+    for package_root in sorted(path for path in pilot_root.iterdir() if path.is_dir()):
+        c_root = package_root / "C"
+        if not c_root.is_dir():
+            continue
+        for started_path in sorted(c_root.rglob("attempt-*/started.json")):
+            attempt = started_path.parent
+            result_path = attempt / "result.json"
+            finished_path = attempt / "finished.json"
+            if result_path.is_file() and finished_path.is_file():
+                continue
+            files = {}
+            for name in ("started.json", "worker-job.json", "result.json", "finished.json"):
+                path = attempt / name
+                if path.is_file():
+                    files[name] = file_sha256(path)
+            records.append({
+                "package_commit": package_root.name,
+                "attempt_path": attempt.relative_to(backend.ARTIFACTS).as_posix(),
+                "present_receipt_sha256": files,
+                "time_status": "UNKNOWN_NOT_RECONSTRUCTED",
+            })
+    return records
+
+
+def _formal_clock_snapshot(backend, allowance: float, existing_bridge: Mapping[str, Any] | None) -> dict[str, Any]:
+    path = backend.ARTIFACTS / "active-wall-issue84-task.json"
+    if not math.isfinite(allowance) or allowance <= 0:
+        raise RuntimeError("formal continuation allowance is not finite and positive")
+    if not path.is_file():
+        raise RuntimeError("formal continuation requires the existing cumulative task clock")
+    current = read_json(path)
+    if (
+        current.get("schema_id") != "issue79-active-wall-clock-v1"
+        or current.get("mode") != "issue84-task"
+        or float(current.get("allowance_seconds", -1)) != allowance
+    ):
+        raise RuntimeError("formal continuation would change the existing task-wide wall allowance")
+    process_ids = current.get("process_ids", [])
+    if not isinstance(process_ids, list):
+        raise RuntimeError("existing cumulative task clock has an invalid process list")
+    if current.get("active_session"):
+        if existing_bridge is None:
+            raise RuntimeError("cannot create formal continuation bridge while the cumulative task clock is active")
+        if any(backend._pid_alive(int(pid)) for pid in process_ids):
+            raise RuntimeError("cannot validate formal continuation while a prior task process is active")
+    elif process_ids:
+        raise RuntimeError("existing cumulative task clock has process IDs without an active session")
+    current_elapsed = float(current.get("elapsed_seconds", -1))
+    if not math.isfinite(current_elapsed) or current_elapsed < 0 or current_elapsed > allowance:
+        raise RuntimeError("existing cumulative task clock is invalid or already exceeds its allowance")
+    if existing_bridge is None:
+        payload = path.read_bytes()
+        return {
+            "path": path.relative_to(backend.ARTIFACTS).as_posix(),
+            "file_sha256": sha256(payload),
+            "record_sha256": sha256(canonical(current)),
+            "record": current,
+        }
+
+    snapshot = existing_bridge.get("predecessor_active_wall_clock")
+    if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("record"), Mapping):
+        raise RuntimeError("formal continuation bridge lacks its predecessor clock snapshot")
+    saved_record = snapshot["record"]
+    saved_elapsed = float(saved_record.get("elapsed_seconds", -1))
+    if (
+        snapshot.get("path") != path.relative_to(backend.ARTIFACTS).as_posix()
+        or snapshot.get("record_sha256") != sha256(canonical(saved_record))
+        or float(saved_record.get("allowance_seconds", -1)) != allowance
+        or saved_record.get("active_session")
+        or saved_record.get("process_ids")
+        or not math.isfinite(saved_elapsed)
+        or saved_elapsed < 0
+        or saved_elapsed > allowance
+        or current_elapsed < saved_elapsed
+    ):
+        raise RuntimeError("formal continuation clock lineage is invalid or was reset")
+    return dict(snapshot)
+
+
+def formal_continuation(
+    *, package: str, source_lock_sha256: str, current_lock: Mapping[str, Any],
+    current_seed_table: Mapping[str, Any], backend,
+) -> dict[str, Any] | None:
+    """Create/verify an append-only bridge from the accepted formal A0 outcomes."""
+    legacy_progress_path = backend.ARTIFACTS / "formal" / "formal-progress.json"
+    if not legacy_progress_path.is_file():
+        return None
+    if package == FORMAL_PREDECESSOR_PACKAGE:
+        raise RuntimeError("legacy formal progress requires a new source-locked package to continue")
+    if (
+        backend.SEED_TABLE != seed_table_path(package)
+        or source_lock_sha256 != file_sha256(SOURCE_LOCK_PATH)
+        or current_seed_table.get("schema_id") != "issue84-seed-table-v1"
+        or current_seed_table.get("source_lock_sha256") != source_lock_sha256
+        or not isinstance(current_seed_table.get("rows"), list)
+        or current_seed_table.get("rows_sha256") != sha256(canonical(current_seed_table.get("rows")))
+        or not backend.SEED_TABLE.is_file()
+        or read_json(backend.SEED_TABLE) != dict(current_seed_table)
+    ):
+        raise RuntimeError("formal continuation backend/seed table is bound to another package or source lock")
+
+    predecessor = FORMAL_PREDECESSOR_PACKAGE
+    predecessor_lock_sha = FORMAL_PREDECESSOR_LOCK_SHA256
+    legacy_root = backend.ARTIFACTS / "formal" / "A"
+    legacy_seed_path = seed_table_path(predecessor)
+    lock_path = backend.ARTIFACTS / "source-lock-history" / f"{predecessor}-{predecessor_lock_sha}.json"
+    forecast_path = backend.ARTIFACTS / "pilot" / predecessor / "task-wall-forecast.json"
+    for path, description in (
+        (legacy_seed_path, "predecessor formal seed table"),
+        (lock_path, "predecessor source lock"),
+        (forecast_path, "predecessor pilot forecast"),
+    ):
+        if not path.is_file():
+            raise RuntimeError(f"formal continuation is missing its {description}")
+    if file_sha256(lock_path) != predecessor_lock_sha:
+        raise RuntimeError("formal continuation predecessor source-lock archive hash differs")
+    predecessor_lock = read_json(lock_path)
+    _verify_predecessor_lock_compatibility(predecessor_lock, current_lock)
+
+    old_progress = read_json(legacy_progress_path)
+    old_seed_table = read_json(legacy_seed_path)
+    source_forecast = read_json(forecast_path)
+    if (
+        old_progress.get("schema_id") != "issue84-formal-progress-v1"
+        or old_progress.get("status") != "IN_PROGRESS"
+        or old_progress.get("package_commit") != predecessor
+        or old_progress.get("source_lock_sha256") != predecessor_lock_sha
+        or old_progress.get("active_stage") != "actor-update"
+        or old_progress.get("active_arm") != "A"
+        or old_progress.get("active_block") != 0
+        or old_progress.get("seed_table_sha256") != file_sha256(legacy_seed_path)
+        or old_seed_table.get("schema_id") != "issue84-seed-table-v1"
+        or old_seed_table.get("source_lock_sha256") != predecessor_lock_sha
+        or not isinstance(old_seed_table.get("rows"), list)
+        or old_seed_table.get("rows_sha256") != sha256(canonical(old_seed_table.get("rows")))
+        or old_seed_table.get("rows") != current_seed_table.get("rows")
+        or old_seed_table.get("rows_sha256") != current_seed_table.get("rows_sha256")
+        or old_progress.get("forecast_sha256") != file_sha256(forecast_path)
+        or source_forecast.get("package_commit") != predecessor
+        or source_forecast.get("source_lock_sha256") != predecessor_lock_sha
+        or source_forecast.get("schema_id") != "issue84-task-wall-forecast-v1"
+    ):
+        raise RuntimeError("formal predecessor ledger, seed schedule, or forecast binding is incompatible")
+
+    allowance = float(source_forecast.get("one_task_active_wall_allowance_seconds", -1))
+    if allowance <= 0:
+        raise RuntimeError("predecessor formal forecast has no valid task-wide allowance")
+    current_rows = [
+        dict(row) for row in current_seed_table.get("rows", [])
+        if row.get("phase") == "training" and row.get("formal") is True
+        and row.get("issue84_arm") == "A" and row.get("block_index") == 0
+    ]
+    old_rows = [
+        dict(row) for row in old_seed_table.get("rows", [])
+        if row.get("phase") == "training" and row.get("formal") is True
+        and row.get("issue84_arm") == "A" and row.get("block_index") == 0
+    ]
+    if len(current_rows) != 128 or current_rows != old_rows:
+        raise RuntimeError("formal continuation A block-0 seed rows changed")
+    rows = sorted(current_rows, key=lambda row: int(row["owner_seed"]))
+    expected_unit_ids = [f"TRAIN:{seed}:A" for seed in range(8_400_001, 8_400_129)]
+    if [str(row.get("unit_id")) for row in rows] != expected_unit_ids:
+        raise RuntimeError("formal continuation A block-0 owner schedule is incomplete or reordered")
+
+    old_group = old_progress.get("training_blocks", {}).get("A", {}).get("0")
+    if (
+        not isinstance(old_group, dict)
+        or old_group.get("schema_id") != "issue84-game-group-v1"
+        or old_group.get("status") != "SUCCEEDED"
+        or old_group.get("group") != "TRAIN-A-BLOCK-00"
+        or old_group.get("expected") != 128
+        or old_group.get("completed") != 128
+        or "actor_update" in old_group
+    ):
+        raise RuntimeError("formal predecessor does not stop cleanly after the accepted A0 game group")
+    if (
+        old_group["run_summary"].get("status") != "SUCCEEDED"
+        or old_group["run_summary"].get("completed") != 128
+        or old_group["run_summary"].get("retry_count") != 0
+        or len(old_group["run_summary"].get("outcomes", [])) != 128
+    ):
+        raise RuntimeError("formal predecessor A0 run summary is incomplete or contains retries")
+
+    absent_update_artifacts = [
+        legacy_root / "models" / "blocks" / "block-00-step.pt",
+        legacy_root / "models" / "blocks" / "block-00-update.json",
+        legacy_root / "models" / "pi13.pt",
+    ]
+    if any(path.exists() for path in absent_update_artifacts):
+        raise RuntimeError("formal predecessor has actor-update artifacts; refusing ambiguous continuation")
+
+    units = []
+    reports = {}
+    native_wall = {}
+    with _predecessor_source_lock(predecessor):
+        for row in rows:
+            unit_id = str(row["unit_id"])
+            unit_dir = legacy_root / "units" / backend.unit_key(unit_id)
+            attempt_dirs = sorted(path for path in unit_dir.glob("attempt-*") if path.is_dir())
+            if len(attempt_dirs) != 1 or attempt_dirs[0].name != "attempt-0001":
+                raise RuntimeError(f"formal predecessor has a missing or retried owner attempt: {unit_id}")
+            record = backend.existing_success_record(legacy_root, row, predecessor)
+            if record is None:
+                raise RuntimeError(f"formal predecessor lacks a source-bound success for {unit_id}")
+            report, result_path = record
+            hashes = _validate_carried_attempt(
+                row, legacy_root, report, result_path,
+                package=predecessor, source_lock_sha256=predecessor_lock_sha,
+                formal=True,
+            )
+            attempt_dir = result_path.parent
+            started_path = attempt_dir / "started.json"
+            finished_path = attempt_dir / "finished.json"
+            job_path = attempt_dir / "worker-job.json"
+            if not job_path.is_file():
+                raise RuntimeError(f"formal predecessor worker-job receipt is missing: {unit_id}")
+            job = read_json(job_path)
+            attempt_relative = attempt_dir.relative_to(backend.ARTIFACTS).as_posix()
+            expected_wsl_attempt = f"{DATA_ROOT_WSL}/artifacts/{attempt_relative}"
+            expected_wsl_root = f"{DATA_ROOT_WSL}/artifacts/formal/A"
+            started = read_json(started_path)
+            finished = read_json(finished_path)
+            if (
+                job.get("schema_id") != "issue79-owner-worker-job-v1"
+                or job.get("unit_id") != unit_id
+                or job.get("row") != row
+                or job.get("phase") != "training"
+                or job.get("pilot") is not False
+                or job.get("package_commit") != predecessor
+                or job.get("runner_code_commit") != predecessor
+                or job.get("source_lock_sha256") != predecessor_lock_sha
+                or job.get("artifact_root") != expected_wsl_root
+                or job.get("attempt_dir") != expected_wsl_attempt
+                or job.get("result_path") != f"{expected_wsl_attempt}/result.json"
+                or started.get("run_id") != job.get("run_id")
+                or finished.get("run_id") != job.get("run_id")
+            ):
+                raise RuntimeError(f"formal predecessor worker-job receipt binding differs: {unit_id}")
+            hashes["worker_job_sha256"] = file_sha256(job_path)
+            if hashes.pop("unit_id", None) != unit_id:
+                raise RuntimeError(f"formal predecessor validation returned another owner: {unit_id}")
+            hashes["seed_row_sha256"] = sha256(canonical(row))
+            units.append({
+                "unit_id": unit_id,
+                "owner_seed": int(row["owner_seed"]),
+                "seed_row_sha256": hashes.pop("seed_row_sha256"),
+                "result_path": result_path.relative_to(backend.ARTIFACTS).as_posix(),
+                "training_features_path": (
+                    legacy_root.relative_to(backend.ARTIFACTS)
+                    / str(report["training_features"]["path"])
+                ).as_posix(),
+                "receipt_sha256": hashes,
+            })
+            reports[unit_id] = report
+            native_wall[unit_id] = float(report.get("resource", {}).get("worker_wall_seconds", 0.0))
+
+        reconstructed = run_summary({
+            "status": "SUCCEEDED",
+            "completed": 128,
+            "elapsed_seconds": float(old_group["run_summary"]["elapsed_seconds"]),
+            "native_wall_seconds_by_unit": native_wall,
+            "tries": {"carried-forward": 1},
+            "results": reports,
+        }, rows=rows, root=legacy_root, package=predecessor)
+    if reconstructed != old_group["run_summary"]:
+        raise RuntimeError("formal predecessor progress summary differs from immutable owner receipts")
+
+    bridge_path = backend.ARTIFACTS / "formal" / package / "continuation-bridge.json"
+    existing_bridge = read_json(bridge_path) if bridge_path.is_file() else None
+    predecessor_clock = _formal_clock_snapshot(backend, allowance, existing_bridge)
+    unknown_tails = _formal_unknown_pilot_tails(backend)
+    manifest = {
+        "schema_id": "issue84-formal-continuation-bridge-v1",
+        "predecessor": {
+            "package_commit": predecessor,
+            "source_lock_sha256": predecessor_lock_sha,
+            "progress_path": legacy_progress_path.relative_to(backend.ARTIFACTS).as_posix(),
+            "progress_sha256": file_sha256(legacy_progress_path),
+            "seed_table_path": legacy_seed_path.relative_to(backend.ARTIFACTS).as_posix(),
+            "seed_table_sha256": file_sha256(legacy_seed_path),
+            "seed_rows_sha256": old_seed_table["rows_sha256"],
+            "pilot_forecast_path": forecast_path.relative_to(backend.ARTIFACTS).as_posix(),
+            "pilot_forecast_sha256": file_sha256(forecast_path),
+            "formal_arm_a_root": legacy_root.relative_to(backend.ARTIFACTS).as_posix(),
+            "a0_group_summary_sha256": sha256(canonical(old_group)),
+        },
+        "current": {
+            "package_commit": package,
+            "source_lock_sha256": source_lock_sha256,
+            "seed_table_path": backend.SEED_TABLE.relative_to(backend.ARTIFACTS).as_posix(),
+            "seed_table_sha256": file_sha256(backend.SEED_TABLE),
+            "seed_rows_sha256": str(current_seed_table["rows_sha256"]),
+            "formal_root": (backend.ARTIFACTS / "formal" / package).relative_to(backend.ARTIFACTS).as_posix(),
+        },
+        "one_task_wall_allowance_seconds": allowance,
+        "predecessor_active_wall_clock": predecessor_clock,
+        "historical_unknown_pilot_tails": unknown_tails,
+        "actor_update_absence": [
+            path.relative_to(backend.ARTIFACTS).as_posix() for path in absent_update_artifacts
+        ],
+        "units": units,
+    }
+    manifest_sha256 = sha256(canonical(manifest))
+    candidate_bridge = {**manifest, "manifest_sha256": manifest_sha256}
+    bridge_path.parent.mkdir(parents=True, exist_ok=True)
+    if existing_bridge is not None and existing_bridge != candidate_bridge:
+        raise RuntimeError("existing append-only formal continuation bridge differs from verified evidence")
+    backend.write_json_once(bridge_path, candidate_bridge)
+    bridge_file_sha256 = file_sha256(bridge_path)
+
+    current_forecast_path = backend.ARTIFACTS / "pilot" / package / "task-wall-forecast.json"
+    rebound_forecast = {
+        **source_forecast,
+        "package_commit": package,
+        "source_lock_sha256": source_lock_sha256,
+        "continuation_origin": {
+            "schema_id": "issue84-formal-continuation-forecast-origin-v1",
+            "predecessor_package_commit": predecessor,
+            "predecessor_source_lock_sha256": predecessor_lock_sha,
+            "predecessor_forecast_path": forecast_path.relative_to(backend.ARTIFACTS).as_posix(),
+            "predecessor_forecast_sha256": file_sha256(forecast_path),
+            "continuation_bridge_path": bridge_path.relative_to(backend.ARTIFACTS).as_posix(),
+            "continuation_bridge_sha256": bridge_file_sha256,
+        },
+    }
+    current_forecast_path.parent.mkdir(parents=True, exist_ok=True)
+    backend.write_json_once(current_forecast_path, rebound_forecast)
+    if read_json(current_forecast_path) != rebound_forecast:
+        raise RuntimeError("current-package continuation forecast differs from its predecessor binding")
+
+    origin = {
+        "schema_id": "issue84-formal-training-continuation-v1",
+        "predecessor_package_commit": predecessor,
+        "predecessor_source_lock_sha256": predecessor_lock_sha,
+        "predecessor_root": legacy_root.relative_to(backend.ARTIFACTS).as_posix(),
+        "bridge_path": bridge_path.relative_to(backend.ARTIFACTS).as_posix(),
+        "bridge_sha256": bridge_file_sha256,
+        "bridge_manifest_sha256": manifest_sha256,
+        "receipts_sha256": sha256(canonical(units)),
+    }
+    return {
+        "bridge": candidate_bridge,
+        "bridge_path": bridge_path,
+        "bridge_sha256": bridge_file_sha256,
+        "forecast_path": current_forecast_path,
+        "forecast_sha256": file_sha256(current_forecast_path),
+        "predecessor_group": old_group,
+        "predecessor_root": legacy_root,
+        "predecessor_package": predecessor,
+        "predecessor_lock_sha256": predecessor_lock_sha,
+        "training_origin": origin,
     }
 
 

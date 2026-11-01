@@ -162,9 +162,78 @@ def _prepare_predictors(
     return fit, d.file_sha256(predictor_path)
 
 
-def _train_actor_block(arm: str, block: int, rows, *, root: Path, package: str, clock, progress, backend) -> dict[str, Any]:
+def _train_actor_block(
+    arm: str, block: int, rows, *, root: Path, package: str, clock, progress, backend,
+    training_root: Path | None = None, training_package: str | None = None,
+    training_origin: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     algorithm, runtime, model, learning, executor = d.load_modules(root, pilot=False)
-    examples, outcomes = d.load_training_outcomes(rows, root=root, executor=executor, package=package)
+    training_root = root if training_root is None else training_root
+    training_package = package if training_package is None else training_package
+    training_origin = None if training_origin is None else dict(training_origin)
+    if training_package != package:
+        if (
+            training_origin is None
+            or training_origin.get("schema_id") != "issue84-formal-training-continuation-v1"
+            or training_origin.get("predecessor_package_commit") != training_package
+            or training_origin.get("predecessor_source_lock_sha256")
+            != d.FORMAL_PREDECESSOR_LOCK_SHA256
+            or not isinstance(training_origin.get("bridge_sha256"), str)
+            or not isinstance(training_origin.get("bridge_manifest_sha256"), str)
+        ):
+            raise RuntimeError("formal actor update lacks a valid predecessor evidence bridge")
+        artifact_root = backend.ARTIFACTS.resolve()
+        expected_root = (artifact_root / str(training_origin.get("predecessor_root", ""))).resolve()
+        bridge_path = (artifact_root / str(training_origin.get("bridge_path", ""))).resolve()
+        try:
+            expected_root.relative_to(artifact_root)
+            bridge_path.relative_to(artifact_root)
+        except ValueError as exc:
+            raise RuntimeError("formal actor update predecessor provenance escapes its artifact root") from exc
+        if (
+            Path(training_root).resolve() != expected_root.resolve()
+            or not expected_root.is_dir()
+            or not bridge_path.is_file()
+            or d.file_sha256(bridge_path) != training_origin.get("bridge_sha256")
+        ):
+            raise RuntimeError("formal actor update predecessor evidence path/hash differs from its bridge")
+        bridge = d.read_json(bridge_path)
+        bridge_manifest = {key: value for key, value in bridge.items() if key != "manifest_sha256"}
+        if (
+            bridge.get("schema_id") != "issue84-formal-continuation-bridge-v1"
+            or bridge.get("manifest_sha256") != d.sha256(d.canonical(bridge_manifest))
+            or bridge.get("manifest_sha256") != training_origin.get("bridge_manifest_sha256")
+            or not isinstance(bridge.get("current"), Mapping)
+            or not isinstance(bridge.get("predecessor"), Mapping)
+            or not isinstance(bridge.get("units"), list)
+            or bridge.get("current", {}).get("package_commit") != package
+            or bridge.get("current", {}).get("source_lock_sha256") != d.file_sha256(d.SOURCE_LOCK_PATH)
+            or bridge.get("predecessor", {}).get("package_commit") != training_package
+            or bridge.get("predecessor", {}).get("source_lock_sha256")
+            != training_origin.get("predecessor_source_lock_sha256")
+            or bridge.get("predecessor", {}).get("formal_arm_a_root")
+            != training_origin.get("predecessor_root")
+            or training_origin.get("receipts_sha256") != d.sha256(d.canonical(bridge.get("units")))
+        ):
+            raise RuntimeError("formal actor update bridge manifest hash differs from progress lineage")
+    elif training_origin is not None:
+        raise RuntimeError("current-package actor update unexpectedly received predecessor provenance")
+
+    if training_package == package:
+        examples, outcomes = d.load_training_outcomes(
+            rows, root=training_root, executor=executor, package=training_package,
+        )
+        feature_sha = d.owner_feature_manifest(
+            rows, root=training_root, package=training_package,
+        )
+    else:
+        with d._predecessor_source_lock(training_package):
+            examples, outcomes = d.load_training_outcomes(
+                rows, root=training_root, executor=executor, package=training_package,
+            )
+            feature_sha = d.owner_feature_manifest(
+                rows, root=training_root, package=training_package,
+            )
     if len(examples) != FORMAL_OWNERS_PER_BLOCK:
         raise RuntimeError(f"arm {arm} block {block} does not have 128 complete native outcomes")
     expected_owners = [int(row["owner_seed"]) for row in sorted(rows, key=lambda row: int(row["owner_seed"]))]
@@ -194,7 +263,6 @@ def _train_actor_block(arm: str, block: int, rows, *, root: Path, package: str, 
 
     ordered_rows = sorted(rows, key=lambda row: int(row["owner_seed"]))
     owner_seed_sha = hashlib.sha256(",".join(str(seed) for seed in expected_owners).encode("ascii")).hexdigest()
-    feature_sha = d.owner_feature_manifest(rows, root=root, package=package)
     order_seed = d.derive_seed("formal", arm, "block-order", block)
     checkpoint_path = root / "models" / "blocks" / f"block-{block:02d}-step.pt"
     update_path = root / "models" / "blocks" / f"block-{block:02d}-update.json"
@@ -211,6 +279,7 @@ def _train_actor_block(arm: str, block: int, rows, *, root: Path, package: str, 
             "source_model_digest": source_digest,
             "owner_seed_sha256": owner_seed_sha,
             "owner_training_feature_manifest_sha256": feature_sha,
+            "training_evidence_origin": training_origin,
             "predictor_checkpoint_sha256": predictor_sha,
             "source_lock_sha256": d.file_sha256(d.SOURCE_LOCK_PATH),
             "package_commit": package,
@@ -232,6 +301,7 @@ def _train_actor_block(arm: str, block: int, rows, *, root: Path, package: str, 
             "source_model_digest": source_digest,
             "owner_seed_sha256": owner_seed_sha,
             "owner_training_feature_manifest_sha256": feature_sha,
+            "training_evidence_origin": training_origin,
             "actor_state_dict": trained.state_dict(),
             "optimizer_state_dict": current_optimizer.state_dict(),
             "python_rng_state": rng_state,
@@ -277,6 +347,7 @@ def _train_actor_block(arm: str, block: int, rows, *, root: Path, package: str, 
         "owner_count": len(outcomes),
         "owner_seed_sha256": owner_seed_sha,
         "owner_training_feature_manifest_sha256": feature_sha,
+        "training_evidence_origin": training_origin,
         "source_model_digest": source_digest,
         "source_model_checkpoint_sha256": source_record.get("checkpoint_sha256"),
         "result_model_digest": model_module.model_digest(actor),
@@ -606,6 +677,14 @@ def run_formal() -> dict[str, Any]:
     osenv["STS_LIGHTSPEED_SOURCE_DIR"] = d.STS_SOURCE_WSL
     osenv["STSRL_SOURCE_DIR"] = d.STSRL_SOURCE_WSL
     package = d.package_commit()
+    seed_table = d.ensure_seed_table()
+    continuation = d.formal_continuation(
+        package=package,
+        source_lock_sha256=source["sha256"],
+        current_lock=source["lock"],
+        current_seed_table=seed_table,
+        backend=backend,
+    )
     pilot_root = backend.ARTIFACTS / "pilot" / package
     forecast_path = pilot_root / "task-wall-forecast.json"
     if not forecast_path.is_file():
@@ -616,12 +695,13 @@ def run_formal() -> dict[str, Any]:
     allowance = float(forecast["one_task_active_wall_allowance_seconds"])
     if not math.isfinite(allowance) or allowance <= 0:
         raise RuntimeError("formal task-wide wall allowance is invalid")
-    seed_table = d.ensure_seed_table()
-    formal_root = backend.ARTIFACTS / "formal"
+    if continuation is not None and continuation["forecast_path"] != forecast_path:
+        raise RuntimeError("formal continuation forecast is not in the current package namespace")
+    formal_root = backend.ARTIFACTS / "formal" / package
     formal_root.mkdir(parents=True, exist_ok=True)
     progress_path = formal_root / "formal-progress.json"
     progress = d.read_json(progress_path) if progress_path.is_file() else {
-        "schema_id": "issue84-formal-progress-v1",
+        "schema_id": "issue84-formal-progress-v2",
         "status": "IN_PROGRESS",
         "package_commit": package,
         "source_lock_sha256": source["sha256"],
@@ -631,13 +711,36 @@ def run_formal() -> dict[str, Any]:
         "validation_groups": {},
         "test_groups": {},
     }
+    if continuation is not None:
+        origin = continuation["training_origin"]
+        if not progress_path.is_file():
+            progress["continuation_bridge_sha256"] = continuation["bridge_sha256"]
+            progress["training_blocks"]["A"]["0"] = {
+                **continuation["predecessor_group"],
+                "continuation_origin": origin,
+            }
+        elif progress.get("continuation_bridge_sha256") != continuation["bridge_sha256"]:
+            raise RuntimeError("current formal progress is not bound to the validated continuation bridge")
+        saved_a0 = progress.get("training_blocks", {}).get("A", {}).get("0")
+        if not isinstance(saved_a0, dict):
+            raise RuntimeError("current formal progress lost its carried A0 evidence")
+        if saved_a0.get("continuation_origin") != origin:
+            raise RuntimeError("current formal A0 progress changed its continuation provenance")
+        saved_base = {
+            key: value for key, value in saved_a0.items()
+            if key not in {"continuation_origin", "actor_update"}
+        }
+        if saved_base != continuation["predecessor_group"]:
+            raise RuntimeError("current formal A0 progress differs from the immutable predecessor group")
     expected_binding = {
-        "schema_id": "issue84-formal-progress-v1",
+        "schema_id": "issue84-formal-progress-v2",
         "package_commit": package,
         "source_lock_sha256": source["sha256"],
         "seed_table_sha256": d.file_sha256(backend.SEED_TABLE),
         "forecast_sha256": d.file_sha256(forecast_path),
     }
+    if continuation is not None:
+        expected_binding["continuation_bridge_sha256"] = continuation["bridge_sha256"]
     if any(progress.get(key) != value for key, value in expected_binding.items()):
         raise RuntimeError("formal progress state belongs to another source-locked run")
     final_report_path = formal_root / "formal-run-report.json"
@@ -673,7 +776,22 @@ def run_formal() -> dict[str, Any]:
                 progress["active_block"] = block
                 _save_progress(progress_path, progress, backend)
                 saved_group = progress["training_blocks"].setdefault(arm, {}).get(str(block))
-                if saved_group is not None:
+                if continuation is not None and arm == "A" and block == 0:
+                    if saved_group is None:
+                        raise RuntimeError("current formal progress is missing the bridged A0 training group")
+                    if saved_group.get("continuation_origin") != continuation["training_origin"]:
+                        raise RuntimeError("current formal A0 group is not bound to the validated continuation bridge")
+                    saved_base = {
+                        key: value for key, value in saved_group.items()
+                        if key not in {"continuation_origin", "actor_update"}
+                    }
+                    if saved_base != continuation["predecessor_group"]:
+                        raise RuntimeError("current formal A0 group differs from its immutable predecessor")
+                    game_summary = {
+                        **continuation["predecessor_group"],
+                        "continuation_origin": continuation["training_origin"],
+                    }
+                elif saved_group is not None:
                     game_summary = _verify_saved_game_group(
                         saved_group, rows, root=root, package=package, backend=backend,
                     )
@@ -692,16 +810,25 @@ def run_formal() -> dict[str, Any]:
                 _save_progress(progress_path, progress, backend)
                 progress["active_stage"] = "actor-update"
                 _save_progress(progress_path, progress, backend)
+                training_root = root
+                training_package = package
+                training_origin = None
+                if continuation is not None and arm == "A" and block == 0:
+                    training_root = continuation["predecessor_root"]
+                    training_package = continuation["predecessor_package"]
+                    training_origin = continuation["training_origin"]
                 update = _train_actor_block(
                     arm, block, rows, root=root, package=package,
                     clock=clock, progress=progress, backend=backend,
+                    training_root=training_root, training_package=training_package,
+                    training_origin=training_origin,
                 )
                 progress["training_blocks"][arm][str(block)]["actor_update"] = update
                 progress["cumulative_active_wall_seconds"] = clock.elapsed()
                 _save_progress(progress_path, progress, backend)
 
         validation_groups = progress["validation_groups"]
-        validation_root = backend.ARTIFACTS / "validation"
+        validation_root = backend.ARTIFACTS / "validation" / package
         for group in ("PARENT", *(f"{arm}{games}" for arm in d.ARMS for games in (512, 1024, 2048))):
             if clock.expired():
                 progress["status"] = "STOPPED_TASK_WALL_ALLOWANCE"
