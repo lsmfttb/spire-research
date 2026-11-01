@@ -96,11 +96,14 @@ class PredictorTests(unittest.TestCase):
             value_model=value_memory, value_optimizer=optimizer_memory,
             action_value_model=q_memory, action_value_optimizer=q_optimizer_memory,
         )
-        binding = {"arm": "E", "current_block_index": 1, "prior_block_indices": [0],
+        binding = {"schema_id": "issue84-formal-predictor-checkpoint-v1",
+                   "arm": "E", "current_block_index": 1, "prior_block_indices": [0],
                    "source_lock_sha256": "a" * 64}
         with tempfile.TemporaryDirectory() as temporary:
             cache = Path(temporary) / "cache"
             manifest = build_predictor_cache([(0, source)], cache_path=cache, binding=binding)
+            self.assertEqual(manifest["schema_id"], "issue84-predictor-feature-cache-v2")
+            self.assertEqual(manifest["binding"], binding)
             self.assertEqual(manifest["examples"], 300)
             disk_receipt = fit_cached_prior_block_predictors(
                 arm="E", current_block_index=1, cache_path=cache, cache_manifest=manifest,

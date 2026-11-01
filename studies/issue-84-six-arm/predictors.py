@@ -166,9 +166,16 @@ def _file_sha256(path: Path) -> str:
 
 
 def _validate_cache_files(cache_path: Path, manifest: dict[str, object], binding: dict[str, object]) -> None:
-    if manifest.get("schema_id") != "issue84-predictor-feature-cache-v1":
+    if manifest.get("schema_id") != "issue84-predictor-feature-cache-v2":
         raise RuntimeError("predictor cache schema identifier is invalid")
-    if any(manifest.get(key) != value for key, value in binding.items()):
+    stored_binding = manifest.get("binding")
+    if not isinstance(stored_binding, dict) or stored_binding != binding:
+        raise RuntimeError("existing predictor cache has a different source/history binding")
+    if any(
+        manifest.get(key) != value
+        for key, value in binding.items()
+        if key != "schema_id"
+    ):
         raise RuntimeError("existing predictor cache has a different source/history binding")
     count = manifest.get("examples")
     if not isinstance(count, int) or count < 0:
@@ -204,6 +211,9 @@ def build_predictor_cache(
     cache that a later recovery could mistake for evidence.
     """
     cache_path = Path(cache_path)
+    reserved_binding_keys = {"binding", "examples", "feature_dimension", "dtype", "files"}
+    if reserved_binding_keys.intersection(binding):
+        raise ValueError("predictor cache binding uses a reserved manifest field")
     manifest_path = cache_path / "manifest.json"
     if manifest_path.is_file():
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -245,8 +255,9 @@ def build_predictor_cache(
                 stream.flush()
                 os.fsync(stream.fileno())
         manifest: dict[str, object] = {
-            "schema_id": "issue84-predictor-feature-cache-v1",
-            **binding,
+            "schema_id": "issue84-predictor-feature-cache-v2",
+            **{key: value for key, value in binding.items() if key != "schema_id"},
+            "binding": dict(binding),
             "examples": row_count,
             "feature_dimension": 2048,
             "dtype": "float32-le",
@@ -318,10 +329,10 @@ def fit_cached_prior_block_predictors(
         }
     count = int(cache_manifest["examples"])
     cache_path = Path(cache_path)
-    _validate_cache_files(cache_path, cache_manifest, {
-        key: value for key, value in cache_manifest.items()
-        if key not in {"schema_id", "examples", "feature_dimension", "dtype", "files"}
-    })
+    binding = cache_manifest.get("binding")
+    if not isinstance(binding, dict):
+        raise RuntimeError("cached predictor manifest lacks its immutable binding")
+    _validate_cache_files(cache_path, cache_manifest, binding)
     states = np.memmap(cache_path / "states.f32", mode="r", dtype="<f4", shape=(count, 2048))
     actions = np.memmap(cache_path / "actions.f32", mode="r", dtype="<f4", shape=(count, 2048))
     targets = np.memmap(cache_path / "targets.f32", mode="r", dtype="<f4", shape=(count,))
