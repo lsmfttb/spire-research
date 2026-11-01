@@ -10,6 +10,7 @@ import argparse
 import ast
 import copy
 from contextlib import contextmanager
+from datetime import datetime, timezone
 import hashlib
 import importlib.util
 import json
@@ -95,6 +96,21 @@ def file_sha256(path: Path) -> str:
         while chunk := stream.read(1024 * 1024):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _parse_utc_timestamp(value: Any, *, description: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError(f"{description} is missing a timezone-aware timestamp")
+    text = value.strip()
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise RuntimeError(f"{description} has an invalid ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise RuntimeError(f"{description} timestamp must include a timezone")
+    return parsed.astimezone(timezone.utc)
 
 
 class _RootCaptureLimit:
@@ -1318,6 +1334,7 @@ def formal_continuation(
     old_seed_table = read_json(legacy_seed_path)
     source_forecast = read_json(forecast_path)
     cap_installation = read_json(cap_installation_path)
+    legacy_seed_sha256 = file_sha256(legacy_seed_path)
     if (
         old_progress.get("schema_id") != "issue84-formal-progress-v1"
         or old_progress.get("status") != "IN_PROGRESS"
@@ -1326,7 +1343,7 @@ def formal_continuation(
         or old_progress.get("active_stage") != "actor-update"
         or old_progress.get("active_arm") != "A"
         or old_progress.get("active_block") != 0
-        or old_progress.get("seed_table_sha256") != file_sha256(legacy_seed_path)
+        or old_progress.get("seed_table_sha256") != legacy_seed_sha256
         or old_seed_table.get("schema_id") != "issue84-seed-table-v1"
         or old_seed_table.get("source_lock_sha256") != predecessor_lock_sha
         or not isinstance(old_seed_table.get("rows"), list)
@@ -1363,6 +1380,8 @@ def formal_continuation(
         or cap_installation.get("source_lock_sha256") != predecessor_lock_sha
         or cap_installation.get("forecast_path") != forecast_path_relative
         or cap_installation.get("forecast_sha256") != file_sha256(forecast_path)
+        or source_forecast.get("seed_table_sha256") != legacy_seed_sha256
+        or cap_installation.get("seed_table_sha256") != legacy_seed_sha256
         or float(cap_installation.get("selected_global_allowance_seconds", -1)) != allowance
         or cap_installation.get("prior_wall_carried_forward_once") is not True
         or cap_installation.get("unknown_pilot_tail_preserved") is not True
@@ -1388,6 +1407,9 @@ def formal_continuation(
         or cap_installation.get("unknown_tail_record") != carry_forward.get("unknown_tail")
     ):
         raise RuntimeError("predecessor forecast and installed global wall-cap receipt are incompatible")
+    cap_installed_at = _parse_utc_timestamp(
+        cap_installation.get("installed_utc"), description="formal wall-cap installation receipt",
+    )
     current_rows = [
         dict(row) for row in current_seed_table.get("rows", [])
         if row.get("phase") == "training" and row.get("formal") is True
@@ -1463,6 +1485,11 @@ def formal_continuation(
             expected_wsl_root = f"{DATA_ROOT_WSL}/artifacts/formal/A"
             started = read_json(started_path)
             finished = read_json(finished_path)
+            started_at = _parse_utc_timestamp(
+                started.get("started_utc"), description=f"carried A0 start receipt {unit_id}",
+            )
+            if started_at <= cap_installed_at:
+                raise RuntimeError(f"carried A0 start receipt predates or coincides with wall-cap installation: {unit_id}")
             if (
                 job.get("schema_id") != "issue79-owner-worker-job-v1"
                 or job.get("unit_id") != unit_id
@@ -1528,6 +1555,7 @@ def formal_continuation(
                 cap_installation_path.relative_to(backend.ARTIFACTS).as_posix()
             ),
             "wall_cap_installation_receipt_sha256": file_sha256(cap_installation_path),
+            "wall_cap_installation_utc": cap_installation["installed_utc"],
             "formal_arm_a_root": legacy_root.relative_to(backend.ARTIFACTS).as_posix(),
             "a0_group_summary_sha256": sha256(canonical(old_group)),
         },

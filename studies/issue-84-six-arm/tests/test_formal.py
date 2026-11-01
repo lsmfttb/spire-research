@@ -100,6 +100,7 @@ class FormalAnalysisTests(unittest.TestCase):
                 "unit_id": unit_id, "owner_seed": seed,
                 "package_commit": driver_module.FORMAL_PREDECESSOR_PACKAGE,
                 "seed_row_sha256": row_sha, "run_id": run_id,
+                "started_utc": f"2026-11-01T02:{22 + (seed - 8_400_001) // 60:02d}:{(seed - 8_400_001) % 60:02d}Z",
             }
             (attempt / "started.json").write_bytes(canonical(started))
             finished = {
@@ -189,6 +190,7 @@ class FormalAnalysisTests(unittest.TestCase):
                     "source_lock_sha256": old_lock_sha,
                 }
                 old_seed_path.write_bytes(canonical(old_seed_table) + b"\n")
+                old_seed_sha256 = driver_module.file_sha256(old_seed_path)
                 bridge_seed_table_path.parent.mkdir(parents=True, exist_ok=True)
                 bridge_seed_table_path.write_bytes(canonical(current_seed_table) + b"\n")
 
@@ -213,6 +215,7 @@ class FormalAnalysisTests(unittest.TestCase):
                     "formal_sampling_authorized": True,
                     "formal_seeds_started_at_installation": False,
                     "one_task_active_wall_allowance_seconds": 204171.592,
+                    "seed_table_sha256": old_seed_sha256,
                     "allowance_basis": {
                         "planner_selected_seconds": 204171.592,
                         "planner_feasibility_decision": feasibility_comment,
@@ -235,10 +238,12 @@ class FormalAnalysisTests(unittest.TestCase):
                     "issue_number": 84,
                     "study_id": "issue-84-six-arm",
                     "status": "INSTALLED_BEFORE_FORMAL_SAMPLING",
+                    "installed_utc": "2026-11-01T02:20:56Z",
                     "package_commit": old_package,
                     "source_lock_sha256": old_lock_sha,
                     "forecast_path": old_forecast_path.relative_to(artifacts_root).as_posix(),
                     "forecast_sha256": driver_module.file_sha256(old_forecast_path),
+                    "seed_table_sha256": old_seed_sha256,
                     "selected_global_allowance_seconds": 204171.592,
                     "planner_feasibility_comment": feasibility_comment,
                     "planner_formal_execution_authorization": formal_authorization,
@@ -354,6 +359,51 @@ class FormalAnalysisTests(unittest.TestCase):
                             current_lock=compatible_lock, current_seed_table=current_seed_table, backend=backend,
                         )
                     cap_installation_path.write_bytes(cap_installation_bytes)
+                    late_installation = json.loads(cap_installation_path.read_text(encoding="utf-8"))
+                    late_installation["installed_utc"] = "2026-11-01T02:22:01Z"
+                    cap_installation_path.write_bytes(canonical(late_installation) + b"\n")
+                    with self.assertRaisesRegex(
+                        RuntimeError, "carried A0 start receipt predates or coincides with wall-cap installation",
+                    ):
+                        driver_module.formal_continuation(
+                            package=new_package, source_lock_sha256=current_lock_sha,
+                            current_lock=compatible_lock, current_seed_table=current_seed_table, backend=backend,
+                        )
+                    cap_installation_path.write_bytes(cap_installation_bytes)
+
+                    wrong_receipt_seed_sha = json.loads(cap_installation_path.read_text(encoding="utf-8"))
+                    wrong_receipt_seed_sha["seed_table_sha256"] = "c" * 64
+                    cap_installation_path.write_bytes(canonical(wrong_receipt_seed_sha) + b"\n")
+                    with self.assertRaisesRegex(
+                        RuntimeError, "predecessor forecast and installed global wall-cap receipt are incompatible",
+                    ):
+                        driver_module.formal_continuation(
+                            package=new_package, source_lock_sha256=current_lock_sha,
+                            current_lock=compatible_lock, current_seed_table=current_seed_table, backend=backend,
+                        )
+                    cap_installation_path.write_bytes(cap_installation_bytes)
+
+                    wrong_forecast_seed_sha = json.loads(old_forecast_path.read_text(encoding="utf-8"))
+                    wrong_forecast_seed_sha["seed_table_sha256"] = "d" * 64
+                    old_forecast_path.write_bytes(canonical(wrong_forecast_seed_sha) + b"\n")
+                    wrong_forecast_hash = driver_module.file_sha256(old_forecast_path)
+                    rebound_cap_receipt = json.loads(cap_installation_path.read_text(encoding="utf-8"))
+                    rebound_cap_receipt["forecast_sha256"] = wrong_forecast_hash
+                    cap_installation_path.write_bytes(canonical(rebound_cap_receipt) + b"\n")
+                    rebound_progress = json.loads(old_progress_path.read_text(encoding="utf-8"))
+                    rebound_progress["forecast_sha256"] = wrong_forecast_hash
+                    old_progress_path.write_bytes(canonical(rebound_progress) + b"\n")
+                    with self.assertRaisesRegex(
+                        RuntimeError, "predecessor forecast and installed global wall-cap receipt are incompatible",
+                    ):
+                        driver_module.formal_continuation(
+                            package=new_package, source_lock_sha256=current_lock_sha,
+                            current_lock=compatible_lock, current_seed_table=current_seed_table, backend=backend,
+                        )
+                    old_forecast_path.write_bytes(old_forecast_bytes)
+                    cap_installation_path.write_bytes(cap_installation_bytes)
+                    old_progress_path.write_bytes(old_progress_bytes)
+
                     reset_clock = json.loads(clock_bytes)
                     reset_clock["elapsed_seconds"] = 0.0
                     clock_path.write_bytes(canonical(reset_clock) + b"\n")
@@ -395,6 +445,10 @@ class FormalAnalysisTests(unittest.TestCase):
                 self.assertEqual(
                     first["bridge"]["predecessor"]["wall_cap_installation_receipt_sha256"],
                     driver_module.file_sha256(cap_installation_path),
+                )
+                self.assertEqual(
+                    first["bridge"]["predecessor"]["wall_cap_installation_utc"],
+                    cap_installation["installed_utc"],
                 )
                 self.assertEqual(first["bridge"]["units"][0]["receipt_sha256"].keys(), {
                     "result_sha256", "started_sha256", "finished_sha256",
