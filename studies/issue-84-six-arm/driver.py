@@ -481,12 +481,16 @@ def bind_issue73_source_paths(runtime: Any, preflight: Any, snapshot_root: Path)
 
 def _source_files() -> dict[str, str]:
     files: dict[str, str] = {}
+    generated_cache_directories = {"__pycache__", ".pytest_cache"}
     for path in sorted(STUDY.rglob("*")):
         if not path.is_file() or path.name == SOURCE_LOCK_PATH.name:
             continue
-        if "__pycache__" in path.parts or (path.suffix not in {".py", ".json"} and path.name != ".gitignore"):
+        relative = path.relative_to(STUDY)
+        if any(part in generated_cache_directories for part in relative.parts):
             continue
-        files[path.relative_to(STUDY).as_posix()] = file_sha256(path)
+        if path.suffix not in {".py", ".json"} and path.name != ".gitignore":
+            continue
+        files[relative.as_posix()] = file_sha256(path)
     return files
 
 

@@ -601,6 +601,22 @@ class FormalAnalysisTests(unittest.TestCase):
                 save_preflight_receipt({**receipt, "native_module_sha256": "d" * 64}, data_root=Path(temporary))
             self.assertEqual(first["status"], "SUCCEEDED_NO_GAMES_STARTED")
 
+    def test_source_files_excludes_generated_cache_directories(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / ".gitignore").write_text("*.pyc\n", encoding="utf-8")
+            (root / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
+            (root / ".pytest_cache").mkdir()
+            (root / ".pytest_cache" / ".gitignore").write_text("*\n", encoding="utf-8")
+            (root / ".pytest_cache" / "lastfailed.json").write_text("{}\n", encoding="utf-8")
+            (root / "nested" / "__pycache__").mkdir(parents=True)
+            (root / "nested" / "__pycache__" / "generated.py").write_text("CACHE = True\n", encoding="utf-8")
+
+            with patch.object(driver_module, "STUDY", root):
+                files = driver_module._source_files()
+
+        self.assertEqual(set(files), {".gitignore", "source.py"})
+
     def test_source_lock_refresh_archives_previous_bytes_before_replacement(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
