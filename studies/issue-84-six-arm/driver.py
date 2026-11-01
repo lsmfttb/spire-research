@@ -1300,10 +1300,12 @@ def formal_continuation(
     legacy_seed_path = seed_table_path(predecessor)
     lock_path = backend.ARTIFACTS / "source-lock-history" / f"{predecessor}-{predecessor_lock_sha}.json"
     forecast_path = backend.ARTIFACTS / "pilot" / predecessor / "task-wall-forecast.json"
+    cap_installation_path = forecast_path.parent / "formal-wall-cap-installation-v1.json"
     for path, description in (
         (legacy_seed_path, "predecessor formal seed table"),
         (lock_path, "predecessor source lock"),
         (forecast_path, "predecessor pilot forecast"),
+        (cap_installation_path, "predecessor formal wall-cap installation receipt"),
     ):
         if not path.is_file():
             raise RuntimeError(f"formal continuation is missing its {description}")
@@ -1315,6 +1317,7 @@ def formal_continuation(
     old_progress = read_json(legacy_progress_path)
     old_seed_table = read_json(legacy_seed_path)
     source_forecast = read_json(forecast_path)
+    cap_installation = read_json(cap_installation_path)
     if (
         old_progress.get("schema_id") != "issue84-formal-progress-v1"
         or old_progress.get("status") != "IN_PROGRESS"
@@ -1333,13 +1336,58 @@ def formal_continuation(
         or old_progress.get("forecast_sha256") != file_sha256(forecast_path)
         or source_forecast.get("package_commit") != predecessor
         or source_forecast.get("source_lock_sha256") != predecessor_lock_sha
-        or source_forecast.get("schema_id") != "issue84-task-wall-forecast-v1"
+        or source_forecast.get("schema_id") != "issue84-installed-task-wall-forecast-v1"
     ):
         raise RuntimeError("formal predecessor ledger, seed schedule, or forecast binding is incompatible")
 
     allowance = float(source_forecast.get("one_task_active_wall_allowance_seconds", -1))
-    if allowance <= 0:
-        raise RuntimeError("predecessor formal forecast has no valid task-wide allowance")
+    forecast_path_relative = forecast_path.relative_to(backend.ARTIFACTS).as_posix()
+    forecast_allowance_basis = source_forecast.get("allowance_basis")
+    carry_forward = source_forecast.get("pilot_wall_carry_forward")
+    if (
+        not math.isfinite(allowance)
+        or allowance <= 0
+        or source_forecast.get("issue_number") != 84
+        or source_forecast.get("study_id") != "issue-84-six-arm"
+        or source_forecast.get("scope") != "STUDY_ONLY"
+        or source_forecast.get("status") != "APPROVED_SINGLE_GLOBAL_CUMULATIVE_ACTIVE_WALL_CAP"
+        or source_forecast.get("formal_sampling_authorized") is not True
+        or source_forecast.get("formal_seeds_started_at_installation") is not False
+        or not isinstance(forecast_allowance_basis, Mapping)
+        or not isinstance(carry_forward, Mapping)
+        or cap_installation.get("schema_id") != "issue84-formal-global-wall-cap-installation-v1"
+        or cap_installation.get("issue_number") != 84
+        or cap_installation.get("study_id") != "issue-84-six-arm"
+        or cap_installation.get("status") != "INSTALLED_BEFORE_FORMAL_SAMPLING"
+        or cap_installation.get("package_commit") != predecessor
+        or cap_installation.get("source_lock_sha256") != predecessor_lock_sha
+        or cap_installation.get("forecast_path") != forecast_path_relative
+        or cap_installation.get("forecast_sha256") != file_sha256(forecast_path)
+        or float(cap_installation.get("selected_global_allowance_seconds", -1)) != allowance
+        or cap_installation.get("prior_wall_carried_forward_once") is not True
+        or cap_installation.get("unknown_pilot_tail_preserved") is not True
+        or cap_installation.get("formal_seed_count_at_installation") != 0
+        or cap_installation.get("formal_root_was_absent_at_installation") is not True
+        or cap_installation.get("no_pilot_checkpoints_used_or_deleted") is not True
+        or forecast_allowance_basis.get("planner_selected_seconds") != allowance
+        or forecast_allowance_basis.get("planner_feasibility_decision")
+        != cap_installation.get("planner_feasibility_comment")
+        or forecast_allowance_basis.get("planner_formal_execution_authorization")
+        != cap_installation.get("planner_formal_execution_authorization")
+        or carry_forward.get("add_again_at_launch") is not False
+        or carry_forward.get("already_in_global_clock") is not True
+        or carry_forward.get("clock_path") != "active-wall-issue84-task.json"
+        or carry_forward.get("clock_sha256_before_formal_start")
+        != cap_installation.get("prior_active_wall_clock_sha256")
+        or carry_forward.get("known_cumulative_active_seconds")
+        != cap_installation.get("prior_cumulative_active_wall_seconds")
+        or not isinstance(carry_forward.get("unknown_tail"), Mapping)
+        or carry_forward.get("unknown_tail", {}).get("status") != "UNKNOWN"
+        or carry_forward.get("unknown_tail", {}).get("treatment")
+        != "not zeroed and no duration invented"
+        or cap_installation.get("unknown_tail_record") != carry_forward.get("unknown_tail")
+    ):
+        raise RuntimeError("predecessor forecast and installed global wall-cap receipt are incompatible")
     current_rows = [
         dict(row) for row in current_seed_table.get("rows", [])
         if row.get("phase") == "training" and row.get("formal") is True
@@ -1476,6 +1524,10 @@ def formal_continuation(
             "seed_rows_sha256": old_seed_table["rows_sha256"],
             "pilot_forecast_path": forecast_path.relative_to(backend.ARTIFACTS).as_posix(),
             "pilot_forecast_sha256": file_sha256(forecast_path),
+            "wall_cap_installation_receipt_path": (
+                cap_installation_path.relative_to(backend.ARTIFACTS).as_posix()
+            ),
+            "wall_cap_installation_receipt_sha256": file_sha256(cap_installation_path),
             "formal_arm_a_root": legacy_root.relative_to(backend.ARTIFACTS).as_posix(),
             "a0_group_summary_sha256": sha256(canonical(old_group)),
         },

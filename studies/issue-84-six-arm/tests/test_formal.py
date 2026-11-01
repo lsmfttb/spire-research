@@ -194,14 +194,65 @@ class FormalAnalysisTests(unittest.TestCase):
 
                 old_forecast_path = artifacts_root / "pilot" / old_package / "task-wall-forecast.json"
                 old_forecast_path.parent.mkdir(parents=True)
+                feasibility_comment = "https://github.com/lsmfttb/spire-research/issues/84#issuecomment-6546533491"
+                formal_authorization = "https://github.com/lsmfttb/spire-research/issues/84#issuecomment-6552055284"
+                prior_clock_sha = "b" * 64
+                prior_clock_seconds = 5624.912292028998
+                unknown_tail_record = {
+                    "status": "UNKNOWN",
+                    "treatment": "not zeroed and no duration invented",
+                }
                 forecast = {
-                    "schema_id": "issue84-task-wall-forecast-v1",
+                    "schema_id": "issue84-installed-task-wall-forecast-v1",
                     "package_commit": old_package,
                     "source_lock_sha256": old_lock_sha,
+                    "issue_number": 84,
+                    "study_id": "issue-84-six-arm",
+                    "scope": "STUDY_ONLY",
+                    "status": "APPROVED_SINGLE_GLOBAL_CUMULATIVE_ACTIVE_WALL_CAP",
+                    "formal_sampling_authorized": True,
+                    "formal_seeds_started_at_installation": False,
                     "one_task_active_wall_allowance_seconds": 204171.592,
+                    "allowance_basis": {
+                        "planner_selected_seconds": 204171.592,
+                        "planner_feasibility_decision": feasibility_comment,
+                        "planner_formal_execution_authorization": formal_authorization,
+                    },
+                    "pilot_wall_carry_forward": {
+                        "add_again_at_launch": False,
+                        "already_in_global_clock": True,
+                        "clock_path": "active-wall-issue84-task.json",
+                        "clock_sha256_before_formal_start": prior_clock_sha,
+                        "known_cumulative_active_seconds": prior_clock_seconds,
+                        "unknown_tail": unknown_tail_record,
+                    },
                 }
                 old_forecast_path.write_bytes(canonical(forecast) + b"\n")
                 old_forecast_bytes = old_forecast_path.read_bytes()
+                cap_installation_path = old_forecast_path.with_name("formal-wall-cap-installation-v1.json")
+                cap_installation = {
+                    "schema_id": "issue84-formal-global-wall-cap-installation-v1",
+                    "issue_number": 84,
+                    "study_id": "issue-84-six-arm",
+                    "status": "INSTALLED_BEFORE_FORMAL_SAMPLING",
+                    "package_commit": old_package,
+                    "source_lock_sha256": old_lock_sha,
+                    "forecast_path": old_forecast_path.relative_to(artifacts_root).as_posix(),
+                    "forecast_sha256": driver_module.file_sha256(old_forecast_path),
+                    "selected_global_allowance_seconds": 204171.592,
+                    "planner_feasibility_comment": feasibility_comment,
+                    "planner_formal_execution_authorization": formal_authorization,
+                    "prior_active_wall_clock_sha256": prior_clock_sha,
+                    "prior_cumulative_active_wall_seconds": prior_clock_seconds,
+                    "prior_wall_carried_forward_once": True,
+                    "unknown_pilot_tail_preserved": True,
+                    "unknown_tail_record": unknown_tail_record,
+                    "formal_seed_count_at_installation": 0,
+                    "formal_root_was_absent_at_installation": True,
+                    "no_pilot_checkpoints_used_or_deleted": True,
+                }
+                cap_installation_path.write_bytes(canonical(cap_installation) + b"\n")
+                cap_installation_bytes = cap_installation_path.read_bytes()
                 unknown_attempt = (
                     artifacts_root / "pilot" / old_package / "C" / "units"
                     / "TRAIN-8480022-C" / "attempt-0019"
@@ -292,6 +343,17 @@ class FormalAnalysisTests(unittest.TestCase):
                         6323.316307722998,
                     )
                     clock_path.write_bytes(clock_bytes)
+                    tampered_installation = json.loads(cap_installation_path.read_text(encoding="utf-8"))
+                    tampered_installation["selected_global_allowance_seconds"] += 1.0
+                    cap_installation_path.write_bytes(canonical(tampered_installation) + b"\n")
+                    with self.assertRaisesRegex(
+                        RuntimeError, "predecessor forecast and installed global wall-cap receipt are incompatible",
+                    ):
+                        driver_module.formal_continuation(
+                            package=new_package, source_lock_sha256=current_lock_sha,
+                            current_lock=compatible_lock, current_seed_table=current_seed_table, backend=backend,
+                        )
+                    cap_installation_path.write_bytes(cap_installation_bytes)
                     reset_clock = json.loads(clock_bytes)
                     reset_clock["elapsed_seconds"] = 0.0
                     clock_path.write_bytes(canonical(reset_clock) + b"\n")
@@ -318,6 +380,7 @@ class FormalAnalysisTests(unittest.TestCase):
                 self.assertEqual(first["predecessor_group"], old_group)
                 self.assertEqual(old_progress_path.read_bytes(), old_progress_bytes)
                 self.assertEqual(old_forecast_path.read_bytes(), old_forecast_bytes)
+                self.assertEqual(cap_installation_path.read_bytes(), cap_installation_bytes)
                 rebound = json.loads(first["forecast_path"].read_text(encoding="utf-8"))
                 self.assertEqual(rebound["one_task_active_wall_allowance_seconds"], 204171.592)
                 self.assertEqual(
@@ -325,6 +388,14 @@ class FormalAnalysisTests(unittest.TestCase):
                     first["bridge_sha256"],
                 )
                 self.assertEqual(len(first["bridge"]["units"]), 128)
+                self.assertEqual(
+                    first["bridge"]["predecessor"]["wall_cap_installation_receipt_path"],
+                    cap_installation_path.relative_to(artifacts_root).as_posix(),
+                )
+                self.assertEqual(
+                    first["bridge"]["predecessor"]["wall_cap_installation_receipt_sha256"],
+                    driver_module.file_sha256(cap_installation_path),
+                )
                 self.assertEqual(first["bridge"]["units"][0]["receipt_sha256"].keys(), {
                     "result_sha256", "started_sha256", "finished_sha256",
                     "training_features_sha256", "worker_job_sha256",
