@@ -42,6 +42,7 @@ from driver import (
 )
 import driver as driver_module
 from formal import (
+    _issue75_policy,
     _new_predictors,
     _prepare_predictors,
     _predictor_state,
@@ -1366,6 +1367,24 @@ class FormalAnalysisTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_formal_policy_comes_from_locked_issue75_root_config(self):
+        upstream75 = STUDY / "upstream" / "issue-75-no-expert-oracle"
+        config_path = upstream75 / "config.json"
+        relative = "issue-75-no-expert-oracle/config.json"
+        manifest = json.loads((
+            STUDY / "upstream" / "upstream-manifest.json"
+        ).read_text(encoding="utf-8"))
+        self.assertFalse((STUDY / "config.json").exists())
+        self.assertEqual(
+            hashlib.sha256(config_path.read_bytes()).hexdigest(),
+            manifest["files"][relative]["sha256"],
+        )
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        policy = _issue75_policy()
+        self.assertEqual(policy, config["policy"])
+        self.assertEqual(policy["initial_model_seed"], 73507501)
+        self.assertEqual(policy["actor_final_weight_std"], 0.01)
 
     def test_issue75_lineage_inputs_are_vendored_and_locked(self):
         upstream = STUDY / "upstream"

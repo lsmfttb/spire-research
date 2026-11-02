@@ -34,6 +34,14 @@ def _hash(value: object) -> str:
     return hashlib.sha256(d.canonical(value)).hexdigest()
 
 
+def _issue75_policy() -> Mapping[str, Any]:
+    """Read the model policy from the vendored, source-locked Issue 75 config."""
+    policy = d.read_json(d.UPSTREAM75 / "config.json").get("policy")
+    if not isinstance(policy, Mapping):
+        raise RuntimeError("locked Issue 75 config lacks its model policy mapping")
+    return policy
+
+
 def _restore_predictors(state: Mapping[str, Any], arm: str, value, value_optimizer, action_value, action_optimizer) -> None:
     if state.get("arm") != arm:
         raise RuntimeError("predictor checkpoint is bound to a different arm")
@@ -834,7 +842,7 @@ def _formal_training_carry_forward(
     if Path(model_module.__file__).resolve(strict=True) != locked_model_path:
         raise RuntimeError("formal carry-forward loaded a model outside the locked Issue 75 source")
 
-    policy = d.read_json(d.STUDY / "config.json")["policy"]
+    policy = _issue75_policy()
     for arm in d.ARMS:
         blocks = old_blocks.get(arm)
         if not isinstance(blocks, Mapping) or set(blocks) != {str(block) for block in range(FORMAL_BLOCKS)}:
