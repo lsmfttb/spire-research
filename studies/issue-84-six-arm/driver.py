@@ -10,6 +10,7 @@ import argparse
 import ast
 import copy
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 import hashlib
 import importlib.util
@@ -62,6 +63,7 @@ PARENT_UPDATE_SHA256 = "60fc4ebbefb5ee88cd4dbe25407567e8fd38b7e38bf8e10d1fa3287a
 UPSTREAM_COMMIT = "ecb588e580c0226da3aabaf54d79f2c2267308e3"
 
 ARMS = ("A", "B", "C", "D", "E", "F")
+_ISSUE84_HELDOUT_ORIGINAL_ARM = ContextVar("issue84_heldout_original_arm", default=None)
 CONCURRENCY = 8
 T_REF = 36.6474609375
 S_REF = 5.360108706240238
@@ -137,16 +139,19 @@ def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
     them from its returned summary when durable=False; #75 consumes those
     matrices through its volatile training-decision interface.
     """
-    # #75 routes the Issue 84 evaluation row label into #73's controller.
-    # The row label selects the frozen model and remains in the durable #75
-    # result; #73 only needs its generic learned-policy controller mode.
-    # Without this boundary mapping, its closed arm vocabulary rejects
-    # PARENT and A-F before a game starts.
-    if (
-        str(kwargs.get("purpose", "")).startswith("stage1-heldout-")
-        and (kwargs.get("arm") == "PARENT" or kwargs.get("arm") in ARMS)
-    ):
-        kwargs["arm"] = "BRANCH"
+    # A formal Issue 84 held-out worker sets this context while adapting its
+    # Issue 75 dispatch arm to BRANCH. Retain the registered Issue 84 label in
+    # the pinned #73 controller's sampling-purpose provenance.
+    purpose = kwargs.get("purpose")
+    original_arm = _ISSUE84_HELDOUT_ORIGINAL_ARM.get()
+    if original_arm is not None and isinstance(purpose, str):
+        match = re.fullmatch(r"stage1-heldout-BRANCH-(\d+)", purpose)
+        if match:
+            # The Issue 75 worker is temporarily told to dispatch BRANCH so
+            # its legacy E=Expert branch is bypassed. Restore the registered
+            # Issue 84 arm in controller provenance while keeping that bridge
+            # label away from the older runner.
+            kwargs["purpose"] = f"stage1-heldout-{original_arm}-{match.group(1)}"
 
     root_limit = kwargs.pop("capture_root_limit", None)
     training_features = kwargs.pop("capture_training_features", None)
@@ -237,6 +242,57 @@ def install_issue73_capture_limit_compat(runtime) -> None:
 
     runtime.initialize_native_runtime = initialize_with_capture_limit_compat
     runtime._issue84_capture_limit_compat_installed = True
+
+
+def install_issue84_heldout_actor_arm_compat(executor) -> None:
+    """Bypass #75's legacy E=Expert dispatch for Issue 84 actor evaluation.
+
+    Issue 84 evaluation labels are carried in the row and report. The pinned
+    #75 worker reserves arm E for its separate Expert policy and discards the
+    registered Issue 84 model. Dispatch held-out policy arms through #75's
+    generic BRANCH path, then restore the registered row arm in the result.
+    """
+    if getattr(executor, "_issue84_heldout_actor_arm_compat_installed", False):
+        return
+    original_worker_owner = executor._worker_owner
+
+    def worker_owner_with_issue84_arm_compat(job, ledger):
+        if not isinstance(job, Mapping):
+            return original_worker_owner(job, ledger)
+        row = job.get("row") if isinstance(job, Mapping) else None
+        study_arm = row.get("arm") if isinstance(row, Mapping) else None
+        if (
+            job.get("pilot") is not False
+            or job.get("phase") != "heldout"
+            or study_arm not in ("PARENT", *ARMS)
+        ):
+            return original_worker_owner(job, ledger)
+
+        policy_label = row.get("issue84_policy_label")
+        if not isinstance(policy_label, str) or not re.fullmatch(r"pi(?:1[2-9]|2[0-8])", policy_label):
+            raise ValueError("held-out Issue 84 actor row lacks its registered frozen checkpoint")
+        dispatch_job = dict(job)
+        dispatch_row = dict(row)
+        dispatch_row["arm"] = "BRANCH"
+        dispatch_job["row"] = dispatch_row
+        token = _ISSUE84_HELDOUT_ORIGINAL_ARM.set(str(study_arm))
+        try:
+            result = original_worker_owner(dispatch_job, ledger)
+        finally:
+            _ISSUE84_HELDOUT_ORIGINAL_ARM.reset(token)
+
+        if (
+            not isinstance(result, dict)
+            or result.get("status") != "SUCCEEDED"
+            or result.get("unit_id") != row.get("unit_id")
+            or result.get("arm") != "BRANCH"
+        ):
+            raise RuntimeError("Issue 75 held-out worker changed the Issue 84 unit identity during BRANCH dispatch")
+        result["arm"] = str(study_arm)
+        return result
+
+    executor._worker_owner = worker_owner_with_issue84_arm_compat
+    executor._issue84_heldout_actor_arm_compat_installed = True
 
 
 def _preflight_optimizer_evidence(
@@ -723,7 +779,14 @@ def configure_backend():
     module.__file__ = str(STUDY / "driver.py")
     module.source_commit = package_commit
     BACKEND = module
-    BACKEND_ORIGINAL_LOAD_MODULES = module.load_modules
+    original_load_modules = module.load_modules
+
+    def load_modules_with_issue84_worker_compat(active_root: Path, *, pilot: bool):
+        loaded = original_load_modules(active_root, pilot=pilot)
+        install_issue84_heldout_actor_arm_compat(loaded[-1])
+        return loaded
+
+    BACKEND_ORIGINAL_LOAD_MODULES = load_modules_with_issue84_worker_compat
     module.load_modules = load_modules
     return module
 

@@ -3,11 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 from contextlib import nullcontext
+import importlib.util
 from pathlib import Path
 import subprocess
 import tempfile
 import sys
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 import unittest
 from unittest.mock import patch
 import zlib
@@ -33,6 +34,7 @@ from driver import (
     _preflight_optimizer_evidence,
     call_pinned_issue73_run_one,
     install_issue73_capture_limit_compat,
+    install_issue84_heldout_actor_arm_compat,
     refresh_source_lock,
     sha256,
 )
@@ -80,38 +82,6 @@ class FormalPredictorLifecycleTests(unittest.TestCase):
 
 
 class Issue73EvaluationArmCompatibilityTests(unittest.TestCase):
-    def test_evaluation_arm_labels_map_only_at_the_pinned_controller_boundary(self):
-        class Controller:
-            def __init__(self, *, arm):
-                self.arm = arm
-                self.rng = SimpleNamespace(
-                    seed=None,
-                    manual_seed=lambda seed: setattr(self.rng, "seed", seed),
-                )
-
-        runner = SimpleNamespace(StudyController=Controller)
-
-        def run_one(**kwargs):
-            controller = runner.StudyController(arm=kwargs["arm"])
-            return {
-                "controller_arm": controller.arm,
-                "policy_rng_seed": controller.rng.seed,
-                "purpose": kwargs["purpose"],
-            }
-
-        for study_arm in ("PARENT", *driver_module.ARMS):
-            with self.subTest(study_arm=study_arm):
-                result = call_pinned_issue73_run_one(
-                    runner,
-                    run_one,
-                    arm=study_arm,
-                    policy_rng_seed=123456,
-                    purpose=f"stage1-heldout-{study_arm}-8460001",
-                )
-                self.assertEqual(result["controller_arm"], "BRANCH")
-                self.assertEqual(result["policy_rng_seed"], 123456)
-                self.assertEqual(result["purpose"], f"stage1-heldout-{study_arm}-8460001")
-
     def test_training_and_existing_issue73_labels_are_unchanged(self):
         class Controller:
             def __init__(self, *, arm):
@@ -141,6 +111,230 @@ class Issue73EvaluationArmCompatibilityTests(unittest.TestCase):
                 )
                 self.assertEqual(result["controller_arm"], arm)
                 self.assertEqual(result["policy_rng_seed"], 987)
+
+    def test_issue75_worker_dispatch_preserves_issue84_actor_and_row_identity(self):
+        class Controller:
+            def __init__(self, *, arm):
+                self.arm = arm
+                self.rng = SimpleNamespace(
+                    seed=None,
+                    manual_seed=lambda seed: setattr(self.rng, "seed", seed),
+                )
+
+        runner = SimpleNamespace(StudyController=Controller)
+        observed_rows = []
+        executor = SimpleNamespace()
+        executor._arm_policy = lambda _phase, _arm, row: (row["issue84_policy_label"], False)
+
+        def worker(job, _ledger):
+            row = job["row"]
+            observed_rows.append(dict(row))
+            arm = row["arm"]
+            # Mirror #75's legacy branch: E selects Expert; every other label
+            # loads the adapter-provided registered actor checkpoint.
+            if arm == "E":
+                policy_source = "legacy-expert"
+                checkpoint = None
+            else:
+                checkpoint, _proxy = executor._arm_policy("heldout", arm, row)
+                policy_source = "issue84-actor"
+
+            def run_one(**kwargs):
+                controller = runner.StudyController(arm=kwargs["arm"])
+                return {
+                    "controller_arm": controller.arm,
+                    "policy_rng_seed": controller.rng.seed,
+                    "purpose": kwargs["purpose"],
+                }
+
+            controller_result = call_pinned_issue73_run_one(
+                runner,
+                run_one,
+                arm=arm,
+                policy_rng_seed=row["policy_rng_seed"],
+                purpose=f"stage1-heldout-{arm}-{row['owner_seed']}",
+            )
+            return {
+                "status": "SUCCEEDED",
+                "unit_id": row["unit_id"],
+                "arm": arm,
+                "policy_source": policy_source,
+                "checkpoint": checkpoint,
+                "policy_rng_seed": row["policy_rng_seed"],
+                "controller": controller_result,
+            }
+
+        executor._worker_owner = worker
+        install_issue84_heldout_actor_arm_compat(executor)
+        for study_arm in ("PARENT", *driver_module.ARMS):
+            with self.subTest(study_arm=study_arm):
+                label = "pi12" if study_arm == "PARENT" else "pi28"
+                row = {
+                    "arm": study_arm,
+                    "unit_id": f"EVAL-8460001-{study_arm}",
+                    "owner_seed": 8_460_001,
+                    "issue84_arm": None if study_arm == "PARENT" else study_arm,
+                    "issue84_policy_label": label,
+                    "policy_rng_seed": 84_600_000 + len(observed_rows),
+                    "paired_owner_key": f"eval-{8_460_001}",
+                }
+                result = executor._worker_owner({"pilot": False, "phase": "heldout", "row": row}, None)
+                dispatched = observed_rows[-1]
+                self.assertEqual(dispatched["arm"], "BRANCH")
+                self.assertEqual(dispatched["issue84_arm"], row["issue84_arm"])
+                self.assertEqual(dispatched["issue84_policy_label"], label)
+                self.assertEqual(dispatched["policy_rng_seed"], row["policy_rng_seed"])
+                self.assertEqual(result["arm"], study_arm)
+                self.assertEqual(result["unit_id"], row["unit_id"])
+                self.assertEqual(result["policy_source"], "issue84-actor")
+                self.assertEqual(result["checkpoint"], label)
+                self.assertEqual(result["policy_rng_seed"], row["policy_rng_seed"])
+                self.assertEqual(result["controller"]["controller_arm"], "BRANCH")
+                self.assertEqual(result["controller"]["policy_rng_seed"], row["policy_rng_seed"])
+                self.assertEqual(
+                    result["controller"]["purpose"],
+                    f"stage1-heldout-{study_arm}-{row['owner_seed']}",
+                )
+
+    def test_issue84_worker_compat_does_not_rewrite_training_rows(self):
+        seen = []
+        executor = SimpleNamespace(
+            _worker_owner=lambda job, _ledger: seen.append(dict(job["row"])) or {
+                "status": "SUCCEEDED", "unit_id": job["row"]["unit_id"],
+                "arm": job["row"]["arm"],
+            },
+        )
+        install_issue84_heldout_actor_arm_compat(executor)
+        row = {"arm": "TRAIN", "unit_id": "TRAIN:8400001:E", "issue84_arm": "E"}
+        result = executor._worker_owner({"pilot": False, "phase": "training", "row": row}, None)
+        self.assertEqual(seen, [row])
+        self.assertEqual(result["arm"], "TRAIN")
+        pilot_row = {"arm": "E", "unit_id": "EVAL:8490001:E"}
+        pilot_result = executor._worker_owner(
+            {"pilot": True, "phase": "heldout", "row": pilot_row}, None,
+        )
+        self.assertEqual(seen[-1], pilot_row)
+        self.assertEqual(pilot_result["arm"], "E")
+
+    def test_pinned_issue75_worker_loads_issue84_e_actor_not_legacy_expert(self):
+        stage1 = (
+            STUDY / "upstream" / "issue-75-no-expert-oracle" / "stage1"
+        )
+        executor_path = stage1 / "executor.py"
+        spec = importlib.util.spec_from_file_location("issue84_test_issue75_executor", executor_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        executor = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = executor
+        sys.path.insert(0, str(stage1))
+        try:
+            spec.loader.exec_module(executor)
+        finally:
+            sys.path.remove(str(stage1))
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            output = root / "units" / "EVAL-8460001-E" / "attempt-0001" / "native"
+            executor.ARTIFACT_ROOT = root
+            executor.STUDY_ID = "issue-84-six-arm"
+            executor._arm_policy = lambda _phase, _arm, row: (row["issue84_policy_label"], False)
+            actor_policy = object()
+            loaded_labels = []
+
+            def load_model(label, *, proxy=False):
+                loaded_labels.append((label, proxy))
+                return actor_policy, "a" * 64, {
+                    "source": "issue84-actor",
+                    "checkpoint_sha256": "b" * 64,
+                    "formal_use": True,
+                }
+
+            executor._load_model = load_model
+            install_issue84_heldout_actor_arm_compat(executor)
+
+            algorithm = ModuleType("algorithm")
+            algorithm.InvocationBudget = object
+            algorithm.SEARCH_CPU_CAP_SECONDS = 32.0
+            algorithm.SEARCH_CPU_STOP_MARGIN_SECONDS = 0.0
+            algorithm.run_search = lambda **_kwargs: None
+            algorithm.derive_attempt_seed = lambda *_parts: 1
+            algorithm.write_immutable_json = lambda *_args, **_kwargs: None
+            runtime = ModuleType("runtime")
+            runner_seen = {}
+
+            class Controller:
+                def __init__(self, *, arm):
+                    self.arm = arm
+                    self.rng = SimpleNamespace(
+                        seed=None,
+                        manual_seed=lambda seed: setattr(self.rng, "seed", seed),
+                    )
+
+            runner = SimpleNamespace(StudyController=Controller)
+
+            def run_one(**kwargs):
+                controller = runner.StudyController(arm=kwargs["arm"])
+                runner_seen.update({
+                    "arm": controller.arm,
+                    "model": kwargs["model"],
+                    "purpose": kwargs["purpose"],
+                    "policy_rng_seed": controller.rng.seed,
+                })
+                return {
+                    "terminal": {
+                        "outcome": "PLAYER_LOSS", "terminal_floor": 1,
+                        "terminal_act": 3, "heart_victory": False,
+                        "act2_plus": True, "act3_plus": False,
+                        "act4_reached": False,
+                    },
+                    "completed_transitions": 40,
+                }
+
+            runner._run_one = run_one
+            runtime.initialize_native_runtime = lambda *_args, **_kwargs: (
+                {"source": {
+                    "sts_lightspeed_commit": "c" * 40,
+                    "stsr_source_commit": "d" * 40,
+                    "native_module_sha256": "e" * 64,
+                }}, runner, None, None,
+            )
+            runtime.PolicyAdapter = lambda model: model
+            install_issue73_capture_limit_compat(runtime)
+            row = {
+                "unit_id": "EVAL-8460001-E",
+                "owner_seed": 8_460_001,
+                "game_seed": 8_460_001,
+                "arm": "E",
+                "formal": True,
+                "paired_owner_key": "eval-8460001",
+                "issue84_arm": "E",
+                "issue84_policy_label": "pi28",
+                "policy_rng_seed": 84_600_001,
+                "search_invocation_seeds": [],
+            }
+            job = {
+                "pilot": False,
+                "phase": "heldout",
+                "row": row,
+                "output_dir": str(output),
+                "run_id": "EVAL-8460001-E-attempt-0001",
+            }
+            with patch.dict(sys.modules, {"algorithm": algorithm, "runtime": runtime}):
+                result = executor._worker_owner(job, SimpleNamespace(
+                    binding=SimpleNamespace(
+                        package_commit="f" * 40,
+                        source_lock_sha256="1" * 64,
+                    ),
+                ))
+
+            self.assertEqual(loaded_labels, [("pi28", False)])
+            self.assertIs(runner_seen["model"], actor_policy)
+            self.assertEqual(runner_seen["arm"], "BRANCH")
+            self.assertEqual(runner_seen["policy_rng_seed"], row["policy_rng_seed"])
+            self.assertEqual(runner_seen["purpose"], "stage1-heldout-E-8460001")
+            self.assertEqual(result["arm"], "E")
+            self.assertEqual(result["policy_source"]["source"], "issue84-actor")
+            self.assertEqual(result["policy_source"]["checkpoint_sha256"], "b" * 64)
 
 
 class FormalAnalysisTests(unittest.TestCase):
