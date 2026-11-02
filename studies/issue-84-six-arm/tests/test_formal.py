@@ -20,6 +20,8 @@ from driver import (
     T_REF,
     FORMAL_PREDECESSOR_LOCK_SHA256,
     FORMAL_PREDECESSOR_PACKAGE,
+    carried_formal_model_record,
+    install_formal_training_model_carry_forward,
     PILOT_PREDECESSOR_RUNTIME_AST_SHA256,
     _pilot_runtime_fingerprint,
     _terminal_game_reward,
@@ -39,7 +41,167 @@ from driver import (
     sha256,
 )
 import driver as driver_module
-from formal import _new_predictors, _prepare_predictors, _predictor_state, paired_bootstrap
+from formal import (
+    _new_predictors,
+    _prepare_predictors,
+    _predictor_state,
+    _verify_formal_training_forecast_carry_forward,
+    _verify_formal_training_lock_compatibility,
+    paired_bootstrap,
+)
+
+
+class FormalTrainingCarryForwardBindingTests(unittest.TestCase):
+    def test_training_forecast_carry_forward_preserves_the_approved_global_cap(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            predecessor, package = "a" * 40, "b" * 40
+            predecessor_lock, current_lock = "c" * 64, "d" * 64
+            approved = {
+                "schema_id": "issue84-installed-task-wall-forecast-v1",
+                "status": "APPROVED_SINGLE_GLOBAL_CUMULATIVE_ACTIVE_WALL_CAP",
+                "issue_number": 84,
+                "study_id": "issue-84-six-arm",
+                "source_lock_sha256": predecessor_lock,
+                "scope": "STUDY_ONLY",
+                "formal_sampling_authorized": True,
+                "formal_seeds_started_at_installation": False,
+                "one_task_active_wall_allowance_seconds": 204171.592,
+                "allowance_basis": {"planner_selected_seconds": 204171.592},
+            }
+            current = {
+                **approved,
+                "package_commit": package,
+                "source_lock_sha256": current_lock,
+            }
+            approved["package_commit"] = predecessor
+            old_path = root / "pilot" / predecessor / "task-wall-forecast.json"
+            new_path = root / "pilot" / package / "task-wall-forecast.json"
+            old_path.parent.mkdir(parents=True)
+            new_path.parent.mkdir(parents=True)
+            old_path.write_bytes(canonical(approved) + b"\n")
+            new_path.write_bytes(canonical(current) + b"\n")
+            old_progress = {"forecast_sha256": file_sha256(old_path)}
+            prior, rebound = _verify_formal_training_forecast_carry_forward(
+                predecessor=predecessor,
+                predecessor_lock_sha256=predecessor_lock,
+                package=package,
+                source_lock_sha256=current_lock,
+                old_progress=old_progress,
+                artifact_root=root,
+            )
+            self.assertEqual(prior["one_task_active_wall_allowance_seconds"], 204171.592)
+            self.assertEqual(rebound["one_task_active_wall_allowance_seconds"], 204171.592)
+            current["one_task_active_wall_allowance_seconds"] = 204171.593
+            new_path.write_bytes(canonical(current) + b"\n")
+            with self.assertRaisesRegex(RuntimeError, "forecast binding differs"):
+                _verify_formal_training_forecast_carry_forward(
+                    predecessor=predecessor,
+                    predecessor_lock_sha256=predecessor_lock,
+                    package=package,
+                    source_lock_sha256=current_lock,
+                    old_progress=old_progress,
+                    artifact_root=root,
+                )
+
+    def test_predecessor_lock_allows_only_formal_resume_adapter_files(self):
+        predecessor = {
+            "contract_sha256": "contract",
+            "upstream_commit": "upstream",
+            "upstream_files": {"driver.py": "a"},
+            "issue73_source_snapshot": {"sha256": "issue73"},
+            "external_runtime": {"native": "native"},
+            "parent": {"pi12": "parent"},
+            "fixed_scales": {"t_ref": 1, "s_ref": 2},
+            "seed_derivation": "seed-v1",
+            "generated_from_commit": "old",
+            "generated_utc": "old-time",
+            "local_code_files": {"driver.py": "old-driver", "formal.py": "same", "training.py": "same-training", "tests/test_formal.py": "old-tests"},
+        }
+        current = {
+            **predecessor,
+            "generated_from_commit": "new",
+            "generated_utc": "new-time",
+            "local_code_files": {"driver.py": "new-driver", "formal.py": "new-formal", "training.py": "same-training", "tests/test_formal.py": "new-tests"},
+        }
+        _verify_formal_training_lock_compatibility(predecessor, current)
+        current["local_code_files"]["training.py"] = "changed-training"
+        with self.assertRaisesRegex(RuntimeError, "outside the held-out/resume adapter"):
+            _verify_formal_training_lock_compatibility(predecessor, current)
+        current["local_code_files"]["training.py"] = "same-training"
+        current["parent"] = {"pi12": "different-parent"}
+        with self.assertRaisesRegex(RuntimeError, "contract or locked runtime inputs"):
+            _verify_formal_training_lock_compatibility(predecessor, current)
+
+    def test_carried_actor_model_is_bound_to_package_arm_label_and_artifact_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            data_root = Path(temporary)
+            artifacts = data_root / "artifacts"
+            package = "a" * 40
+            lock_path = data_root / "source-lock.json"
+            lock_path.write_text("current lock", encoding="utf-8")
+            source_lock_sha = file_sha256(lock_path)
+            formal_root = artifacts / "formal" / package
+            active_root = formal_root / "A"
+            carried_path = artifacts / "formal" / "d7e7ac5e93255787e6b55e25bd3f1197c396c8c2" / "A" / "models" / "pi13.pt"
+            carried_path.parent.mkdir(parents=True)
+            carried_path.write_bytes(b"frozen actor bytes")
+            entry = {
+                "arm": "A",
+                "label": "pi13",
+                "path": carried_path.relative_to(artifacts).as_posix(),
+                "checkpoint_sha256": file_sha256(carried_path),
+                "model_digest": "digest",
+                "predecessor_package_commit": driver_module.FORMAL_TRAINING_PREDECESSOR_PACKAGE,
+                "predecessor_source_lock_sha256": driver_module.FORMAL_TRAINING_PREDECESSOR_LOCK_SHA256,
+            }
+            bridge_body = {
+                "schema_id": "issue84-formal-training-carry-forward-v1",
+                "current": {"package_commit": package, "source_lock_sha256": source_lock_sha, "formal_root": f"formal/{package}"},
+                "final_policy_models": {"A": {"pi13": entry}, "B": {"pi13": entry}},
+            }
+            bridge = {**bridge_body, "manifest_sha256": sha256(canonical(bridge_body))}
+            bridge_path = formal_root / "formal-training-carry-forward.json"
+            bridge_path.parent.mkdir(parents=True)
+            bridge_path.write_bytes(canonical(bridge) + b"\n")
+            with (
+                patch.object(driver_module, "host_path", return_value=data_root),
+                patch.object(driver_module, "package_commit", return_value=package),
+                patch.object(driver_module, "SOURCE_LOCK_PATH", lock_path),
+            ):
+                record = carried_formal_model_record(active_root, "pi13", "A")
+                self.assertEqual(record["resolved_path"], carried_path)
+                self.assertEqual(record["checkpoint_sha256"], file_sha256(carried_path))
+                self.assertEqual(record["bridge_sha256"], file_sha256(bridge_path))
+                active_root.mkdir(parents=True)
+
+                def original_load_model(label, *, proxy=False):
+                    local_path = active_root / "models" / f"{label}.pt"
+                    self.assertTrue(local_path.is_symlink())
+                    return "actor", "digest", {"source": "issue84-pi13"}
+
+                executor = SimpleNamespace(_load_model=original_load_model)
+                token = driver_module._ISSUE84_HELDOUT_ORIGINAL_ARM.set("A")
+                try:
+                    install_formal_training_model_carry_forward(
+                        executor, active_root=active_root, pilot=False,
+                    )
+                    actor, digest, source = executor._load_model("pi13")
+                finally:
+                    driver_module._ISSUE84_HELDOUT_ORIGINAL_ARM.reset(token)
+                self.assertEqual((actor, digest), ("actor", "digest"))
+                self.assertEqual(source["training_carry_forward"]["checkpoint_path"], entry["path"])
+                self.assertEqual(
+                    (active_root / "models" / "pi13.pt").resolve(), carried_path.resolve(),
+                )
+                tampered_body = {
+                    **bridge_body,
+                    "final_policy_models": {"A": {"pi13": {**entry, "arm": "B"}}},
+                }
+                tampered = {**tampered_body, "manifest_sha256": sha256(canonical(tampered_body))}
+                bridge_path.write_bytes(canonical(tampered) + b"\n")
+                with self.assertRaisesRegex(RuntimeError, "another registered lineage"):
+                    carried_formal_model_record(active_root, "pi13", "A")
 
 
 class FormalPredictorLifecycleTests(unittest.TestCase):

@@ -77,6 +77,9 @@ PILOT_PREDECESSOR_LOCK_SHA256 = "d23bda9d60572814fbeef8d245246d1cccda74cf4ba565a
 PILOT_PREDECESSOR_RUNTIME_AST_SHA256 = "47b9dda9e86843c760dffe9b3a548a6338cbda7fc095420e965282a24571e35a"
 FORMAL_PREDECESSOR_PACKAGE = "1179b14dbed830ce915299e5ee63ab190d16e4a6"
 FORMAL_PREDECESSOR_LOCK_SHA256 = "625b812e9e174c1cd52381820beae6ea6e402daeedc3180a3329b375878d93e4"
+FORMAL_TRAINING_PREDECESSOR_PACKAGE = "d7e7ac5e93255787e6b55e25bd3f1197c396c8c2"
+FORMAL_TRAINING_PREDECESSOR_LOCK_SHA256 = "be8df93a5116e4412c3bdb1eea408bc3ba5378b2a4cec494b091efc38bd23c24"
+FORMAL_TRAINING_PREDECESSOR_SOURCE_LOCK_ARCHIVE = "2740a9ef028ccf781d8b13ab6c0ebe431d93b260-be8df93a5116e4412c3bdb1eea408bc3ba5378b2a4cec494b091efc38bd23c24.json"
 
 sys.path.insert(0, str(STUDY))
 
@@ -788,7 +791,97 @@ def configure_backend():
 
     BACKEND_ORIGINAL_LOAD_MODULES = load_modules_with_issue84_worker_compat
     module.load_modules = load_modules
+    original_issue84_load_modules = module.load_modules
+
+    def load_modules_with_formal_training_carry_forward(active_root: Path, *, pilot: bool):
+        loaded = original_issue84_load_modules(active_root, pilot=pilot)
+        install_formal_training_model_carry_forward(
+            loaded[-1], active_root=Path(active_root), pilot=pilot,
+        )
+        return loaded
+
+    module.load_modules = load_modules_with_formal_training_carry_forward
     return module
+
+
+def carried_formal_model_record(active_root: Path, label: str, study_arm: str) -> dict[str, Any] | None:
+    """Resolve a frozen actor checkpoint through its verified training lineage."""
+    if study_arm not in ARMS or Path(active_root).name != study_arm:
+        return None
+    formal_root = Path(active_root).parent
+    bridge_path = formal_root / "formal-training-carry-forward.json"
+    if not bridge_path.is_file():
+        return None
+    bridge = read_json(bridge_path)
+    manifest = {key: value for key, value in bridge.items() if key != "manifest_sha256"}
+    current_root = host_path(DATA_ROOT_WSL) / "artifacts"
+    if (
+        bridge.get("schema_id") != "issue84-formal-training-carry-forward-v1"
+        or bridge.get("manifest_sha256") != sha256(canonical(manifest))
+        or bridge.get("current", {}).get("package_commit") != package_commit()
+        or bridge.get("current", {}).get("source_lock_sha256") != file_sha256(SOURCE_LOCK_PATH)
+        or formal_root.resolve()
+        != (current_root / str(bridge.get("current", {}).get("formal_root", ""))).resolve()
+    ):
+        raise RuntimeError("formal actor checkpoint carry-forward manifest binding differs")
+    entry = bridge.get("final_policy_models", {}).get(study_arm, {}).get(str(label))
+    if not isinstance(entry, Mapping):
+        return None
+    if (
+        entry.get("arm") != study_arm
+        or entry.get("label") != str(label)
+        or entry.get("predecessor_package_commit") != FORMAL_TRAINING_PREDECESSOR_PACKAGE
+        or entry.get("predecessor_source_lock_sha256") != FORMAL_TRAINING_PREDECESSOR_LOCK_SHA256
+    ):
+        raise RuntimeError("formal actor checkpoint carry-forward entry has another registered lineage")
+    artifact_root = current_root.resolve()
+    model_path = (artifact_root / str(entry.get("path", ""))).resolve(strict=True)
+    try:
+        model_path.relative_to(artifact_root)
+    except ValueError as exc:
+        raise RuntimeError("carried formal actor checkpoint escapes the managed evidence root") from exc
+    if file_sha256(model_path) != entry.get("checkpoint_sha256"):
+        raise RuntimeError("carried formal actor checkpoint bytes differ from the lineage manifest")
+    return {**dict(entry), "resolved_path": model_path, "bridge_sha256": file_sha256(bridge_path)}
+
+
+def install_formal_training_model_carry_forward(executor, *, active_root: Path, pilot: bool) -> None:
+    """Resolve missing formal held-out actors through manifest-bound read-only links."""
+    if pilot or getattr(executor, "_issue84_formal_training_carry_forward_installed", False):
+        return
+    original_load_model = executor._load_model
+
+    def load_model(label: str, *, proxy: bool = False):
+        match = re.fullmatch(r"pi(\d+)", str(label))
+        study_arm = _ISSUE84_HELDOUT_ORIGINAL_ARM.get()
+        if match and 13 <= int(match.group(1)) <= 28 and study_arm in ARMS and Path(active_root).name == study_arm:
+            record = carried_formal_model_record(active_root, str(label), str(study_arm))
+            if record is not None:
+                local_path = Path(active_root) / "models" / f"{label}.pt"
+                local_path.parent.mkdir(parents=True, exist_ok=True)
+                target = Path(record["resolved_path"]).resolve(strict=True)
+                if local_path.is_symlink():
+                    if local_path.resolve(strict=True) != target:
+                        raise RuntimeError("formal local actor link differs from its carry-forward manifest")
+                elif local_path.exists():
+                    raise RuntimeError("formal local actor path exists without its registered carry-forward link")
+                else:
+                    local_path.symlink_to(target)
+                actor, digest, source = original_load_model(label, proxy=proxy)
+                if digest != record.get("model_digest"):
+                    raise RuntimeError("carried formal actor model digest differs from its training receipt")
+                source = dict(source)
+                source["training_carry_forward"] = {
+                    "bridge_sha256": record["bridge_sha256"],
+                    "predecessor_package_commit": record["predecessor_package_commit"],
+                    "predecessor_source_lock_sha256": record["predecessor_source_lock_sha256"],
+                    "checkpoint_path": record["path"],
+                }
+                return actor, digest, source
+        return original_load_model(label, proxy=proxy)
+
+    executor._load_model = load_model
+    executor._issue84_formal_training_carry_forward_installed = True
 
 
 def load_modules(active_root: Path, *, pilot: bool):
@@ -1176,9 +1269,12 @@ def _predecessor_source_lock(package: str):
         yield
         return
     backend = configure_backend()
-    lock_path = backend.ARTIFACTS / "source-lock-history" / (
-        f"{package}-{expected_sha256}.json"
+    archive_name = (
+        FORMAL_TRAINING_PREDECESSOR_SOURCE_LOCK_ARCHIVE
+        if package == FORMAL_TRAINING_PREDECESSOR_PACKAGE
+        else f"{package}-{expected_sha256}.json"
     )
+    lock_path = backend.ARTIFACTS / "source-lock-history" / archive_name
     if not lock_path.is_file() or file_sha256(lock_path) != expected_sha256:
         raise RuntimeError("predecessor source-lock archive is missing or changed")
     previous_path = backend.SOURCE_LOCK
