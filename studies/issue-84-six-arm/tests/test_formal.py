@@ -44,6 +44,7 @@ import driver as driver_module
 from formal import (
     _issue75_policy,
     _new_predictors,
+    _optimizer_parameter_steps_match,
     _prepare_predictors,
     _predictor_state,
     _verify_formal_training_forecast_carry_forward,
@@ -54,6 +55,30 @@ from formal import (
 
 
 class FormalTrainingCarryForwardBindingTests(unittest.TestCase):
+    def test_predecessor_optimizer_steps_match_locked_json_list_shape(self):
+        self.assertTrue(
+            _optimizer_parameter_steps_match([128] * 6, expected_steps=128, parameter_count=6)
+        )
+        self.assertTrue(
+            _optimizer_parameter_steps_match([64] * 6, expected_steps=64, parameter_count=6)
+        )
+        for malformed in (
+            None,
+            {},
+            {f"p{i}": 128 for i in range(6)},
+            [],
+            [128] * 5,
+            [128] * 7,
+            [128] * 5 + [64],
+            [128] * 5 + [True],
+        ):
+            with self.subTest(malformed=malformed):
+                self.assertFalse(
+                    _optimizer_parameter_steps_match(
+                        malformed, expected_steps=128, parameter_count=6,
+                    )
+                )
+
     def test_training_predecessor_archive_is_active_while_saved_group_is_resolved(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -34,6 +34,17 @@ def _hash(value: object) -> str:
     return hashlib.sha256(d.canonical(value)).hexdigest()
 
 
+def _optimizer_parameter_steps_match(
+    value: Any, *, expected_steps: int, parameter_count: int,
+) -> bool:
+    """Validate the JSON list emitted by the locked optimizer-step recorder."""
+    return (
+        isinstance(value, list)
+        and len(value) == parameter_count
+        and all(type(step) is int and step == expected_steps for step in value)
+    )
+
+
 def _issue75_policy() -> Mapping[str, Any]:
     """Read the model policy from the vendored, source-locked Issue 75 config."""
     policy = d.read_json(d.UPSTREAM75 / "config.json").get("policy")
@@ -939,6 +950,11 @@ def _formal_training_carry_forward(
                 if block == 0
                 else blocks[str(block - 1)]["actor_update"].get("model_checkpoint_sha256")
             )
+            actor = model_module.ActionConditionedPolicy(
+                dimension=d.POLICY_DIMENSION,
+                seed=int(policy["initial_model_seed"]),
+                final_weight_std=float(policy["actor_final_weight_std"]),
+            ).eval()
             if (
                 update.get("schema_id") != "issue84-formal-actor-update-v1"
                 or update.get("status") != "SUCCEEDED"
@@ -959,8 +975,11 @@ def _formal_training_carry_forward(
                 or update.get("model_checkpoint", {}).get("model_digest") != update.get("result_model_digest")
                 or update.get("optimizer_checkpoint_sha256") != d.file_sha256(step_path)
                 or update.get("completed_steps") != expected_steps // (2 if block == 0 else 1)
-                or not update.get("optimizer_parameter_steps")
-                or set(update["optimizer_parameter_steps"].values()) != {expected_steps}
+                or not _optimizer_parameter_steps_match(
+                    update.get("optimizer_parameter_steps"),
+                    expected_steps=expected_steps,
+                    parameter_count=len(tuple(actor.parameters())),
+                )
             ):
                 raise RuntimeError(f"formal predecessor actor update binding differs for {arm}/{block}")
             if block == 0:
@@ -970,11 +989,6 @@ def _formal_training_carry_forward(
             elif update.get("training_evidence_origin") is not None:
                 raise RuntimeError(f"formal predecessor actor update has unexpected evidence origin for {arm}/{block}")
 
-            actor = model_module.ActionConditionedPolicy(
-                dimension=d.POLICY_DIMENSION,
-                seed=int(policy["initial_model_seed"]),
-                final_weight_std=float(policy["actor_final_weight_std"]),
-            ).eval()
             actor.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True), strict=True)
             observed_digest = model_module.model_digest(actor)
             if observed_digest != update["result_model_digest"]:
