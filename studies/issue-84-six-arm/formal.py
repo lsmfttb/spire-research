@@ -45,6 +45,15 @@ def _optimizer_parameter_steps_match(
     )
 
 
+def _new_predecessor_actor(model_module, policy: Mapping[str, Any]):
+    """Build the carry-forward validator with the dimension from its locked model."""
+    return model_module.ActionConditionedPolicy(
+        dimension=model_module.DEFAULT_HASH_DIMENSION,
+        seed=int(policy["initial_model_seed"]),
+        final_weight_std=float(policy["actor_final_weight_std"]),
+    ).eval()
+
+
 def _issue75_policy() -> Mapping[str, Any]:
     """Read the model policy from the vendored, source-locked Issue 75 config."""
     policy = d.read_json(d.UPSTREAM75 / "config.json").get("policy")
@@ -950,11 +959,7 @@ def _formal_training_carry_forward(
                 if block == 0
                 else blocks[str(block - 1)]["actor_update"].get("model_checkpoint_sha256")
             )
-            actor = model_module.ActionConditionedPolicy(
-                dimension=d.POLICY_DIMENSION,
-                seed=int(policy["initial_model_seed"]),
-                final_weight_std=float(policy["actor_final_weight_std"]),
-            ).eval()
+            actor = _new_predecessor_actor(model_module, policy)
             if (
                 update.get("schema_id") != "issue84-formal-actor-update-v1"
                 or update.get("status") != "SUCCEEDED"

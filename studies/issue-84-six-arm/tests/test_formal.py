@@ -44,6 +44,7 @@ import driver as driver_module
 from formal import (
     _issue75_policy,
     _new_predictors,
+    _new_predecessor_actor,
     _optimizer_parameter_steps_match,
     _prepare_predictors,
     _predictor_state,
@@ -55,6 +56,27 @@ from formal import (
 
 
 class FormalTrainingCarryForwardBindingTests(unittest.TestCase):
+    def test_predecessor_actor_dimension_comes_from_locked_model_module(self):
+        class Actor:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+            def eval(self):
+                return self
+
+        model_module = SimpleNamespace(
+            DEFAULT_HASH_DIMENSION=2048,
+            ActionConditionedPolicy=Actor,
+        )
+        policy = {"initial_model_seed": 75, "actor_final_weight_std": 0.02}
+
+        actor = _new_predecessor_actor(model_module, policy)
+
+        self.assertEqual(
+            actor.kwargs,
+            {"dimension": 2048, "seed": 75, "final_weight_std": 0.02},
+        )
+
     def test_predecessor_optimizer_steps_match_locked_json_list_shape(self):
         self.assertTrue(
             _optimizer_parameter_steps_match([128] * 6, expected_steps=128, parameter_count=6)
