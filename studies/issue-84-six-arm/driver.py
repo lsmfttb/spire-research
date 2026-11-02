@@ -1263,6 +1263,7 @@ def _predecessor_source_lock(package: str):
     lock_by_package = {
         PILOT_PREDECESSOR_PACKAGE: PILOT_PREDECESSOR_LOCK_SHA256,
         FORMAL_PREDECESSOR_PACKAGE: FORMAL_PREDECESSOR_LOCK_SHA256,
+        FORMAL_TRAINING_PREDECESSOR_PACKAGE: FORMAL_TRAINING_PREDECESSOR_LOCK_SHA256,
     }
     expected_sha256 = lock_by_package.get(package)
     if expected_sha256 is None:

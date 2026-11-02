@@ -47,11 +47,77 @@ from formal import (
     _predictor_state,
     _verify_formal_training_forecast_carry_forward,
     _verify_formal_training_lock_compatibility,
+    _verify_saved_game_group,
     paired_bootstrap,
 )
 
 
 class FormalTrainingCarryForwardBindingTests(unittest.TestCase):
+    def test_training_predecessor_archive_is_active_while_saved_group_is_resolved(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            artifacts = root / "artifacts"
+            package = "f" * 40
+            current_lock = root / "source-lock.json"
+            current_lock.write_bytes(b"current source lock")
+            archive = artifacts / "source-lock-history" / "training-lock.json"
+            archive.parent.mkdir(parents=True)
+            archive.write_bytes(b"archived training source lock")
+            archived_sha = file_sha256(archive)
+            result_path = artifacts / "formal" / package / "A" / "result.json"
+            result_path.parent.mkdir(parents=True)
+            result_path.write_bytes(b"saved success receipt")
+            row = {"unit_id": "TRAIN:8400129:A"}
+            report = {"model_digest": "actor-digest", "source_lock_sha256": archived_sha}
+            result_sha = file_sha256(result_path)
+            saved = {
+                "status": "SUCCEEDED",
+                "run_summary": {
+                    "status": "SUCCEEDED",
+                    "completed": 1,
+                    "outcomes": [{
+                        "unit_id": row["unit_id"],
+                        "result_sha256": result_sha,
+                        "policy_model_digest": report["model_digest"],
+                        "source_lock_sha256": archived_sha,
+                    }],
+                },
+            }
+
+            class Backend:
+                ARTIFACTS = artifacts
+                SOURCE_LOCK = current_lock
+
+                def __init__(self):
+                    self.observed_lock_hashes = []
+
+                def source_lock_sha(self):
+                    return file_sha256(self.SOURCE_LOCK)
+
+                def existing_success_record(self, _root, _row, _package):
+                    active_lock_sha = self.source_lock_sha()
+                    self.observed_lock_hashes.append(active_lock_sha)
+                    if active_lock_sha != archived_sha:
+                        return None
+                    return report, result_path
+
+            backend = Backend()
+            with (
+                patch.object(driver_module, "FORMAL_TRAINING_PREDECESSOR_PACKAGE", package),
+                patch.object(driver_module, "FORMAL_TRAINING_PREDECESSOR_LOCK_SHA256", archived_sha),
+                patch.object(driver_module, "FORMAL_TRAINING_PREDECESSOR_SOURCE_LOCK_ARCHIVE", archive.name),
+                patch.object(driver_module, "configure_backend", return_value=backend),
+            ):
+                with driver_module._predecessor_source_lock(package):
+                    self.assertEqual(backend.SOURCE_LOCK, archive)
+                    verified = _verify_saved_game_group(
+                        saved, [row], root=artifacts / "formal" / package / "A",
+                        package=package, backend=backend,
+                    )
+                self.assertEqual(backend.SOURCE_LOCK, current_lock)
+            self.assertEqual(verified["status"], "SUCCEEDED")
+            self.assertEqual(backend.observed_lock_hashes, [archived_sha])
+
     def test_training_forecast_carry_forward_preserves_the_approved_global_cap(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
