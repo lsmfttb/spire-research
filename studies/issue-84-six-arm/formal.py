@@ -827,7 +827,12 @@ def _formal_training_carry_forward(
     if not isinstance(old_blocks, Mapping) or set(old_blocks) != set(d.ARMS):
         raise RuntimeError("formal training predecessor is missing one or more registered arms")
 
-    from model import ActionConditionedPolicy, model_digest
+    # Resolve the model through the same clean, source-locked loader used for training.
+    # The driver deliberately removes generic #75 imports from sys.path after loading.
+    _, _, model_module, _, _ = d.load_modules(formal_root, pilot=False)
+    locked_model_path = (d.UPSTREAM75 / "model.py").resolve(strict=True)
+    if Path(model_module.__file__).resolve(strict=True) != locked_model_path:
+        raise RuntimeError("formal carry-forward loaded a model outside the locked Issue 75 source")
 
     policy = d.read_json(d.STUDY / "config.json")["policy"]
     for arm in d.ARMS:
@@ -957,13 +962,13 @@ def _formal_training_carry_forward(
             elif update.get("training_evidence_origin") is not None:
                 raise RuntimeError(f"formal predecessor actor update has unexpected evidence origin for {arm}/{block}")
 
-            actor = ActionConditionedPolicy(
+            actor = model_module.ActionConditionedPolicy(
                 dimension=d.POLICY_DIMENSION,
                 seed=int(policy["initial_model_seed"]),
                 final_weight_std=float(policy["actor_final_weight_std"]),
             ).eval()
             actor.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True), strict=True)
-            observed_digest = model_digest(actor)
+            observed_digest = model_module.model_digest(actor)
             if observed_digest != update["result_model_digest"]:
                 raise RuntimeError(f"formal predecessor model digest differs for {arm}/{block}")
             previous_model_digest = observed_digest

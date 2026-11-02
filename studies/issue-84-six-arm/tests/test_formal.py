@@ -1327,6 +1327,46 @@ class FormalAnalysisTests(unittest.TestCase):
             text=True,
         )
 
+    def test_clean_worker_loads_locked_issue75_model_through_driver(self):
+        upstream75 = STUDY / "upstream" / "issue-75-no-expert-oracle"
+        relative = "issue-75-no-expert-oracle/model.py"
+        manifest = json.loads((
+            STUDY / "upstream" / "upstream-manifest.json"
+        ).read_text(encoding="utf-8"))
+        model_path = upstream75 / "model.py"
+        self.assertEqual(
+            hashlib.sha256(model_path.read_bytes()).hexdigest(),
+            manifest["files"][relative]["sha256"],
+        )
+
+        # Reproduce a worker interpreter with no generic #75 import roots or
+        # cached model module; the pinned driver must load the locked model.
+        code = (
+            "import os, sys\n"
+            "from pathlib import Path\n"
+            "import driver\n"
+            "os.environ[\"ISSUE84_PACKAGE_COMMIT\"] = \"0000000000000000000000000000000000000000\"\n"
+            "assert \"model\" not in sys.modules\n"
+            "assert not any(\"issue-75-no-expert-oracle\" in p for p in sys.path)\n"
+            "os.environ[\"STS_LIGHTSPEED_SOURCE_DIR\"] = driver.STS_SOURCE_WSL\n"
+            "os.environ[\"STSRL_SOURCE_DIR\"] = driver.STSRL_SOURCE_WSL\n"
+            "root = Path(sys.argv[1])\n"
+            "root.mkdir(parents=True, exist_ok=True)\n"
+            "modules = driver.load_modules(root, pilot=False)\n"
+            "model = modules[2]\n"
+            "assert Path(model.__file__).resolve() == (driver.UPSTREAM75 / \"model.py\").resolve()\n"
+            "assert callable(model.ActionConditionedPolicy) and callable(model.model_digest)\n"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            result = subprocess.run(
+                [sys.executable, "-c", code, str(Path(temporary) / "active")],
+                cwd=STUDY,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_issue75_lineage_inputs_are_vendored_and_locked(self):
         upstream = STUDY / "upstream"
         manifest = json.loads(
