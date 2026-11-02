@@ -137,6 +137,17 @@ def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
     them from its returned summary when durable=False; #75 consumes those
     matrices through its volatile training-decision interface.
     """
+    # #75 routes the Issue 84 evaluation row label into #73's controller.
+    # The row label selects the frozen model and remains in the durable #75
+    # result; #73 only needs its generic learned-policy controller mode.
+    # Without this boundary mapping, its closed arm vocabulary rejects
+    # PARENT and A-F before a game starts.
+    if (
+        str(kwargs.get("purpose", "")).startswith("stage1-heldout-")
+        and (kwargs.get("arm") == "PARENT" or kwargs.get("arm") in ARMS)
+    ):
+        kwargs["arm"] = "BRANCH"
+
     root_limit = kwargs.pop("capture_root_limit", None)
     training_features = kwargs.pop("capture_training_features", None)
     policy_rng_seed = kwargs.pop("policy_rng_seed", None)

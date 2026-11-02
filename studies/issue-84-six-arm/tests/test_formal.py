@@ -31,6 +31,7 @@ from driver import (
     save_preflight_receipt,
     seed_table_path,
     _preflight_optimizer_evidence,
+    call_pinned_issue73_run_one,
     install_issue73_capture_limit_compat,
     refresh_source_lock,
     sha256,
@@ -76,6 +77,70 @@ class FormalPredictorLifecycleTests(unittest.TestCase):
             self.assertIsNotNone(_predictor_state(
                 value, value_optimizer, action_value, action_optimizer,
             )["value_model_state_dict"])
+
+
+class Issue73EvaluationArmCompatibilityTests(unittest.TestCase):
+    def test_evaluation_arm_labels_map_only_at_the_pinned_controller_boundary(self):
+        class Controller:
+            def __init__(self, *, arm):
+                self.arm = arm
+                self.rng = SimpleNamespace(
+                    seed=None,
+                    manual_seed=lambda seed: setattr(self.rng, "seed", seed),
+                )
+
+        runner = SimpleNamespace(StudyController=Controller)
+
+        def run_one(**kwargs):
+            controller = runner.StudyController(arm=kwargs["arm"])
+            return {
+                "controller_arm": controller.arm,
+                "policy_rng_seed": controller.rng.seed,
+                "purpose": kwargs["purpose"],
+            }
+
+        for study_arm in ("PARENT", *driver_module.ARMS):
+            with self.subTest(study_arm=study_arm):
+                result = call_pinned_issue73_run_one(
+                    runner,
+                    run_one,
+                    arm=study_arm,
+                    policy_rng_seed=123456,
+                    purpose=f"stage1-heldout-{study_arm}-8460001",
+                )
+                self.assertEqual(result["controller_arm"], "BRANCH")
+                self.assertEqual(result["policy_rng_seed"], 123456)
+                self.assertEqual(result["purpose"], f"stage1-heldout-{study_arm}-8460001")
+
+    def test_training_and_existing_issue73_labels_are_unchanged(self):
+        class Controller:
+            def __init__(self, *, arm):
+                self.arm = arm
+                self.rng = SimpleNamespace(
+                    seed=None,
+                    manual_seed=lambda seed: setattr(self.rng, "seed", seed),
+                )
+
+        runner = SimpleNamespace(StudyController=Controller)
+
+        def run_one(**kwargs):
+            controller = runner.StudyController(arm=kwargs["arm"])
+            return {
+                "controller_arm": controller.arm,
+                "policy_rng_seed": controller.rng.seed,
+                "purpose": kwargs.get("purpose"),
+            }
+
+        for arm in ("TRAIN", "BRANCH", "P0", "P1", "E", "SUFFIX"):
+            with self.subTest(arm=arm):
+                result = call_pinned_issue73_run_one(
+                    runner,
+                    run_one,
+                    arm=arm,
+                    policy_rng_seed=987,
+                )
+                self.assertEqual(result["controller_arm"], arm)
+                self.assertEqual(result["policy_rng_seed"], 987)
 
 
 class FormalAnalysisTests(unittest.TestCase):
