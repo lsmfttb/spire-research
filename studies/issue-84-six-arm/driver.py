@@ -888,19 +888,20 @@ def install_formal_training_model_carry_forward(executor, *, active_root: Path, 
                 local_path = Path(active_root) / "models" / f"{label}.pt"
                 local_path.parent.mkdir(parents=True, exist_ok=True)
                 target = Path(record["resolved_path"]).resolve(strict=True)
-                if local_path.is_symlink():
-                    if local_path.resolve(strict=True) != target:
-                        raise RuntimeError("formal local actor link differs from its carry-forward manifest")
-                elif local_path.exists():
-                    raise RuntimeError("formal local actor path exists without its registered carry-forward link")
-                else:
-                    try:
-                        local_path.symlink_to(target)
-                    except FileExistsError:
-                        # Concurrent workers may install the same immutable
-                        # checkpoint link. Accept only the exact intended link.
-                        if not local_path.is_symlink() or local_path.resolve(strict=True) != target:
-                            raise
+                try:
+                    local_path.symlink_to(target)
+                except FileExistsError:
+                    # Another worker may have installed this immutable link
+                    # between our filesystem operations. Validate the path
+                    # after the atomic create attempt rather than making a
+                    # separate exists/is_symlink decision that can go stale.
+                    pass
+                if not local_path.is_symlink():
+                    raise RuntimeError(
+                        "formal local actor path exists without its registered carry-forward link"
+                    )
+                if local_path.resolve(strict=True) != target:
+                    raise RuntimeError("formal local actor link differs from its carry-forward manifest")
                 actor, digest, source = original_load_model(label, proxy=proxy)
                 if digest != record.get("model_digest"):
                     raise RuntimeError("carried formal actor model digest differs from its training receipt")

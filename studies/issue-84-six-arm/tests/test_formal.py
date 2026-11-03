@@ -333,6 +333,35 @@ class FormalTrainingCarryForwardBindingTests(unittest.TestCase):
                 self.assertEqual((raced_actor, raced_digest), ("actor", "digest"))
                 self.assertEqual(local_path.resolve(), carried_path.resolve())
 
+                # Guard against the narrower race that escaped the earlier
+                # test. If code reintroduces a separate exists() pre-check,
+                # this callback installs the competing link in that window;
+                # the production code must use atomic create-then-validate.
+                local_path.unlink()
+                real_exists = Path.exists
+                exists_checks = []
+
+                def race_if_exists_is_prechecked(path):
+                    if path == local_path:
+                        exists_checks.append(path)
+                        if not path.is_symlink():
+                            real_symlink_to(path, carried_path)
+                    return real_exists(path)
+
+                racing_check_executor = SimpleNamespace(_load_model=original_load_model)
+                racing_check_token = driver_module._ISSUE84_HELDOUT_ORIGINAL_ARM.set("A")
+                try:
+                    with patch.object(Path, "exists", race_if_exists_is_prechecked):
+                        install_formal_training_model_carry_forward(
+                            racing_check_executor, active_root=active_root, pilot=False,
+                        )
+                        checked_actor, checked_digest, _ = racing_check_executor._load_model("pi13")
+                finally:
+                    driver_module._ISSUE84_HELDOUT_ORIGINAL_ARM.reset(racing_check_token)
+                self.assertEqual(exists_checks, [])
+                self.assertEqual((checked_actor, checked_digest), ("actor", "digest"))
+                self.assertEqual(local_path.resolve(), carried_path.resolve())
+
                 tampered_body = {
                     **bridge_body,
                     "final_policy_models": {"A": {"pi13": {**entry, "arm": "B"}}},
