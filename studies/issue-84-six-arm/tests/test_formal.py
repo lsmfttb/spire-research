@@ -51,6 +51,7 @@ from formal import (
     _verify_formal_training_forecast_carry_forward,
     _verify_formal_training_lock_compatibility,
     _verify_saved_game_group,
+    _verify_saved_validation_game_group,
     _merge_validation_game_group,
     paired_bootstrap,
 )
@@ -449,6 +450,149 @@ class FormalValidationCarryForwardTests(unittest.TestCase):
                 },
                 origin={"schema_id": "issue84-formal-validation-carry-forward-origin-v1"},
             )
+
+    def test_partial_validation_resume_merges_27_saved_games_with_37_fresh_games(self):
+        rows = [
+            {
+                "unit_id": f"EVAL:{8_460_001 + index}:B2048",
+                "owner_seed": 8_460_001 + index,
+                "phase": "evaluation",
+                "arm": "B2048",
+                "issue84_arm": "B",
+                "issue84_policy_label": "pi28",
+                "paired_owner_key": f"eval-{8_460_001 + index}",
+                "game_seed": 8_460_001 + index,
+                "policy_rng_seed": 9_000_000 + index,
+                "search_invocation_seeds": [],
+            }
+            for index in range(64)
+        ]
+        carried_outcomes = [
+            {
+                **row,
+                "package_commit": "a" * 40,
+                "source_lock_sha256": "old-lock",
+                "result_sha256": f"old-result-{index}",
+                "worker_wall_seconds": 2.0,
+                "expert_decisions": 0,
+                "terminal_floor": 16,
+            }
+            for index, row in enumerate(rows[:27])
+        ]
+        fresh_outcomes = [
+            {
+                **row,
+                "package_commit": "b" * 40,
+                "source_lock_sha256": "new-lock",
+                "result_sha256": f"new-result-{index}",
+                "worker_wall_seconds": 3.0,
+                "expert_decisions": 0,
+                "terminal_floor": 17,
+            }
+            for index, row in enumerate(rows[27:])
+        ]
+        result = _merge_validation_game_group(
+            "B2048", rows,
+            carried={"outcomes": carried_outcomes, "prior_attempts": 9},
+            fresh={
+                "status": "SUCCEEDED",
+                "run_summary": {
+                    "status": "SUCCEEDED", "completed": 37, "elapsed_seconds": 12.0,
+                    "native_worker_wall_seconds": 10.0, "retry_count": 0,
+                    "outcomes": fresh_outcomes,
+                },
+            },
+            origin={"schema_id": "issue84-formal-validation-resume-carry-forward-origin-v1"},
+        )
+        outcomes = result["run_summary"]["outcomes"]
+        self.assertEqual(result["status"], "SUCCEEDED")
+        self.assertEqual(result["completed"], 64)
+        self.assertEqual(result["remaining"], 0)
+        self.assertEqual(result["run_summary"]["carried_forward_completed"], 27)
+        self.assertEqual(result["run_summary"]["predecessor_retries"], 9)
+        self.assertEqual(len({item["unit_id"] for item in outcomes}), 64)
+        self.assertEqual(sum(item["package_commit"] == "a" * 40 for item in outcomes), 27)
+        self.assertEqual(sum(item["package_commit"] == "b" * 40 for item in outcomes), 37)
+
+    def test_validation_group_can_verify_receipts_from_multiple_locked_packages(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            artifacts = Path(temporary)
+            origin = {"schema_id": "issue84-formal-validation-resume-carry-forward-origin-v1"}
+            rows = []
+            outcomes = []
+            references = []
+            results = {}
+            package_locks = {"a" * 40: "old-lock-a", "b" * 40: "old-lock-b"}
+            for index, package in enumerate(package_locks, start=1):
+                row = {
+                    "unit_id": f"EVAL:{8_460_000 + index}:A512",
+                    "owner_seed": 8_460_000 + index,
+                    "phase": "evaluation",
+                    "arm": "A512",
+                    "issue84_arm": "A",
+                    "issue84_policy_label": "pi16",
+                    "paired_owner_key": f"eval-{8_460_000 + index}",
+                    "game_seed": 8_460_000 + index,
+                    "policy_rng_seed": 100 + index,
+                    "search_invocation_seeds": [],
+                }
+                rows.append(row)
+                root = artifacts / "formal" / package / "A"
+                attempt = root / "units" / row["unit_id"] / "attempt-0001"
+                attempt.mkdir(parents=True)
+                result_path = attempt / "result.json"
+                result_path.write_text(f"result-{index}", encoding="utf-8")
+                for name in ("worker-job.json", "started.json", "finished.json"):
+                    (attempt / name).write_text(f"{name}-{index}", encoding="utf-8")
+                digest = file_sha256(result_path)
+                outcome = {
+                    **row,
+                    "package_commit": package,
+                    "source_lock_sha256": package_locks[package],
+                    "result_path": result_path.relative_to(root).as_posix(),
+                    "result_sha256": digest,
+                    "policy_model_digest": f"model-{index}",
+                }
+                outcomes.append(outcome)
+                references.append({
+                    "unit_id": row["unit_id"],
+                    "package_commit": package,
+                    "source_lock_sha256": package_locks[package],
+                    "result_path": outcome["result_path"],
+                    "result_sha256": digest,
+                    "worker_job_sha256": file_sha256(attempt / "worker-job.json"),
+                    "started_sha256": file_sha256(attempt / "started.json"),
+                    "finished_sha256": file_sha256(attempt / "finished.json"),
+                })
+                results[(package, row["unit_id"])] = ({"model_digest": f"model-{index}"}, result_path)
+
+            record = {
+                "schema_id": "issue84-game-group-v1",
+                "status": "SUCCEEDED",
+                "group": "A512",
+                "expected": 2,
+                "completed": 2,
+                "run_summary": {"status": "SUCCEEDED", "completed": 2, "outcomes": outcomes},
+                "validation_carry_forward_origin": origin,
+            }
+            carry = {
+                "origin": origin,
+                "groups": {"A512": {"outcomes": outcomes, "references": references}},
+            }
+            backend = SimpleNamespace(ARTIFACTS=artifacts)
+            backend.source_lock_sha = iter(package_locks.values()).__next__
+
+            def existing_success_record(_root, row, package):
+                return results[(package, row["unit_id"])]
+
+            backend.existing_success_record = existing_success_record
+            with patch("formal.d._predecessor_source_lock", side_effect=lambda _package: nullcontext()):
+                verified = _verify_saved_validation_game_group(
+                    record, rows, root=artifacts / "formal" / ("c" * 40) / "A",
+                    package="c" * 40, carry_forward=carry, group="A512", backend=backend,
+                    source_lock_sha256="current-lock",
+                )
+            self.assertEqual(verified, record)
 
 
 class FormalPredictorLifecycleTests(unittest.TestCase):

@@ -885,6 +885,475 @@ def _formal_validation_carry_forward(
     }
 
 
+def _validation_training_binding(
+    row: Mapping[str, Any], *, package: str, source_lock_sha256: str, backend,
+) -> tuple[str, dict[str, Any]]:
+    """Resolve the exact frozen validation model through its source-bound actor lineage."""
+    if row.get("arm") == "PARENT":
+        return d.PARENT_MODEL_DIGEST, {
+            "checkpoint_sha256": d.PARENT_MODEL_SHA256,
+            "formal_use": True,
+            "source": "issue82-parent-pi12",
+        }
+
+    source_locks = {
+        d.FORMAL_VALIDATION_PREDECESSOR_PACKAGE: d.FORMAL_VALIDATION_PREDECESSOR_LOCK_SHA256,
+        d.FORMAL_VALIDATION_RESUME_PREDECESSOR_PACKAGE: d.FORMAL_VALIDATION_RESUME_PREDECESSOR_LOCK_SHA256,
+    }
+    if source_locks.get(package) != source_lock_sha256:
+        raise RuntimeError(f"validation source package is not an authorized predecessor: {package}")
+    source_progress_path = backend.ARTIFACTS / "formal" / package / "formal-progress.json"
+    source_progress = d.read_json(source_progress_path)
+    origin = source_progress.get("execution_carry_forward")
+    if not isinstance(origin, Mapping):
+        raise RuntimeError(f"validation source package lacks its actor-lineage origin: {package}")
+    manifest_path = (backend.ARTIFACTS / str(origin.get("path", ""))).resolve(strict=True)
+    try:
+        manifest_path.relative_to(backend.ARTIFACTS.resolve())
+    except ValueError as exc:
+        raise RuntimeError("validation actor-lineage manifest escaped managed research storage") from exc
+    manifest = d.read_json(manifest_path)
+    manifest_body = {key: value for key, value in manifest.items() if key != "manifest_sha256"}
+    if (
+        d.file_sha256(manifest_path) != origin.get("file_sha256")
+        or manifest.get("schema_id") != "issue84-formal-training-carry-forward-v1"
+        or manifest.get("manifest_sha256") != origin.get("manifest_sha256")
+        or manifest.get("manifest_sha256") != _hash(manifest_body)
+        or manifest.get("current", {}).get("package_commit") != package
+        or manifest.get("current", {}).get("source_lock_sha256") != source_lock_sha256
+        or manifest.get("current", {}).get("seed_table_sha256") != source_progress.get("seed_table_sha256")
+    ):
+        raise RuntimeError(f"validation actor-lineage manifest binding differs for {package}")
+
+    arm = str(row.get("issue84_arm"))
+    label = str(row.get("issue84_policy_label"))
+    model = manifest.get("final_policy_models", {}).get(arm, {}).get(label)
+    if not isinstance(model, Mapping) or model.get("arm") != arm or model.get("label") != label:
+        raise RuntimeError(f"validation actor lineage lacks the frozen model for {arm}/{label}")
+    model_path = (backend.ARTIFACTS / str(model.get("path", ""))).resolve(strict=True)
+    actor_receipt_path = (backend.ARTIFACTS / str(model.get("actor_update_receipt_path", ""))).resolve(strict=True)
+    for path in (model_path, actor_receipt_path):
+        try:
+            path.relative_to(backend.ARTIFACTS.resolve())
+        except ValueError as exc:
+            raise RuntimeError("validation actor/model evidence escaped managed research storage") from exc
+    actor_receipt = d.read_json(actor_receipt_path)
+    if (
+        d.file_sha256(model_path) != model.get("checkpoint_sha256")
+        or d.file_sha256(actor_receipt_path) != model.get("actor_update_receipt_sha256")
+        or actor_receipt.get("schema_id") != "issue84-formal-actor-update-v1"
+        or actor_receipt.get("status") != "SUCCEEDED"
+        or model.get("model_digest") is None
+        or model.get("predecessor_package_commit") != actor_receipt.get("package_commit")
+        or model.get("predecessor_source_lock_sha256") != actor_receipt.get("source_lock_sha256")
+        or model.get("checkpoint_sha256") != actor_receipt.get("model_checkpoint_sha256")
+        or model.get("model_digest") != actor_receipt.get("result_model_digest")
+        or model.get("optimizer_checkpoint_sha256") != actor_receipt.get("optimizer_checkpoint_sha256")
+    ):
+        raise RuntimeError(f"validation actor checkpoint/receipt identity differs for {arm}/{label}")
+    return str(model["model_digest"]), {
+        "checkpoint_sha256": model["checkpoint_sha256"],
+        "formal_use": True,
+        "source": f"issue84-{label}",
+        "training_carry_forward": {
+            "bridge_sha256": origin["file_sha256"],
+            "predecessor_package_commit": model["predecessor_package_commit"],
+            "predecessor_source_lock_sha256": model["predecessor_source_lock_sha256"],
+            "checkpoint_path": model["path"],
+        },
+    }
+
+
+def _formal_validation_resume_carry_forward(
+    *, package: str, source_lock_sha256: str, current_lock: Mapping[str, Any],
+    current_seed_table: Mapping[str, Any], formal_root: Path, backend,
+) -> dict[str, Any] | None:
+    """Resume validation from the last stopped source package without replaying successes."""
+    predecessor = d.FORMAL_VALIDATION_RESUME_PREDECESSOR_PACKAGE
+    predecessor_lock_sha = d.FORMAL_VALIDATION_RESUME_PREDECESSOR_LOCK_SHA256
+    predecessor_root = backend.ARTIFACTS / "formal" / predecessor
+    progress_path = predecessor_root / "formal-progress.json"
+    seed_path = d.seed_table_path(predecessor)
+    lock_path = backend.ARTIFACTS / "source-lock-history" / f"{predecessor}-{predecessor_lock_sha}.json"
+    evidence_paths = (progress_path, seed_path, lock_path)
+    if not any(path.exists() for path in evidence_paths):
+        return _formal_validation_carry_forward(
+            package=package, source_lock_sha256=source_lock_sha256, current_lock=current_lock,
+            current_seed_table=current_seed_table, formal_root=formal_root, backend=backend,
+        )
+    if not all(path.is_file() for path in evidence_paths):
+        raise RuntimeError("formal validation resume predecessor evidence is incomplete; refusing to replay games")
+    if package == predecessor or d.file_sha256(lock_path) != predecessor_lock_sha:
+        raise RuntimeError("formal validation resume predecessor source-lock identity differs")
+
+    old_progress = d.read_json(progress_path)
+    old_seed_table = d.read_json(seed_path)
+    old_seed_sha = d.file_sha256(seed_path)
+    old_partials = old_progress.get("validation_partials", {})
+    expected_closed_groups = {"PARENT", "A512", "A1024", "A2048", "B512", "B1024"}
+    expected_all_groups = {
+        "PARENT", *(f"{arm}{games}" for arm in d.ARMS for games in (512, 1024, 2048)),
+    }
+    if (
+        old_progress.get("schema_id") != "issue84-formal-progress-v2"
+        or old_progress.get("status") != "IN_PROGRESS"
+        or old_progress.get("package_commit") != predecessor
+        or old_progress.get("source_lock_sha256") != predecessor_lock_sha
+        or old_progress.get("seed_table_sha256") != old_seed_sha
+        or old_seed_table.get("schema_id") != "issue84-seed-table-v1"
+        or old_seed_table.get("source_lock_sha256") != predecessor_lock_sha
+        or old_seed_table.get("rows") != current_seed_table.get("rows")
+        or old_seed_table.get("rows_sha256") != current_seed_table.get("rows_sha256")
+        or old_seed_table.get("rows_sha256") != d.sha256(d.canonical(old_seed_table.get("rows")))
+        or set(old_progress.get("validation_groups", {})) != expected_closed_groups
+        or old_progress.get("test_groups")
+        or old_progress.get("active_stage") != "validation"
+        or old_progress.get("active_validation_group", {}).get("group") != "B2048"
+        or old_progress.get("active_validation_group", {}).get("expected") != 64
+        or not isinstance(old_partials, Mapping)
+        or set(old_partials) - {"B2048"}
+        or ("B2048" in old_partials and not isinstance(old_partials["B2048"], Mapping))
+    ):
+        raise RuntimeError("formal validation resume predecessor ledger or frozen seed schedule is incompatible")
+
+    old_training = old_progress.get("training_blocks")
+    if not isinstance(old_training, Mapping) or set(old_training) != set(d.ARMS):
+        raise RuntimeError("formal validation resume predecessor lacks the six-arm training ledger")
+    for arm in d.ARMS:
+        blocks = old_training.get(arm)
+        if not isinstance(blocks, Mapping) or set(blocks) != {str(i) for i in range(FORMAL_BLOCKS)}:
+            raise RuntimeError(f"formal validation resume training coverage differs for {arm}")
+        for block in blocks.values():
+            if block.get("status") != "SUCCEEDED" or block.get("completed") != FORMAL_OWNERS_PER_BLOCK:
+                raise RuntimeError(f"formal validation resume training is incomplete for {arm}")
+
+    old_training_origin = old_progress.get("execution_carry_forward")
+    if not isinstance(old_training_origin, Mapping):
+        raise RuntimeError("formal validation resume predecessor lacks its actor-lineage origin")
+    old_training_manifest_path = (backend.ARTIFACTS / str(old_training_origin.get("path", ""))).resolve(strict=True)
+    try:
+        old_training_manifest_path.relative_to(backend.ARTIFACTS.resolve())
+    except ValueError as exc:
+        raise RuntimeError("formal validation resume actor lineage escaped managed research storage") from exc
+    old_training_manifest = d.read_json(old_training_manifest_path)
+    if (
+        d.file_sha256(old_training_manifest_path) != old_training_origin.get("file_sha256")
+        or old_training_manifest.get("schema_id") != "issue84-formal-training-carry-forward-v1"
+        or old_training_manifest.get("manifest_sha256") != old_training_origin.get("manifest_sha256")
+        or old_training_manifest.get("manifest_sha256") != _hash({
+            key: value for key, value in old_training_manifest.items() if key != "manifest_sha256"
+        })
+        or old_training_manifest.get("current", {}).get("package_commit") != predecessor
+        or old_training_manifest.get("current", {}).get("source_lock_sha256") != predecessor_lock_sha
+        or old_training_manifest.get("current", {}).get("seed_table_sha256") != old_seed_sha
+    ):
+        raise RuntimeError("formal validation resume actor-lineage manifest changed")
+
+    old_forecast_path = backend.ARTIFACTS / "pilot" / predecessor / "task-wall-forecast.json"
+    current_forecast_path = backend.ARTIFACTS / "pilot" / package / "task-wall-forecast.json"
+    old_forecast = d.read_json(old_forecast_path)
+    current_forecast = d.read_json(current_forecast_path)
+    allowance = float(old_forecast.get("one_task_active_wall_allowance_seconds", -1))
+    if (
+        old_progress.get("forecast_sha256") != d.file_sha256(old_forecast_path)
+        or old_forecast.get("package_commit") != predecessor
+        or old_forecast.get("source_lock_sha256") != predecessor_lock_sha
+        or old_forecast.get("status") != "APPROVED_SINGLE_GLOBAL_CUMULATIVE_ACTIVE_WALL_CAP"
+        or allowance != 204171.592
+        or current_forecast.get("package_commit") != package
+        or current_forecast.get("source_lock_sha256") != source_lock_sha256
+        or float(current_forecast.get("one_task_active_wall_allowance_seconds", -1)) != allowance
+    ):
+        raise RuntimeError("formal validation resume would change or misbind the approved global wall cap")
+
+    old_validation_origin = old_progress.get("validation_carry_forward")
+    if not isinstance(old_validation_origin, Mapping):
+        raise RuntimeError("formal validation resume predecessor lacks its earlier carry-forward origin")
+    old_validation_manifest_path = (backend.ARTIFACTS / str(old_validation_origin.get("path", ""))).resolve(strict=True)
+    try:
+        old_validation_manifest_path.relative_to(backend.ARTIFACTS.resolve())
+    except ValueError as exc:
+        raise RuntimeError("earlier validation carry-forward escaped managed research storage") from exc
+    old_validation_manifest = d.read_json(old_validation_manifest_path)
+    old_validation_body = {
+        key: value for key, value in old_validation_manifest.items() if key != "manifest_sha256"
+    }
+    if (
+        d.file_sha256(old_validation_manifest_path) != old_validation_origin.get("file_sha256")
+        or old_validation_manifest.get("manifest_sha256") != old_validation_origin.get("manifest_sha256")
+        or old_validation_manifest.get("manifest_sha256") != _hash(old_validation_body)
+        or old_validation_manifest.get("current", {}).get("package_commit") != predecessor
+        or old_validation_manifest.get("current", {}).get("source_lock_sha256") != predecessor_lock_sha
+        or set(old_validation_manifest.get("groups", {})) != {"PARENT", "A512"}
+        or old_validation_origin.get("predecessor_package_commit") != d.FORMAL_VALIDATION_PREDECESSOR_PACKAGE
+        or old_validation_origin.get("predecessor_source_lock_sha256") != d.FORMAL_VALIDATION_PREDECESSOR_LOCK_SHA256
+    ):
+        raise RuntimeError("formal validation resume predecessor carry-forward manifest changed")
+    earlier = old_validation_manifest.get("predecessor", {})
+    earlier_evidence = {
+        "formal_progress_path": "formal_progress_sha256",
+        "seed_table_path": "seed_table_sha256",
+        "source_lock_archive_path": "source_lock_sha256",
+    }
+    if (
+        earlier.get("package_commit") != d.FORMAL_VALIDATION_PREDECESSOR_PACKAGE
+        or earlier.get("source_lock_sha256") != d.FORMAL_VALIDATION_PREDECESSOR_LOCK_SHA256
+        or earlier.get("completed_validation_groups") != ["PARENT"]
+        or earlier.get("completed_validation_game_outcomes") != 89
+    ):
+        raise RuntimeError("earlier validation carry-forward predecessor binding differs")
+    earlier_paths = {}
+    for path_key, digest_key in earlier_evidence.items():
+        path = (backend.ARTIFACTS / str(earlier.get(path_key, ""))).resolve(strict=True)
+        try:
+            path.relative_to(backend.ARTIFACTS.resolve())
+        except ValueError as exc:
+            raise RuntimeError("earlier validation carry-forward evidence escaped managed storage") from exc
+        if d.file_sha256(path) != earlier.get(digest_key):
+            raise RuntimeError(f"earlier validation carry-forward evidence changed: {path_key}")
+        earlier_paths[path_key] = path
+    earlier_seed_table = d.read_json(earlier_paths["seed_table_path"])
+    if (
+        earlier_seed_table.get("schema_id") != "issue84-seed-table-v1"
+        or earlier_seed_table.get("source_lock_sha256") != d.FORMAL_VALIDATION_PREDECESSOR_LOCK_SHA256
+        or earlier_seed_table.get("rows") != current_seed_table.get("rows")
+        or earlier_seed_table.get("rows_sha256") != current_seed_table.get("rows_sha256")
+        or earlier_seed_table.get("rows_sha256") != d.sha256(d.canonical(earlier_seed_table.get("rows")))
+    ):
+        raise RuntimeError("earlier validation carry-forward seed schedule changed")
+    old_validation_manifest["origin"] = dict(old_validation_origin)
+
+    previous_lock = d.read_json(lock_path)
+    _verify_formal_training_lock_compatibility(previous_lock, current_lock)
+    current_lock_path = backend.ARTIFACTS / "source-lock-history" / f"{package}-{source_lock_sha256}.json"
+    backend.write_json_once(current_lock_path, dict(current_lock))
+    if d.file_sha256(current_lock_path) != source_lock_sha256:
+        raise RuntimeError("current formal source-lock archive is missing or changed")
+
+    current_rows = {
+        group: [row for row in d.seed_table_rows(
+            current_seed_table, phase="evaluation", formal=True,
+            owners=range(8_460_001, 8_460_065),
+        ) if row["arm"] == group]
+        for group in expected_all_groups
+    }
+    if any(len(rows) != 64 for rows in current_rows.values()):
+        raise RuntimeError("current formal validation seed schedule is not 64 rows per group")
+
+    def checked_success(row: Mapping[str, Any], group: str, saved: Mapping[str, Any] | None):
+        source_package = predecessor if saved is None else str(saved.get("package_commit", ""))
+        source_lock = predecessor_lock_sha if saved is None else str(saved.get("source_lock_sha256", ""))
+        allowed_locks = {
+            d.FORMAL_VALIDATION_PREDECESSOR_PACKAGE: d.FORMAL_VALIDATION_PREDECESSOR_LOCK_SHA256,
+            predecessor: predecessor_lock_sha,
+        }
+        if allowed_locks.get(source_package) != source_lock:
+            raise RuntimeError(f"validation receipt has an unapproved package/lock binding: {row['unit_id']}")
+        source_root = backend.ARTIFACTS / "formal" / source_package / (
+            "PARENT" if group == "PARENT" else group[0]
+        )
+        with d._predecessor_source_lock(source_package):
+            expected_digest, expected_policy_source = _validation_training_binding(
+                row, package=source_package, source_lock_sha256=source_lock, backend=backend,
+            )
+            result_record = backend.existing_success_record(source_root, row, source_package)
+            if result_record is None:
+                raise RuntimeError(f"validation success receipt cannot be resolved: {row['unit_id']}")
+            report, result_path = result_record
+            reference = _validation_success_reference(
+                report, result_path, row, group=group, package=source_package,
+                source_lock_sha256=source_lock, expected_model_digest=expected_digest,
+                expected_policy_source=expected_policy_source, root=source_root, backend=backend,
+            )
+        reference["package_commit"] = source_package
+        if saved is not None:
+            if (
+                not _validation_summary_row_matches(saved, row)
+                or saved.get("result_path") != reference["result_path"]
+                or saved.get("result_sha256") != reference["result_sha256"]
+                or saved.get("policy_model_digest") != expected_digest
+                or saved.get("package_commit") != source_package
+                or saved.get("source_lock_sha256") != source_lock
+                or saved.get("policy_source") != expected_policy_source
+            ):
+                raise RuntimeError(f"saved validation summary differs from its raw success receipt: {row['unit_id']}")
+            outcome = dict(saved)
+        else:
+            with d._predecessor_source_lock(source_package):
+                summary = d.run_summary(
+                    {"status": "SUCCEEDED", "completed": 1, "results": {str(row["unit_id"]): report}},
+                    rows=[row], root=source_root, package=source_package,
+                )
+            outcome = summary["outcomes"][0]
+        return outcome, reference
+
+    carried_groups: dict[str, dict[str, Any]] = {}
+    manifest_groups: dict[str, dict[str, Any]] = {}
+    for group in sorted(expected_all_groups, key=lambda item: (item != "PARENT", item)):
+        rows = current_rows[group]
+        saved_record = old_progress.get("validation_groups", {}).get(group)
+        old_root = predecessor_root / ("PARENT" if group == "PARENT" else group[0])
+        if saved_record is not None and saved_record.get("validation_carry_forward_origin") is not None:
+            prior_outcomes = {
+                str(item.get("unit_id")): item
+                for item in saved_record.get("run_summary", {}).get("outcomes", [])
+            }
+            if set(prior_outcomes) != {str(row["unit_id"]) for row in rows}:
+                raise RuntimeError(f"carried validation attempt inventory is incomplete: {group}")
+            inventory = []
+            for row in rows:
+                source_package = str(prior_outcomes[str(row["unit_id"])].get("package_commit", ""))
+                source_root = backend.ARTIFACTS / "formal" / source_package / (
+                    "PARENT" if group == "PARENT" else group[0]
+                )
+                item = _validation_attempt_inventory(source_root, [row], backend=backend)[0]
+                item["source_package_commit"] = source_package
+                inventory.append(item)
+        else:
+            inventory = _validation_attempt_inventory(old_root, rows, backend=backend)
+        if saved_record is not None:
+            if (
+                group not in expected_closed_groups
+                or saved_record.get("schema_id") != "issue84-game-group-v1"
+                or saved_record.get("status") != "SUCCEEDED"
+                or saved_record.get("group") != group
+                or saved_record.get("expected") != 64
+                or saved_record.get("completed") != 64
+                or saved_record.get("run_summary", {}).get("completed") != 64
+                or saved_record.get("run_summary", {}).get("status") != "SUCCEEDED"
+            ):
+                raise RuntimeError(f"formal validation resume group ledger is incomplete: {group}")
+            if saved_record.get("validation_carry_forward_origin") is not None:
+                if (
+                    group not in old_validation_manifest["groups"]
+                    or saved_record.get("validation_carry_forward_origin") != old_validation_origin
+                ):
+                    raise RuntimeError(f"formal validation group has unexpected carried provenance: {group}")
+                _verify_saved_validation_game_group(
+                    saved_record, rows, root=old_root, package=predecessor,
+                    carry_forward=old_validation_manifest, group=group, backend=backend,
+                    source_lock_sha256=predecessor_lock_sha,
+                )
+            else:
+                if group in old_validation_manifest["groups"]:
+                    raise RuntimeError(f"formal validation carry-forward omits {group}'s declared origin")
+                with d._predecessor_source_lock(predecessor):
+                    _verify_saved_game_group(
+                        saved_record, rows, root=old_root, package=predecessor, backend=backend,
+                    )
+            saved_outcomes = {
+                str(item.get("unit_id")): item
+                for item in saved_record.get("run_summary", {}).get("outcomes", [])
+            }
+            if set(saved_outcomes) != {str(row["unit_id"]) for row in rows}:
+                raise RuntimeError(f"formal validation resume group summary coverage differs: {group}")
+            outcomes, references = [], []
+            for row in rows:
+                outcome, reference = checked_success(row, group, saved_outcomes[str(row["unit_id"])])
+                outcomes.append(outcome)
+                references.append(reference)
+            prior_attempts = int(saved_record.get("run_summary", {}).get("retry_count", 0))
+            carried_groups[group] = {
+                "record": dict(saved_record), "outcomes": outcomes,
+                "references": references, "completed": len(outcomes),
+                "prior_attempts": prior_attempts,
+            }
+            manifest_groups[group] = {
+                "status": "SUCCEEDED", "expected": 64, "completed": len(outcomes),
+                "remaining": 0, "prior_attempts": prior_attempts,
+                "group_record_sha256": _hash(dict(saved_record)),
+                "attempt_inventory": inventory, "outcomes": outcomes, "references": references,
+            }
+            continue
+
+        partial_record = old_progress.get("validation_partials", {}).get(group)
+        successful_ids = {item["unit_id"] for item in inventory if item["status"] == "SUCCEEDED"}
+        outcomes, references = [], []
+        for row in rows:
+            if str(row["unit_id"]) not in successful_ids:
+                continue
+            outcome, reference = checked_success(row, group, None)
+            outcomes.append(outcome)
+            references.append(reference)
+        if partial_record is not None:
+            partial_summary = partial_record.get("run_summary", {})
+            partial_outcomes = {
+                str(item.get("unit_id")): item for item in partial_summary.get("outcomes", [])
+            }
+            if (
+                partial_record.get("status") == "SUCCEEDED"
+                or partial_record.get("expected") != 64
+                or partial_record.get("completed") != len(outcomes)
+                or set(partial_outcomes) != successful_ids
+            ):
+                raise RuntimeError(f"formal validation partial ledger disagrees with attempt receipts: {group}")
+            for row in rows:
+                unit_id = str(row["unit_id"])
+                if unit_id in successful_ids and not _validation_summary_row_matches(
+                    partial_outcomes[unit_id], row,
+                ):
+                    raise RuntimeError(f"formal validation partial changed the frozen row: {unit_id}")
+        prior_attempts = sum(
+            int(item["attempt_count"]) for item in inventory if item["status"] != "SUCCEEDED"
+        )
+        if outcomes or prior_attempts or partial_record is not None:
+            group_result = {
+                "record": None, "outcomes": outcomes, "references": references,
+                "completed": len(outcomes), "prior_attempts": prior_attempts,
+            }
+            carried_groups[group] = group_result
+            manifest_groups[group] = {
+                "status": "PARTIAL" if len(outcomes) < 64 else "SUCCEEDED",
+                "expected": 64, "completed": len(outcomes), "remaining": 64 - len(outcomes),
+                "prior_attempts": prior_attempts, "partial_record": partial_record,
+                "attempt_inventory": inventory, "outcomes": outcomes, "references": references,
+            }
+        else:
+            manifest_groups[group] = {
+                "status": "NOT_STARTED", "expected": 64, "completed": 0,
+                "remaining": 64, "prior_attempts": 0,
+                "attempt_inventory": inventory, "outcomes": [], "references": [],
+            }
+
+    completed_groups = sorted(
+        group for group, item in carried_groups.items() if item["completed"] == 64
+    )
+    completed_games = sum(item["completed"] for item in carried_groups.values())
+    manifest = {
+        "schema_id": "issue84-formal-validation-resume-carry-forward-v1",
+        "current": {
+            "package_commit": package, "source_lock_sha256": source_lock_sha256,
+            "seed_table_sha256": d.file_sha256(d.seed_table_path(package)),
+            "formal_root": formal_root.relative_to(backend.ARTIFACTS).as_posix(),
+        },
+        "predecessor": {
+            "package_commit": predecessor, "source_lock_sha256": predecessor_lock_sha,
+            "source_lock_archive_path": lock_path.relative_to(backend.ARTIFACTS).as_posix(),
+            "formal_progress_path": progress_path.relative_to(backend.ARTIFACTS).as_posix(),
+            "formal_progress_sha256": d.file_sha256(progress_path),
+            "seed_table_path": seed_path.relative_to(backend.ARTIFACTS).as_posix(),
+            "seed_table_sha256": old_seed_sha,
+            "validation_manifest_path": old_validation_manifest_path.relative_to(backend.ARTIFACTS).as_posix(),
+            "validation_manifest_sha256": d.file_sha256(old_validation_manifest_path),
+            "completed_validation_groups": completed_groups,
+            "completed_validation_game_outcomes": completed_games,
+        },
+        "groups": manifest_groups,
+    }
+    manifest["manifest_sha256"] = _hash(manifest)
+    manifest_path = formal_root / "formal-validation-resume-carry-forward.json"
+    backend.write_json_once(manifest_path, manifest)
+    origin = {
+        "schema_id": "issue84-formal-validation-resume-carry-forward-origin-v1",
+        "path": manifest_path.relative_to(backend.ARTIFACTS).as_posix(),
+        "manifest_sha256": manifest["manifest_sha256"],
+        "file_sha256": d.file_sha256(manifest_path),
+        "predecessor_package_commit": predecessor,
+        "predecessor_source_lock_sha256": predecessor_lock_sha,
+    }
+    return {"origin": origin, "groups": carried_groups}
+
+
 def _merge_validation_game_group(
     group: str, rows, *, carried: Mapping[str, Any], fresh: Mapping[str, Any],
     origin: Mapping[str, Any],
@@ -945,7 +1414,7 @@ def _merge_validation_game_group(
 
 def _verify_saved_validation_game_group(
     record: Mapping[str, Any], rows, *, root: Path, package: str, carry_forward: Mapping[str, Any],
-    group: str, backend,
+    group: str, backend, source_lock_sha256: str | None = None,
 ) -> dict[str, Any]:
     if record.get("validation_carry_forward_origin") != carry_forward.get("origin"):
         raise RuntimeError("saved validation group has a different carry-forward manifest")
@@ -972,8 +1441,6 @@ def _verify_saved_validation_game_group(
     carried_refs = {
         str(item.get("unit_id")): item for item in carried_group.get("references", [])
     }
-    predecessor = d.FORMAL_VALIDATION_PREDECESSOR_PACKAGE
-    predecessor_root = backend.ARTIFACTS / "formal" / predecessor
     for row in rows:
         unit_id = str(row["unit_id"])
         saved = by_id.get(unit_id)
@@ -983,17 +1450,22 @@ def _verify_saved_validation_game_group(
             expected_ref = carried_refs.get(unit_id)
             if expected_ref is None:
                 raise RuntimeError(f"validation carry-forward lacks a receipt reference: {unit_id}")
-            source_package = predecessor
-            source_lock = d.FORMAL_VALIDATION_PREDECESSOR_LOCK_SHA256
-            source_root = predecessor_root / ("PARENT" if group == "PARENT" else group[0])
-            with d._predecessor_source_lock(predecessor):
-                result = backend.existing_success_record(source_root, row, predecessor)
+            source_package = str(expected_ref.get("package_commit", ""))
+            source_lock = str(expected_ref.get("source_lock_sha256", ""))
+            source_root = backend.ARTIFACTS / "formal" / source_package / (
+                "PARENT" if group == "PARENT" else group[0]
+            )
         else:
             expected_ref = None
             source_package = package
-            source_lock = d.file_sha256(d.SOURCE_LOCK_PATH)
+            source_lock = source_lock_sha256 or d.file_sha256(d.SOURCE_LOCK_PATH)
             source_root = Path(root)
-            result = backend.existing_success_record(source_root, row, package)
+        if not source_package or not source_lock:
+            raise RuntimeError(f"validation carry-forward lacks a source package/lock binding: {unit_id}")
+        with d._predecessor_source_lock(source_package):
+            if backend.source_lock_sha() != source_lock:
+                raise RuntimeError(f"validation receipt source lock differs from its package: {unit_id}")
+            result = backend.existing_success_record(source_root, row, source_package)
         if result is None:
             raise RuntimeError(f"saved carried validation result is missing: {unit_id}")
         report, result_path = result
@@ -1836,7 +2308,7 @@ def run_formal() -> dict[str, Any]:
                 progress["cumulative_active_wall_seconds"] = clock.elapsed()
                 _save_progress(progress_path, progress, backend)
 
-        validation_carry_forward = _formal_validation_carry_forward(
+        validation_carry_forward = _formal_validation_resume_carry_forward(
             package=package,
             source_lock_sha256=source["sha256"],
             current_lock=source["lock"],
