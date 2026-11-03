@@ -81,6 +81,8 @@ FORMAL_PREDECESSOR_LOCK_SHA256 = "625b812e9e174c1cd52381820beae6ea6e402daeedc318
 FORMAL_TRAINING_PREDECESSOR_PACKAGE = "d7e7ac5e93255787e6b55e25bd3f1197c396c8c2"
 FORMAL_TRAINING_PREDECESSOR_LOCK_SHA256 = "be8df93a5116e4412c3bdb1eea408bc3ba5378b2a4cec494b091efc38bd23c24"
 FORMAL_TRAINING_PREDECESSOR_SOURCE_LOCK_ARCHIVE = "2740a9ef028ccf781d8b13ab6c0ebe431d93b260-be8df93a5116e4412c3bdb1eea408bc3ba5378b2a4cec494b091efc38bd23c24.json"
+FORMAL_VALIDATION_PREDECESSOR_PACKAGE = "3bf1c8f920c5037436ea355156e04fb2b1712d20"
+FORMAL_VALIDATION_PREDECESSOR_LOCK_SHA256 = "4ec991a4609a0955cc65913f916b96141a2876ecd68c8ac0610cc575f4272c5e"
 
 sys.path.insert(0, str(STUDY))
 
@@ -892,7 +894,13 @@ def install_formal_training_model_carry_forward(executor, *, active_root: Path, 
                 elif local_path.exists():
                     raise RuntimeError("formal local actor path exists without its registered carry-forward link")
                 else:
-                    local_path.symlink_to(target)
+                    try:
+                        local_path.symlink_to(target)
+                    except FileExistsError:
+                        # Concurrent workers may install the same immutable
+                        # checkpoint link. Accept only the exact intended link.
+                        if not local_path.is_symlink() or local_path.resolve(strict=True) != target:
+                            raise
                 actor, digest, source = original_load_model(label, proxy=proxy)
                 if digest != record.get("model_digest"):
                     raise RuntimeError("carried formal actor model digest differs from its training receipt")
@@ -1290,6 +1298,7 @@ def _predecessor_source_lock(package: str):
         PILOT_PREDECESSOR_PACKAGE: PILOT_PREDECESSOR_LOCK_SHA256,
         FORMAL_PREDECESSOR_PACKAGE: FORMAL_PREDECESSOR_LOCK_SHA256,
         FORMAL_TRAINING_PREDECESSOR_PACKAGE: FORMAL_TRAINING_PREDECESSOR_LOCK_SHA256,
+        FORMAL_VALIDATION_PREDECESSOR_PACKAGE: FORMAL_VALIDATION_PREDECESSOR_LOCK_SHA256,
     }
     expected_sha256 = lock_by_package.get(package)
     if expected_sha256 is None:

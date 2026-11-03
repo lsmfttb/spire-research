@@ -51,6 +51,7 @@ from formal import (
     _verify_formal_training_forecast_carry_forward,
     _verify_formal_training_lock_compatibility,
     _verify_saved_game_group,
+    _merge_validation_game_group,
     paired_bootstrap,
 )
 
@@ -308,6 +309,30 @@ class FormalTrainingCarryForwardBindingTests(unittest.TestCase):
                 self.assertEqual(
                     (active_root / "models" / "pi13.pt").resolve(), carried_path.resolve(),
                 )
+
+                # Simulate another worker winning symlink creation immediately
+                # before this worker receives FileExistsError.
+                local_path = active_root / "models" / "pi13.pt"
+                local_path.unlink()
+                real_symlink_to = Path.symlink_to
+
+                def create_link_then_raise(path, target, target_is_directory=False):
+                    real_symlink_to(path, target, target_is_directory=target_is_directory)
+                    raise FileExistsError("concurrent worker created the same link")
+
+                racing_executor = SimpleNamespace(_load_model=original_load_model)
+                racing_token = driver_module._ISSUE84_HELDOUT_ORIGINAL_ARM.set("A")
+                try:
+                    with patch.object(Path, "symlink_to", create_link_then_raise):
+                        install_formal_training_model_carry_forward(
+                            racing_executor, active_root=active_root, pilot=False,
+                        )
+                        raced_actor, raced_digest, _ = racing_executor._load_model("pi13")
+                finally:
+                    driver_module._ISSUE84_HELDOUT_ORIGINAL_ARM.reset(racing_token)
+                self.assertEqual((raced_actor, raced_digest), ("actor", "digest"))
+                self.assertEqual(local_path.resolve(), carried_path.resolve())
+
                 tampered_body = {
                     **bridge_body,
                     "final_policy_models": {"A": {"pi13": {**entry, "arm": "B"}}},
@@ -316,6 +341,85 @@ class FormalTrainingCarryForwardBindingTests(unittest.TestCase):
                 bridge_path.write_bytes(canonical(tampered) + b"\n")
                 with self.assertRaisesRegex(RuntimeError, "another registered lineage"):
                     carried_formal_model_record(active_root, "pi13", "A")
+
+
+class FormalValidationCarryForwardTests(unittest.TestCase):
+    def test_partial_predecessor_results_merge_without_replaying_completed_owners(self):
+        def row(unit_id, owner):
+            return {
+                "unit_id": unit_id,
+                "owner_seed": owner,
+                "phase": "evaluation",
+                "arm": "A512",
+                "issue84_arm": "A",
+                "issue84_policy_label": "pi16",
+                "paired_owner_key": f"eval-{owner}",
+                "game_seed": owner,
+                "policy_rng_seed": owner + 100,
+                "search_invocation_seeds": [],
+            }
+
+        first = row("EVAL:8460001:A512", 8_460_001)
+        second = row("EVAL:8460002:A512", 8_460_002)
+        carried_outcome = {
+            **first,
+            "package_commit": "a" * 40,
+            "source_lock_sha256": "old-lock",
+            "result_sha256": "old-result",
+            "worker_wall_seconds": 2.0,
+            "expert_decisions": 0,
+            "terminal_floor": 16,
+        }
+        fresh_outcome = {
+            **second,
+            "package_commit": "b" * 40,
+            "source_lock_sha256": "new-lock",
+            "result_sha256": "new-result",
+            "worker_wall_seconds": 3.0,
+            "expert_decisions": 0,
+            "terminal_floor": 17,
+        }
+        result = _merge_validation_game_group(
+            "A512",
+            [first, second],
+            carried={"outcomes": [carried_outcome], "prior_attempts": 4},
+            fresh={
+                "status": "SUCCEEDED",
+                "run_summary": {
+                    "status": "SUCCEEDED",
+                    "completed": 1,
+                    "elapsed_seconds": 5.0,
+                    "native_worker_wall_seconds": 3.0,
+                    "retry_count": 0,
+                    "outcomes": [fresh_outcome],
+                },
+            },
+            origin={"schema_id": "issue84-formal-validation-carry-forward-origin-v1"},
+        )
+        self.assertEqual(result["status"], "SUCCEEDED")
+        self.assertEqual(result["completed"], 2)
+        self.assertEqual(result["remaining"], 0)
+        self.assertEqual(result["run_summary"]["carried_forward_completed"], 1)
+        self.assertEqual(result["run_summary"]["predecessor_retries"], 4)
+        self.assertEqual(result["run_summary"]["retry_count"], 4)
+        self.assertEqual(result["run_summary"]["native_worker_wall_seconds"], 3.0)
+        self.assertEqual(result["run_summary"]["carried_forward_reported_worker_wall_seconds"], 2.0)
+        self.assertEqual(
+            [item["unit_id"] for item in result["run_summary"]["outcomes"]],
+            [first["unit_id"], second["unit_id"]],
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "duplicated an owner"):
+            _merge_validation_game_group(
+                "A512",
+                [first, second],
+                carried={"outcomes": [carried_outcome], "prior_attempts": 4},
+                fresh={
+                    "status": "SUCCEEDED",
+                    "run_summary": {"status": "SUCCEEDED", "outcomes": [carried_outcome]},
+                },
+                origin={"schema_id": "issue84-formal-validation-carry-forward-origin-v1"},
+            )
 
 
 class FormalPredictorLifecycleTests(unittest.TestCase):
