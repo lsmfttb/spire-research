@@ -576,6 +576,7 @@ class FormalValidationCarryForwardTests(unittest.TestCase):
                 "validation_carry_forward_origin": origin,
             }
             carry = {
+                "schema_id": "issue84-formal-validation-resume-carry-forward-v1",
                 "origin": origin,
                 "groups": {"A512": {"outcomes": outcomes, "references": references}},
             }
@@ -593,6 +594,36 @@ class FormalValidationCarryForwardTests(unittest.TestCase):
                     source_lock_sha256="current-lock",
                 )
             self.assertEqual(verified, record)
+
+            legacy_origin = {
+                "schema_id": "issue84-formal-validation-carry-forward-origin-v1",
+            }
+            legacy_record = {
+                **record,
+                "validation_carry_forward_origin": legacy_origin,
+            }
+            legacy_carry = {
+                "schema_id": "issue84-formal-validation-carry-forward-v1",
+                "origin": legacy_origin,
+                "groups": {
+                    "A512": {
+                        "status": "SUCCEEDED",
+                        "expected": 2,
+                        "completed": 2,
+                        # The original schema put these immutable receipt
+                        # references here instead of in a `references` list.
+                        "outcomes": references,
+                    },
+                },
+            }
+            backend.source_lock_sha = iter(package_locks.values()).__next__
+            with patch("formal.d._predecessor_source_lock", side_effect=lambda _package: nullcontext()):
+                legacy_verified = _verify_saved_validation_game_group(
+                    legacy_record, rows, root=artifacts / "formal" / ("c" * 40) / "A",
+                    package="c" * 40, carry_forward=legacy_carry, group="A512", backend=backend,
+                    source_lock_sha256="current-lock",
+                )
+            self.assertEqual(legacy_verified, legacy_record)
 
 
 class FormalPredictorLifecycleTests(unittest.TestCase):

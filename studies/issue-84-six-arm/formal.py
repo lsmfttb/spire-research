@@ -1351,7 +1351,7 @@ def _formal_validation_resume_carry_forward(
         "predecessor_package_commit": predecessor,
         "predecessor_source_lock_sha256": predecessor_lock_sha,
     }
-    return {"origin": origin, "groups": carried_groups}
+    return {"schema_id": manifest["schema_id"], "origin": origin, "groups": carried_groups}
 
 
 def _merge_validation_game_group(
@@ -1435,21 +1435,35 @@ def _verify_saved_validation_game_group(
     carried_group = carry_forward.get("groups", {}).get(group)
     if not isinstance(carried_group, Mapping):
         raise RuntimeError(f"validation carry-forward manifest lacks {group}")
-    carried_by_id = {
-        str(item.get("unit_id")): item for item in carried_group.get("outcomes", [])
-    }
-    carried_refs = {
-        str(item.get("unit_id")): item for item in carried_group.get("references", [])
-    }
+    carry_schema = carry_forward.get("schema_id")
+    if carry_schema == "issue84-formal-validation-carry-forward-v1":
+        # The earlier carry-forward schema stored immutable receipt references
+        # in `outcomes`; it did not have a separate `references` field.
+        carried_outcomes = {}
+        reference_items = carried_group.get("outcomes", [])
+    elif carry_schema == "issue84-formal-validation-resume-carry-forward-v1":
+        carried_outcomes = {
+            str(item.get("unit_id")): item for item in carried_group.get("outcomes", [])
+        }
+        reference_items = carried_group.get("references", [])
+    else:
+        raise RuntimeError(f"unsupported validation carry-forward schema: {carry_schema}")
+    carried_refs = {str(item.get("unit_id")): item for item in reference_items}
+    if len(carried_refs) != len(reference_items):
+        raise RuntimeError(f"validation carry-forward duplicates a receipt reference: {group}")
+    if carry_schema == "issue84-formal-validation-resume-carry-forward-v1" and (
+        set(carried_outcomes) != set(carried_refs)
+    ):
+        raise RuntimeError(f"validation carry-forward outcomes/references differ: {group}")
+    if not set(carried_refs) <= set(by_id):
+        raise RuntimeError(f"validation carry-forward references contain an unknown owner: {group}")
     for row in rows:
         unit_id = str(row["unit_id"])
         saved = by_id.get(unit_id)
         if saved is None or not _validation_summary_row_matches(saved, row):
             raise RuntimeError(f"saved carried validation outcome differs from its seed row: {unit_id}")
-        if unit_id in carried_by_id:
-            expected_ref = carried_refs.get(unit_id)
-            if expected_ref is None:
-                raise RuntimeError(f"validation carry-forward lacks a receipt reference: {unit_id}")
+        expected_ref = carried_refs.get(unit_id)
+        if expected_ref is not None:
             source_package = str(expected_ref.get("package_commit", ""))
             source_lock = str(expected_ref.get("source_lock_sha256", ""))
             source_root = backend.ARTIFACTS / "formal" / source_package / (
@@ -1482,7 +1496,7 @@ def _verify_saved_validation_game_group(
             or expected_ref.get("worker_job_sha256") != d.file_sha256(result_path.parent / "worker-job.json")
             or expected_ref.get("started_sha256") != d.file_sha256(result_path.parent / "started.json")
             or expected_ref.get("finished_sha256") != d.file_sha256(result_path.parent / "finished.json")
-            or saved != carried_by_id[unit_id]
+            or (unit_id in carried_outcomes and saved != carried_outcomes[unit_id])
         ):
             raise RuntimeError(f"saved validation result differs from its immutable carry-forward reference: {unit_id}")
     return dict(record)
