@@ -142,19 +142,19 @@ def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
     them from its returned summary when durable=False; #75 consumes those
     matrices through its volatile training-decision interface.
     """
-    # A formal Issue 84 held-out worker sets this context while adapting its
+    # A formal Issue 84 evaluation worker sets this context while adapting its
     # Issue 75 dispatch arm to BRANCH. Retain the registered Issue 84 label in
     # the pinned #73 controller's sampling-purpose provenance.
     purpose = kwargs.get("purpose")
     original_arm = _ISSUE84_HELDOUT_ORIGINAL_ARM.get()
     if original_arm is not None and isinstance(purpose, str):
-        match = re.fullmatch(r"stage1-heldout-BRANCH-(\d+)", purpose)
+        match = re.fullmatch(r"stage1-(heldout|evaluation)-BRANCH-(\d+)", purpose)
         if match:
             # The Issue 75 worker is temporarily told to dispatch BRANCH so
             # its legacy E=Expert branch is bypassed. Restore the registered
             # Issue 84 arm in controller provenance while keeping that bridge
             # label away from the older runner.
-            kwargs["purpose"] = f"stage1-heldout-{original_arm}-{match.group(1)}"
+            kwargs["purpose"] = f"stage1-{match.group(1)}-{original_arm}-{match.group(2)}"
 
     root_limit = kwargs.pop("capture_root_limit", None)
     training_features = kwargs.pop("capture_training_features", None)
@@ -266,7 +266,7 @@ def install_issue84_heldout_actor_arm_compat(executor) -> None:
         study_arm = row.get("arm") if isinstance(row, Mapping) else None
         if (
             job.get("pilot") is not False
-            or job.get("phase") != "heldout"
+            or job.get("phase") not in {"heldout", "evaluation"}
             or study_arm not in ("PARENT", *ARMS)
         ):
             return original_worker_owner(job, ledger)

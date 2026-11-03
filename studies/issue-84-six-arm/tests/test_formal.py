@@ -412,7 +412,7 @@ class Issue73EvaluationArmCompatibilityTests(unittest.TestCase):
                 policy_source = "legacy-expert"
                 checkpoint = None
             else:
-                checkpoint, _proxy = executor._arm_policy("heldout", arm, row)
+                checkpoint, _proxy = executor._arm_policy(job["phase"], arm, row)
                 policy_source = "issue84-actor"
 
             def run_one(**kwargs):
@@ -428,7 +428,7 @@ class Issue73EvaluationArmCompatibilityTests(unittest.TestCase):
                 run_one,
                 arm=arm,
                 policy_rng_seed=row["policy_rng_seed"],
-                purpose=f"stage1-heldout-{arm}-{row['owner_seed']}",
+                purpose=f"stage1-{job['phase']}-{arm}-{row['owner_seed']}",
             )
             return {
                 "status": "SUCCEEDED",
@@ -442,8 +442,12 @@ class Issue73EvaluationArmCompatibilityTests(unittest.TestCase):
 
         executor._worker_owner = worker
         install_issue84_heldout_actor_arm_compat(executor)
-        for study_arm in ("PARENT", *driver_module.ARMS):
-            with self.subTest(study_arm=study_arm):
+        for phase, study_arm in (
+            (phase, arm)
+            for phase in ("heldout", "evaluation")
+            for arm in ("PARENT", *driver_module.ARMS)
+        ):
+            with self.subTest(phase=phase, study_arm=study_arm):
                 label = "pi12" if study_arm == "PARENT" else "pi28"
                 row = {
                     "arm": study_arm,
@@ -454,7 +458,7 @@ class Issue73EvaluationArmCompatibilityTests(unittest.TestCase):
                     "policy_rng_seed": 84_600_000 + len(observed_rows),
                     "paired_owner_key": f"eval-{8_460_001}",
                 }
-                result = executor._worker_owner({"pilot": False, "phase": "heldout", "row": row}, None)
+                result = executor._worker_owner({"pilot": False, "phase": phase, "row": row}, None)
                 dispatched = observed_rows[-1]
                 self.assertEqual(dispatched["arm"], "BRANCH")
                 self.assertEqual(dispatched["issue84_arm"], row["issue84_arm"])
@@ -469,7 +473,7 @@ class Issue73EvaluationArmCompatibilityTests(unittest.TestCase):
                 self.assertEqual(result["controller"]["policy_rng_seed"], row["policy_rng_seed"])
                 self.assertEqual(
                     result["controller"]["purpose"],
-                    f"stage1-heldout-{study_arm}-{row['owner_seed']}",
+                    f"stage1-{phase}-{study_arm}-{row['owner_seed']}",
                 )
 
     def test_issue84_worker_compat_does_not_rewrite_training_rows(self):
@@ -491,6 +495,13 @@ class Issue73EvaluationArmCompatibilityTests(unittest.TestCase):
         )
         self.assertEqual(seen[-1], pilot_row)
         self.assertEqual(pilot_result["arm"], "E")
+        pilot_eval_row = dict(pilot_row)
+        pilot_eval_row["unit_id"] = "EVAL:8460001:E"
+        pilot_eval_result = executor._worker_owner(
+            {"pilot": True, "phase": "evaluation", "row": pilot_eval_row}, None,
+        )
+        self.assertEqual(seen[-1], pilot_eval_row)
+        self.assertEqual(pilot_eval_result["arm"], "E")
 
     def test_pinned_issue75_worker_loads_issue84_e_actor_not_legacy_expert(self):
         stage1 = (
