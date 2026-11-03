@@ -64,6 +64,7 @@ UPSTREAM_COMMIT = "ecb588e580c0226da3aabaf54d79f2c2267308e3"
 
 ARMS = ("A", "B", "C", "D", "E", "F")
 _ISSUE84_HELDOUT_ORIGINAL_ARM = ContextVar("issue84_heldout_original_arm", default=None)
+_ISSUE84_HELDOUT_ORIGINAL_GROUP = ContextVar("issue84_heldout_original_group", default=None)
 CONCURRENCY = 8
 T_REF = 36.6474609375
 S_REF = 5.360108706240238
@@ -147,14 +148,17 @@ def call_pinned_issue73_run_one(runner, original_run_one, *args, **kwargs):
     # the pinned #73 controller's sampling-purpose provenance.
     purpose = kwargs.get("purpose")
     original_arm = _ISSUE84_HELDOUT_ORIGINAL_ARM.get()
-    if original_arm is not None and isinstance(purpose, str):
+    original_group = _ISSUE84_HELDOUT_ORIGINAL_GROUP.get()
+    if original_group is None:
+        original_group = original_arm
+    if original_group is not None and isinstance(purpose, str):
         match = re.fullmatch(r"stage1-(heldout|evaluation)-BRANCH-(\d+)", purpose)
         if match:
             # The Issue 75 worker is temporarily told to dispatch BRANCH so
-            # its legacy E=Expert branch is bypassed. Restore the registered
-            # Issue 84 arm in controller provenance while keeping that bridge
-            # label away from the older runner.
-            kwargs["purpose"] = f"stage1-{match.group(1)}-{original_arm}-{match.group(2)}"
+            # its legacy E=Expert branch is bypassed. Restore the exact
+            # registered Issue 84 validation group in controller provenance;
+            # the base actor arm remains separately bound for checkpoint lookup.
+            kwargs["purpose"] = f"stage1-{match.group(1)}-{original_group}-{match.group(2)}"
 
     root_limit = kwargs.pop("capture_root_limit", None)
     training_features = kwargs.pop("capture_training_features", None)
@@ -250,10 +254,12 @@ def install_issue73_capture_limit_compat(runtime) -> None:
 def install_issue84_heldout_actor_arm_compat(executor) -> None:
     """Bypass #75's legacy E=Expert dispatch for Issue 84 actor evaluation.
 
-    Issue 84 evaluation labels are carried in the row and report. The pinned
-    #75 worker reserves arm E for its separate Expert policy and discards the
-    registered Issue 84 model. Dispatch held-out policy arms through #75's
-    generic BRANCH path, then restore the registered row arm in the result.
+    Issue 84 evaluation groups and actor identities are carried in the seed
+    row and report. The pinned #75 worker reserves arm E for its separate
+    Expert policy and discards the registered Issue 84 model. Dispatch held-out
+    policy groups through #75's generic BRANCH path, then restore the exact
+    group label in the result. The registered base arm remains available for
+    source-bound model carry-forward and is kept distinct from that group label.
     """
     if getattr(executor, "_issue84_heldout_actor_arm_compat_installed", False):
         return
@@ -263,13 +269,31 @@ def install_issue84_heldout_actor_arm_compat(executor) -> None:
         if not isinstance(job, Mapping):
             return original_worker_owner(job, ledger)
         row = job.get("row") if isinstance(job, Mapping) else None
-        study_arm = row.get("arm") if isinstance(row, Mapping) else None
+        study_group = row.get("arm") if isinstance(row, Mapping) else None
+        phase = job.get("phase")
         if (
             job.get("pilot") is not False
-            or job.get("phase") not in {"heldout", "evaluation"}
-            or study_arm not in ("PARENT", *ARMS)
+            or phase not in {"heldout", "evaluation"}
         ):
             return original_worker_owner(job, ledger)
+
+        validation_match = (
+            re.fullmatch(r"([A-F])(?:512|1024|2048)", study_group)
+            if phase == "evaluation" and isinstance(study_group, str)
+            else None
+        )
+        if study_group == "PARENT":
+            registered_arm = None
+        elif study_group in ARMS:
+            registered_arm = str(study_group)
+        elif validation_match is not None:
+            registered_arm = validation_match.group(1)
+        else:
+            return original_worker_owner(job, ledger)
+        if row.get("issue84_arm") != registered_arm:
+            raise RuntimeError(
+                "held-out Issue 84 group label differs from its registered base arm"
+            )
 
         policy_label = row.get("issue84_policy_label")
         if not isinstance(policy_label, str) or not re.fullmatch(r"pi(?:1[2-9]|2[0-8])", policy_label):
@@ -278,11 +302,13 @@ def install_issue84_heldout_actor_arm_compat(executor) -> None:
         dispatch_row = dict(row)
         dispatch_row["arm"] = "BRANCH"
         dispatch_job["row"] = dispatch_row
-        token = _ISSUE84_HELDOUT_ORIGINAL_ARM.set(str(study_arm))
+        arm_token = _ISSUE84_HELDOUT_ORIGINAL_ARM.set(registered_arm)
+        group_token = _ISSUE84_HELDOUT_ORIGINAL_GROUP.set(str(study_group))
         try:
             result = original_worker_owner(dispatch_job, ledger)
         finally:
-            _ISSUE84_HELDOUT_ORIGINAL_ARM.reset(token)
+            _ISSUE84_HELDOUT_ORIGINAL_GROUP.reset(group_token)
+            _ISSUE84_HELDOUT_ORIGINAL_ARM.reset(arm_token)
 
         if (
             not isinstance(result, dict)
@@ -291,7 +317,7 @@ def install_issue84_heldout_actor_arm_compat(executor) -> None:
             or result.get("arm") != "BRANCH"
         ):
             raise RuntimeError("Issue 75 held-out worker changed the Issue 84 unit identity during BRANCH dispatch")
-        result["arm"] = str(study_arm)
+        result["arm"] = str(study_group)
         return result
 
     executor._worker_owner = worker_owner_with_issue84_arm_compat

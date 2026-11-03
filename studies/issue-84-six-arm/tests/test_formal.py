@@ -476,6 +476,57 @@ class Issue73EvaluationArmCompatibilityTests(unittest.TestCase):
                     f"stage1-{phase}-{study_arm}-{row['owner_seed']}",
                 )
 
+        # Exercise the exact formal seed-table schema used by validation, not
+        # synthetic A-F rows. All 18 actor groups contain 64 registered owners.
+        with (
+            patch.dict("os.environ", {"ISSUE84_PACKAGE_COMMIT": "a" * 40}),
+            patch.object(driver_module, "BACKEND", None),
+            patch.object(driver_module, "BACKEND_ORIGINAL_LOAD_MODULES", None),
+        ):
+            seed_table = driver_module.make_seed_table()
+        formal_validation_rows = driver_module.seed_table_rows(
+            seed_table,
+            phase="evaluation",
+            formal=True,
+            owners=range(8_460_001, 8_460_065),
+        )
+        validation_groups = tuple(
+            f"{arm}{games}"
+            for arm in driver_module.ARMS
+            for games in (512, 1024, 2048)
+        )
+        self.assertEqual(
+            {row["arm"] for row in formal_validation_rows},
+            {"PARENT", *validation_groups},
+        )
+        for group in validation_groups:
+            group_rows = [row for row in formal_validation_rows if row["arm"] == group]
+            with self.subTest(validation_group=group):
+                self.assertEqual(len(group_rows), 64)
+                registered_arm = group[0]
+                expected_policy = {"512": "pi16", "1024": "pi20", "2048": "pi28"}[group[1:]]
+                for row in group_rows:
+                    dispatch_index = len(observed_rows)
+                    result = executor._worker_owner(
+                        {"pilot": False, "phase": "evaluation", "row": row}, None,
+                    )
+                    dispatched = observed_rows[dispatch_index]
+                    self.assertEqual(dispatched["arm"], "BRANCH")
+                    self.assertEqual(dispatched["unit_id"], row["unit_id"])
+                    self.assertEqual(dispatched["issue84_arm"], registered_arm)
+                    self.assertEqual(dispatched["issue84_policy_label"], expected_policy)
+                    self.assertEqual(dispatched["paired_owner_key"], row["paired_owner_key"])
+                    self.assertEqual(result["arm"], group)
+                    self.assertEqual(result["unit_id"], row["unit_id"])
+                    self.assertEqual(result["policy_source"], "issue84-actor")
+                    self.assertEqual(result["checkpoint"], expected_policy)
+                    self.assertEqual(result["controller"]["controller_arm"], "BRANCH")
+                    self.assertEqual(
+                        result["controller"]["purpose"],
+                        f"stage1-evaluation-{group}-{row['owner_seed']}",
+                    )
+                    self.assertEqual(row["arm"], group)
+
     def test_issue84_worker_compat_does_not_rewrite_training_rows(self):
         seen = []
         executor = SimpleNamespace(
