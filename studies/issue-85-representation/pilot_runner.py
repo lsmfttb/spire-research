@@ -532,6 +532,22 @@ def _validate_predecessor_progress(
     return rows, dict(summary)
 
 
+def _validate_predecessor_reuse_source_diff(changed_paths: Sequence[str]) -> None:
+    """Accept only the independently reviewed runner and owner-outcome API repairs."""
+    expected_paths = sorted((
+        "studies/issue-85-representation/pilot_runner.py",
+        "studies/issue-85-representation/tests/test_pilot_runner.py",
+        "studies/issue-85-representation/runtime_integration.py",
+        "studies/issue-85-representation/tests/test_runtime_integration.py",
+    ))
+    observed_paths = sorted(filter(None, (str(path) for path in changed_paths)))
+    if observed_paths != expected_paths:
+        raise RuntimeError(
+            "Issue 85 predecessor reuse requires only the reviewed runner and locked "
+            "#84 outcome API repairs and their tests"
+        )
+
+
 def _load_predecessor_b_training(
     backend: Any,
     *,
@@ -550,12 +566,7 @@ def _load_predecessor_b_training(
     if is_ancestor.returncode != 0:
         raise RuntimeError("Issue 85 pilot continuation source is not descended from its exact predecessor")
     changed_paths = sorted(filter(None, _git(REPO, "diff", "--name-only", predecessor_commit, identity["package_commit"]).splitlines()))
-    expected_paths = sorted((
-        "studies/issue-85-representation/pilot_runner.py",
-        "studies/issue-85-representation/tests/test_pilot_runner.py",
-    ))
-    if changed_paths != expected_paths:
-        raise RuntimeError("Issue 85 predecessor reuse requires only the reviewed runner/API repair and its tests")
+    _validate_predecessor_reuse_source_diff(changed_paths)
 
     prior_root = PILOT_ROOT / predecessor_commit
     progress_path = prior_root / "pilot-progress.json"

@@ -524,6 +524,21 @@ class PilotRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unregistered predecessor source"):
             pilot_runner.pilot_plan(resume_from="a" * 40)
 
+    def test_predecessor_reuse_allows_only_reviewed_runner_and_adapter_repairs(self):
+        approved_paths = (
+            "studies/issue-85-representation/pilot_runner.py",
+            "studies/issue-85-representation/tests/test_pilot_runner.py",
+            "studies/issue-85-representation/runtime_integration.py",
+            "studies/issue-85-representation/tests/test_runtime_integration.py",
+        )
+        pilot_runner._validate_predecessor_reuse_source_diff(approved_paths)
+        with self.assertRaisesRegex(RuntimeError, "reviewed runner and locked #84 outcome API repairs"):
+            pilot_runner._validate_predecessor_reuse_source_diff(
+                (*approved_paths, "studies/issue-85-representation/contract.json"),
+            )
+        with self.assertRaisesRegex(RuntimeError, "reviewed runner and locked #84 outcome API repairs"):
+            pilot_runner._validate_predecessor_reuse_source_diff(approved_paths[:-1])
+
     def test_reuse_manifest_names_the_progress_snapshot_clock_value(self):
         predecessor = {
             "source_commit": pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
