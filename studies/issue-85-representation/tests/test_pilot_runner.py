@@ -28,6 +28,36 @@ class FakeBackend:
 
 
 class PilotRunnerTests(unittest.TestCase):
+    def test_actor_gradient_clip_comes_from_locked_issue84_contract_and_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            contract_path = Path(directory) / "contract.json"
+            driver = SimpleNamespace(CONTRACT_PATH=contract_path)
+            contract_path.write_text(
+                json.dumps({"unchanged_actor_and_environment": {"actor_gradient_norm_clip": 1.0}}),
+                encoding="utf-8",
+            )
+            self.assertEqual(pilot_runner._issue84_actor_gradient_norm_clip(driver), 1.0)
+
+            invalid_contracts = (
+                {},
+                {"unchanged_actor_and_environment": {}},
+                {"unchanged_actor_and_environment": {"actor_gradient_norm_clip": True}},
+                {"unchanged_actor_and_environment": {"actor_gradient_norm_clip": "1.0"}},
+                {"unchanged_actor_and_environment": {"actor_gradient_norm_clip": 0}},
+                {"unchanged_actor_and_environment": {"actor_gradient_norm_clip": -1}},
+                {"unchanged_actor_and_environment": {"actor_gradient_norm_clip": float("nan")}},
+                {"unchanged_actor_and_environment": {"actor_gradient_norm_clip": float("inf")}},
+            )
+            for invalid in invalid_contracts:
+                with self.subTest(contract=invalid):
+                    contract_path.write_text(json.dumps(invalid), encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        pilot_runner._issue84_actor_gradient_norm_clip(driver)
+
+        with self.assertRaisesRegex(RuntimeError, "lacks its contract path"):
+            pilot_runner._issue84_actor_gradient_norm_clip(SimpleNamespace())
+
+
     def test_issue84_training_examples_use_the_locked_public_loader(self):
         calls = {}
         examples = [object()]

@@ -1320,6 +1320,24 @@ def _load_pilot_training_examples(
     return examples
 
 
+def _issue84_actor_gradient_norm_clip(issue84_driver: Any) -> float:
+    """Read the actor clip threshold from the source-locked Issue 84 contract."""
+    contract_path = getattr(issue84_driver, "CONTRACT_PATH", None)
+    if contract_path is None:
+        raise RuntimeError("locked Issue 84 driver lacks its contract path")
+    contract = read_json(Path(contract_path))
+    unchanged = contract.get("unchanged_actor_and_environment")
+    if not isinstance(unchanged, dict):
+        raise ValueError("locked Issue 84 contract lacks unchanged_actor_and_environment")
+    value = unchanged.get("actor_gradient_norm_clip")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("locked Issue 84 contract has no numeric actor_gradient_norm_clip")
+    clip = float(value)
+    if not math.isfinite(clip) or clip <= 0:
+        raise ValueError("locked Issue 84 actor_gradient_norm_clip must be finite and positive")
+    return clip
+
+
 def _pilot_training_example_is_usable(example: Any) -> bool:
     """Check completeness through the locked #84 OwnerTrainingExample.base API."""
     base = getattr(example, "base", None)
@@ -1348,6 +1366,7 @@ def _train_pilot_arm(
     import torch
     from representations import Issue85Arm, continue_parent_adamw
 
+    actor_gradient_norm_clip = _issue84_actor_gradient_norm_clip(issue84_driver)
     loaded = backend.load_modules(root, pilot=True)
     _algorithm, _runtime, model, learning, executor = loaded
     examples = _load_pilot_training_examples(
@@ -1704,7 +1723,7 @@ def _train_pilot_arm(
             parameters = tuple(parameter for parameter in actor.parameters() if parameter.requires_grad)
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
-            before = float(torch.nn.utils.clip_grad_norm_(parameters, gradients.ACTOR_GRAD_CLIP).item())
+            before = float(torch.nn.utils.clip_grad_norm_(parameters, actor_gradient_norm_clip).item())
             if not math.isfinite(before):
                 raise RuntimeError(f"pilot actor gradient norm became non-finite at step {step + 1}")
             optimizer.step()
