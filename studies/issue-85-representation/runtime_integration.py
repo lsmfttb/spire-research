@@ -54,7 +54,19 @@ def _sha256(raw: bytes) -> str:
 
 
 def _public_payload(adapter: Any, snapshot: Any) -> Mapping[str, Any]:
-    projection = adapter.public_projection(snapshot)
+    # The locked adapter's public_projection() is the older T014 surface. The
+    # registered representation study requires the current V3 projection, so
+    # call the pinned native binding explicitly and validate the exact snapshot
+    # before reading it. Never silently substitute the legacy projection.
+    simulator = getattr(adapter, "_sim", None)
+    project_v3 = getattr(simulator, "public_projection_v3", None)
+    assert_current = getattr(adapter, "_assert_snapshot_is_current", None)
+    if not callable(project_v3) or not callable(assert_current):
+        raise RuntimeError(
+            "pinned Issue 73 adapter must expose the native V3 projection and snapshot freshness check"
+        )
+    assert_current(snapshot)
+    projection = project_v3()
     serialized = getattr(projection, "canonical_payload", None)
     if isinstance(serialized, str):
         value = json.loads(serialized)
@@ -64,6 +76,8 @@ def _public_payload(adapter: Any, snapshot: Any) -> Mapping[str, Any]:
         raise TypeError("pinned native publicProjectionV3 returned a non-JSON projection")
     if not isinstance(value, Mapping):
         raise TypeError("pinned native publicProjectionV3 payload is not an object")
+    if value.get("schema_id") != "native-public-projection-v3":
+        raise ValueError("Issue 85 requires the locked native publicProjectionV3 schema")
     return value
 
 

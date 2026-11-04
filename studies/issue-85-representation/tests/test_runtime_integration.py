@@ -63,6 +63,29 @@ class LegacyPolicy:
         return 0, np.full(len(matrix), 1.0 / len(matrix)), 0.0
 
 
+def native_v3_adapter(projection=None):
+    calls = []
+    value = projection or {"schema_id": "native-public-projection-v3"}
+
+    def assert_current(snapshot):
+        calls.append(("freshness", snapshot))
+
+    def public_projection_v3():
+        calls.append(("public_projection_v3", None))
+        return value
+
+    def legacy_projection(_snapshot):
+        raise AssertionError("Issue 85 must not fall back to legacy public_projection()")
+
+    adapter = SimpleNamespace(
+        _sim=SimpleNamespace(public_projection_v3=public_projection_v3),
+        _assert_snapshot_is_current=assert_current,
+        public_projection=legacy_projection,
+    )
+    adapter.calls = calls
+    return adapter
+
+
 @dataclass(frozen=True)
 class BaseDecision:
     candidate_features: np.ndarray
@@ -202,11 +225,14 @@ class RuntimeIntegrationTests(unittest.TestCase):
         adapter = self.runtime.PolicyAdapter(actor)
         runner = self.runtime.load_issue73_runner({})
         controller = runner.StudyController(adapter)
-        public_adapter = SimpleNamespace(public_projection=lambda _snapshot: {"schema_id": "native-public-projection-v3"})
+        snapshot = object()
+        public_adapter = native_v3_adapter()
         privileged = {"candidates": [{}, {}, {}]}
         controller.select_action(
-            public_adapter, object(), ["a", "b", "c"], privileged, 12,
+            public_adapter, snapshot, ["a", "b", "c"], privileged, 12,
         )
+        self.assertEqual([call[0] for call in public_adapter.calls], ["freshness", "public_projection_v3"])
+        self.assertIs(public_adapter.calls[0][1], snapshot)
         self.assertIsInstance(controller.trace, list)
         trace_row = controller.trace[0]
         self.assertIn("issue85_payload", trace_row)
@@ -225,16 +251,32 @@ class RuntimeIntegrationTests(unittest.TestCase):
         self.assertEqual(restored.decisions[0].issue85_payload, decision.issue85_payload)
         np.testing.assert_array_equal(restored.decisions[0].candidate_features, decision.candidate_features)
 
+    def test_context_requires_v3_schema_and_fails_closed_without_v3_binding(self):
+        runner = self.runtime.load_issue73_runner({})
+        controller = runner.StudyController(FakeIssue85Policy("C"))
+        bad_schema = native_v3_adapter({"schema_id": "native-public-projection-v1"})
+        with self.assertRaisesRegex(ValueError, "requires the locked native publicProjectionV3 schema"):
+            controller.select_action(bad_schema, object(), ["a", "b"], {}, 0)
+
+        controller = runner.StudyController(FakeIssue85Policy("C"))
+        legacy_only = SimpleNamespace(
+            public_projection=lambda _snapshot: {"schema_id": "native-public-projection-v3"},
+            _assert_snapshot_is_current=lambda _snapshot: None,
+        )
+        with self.assertRaisesRegex(RuntimeError, "must expose the native V3 projection"):
+            controller.select_action(legacy_only, object(), ["a", "b"], {}, 0)
+
     def test_pinned_direct_model_shape_and_runtime_decision_rows_keep_context_and_wide_features(self):
         actor = FakeIssue85Policy("D")
         runner = self.runtime.load_issue73_runner({})
         controller = runner.StudyController(actor)
         original_model = controller.model
-        adapter = SimpleNamespace(public_projection=lambda _snapshot: {
-            "schema_id": "native-public-projection-v3",
-        })
+        snapshot = object()
+        adapter = native_v3_adapter()
         privileged = {"candidates": [{}, {}, {}]}
-        controller.select_action(adapter, object(), ["a", "b", "c"], privileged, 21)
+        controller.select_action(adapter, snapshot, ["a", "b", "c"], privileged, 21)
+        self.assertEqual([call[0] for call in adapter.calls], ["freshness", "public_projection_v3"])
+        self.assertIs(adapter.calls[0][1], snapshot)
 
         # The pinned StudyController receives a model and calls model.choose;
         # the integration temporarily supplies its compatible sampler, then
@@ -302,14 +344,14 @@ class RuntimeIntegrationTests(unittest.TestCase):
         runner = self.runtime.load_issue73_runner({})
         controller = runner.StudyController(self.runtime.PolicyAdapter(actor))
         controller.encoder = BrokenWideEncoder()
-        adapter = SimpleNamespace(public_projection=lambda _snapshot: {"schema_id": "native-public-projection-v3"})
+        adapter = native_v3_adapter()
         with self.assertRaisesRegex(ValueError, "does not fold"):
             controller.select_action(adapter, object(), ["a", "b", "c"], {}, 0)
 
     def test_context_trace_only_enriches_categorical_decisions(self):
         actor = FakeIssue85Policy("C")
         controller = self.runtime.load_issue73_runner({}).StudyController(self.runtime.PolicyAdapter(actor))
-        adapter = SimpleNamespace(public_projection=lambda _snapshot: {"schema_id": "native-public-projection-v3"})
+        adapter = native_v3_adapter()
         controller.select_action(adapter, object(), ["a", "b", "c"], {}, 3)
         controller.trace.append({"kind": "single_action", "step": 4})
         self.assertNotIn("issue85_payload", controller.trace[-1])
