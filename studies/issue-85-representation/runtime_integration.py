@@ -482,8 +482,11 @@ def install_issue85_runtime(
             return original_owner_loss(actor, example, arm=arm, block_examples=block_examples, **kwargs)
         import torch
 
-        if str(arm).upper() != "B":
-            raise ValueError("Issue 85 B–F must use the frozen #84 B LENGTH_ONLY objective")
+        selected_arm = str(arm).upper()
+        if selected_arm not in ISSUE85_ARMS:
+            raise ValueError("Issue 85 actor updates are limited to the registered B–F arms")
+        if selected_arm != str(actor.arm).upper():
+            raise ValueError("Issue 85 training arm does not match the actor's registered arm")
         gradients._check_block(block_examples)
         matched = [i for i, row in enumerate(block_examples) if int(row.owner_seed) == int(example.owner_seed)]
         if not example.complete or len(matched) != 1 or float(block_examples[matched[0]].reward) != float(example.reward):

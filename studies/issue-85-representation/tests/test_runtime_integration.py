@@ -370,26 +370,59 @@ class RuntimeIntegrationTests(unittest.TestCase):
             _pack_matrix(np.ones((2, 2), dtype=np.float32))
 
     def test_owner_loss_uses_exact_registered_length_only_formula(self):
-        actor = FakeIssue85Policy("B")
         legacy = np.zeros((3, 2048), dtype=np.float32)
         legacy[:, 0] = [1.0, 2.0, 3.0]
         wide = np.zeros((3, 8192), dtype=np.float32)
         wide[:, 0] = legacy[:, 0]
+        for arm in ("B", "C", "D", "E", "F"):
+            with self.subTest(arm=arm):
+                actor = FakeIssue85Policy(arm)
+                payload = None if arm == "B" else {
+                    "candidates": [
+                        {"kind": "choice", "features": {"row": index}}
+                        for index in range(3)
+                    ],
+                }
+                decision = Issue85Decision(
+                    BaseDecision(legacy, 2),
+                    payload=payload,
+                    wide_candidate_features=wide if arm in {"B", "D"} else None,
+                    legacy_sha256="fixture-legacy-digest",
+                )
+                owner = Owner(1, 2.0, True, (decision,))
+                block = [
+                    owner,
+                    Owner(2, 0.0, True, (decision,)),
+                ]
+                loss, diagnostics = self.gradients.owner_loss(
+                    actor, owner, arm=arm, block_examples=block,
+                )
+                features = wide if arm in {"B", "D"} else legacy
+                _logits, logp, entropy = actor.distribution(
+                    torch.as_tensor(features), payload or {},
+                )
+                expected = (
+                    -logp[2] / self.gradients.T_REF
+                    - self.gradients.ENTROPY_COEFFICIENT * entropy
+                )
+                torch.testing.assert_close(loss, expected)
+                self.assertEqual(diagnostics["decision_count"], 1.0)
+                loss.backward()
+                self.assertNotEqual(float(actor.weight.grad), 0.0)
+
+    def test_owner_loss_rejects_an_arm_label_that_differs_from_actor(self):
+        actor = FakeIssue85Policy("C")
         decision = Issue85Decision(
-            BaseDecision(legacy, 2),
-            payload=None,
-            wide_candidate_features=wide,
+            BaseDecision(np.zeros((3, 2048), dtype=np.float32), 0),
+            payload={"candidates": [{"kind": "choice"}] * 3},
+            wide_candidate_features=None,
             legacy_sha256="fixture-legacy-digest",
         )
         owner = Owner(1, 2.0, True, (decision,))
-        block = [Owner(1, 2.0, True, (decision,)), Owner(2, 0.0, True, (decision,))]
-        loss, diagnostics = self.gradients.owner_loss(
-            actor, owner, arm="B", block_examples=block,
-        )
-        _logits, logp, entropy = actor.distribution(torch.as_tensor(wide), {})
-        expected = -logp[2] / self.gradients.T_REF - self.gradients.ENTROPY_COEFFICIENT * entropy
-        torch.testing.assert_close(loss, expected)
-        self.assertEqual(diagnostics["decision_count"], 1.0)
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            self.gradients.owner_loss(
+                actor, owner, arm="B", block_examples=[owner],
+            )
 
 
 if __name__ == "__main__":
