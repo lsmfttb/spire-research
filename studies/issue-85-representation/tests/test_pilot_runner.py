@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import pilot_runner
 
@@ -24,6 +25,95 @@ class FakeBackend:
 
 
 class PilotRunnerTests(unittest.TestCase):
+    def test_issue84_training_examples_use_the_locked_public_loader(self):
+        calls = {}
+        examples = [object()]
+
+        def load_training_outcomes(rows, *, root, executor, package):
+            calls.update(rows=rows, root=root, executor=executor, package=package)
+            return examples, [{"status": "SUCCEEDED"}]
+
+        rows = [{"unit_id": "PILOT-TRAIN:B:8530001"}]
+        executor = object()
+        loaded = pilot_runner._load_pilot_training_examples(
+            SimpleNamespace(load_training_outcomes=load_training_outcomes),
+            rows,
+            root=Path("predecessor-training"),
+            executor=executor,
+            package_commit=pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
+        )
+
+        self.assertIs(loaded, examples)
+        self.assertEqual(calls, {
+            "rows": rows,
+            "root": Path("predecessor-training"),
+            "executor": executor,
+            "package": pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
+        })
+
+    def test_predecessor_progress_requires_exact_fixed_successful_b_cohort(self):
+        rows = [
+            {
+                "unit_id": f"PILOT-TRAIN:B:{owner}",
+                "phase": "training",
+                "issue85_arm": "B",
+                "owner_seed": owner,
+            }
+            for owner in pilot_runner.PILOT_OWNERS
+        ]
+        seed_table = {
+            "schema_id": "issue85-nonformal-pilot-seed-table-v1",
+            "rows": rows,
+            "rows_sha256": pilot_runner.sha256(pilot_runner.canonical(rows)),
+        }
+        unit_ids = sorted(row["unit_id"] for row in rows)
+        summary = {
+            "status": "SUCCEEDED",
+            "expected": len(rows),
+            "successful_completions": len(rows),
+            "successful_unit_ids": unit_ids,
+            "failed_attempts": [],
+            "incomplete_attempts": [],
+            "incomplete": [],
+            "attempt_count_by_owner": {unit_id: 1 for unit_id in unit_ids},
+        }
+        progress = {
+            "schema_id": "issue85-pilot-progress-v1",
+            "status": "FAILED_OR_INCOMPLETE",
+            "package_commit": pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
+            "source_lock_sha256": "lock-sha",
+            "issue84_source_commit": pilot_runner.ISSUE84_ACCEPTED_COMMIT,
+            "active_stage": "pilot-actor-update",
+            "active_arm": "B",
+            "failure": {
+                "type": "AttributeError",
+                "detail": "module 'issue85_exact_issue84_driver' has no attribute '_training_examples'",
+            },
+            "training_runs": {"B": summary},
+            "evaluation_runs": {},
+            "actor_updates": {},
+            "seed_table_rows": len(rows),
+        }
+        checked_rows, checked_summary = pilot_runner._validate_predecessor_progress(
+            progress,
+            predecessor_commit=pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
+            current_identity={"package_commit": "b" * 40, "source_lock_sha256": "lock-sha"},
+            prior_seed_table=seed_table,
+            current_seed_table=seed_table,
+        )
+
+        self.assertEqual(checked_rows, rows)
+        self.assertEqual(checked_summary, summary)
+        changed_table = {**seed_table, "rows": [*rows[:-1], {**rows[-1], "owner_seed": 999}]}
+        with self.assertRaisesRegex(RuntimeError, "exact unchanged pilot owner/seed table"):
+            pilot_runner._validate_predecessor_progress(
+                progress,
+                predecessor_commit=pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
+                current_identity={"package_commit": "b" * 40, "source_lock_sha256": "lock-sha"},
+                prior_seed_table=seed_table,
+                current_seed_table=changed_table,
+            )
+
     def test_seed_table_has_only_registered_nonformal_pilot_runs(self):
         table = pilot_runner.build_seed_rows(FakeBackend)
         rows = table["rows"]
