@@ -54,10 +54,10 @@ def projection(target_index: int) -> dict:
 def public_projection(target_index: int) -> dict:
     return {
         "schema_id": "native-public-projection-v3",
-        "screen_identity": {"availability": "available", "visibility": "public_now", "value": "CARD_SELECT"},
-        "persistent_resources": {"availability": "available", "visibility": "public_now", "value": {"deck": [{"id": 42, "name": "Strike_R", "upgraded": False}]}},
-        "screen_payload": {"availability": "available", "visibility": "public_now", "value": {"coverage_status": "supported", "choices": [{"candidate_index": 0, "candidate_action": {"scope": "event", "kind": "card_select", "idx1": target_index, "idx2": 0, "idx3": 0}, "choice_type": "card_select", "card": {"id": 42, "name": "Strike_R", "upgraded": False}}]}},
-        "candidate_actions": {"availability": "available", "visibility": "public_now", "value": [{"scope": "event", "kind": "card_select", "idx1": target_index, "idx2": 0, "idx3": 0, "label": f"event.card_select idx1={target_index}"}]},
+        "screen_identity": {"availability": "available", "value": "CARD_SELECT"},
+        "persistent_resources": {"availability": "available", "value": {"deck": [{"id": 42, "name": "Strike_R", "upgraded": False}]}},
+        "screen_payload": {"availability": "available", "value": {"coverage_status": "supported", "choices": [{"candidate_index": 0, "candidate_action": {"scope": "event", "kind": "card_select", "idx1": target_index, "idx2": 0, "idx3": 0}, "choice_type": "card_select", "card": {"id": 42, "name": "Strike_R", "upgraded": False}}]}},
+        "candidate_actions": {"availability": "available", "value": [{"scope": "event", "kind": "card_select", "idx1": target_index, "idx2": 0, "idx3": 0, "label": f"event.card_select idx1={target_index}"}]},
     }
 
 
@@ -146,15 +146,82 @@ def bound_privileged_projection(screen: str, actions: list[dict], features: list
 def v3_projection(screen: str, actions: list[dict], payload: dict, **fields) -> dict:
     result = {
         "schema_id": "native-public-projection-v3",
-        "screen_identity": {"availability": "available", "visibility": "public_now", "value": screen},
-        "candidate_actions": {"availability": "available", "visibility": "public_now", "value": [action.copy() for action in actions]},
-        "screen_payload": {"availability": "available", "visibility": "public_now", "value": payload},
+        "screen_identity": {"availability": "available", "value": screen},
+        "candidate_actions": {"availability": "available", "value": [action.copy() for action in actions]},
+        "screen_payload": {"availability": "available", "value": payload},
     }
     result.update(fields)
     return result
 
 
 class FeatureFirewallTests(unittest.TestCase):
+    def test_native_public_v3_envelopes_get_explicit_public_visibility(self):
+        public = public_projection(0)
+        self.assertTrue(
+            all(
+                "visibility" not in public[field]
+                for field in (
+                    "screen_identity",
+                    "persistent_resources",
+                    "screen_payload",
+                    "candidate_actions",
+                )
+            )
+        )
+
+        result = feature_firewall.new_path_projection(projection(0), public)
+        self.assertEqual(
+            result["public_context"]["persistent_resources"]["visibility"],
+            "public_now",
+        )
+        for field in (
+            "visible_act_boss", "visible_map_graph", "current_map_node",
+            "immediately_legal_routes", "persistent_resources",
+        ):
+            self.assertEqual(result["public_context"][field]["visibility"], "public_now", field)
+
+    def test_unavailable_privileged_envelopes_cannot_carry_values(self):
+        for target in ("shared", "candidate"):
+            privileged = projection(0)
+            if target == "shared":
+                envelope = privileged["shared_context"]["gold"]
+            else:
+                envelope = privileged["candidates"][0]["features"]["target_card"]
+            envelope["availability"] = "unavailable"
+            with self.subTest(target=target), self.assertRaisesRegex(
+                ValueError, "omitted when availability is unavailable"
+            ):
+                feature_firewall.new_path_projection(privileged, public_projection(0))
+
+    def test_match_and_keep_card_state_uses_native_scalar_enum(self):
+        public = public_projection(0)
+        action = public["candidate_actions"]["value"][0]
+        public["screen_payload"]["value"].update({
+            "cards": [
+                {
+                    "index": 0,
+                    "state": "revealed",
+                    "card": {"id": 42, "name": "Strike_R", "upgraded": False},
+                }
+            ],
+            "choices": [{
+                "candidate_index": 0,
+                "candidate_action": action.copy(),
+                "choice_type": "card_select",
+                "card_index": 0,
+            }],
+        })
+        valid = feature_firewall.new_path_projection(projection(0), public)
+        self.assertIn("revealed", json.dumps(valid, sort_keys=True))
+
+        for state in ({"deck_offset": 3}, 0, "unrecognized_state"):
+            malformed = public_projection(0)
+            malformed["screen_payload"]["value"]["cards"] = [{"index": 0, "state": state}]
+            with self.subTest(state=state), self.assertRaisesRegex(
+                ValueError, "native public card-state enum"
+            ):
+                feature_firewall.new_path_projection(projection(0), malformed)
+
     def test_new_path_is_invariant_to_executor_index_and_bindings(self):
         first = feature_firewall.new_path_projection(projection(0), public_projection(0))
         second = feature_firewall.new_path_projection(projection(17), public_projection(17))

@@ -159,6 +159,19 @@ _PUBLIC_CHOICE_KEYS = frozenset(
     }
 )
 _CARD_SLOT_KEYS = frozenset({"index", "state", "card"})
+_CARD_SLOT_STATES = frozenset(
+    {"matched_hidden", "revealed", "first_pick_revealed", "face_down"}
+)
+_PUBLIC_ENVELOPE_FIELDS = (
+    "screen_identity",
+    "visible_act_boss",
+    "visible_map_graph",
+    "current_map_node",
+    "immediately_legal_routes",
+    "persistent_resources",
+    "screen_payload",
+    "candidate_actions",
+)
 
 
 def _check_keys(value: Any, allowed: frozenset[str], path: str) -> Mapping[str, Any]:
@@ -179,7 +192,8 @@ def _check_snapshot(value: Any, allowed: frozenset[str], path: str) -> None:
 
 def _check_feature_envelope(envelope: Any, path: str) -> Any:
     row = _check_keys(envelope, _FEATURE_ENVELOPE_KEYS, path)
-    if row.get("availability") not in {"available", "unavailable"}:
+    availability = row.get("availability")
+    if availability not in {"available", "unavailable"}:
         raise ValueError(f"{path}.availability is not source-schema valid")
     if row.get("visibility") not in {None, "public_now", "oracle_only"}:
         raise ValueError(f"{path}.visibility is not source-schema valid")
@@ -189,9 +203,31 @@ def _check_feature_envelope(envelope: Any, path: str) -> Any:
         raise ValueError(f"{path}.reason must be text")
     if "required_for_choice_semantics" in row and not isinstance(row["required_for_choice_semantics"], bool):
         raise ValueError(f"{path}.required_for_choice_semantics must be boolean")
+    if availability == "unavailable":
+        if "value" in row:
+            raise ValueError(f"{path}.value must be omitted when availability is unavailable")
+        return None
     if "value" not in row:
         return None
     return row["value"]
+
+
+def _explicit_public_visibility(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize the pinned public-v3 envelope schema to explicit visibility.
+
+    The locked native publicProjectionV3 API has no visibility member because
+    these fields are public observations by construction. The learned payload
+    keeps that contract explicit instead of leaking a missing/None tag.
+    """
+    normalized = dict(value)
+    for field in _PUBLIC_ENVELOPE_FIELDS:
+        envelope = normalized.get(field)
+        if not isinstance(envelope, Mapping):
+            continue
+        tagged = dict(envelope)
+        tagged["visibility"] = "public_now"
+        normalized[field] = tagged
+    return normalized
 
 
 def _check_action(value: Any, path: str) -> None:
@@ -358,6 +394,13 @@ def _check_public_projection(value: Any) -> None:
                     raise ValueError("screen_payload.value.cards must be a sequence")
                 for i, slot in enumerate(slots):
                     row = _check_keys(slot, _CARD_SLOT_KEYS, f"screen_payload.value.cards[{i}]")
+                    state = row.get("state")
+                    if "state" in row and (
+                        not isinstance(state, str) or state not in _CARD_SLOT_STATES
+                    ):
+                        raise ValueError(
+                            f"screen_payload.value.cards[{i}].state is not a native public card-state enum"
+                        )
                     if isinstance(row.get("card"), Mapping):
                         _check_snapshot(row["card"], _CARD_KEYS, f"screen_payload.value.cards[{i}].card")
             if "map_graph" in screen:
@@ -507,6 +550,7 @@ def new_path_projection(
     """
     _check_privileged_projection(privileged_projection)
     _check_public_projection(public_projection)
+    public_projection = _explicit_public_visibility(public_projection)
     candidates = privileged_projection.get("candidates")
     if not isinstance(candidates, Sequence) or isinstance(candidates, (str, bytes)):
         raise ValueError("privileged projection has no ordered candidate sequence")
@@ -770,7 +814,7 @@ def _normalize_public_context(
         envelope = public.get(name)
         available, value = _available_value(envelope)
         if not available:
-            return {"availability": "unavailable"}
+            return {"availability": "unavailable", "visibility": "public_now"}
         if name in {"visible_map_graph"}:
             semantic_value = map_nodes
         elif name in {"current_map_node"}:
@@ -801,7 +845,7 @@ def _normalize_public_context(
                     semantic_value.append(sanitize_executor_tree(clean))
         else:
             semantic_value = sanitize_executor_tree(value)
-        return {"availability": "available", "visibility": envelope.get("visibility"), "value": semantic_value}
+        return {"availability": "available", "visibility": "public_now", "value": semantic_value}
 
     normalized = {
         "visible_act_boss": public_field("visible_act_boss"),
