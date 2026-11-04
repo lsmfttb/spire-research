@@ -28,6 +28,7 @@ def projection(target_index: int) -> dict:
         "schema_id": "native-privileged-noncombat-choice-projection-v1",
         "audience": "training_oracle_only",
         "public_api_safe": False,
+        "policy_training_authorized": False,
         "native_source_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
         "candidate_order_source": "StepSimulator::legalActions; ordered occurrences are retained without deduplication",
         "coverage_status": "supported",
@@ -39,7 +40,7 @@ def projection(target_index: int) -> dict:
         "candidates": [
             {
                 "coverage_status": "supported",
-                "candidate_binding": {"availability": "available", "visibility": "oracle_only", "value": {"candidate_index": 0, "candidate_action": {"scope": "event", "kind": "card_select", "idx1": 1, "idx2": 2, "idx3": 0, "bits": "opaque"}}},
+                "candidate_binding": {"availability": "available", "visibility": "oracle_only", "value": {"candidate_index": 0, "candidate_action": {"scope": "event", "kind": "card_select", "idx1": target_index, "idx2": 0, "idx3": 0, "bits": "opaque"}}},
                 "features": {
                     "target_deck_index": {"availability": "available", "visibility": "oracle_only", "source": "SelectScreenCard::deckIdx", "value": target_index},
                     "target_card": {"availability": "available", "visibility": "public_now", "source": "ScreenStateInfo::toSelectCards", "value": {"id": 42, "name": "Strike_R", "type": "ATTACK", "upgraded": False}},
@@ -55,7 +56,7 @@ def public_projection(target_index: int) -> dict:
         "schema_id": "native-public-projection-v3",
         "screen_identity": {"availability": "available", "visibility": "public_now", "value": "CARD_SELECT"},
         "persistent_resources": {"availability": "available", "visibility": "public_now", "value": {"deck": [{"id": 42, "name": "Strike_R", "upgraded": False}]}},
-        "screen_payload": {"availability": "available", "visibility": "public_now", "value": {"coverage_status": "supported", "choices": [{"candidate_index": 0, "candidate_action": {"scope": "event", "kind": "card_select", "idx1": target_index, "idx2": 0, "idx3": 0}, "card": {"id": 42, "name": "Strike_R", "upgraded": False}}]}},
+        "screen_payload": {"availability": "available", "visibility": "public_now", "value": {"coverage_status": "supported", "choices": [{"candidate_index": 0, "candidate_action": {"scope": "event", "kind": "card_select", "idx1": target_index, "idx2": 0, "idx3": 0}, "choice_type": "card_select", "card": {"id": 42, "name": "Strike_R", "upgraded": False}}]}},
         "candidate_actions": {"availability": "available", "visibility": "public_now", "value": [{"scope": "event", "kind": "card_select", "idx1": target_index, "idx2": 0, "idx3": 0, "label": f"event.card_select idx1={target_index}"}]},
     }
 
@@ -100,21 +101,57 @@ def projection_with_legacy_indices(
     return value
 
 
-def public_projection_with_executor_aliases(target_index: int) -> dict:
+def public_projection_with_grandfathered_indices(target_index: int) -> dict:
     value = public_projection(target_index)
     value["persistent_resources"] = {
         "availability": "available",
         "visibility": "public_now",
         "value": {
-            "deck": [{"id": 42, "deckIndex": target_index, "position_hash": str(target_index)}],
-            "potions": [{"id": 7, "potion_index": target_index}],
+            "deck": [{"id": 42, "name": "Strike_R", "upgraded": False, "deck_index": target_index}],
+            "potion_identities": [{"id": 7, "name": "Fire Potion", "potion_index": target_index}],
             "relics": [{"id": 9, "relicIndex": target_index}],
             "potion_capacity": 3,
-            "free_potion_slots": 1,
+            "potion_count": 2,
         },
     }
-    value["screen_payload"]["value"]["choices"][0]["executor_token"] = f"native-{target_index}"
+    value["persistent_resources"]["value"]["relics"][0] = {
+        "id": 9, "name": "Burning Blood", "relic_index": target_index,
+    }
     return value
+
+
+def bound_privileged_projection(screen: str, actions: list[dict], features: list[dict]) -> dict:
+    return {
+        "schema_id": "native-privileged-noncombat-choice-projection-v1",
+        "audience": "training_oracle_only",
+        "public_api_safe": False,
+        "policy_training_authorized": False,
+        "native_source_commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+        "screen_identity": {"availability": "available", "visibility": "public_now", "value": screen},
+        "shared_context": {"gold": {"availability": "available", "visibility": "public_now", "source": "GameContext::gold", "value": 88}},
+        "candidates": [
+            {
+                "candidate_binding": {
+                    "availability": "available",
+                    "visibility": "oracle_only",
+                    "value": {"candidate_index": i, "candidate_action": action.copy()},
+                },
+                "features": feature,
+            }
+            for i, (action, feature) in enumerate(zip(actions, features, strict=True))
+        ],
+    }
+
+
+def v3_projection(screen: str, actions: list[dict], payload: dict, **fields) -> dict:
+    result = {
+        "schema_id": "native-public-projection-v3",
+        "screen_identity": {"availability": "available", "visibility": "public_now", "value": screen},
+        "candidate_actions": {"availability": "available", "visibility": "public_now", "value": [action.copy() for action in actions]},
+        "screen_payload": {"availability": "available", "visibility": "public_now", "value": payload},
+    }
+    result.update(fields)
+    return result
 
 
 class FeatureFirewallTests(unittest.TestCase):
@@ -156,8 +193,8 @@ class FeatureFirewallTests(unittest.TestCase):
     def test_all_grandfathered_indices_are_removed_from_new_paths(self):
         first_privileged = projection_with_legacy_indices(3, 0, 0, 0)
         second_privileged = projection_with_legacy_indices(100003, 100001, 100002, 100004)
-        first_public = public_projection_with_executor_aliases(3)
-        second_public = public_projection_with_executor_aliases(100003)
+        first_public = public_projection_with_grandfathered_indices(3)
+        second_public = public_projection_with_grandfathered_indices(100003)
 
         first = feature_firewall.new_path_projection(first_privileged, first_public)
         second = feature_firewall.new_path_projection(second_privileged, second_public)
@@ -172,12 +209,10 @@ class FeatureFirewallTests(unittest.TestCase):
             "deckIndex",
             "potion_index",
             "relic_index",
-            "position_hash",
-            "executor_token",
         ):
             self.assertNotIn(key, serialized)
         self.assertIn('"potion_capacity": 3', serialized)
-        self.assertIn('"free_potion_slots": 1', serialized)
+        self.assertIn('"potion_count": 2', serialized)
         self.assertIn("Strike_R", serialized)
         self.assertIn("Fire Potion", serialized)
         self.assertIn("Burning Blood", serialized)
@@ -195,6 +230,144 @@ class FeatureFirewallTests(unittest.TestCase):
             self.assertTrue(feature_firewall.is_executor_identifier_key(key), key)
         for key in ("card_id", "potion_id", "relic_id", "potion_capacity", "free_potion_slots"):
             self.assertFalse(feature_firewall.is_executor_identifier_key(key), key)
+
+    def test_reward_groups_become_content_semantics_without_native_group_indices(self):
+        actions = [
+            {"scope": "game", "kind": "reward_card", "idx1": 4, "idx2": 0, "idx3": 0},
+            {"scope": "game", "kind": "reward_card", "idx1": 4, "idx2": 1, "idx3": 0},
+            {"scope": "game", "kind": "reward_card", "idx1": 9, "idx2": 0, "idx3": 0},
+        ]
+        choices = [
+            {"candidate_index": 0, "candidate_action": actions[0].copy(), "choice_type": "card", "card": {"id": 1, "name": "Strike"}},
+            {"candidate_index": 1, "candidate_action": actions[1].copy(), "choice_type": "card", "card": {"id": 2, "name": "Bash"}},
+            {"candidate_index": 2, "candidate_action": actions[2].copy(), "choice_type": "card", "card": {"id": 3, "name": "Inflame"}},
+        ]
+        features = [
+            {
+                "choice": {
+                    "availability": "available",
+                    "visibility": "public_now",
+                    "source": "source-backed reward candidate semantics",
+                    "value": {"choice_type": "card", "card": {"id": i}},
+                }
+            }
+            for i in (1, 2, 3)
+        ]
+        privileged = bound_privileged_projection("REWARDS", actions, features)
+        public = v3_projection("REWARDS", actions, {"coverage_status": "supported", "choices": choices})
+
+        first = feature_firewall.new_path_projection(privileged, public)
+        shifted_actions = [{**action, "idx1": action["idx1"] + 1000} for action in actions]
+        shifted_choices = [
+            {**choice, "candidate_action": shifted_actions[i].copy()}
+            for i, choice in enumerate(choices)
+        ]
+        shifted_privileged = bound_privileged_projection("REWARDS", shifted_actions, features)
+        shifted_public = v3_projection("REWARDS", shifted_actions, {"coverage_status": "supported", "choices": shifted_choices})
+        second = feature_firewall.new_path_projection(shifted_privileged, shifted_public)
+
+        self.assertEqual(first, second)
+        feature_firewall.assert_index_free(first)
+        group_a = first["candidates"][0]["public_choice"]
+        group_b = first["candidates"][1]["public_choice"]
+        group_c = first["candidates"][2]["public_choice"]
+        self.assertEqual(group_a["reward_group_key"], group_b["reward_group_key"])
+        self.assertNotEqual(group_a["reward_group_key"], group_c["reward_group_key"])
+        self.assertEqual(len(group_a["reward_group_alternatives"]), 2)
+        serialized = json.dumps(first, sort_keys=True)
+        self.assertNotIn('"idx1"', serialized)
+        self.assertNotIn('"idx2"', serialized)
+
+    def test_candidate_action_mismatch_fails_closed(self):
+        privileged = projection(3)
+        public = public_projection(3)
+        public["candidate_actions"]["value"][0]["idx1"] = 99
+        with self.assertRaisesRegex(ValueError, "identity mismatch"):
+            feature_firewall.new_path_projection(privileged, public)
+
+    def test_unknown_executor_aliases_fail_closed_at_every_learned_input_boundary(self):
+        alias_cases = (
+            ("target_deck_pos", 17),
+            ("deck_offset", "17"),
+            ("target_deck_hash", "sha256:17"),
+            ("selected_card_number", 17),
+        )
+        for alias, value in alias_cases:
+            with self.subTest(alias=alias):
+                privileged = projection(3)
+                public = public_projection(3)
+                privileged["candidates"][0]["features"]["target_card"]["value"][alias] = value
+                with self.assertRaisesRegex(ValueError, "unrecognized input field"):
+                    feature_firewall.new_path_projection(privileged, public)
+
+        privileged = projection(3)
+        public = public_projection(3)
+        privileged["shared_context"]["deck"] = {
+            "availability": "available", "visibility": "public_now",
+            "source": "GameContext::deck",
+            "value": [{"id": 42, "name": "Strike_R", "upgraded": False, "deck_index": 3, "deck_offset": 3}],
+        }
+        with self.assertRaisesRegex(ValueError, "unrecognized input field"):
+            feature_firewall.new_path_projection(privileged, public)
+
+        privileged = projection(3)
+        public = public_projection(3)
+        public["persistent_resources"]["value"] = {
+            "deck": [{"id": 42, "name": "Strike_R", "upgraded": False, "deck_index": 3, "target_deck_hash": "sha256:3"}],
+        }
+        with self.assertRaisesRegex(ValueError, "unrecognized input field"):
+            feature_firewall.new_path_projection(privileged, public)
+
+    def test_map_coordinates_are_joined_then_removed_while_topology_remains(self):
+        action = {"scope": "game", "kind": "map", "idx1": 0, "idx2": 0, "idx3": 0}
+        features = [{"choice": {"availability": "available", "visibility": "public_now", "source": "source-backed map semantics", "value": {"choice_type": "map_route"}}}]
+        privileged = bound_privileged_projection("MAP_SCREEN", [action], features)
+        graph = [
+            {"x": 0, "y": 0, "room_symbol": "R", "outgoing_edges": [{"x": 0, "y": 1}]},
+            {"x": 0, "y": 1, "room_symbol": "M", "outgoing_edges": [{"x": 1, "y": 2}, {"x": 2, "y": 2}]},
+            {"x": 1, "y": 2, "room_symbol": "S", "outgoing_edges": []},
+            {"x": 2, "y": 2, "room_symbol": "T", "outgoing_edges": []},
+        ]
+        choice = {"candidate_index": 0, "candidate_action": action.copy(), "choice_type": "map_route", "destination": {"location": "map_node", "x": 0, "y": 1, "room_symbol": "M"}}
+        public = v3_projection(
+            "MAP_SCREEN",
+            [action],
+            {"coverage_status": "supported", "choices": [choice]},
+            visible_map_graph={"availability": "available", "visibility": "public_now", "value": graph},
+            current_map_node={"availability": "available", "visibility": "public_now", "value": {"location": "map_node", "x": 0, "y": 0, "room_symbol": "R"}},
+            immediately_legal_routes={"availability": "available", "visibility": "public_now", "value": [{**choice, "destination": choice["destination"].copy()}]},
+            visible_act_boss={"availability": "available", "visibility": "public_now", "value": "THE_GUARDIAN"},
+            persistent_resources={"availability": "available", "visibility": "public_now", "value": {"gold": 88}},
+        )
+        first = feature_firewall.new_path_projection(privileged, public)
+
+        def shift(point):
+            return {**point, "x": point["x"] + 20, "y": point["y"] + 100}
+
+        shifted_action = {**action, "idx1": action["idx1"] + 20}
+        shifted_privileged = bound_privileged_projection("MAP_SCREEN", [shifted_action], features)
+        shifted_graph = [
+            {**shift(node), "outgoing_edges": [shift(edge) for edge in node["outgoing_edges"]]}
+            for node in graph
+        ]
+        shifted_destination = {**choice["destination"], "x": 20, "y": 101}
+        shifted_choice = {**choice, "candidate_action": shifted_action, "destination": shifted_destination}
+        shifted_public = v3_projection(
+            "MAP_SCREEN",
+            [shifted_action],
+            {"coverage_status": "supported", "choices": [shifted_choice]},
+            visible_map_graph={"availability": "available", "visibility": "public_now", "value": shifted_graph},
+            current_map_node={"availability": "available", "visibility": "public_now", "value": {"location": "map_node", "x": 20, "y": 100, "room_symbol": "R"}},
+            immediately_legal_routes={"availability": "available", "visibility": "public_now", "value": [{**shifted_choice, "destination": shifted_destination.copy()}]},
+            visible_act_boss={"availability": "available", "visibility": "public_now", "value": "THE_GUARDIAN"},
+            persistent_resources={"availability": "available", "visibility": "public_now", "value": {"gold": 88}},
+        )
+        second = feature_firewall.new_path_projection(shifted_privileged, shifted_public)
+        self.assertEqual(first, second)
+        feature_firewall.assert_index_free(first)
+        self.assertIn("outgoing_room_symbols", json.dumps(first, sort_keys=True))
+        self.assertNotIn('"x"', json.dumps(first, sort_keys=True))
+        self.assertNotIn('"y"', json.dumps(first, sort_keys=True))
 
 
 if __name__ == "__main__":
