@@ -585,5 +585,32 @@ class FeatureFirewallTests(unittest.TestCase):
         self.assertNotIn('"y"', json.dumps(first, sort_keys=True))
 
 
+    def test_native_final_map_edge_resolves_to_implicit_boss_entry(self):
+        action = {"scope": "game", "kind": "map", "idx1": 3, "idx2": 0, "idx3": 0}
+        features = [{"choice": {"availability": "available", "visibility": "public_now", "value": {"choice_type": "map_route"}}}]
+        privileged = bound_privileged_projection("MAP_SCREEN", [action], features)
+        graph = [{"x": 3, "y": 14, "room_symbol": "R", "outgoing_edges": [{"x": 3, "y": 15}]}]
+        choice = {"candidate_index": 0, "candidate_action": action.copy(), "choice_type": "map_route", "destination": {"location": "boss_entry"}}
+        public = v3_projection(
+            "MAP_SCREEN",
+            [action],
+            {"coverage_status": "supported", "choices": [choice.copy()]},
+            visible_map_graph={"availability": "available", "visibility": "public_now", "value": graph},
+            current_map_node={"availability": "available", "visibility": "public_now", "value": {"location": "map_node", "x": 3, "y": 14, "room_symbol": "R"}},
+            immediately_legal_routes={"availability": "available", "visibility": "public_now", "value": [choice.copy()]},
+            visible_act_boss={"availability": "available", "visibility": "public_now", "value": "THE_GUARDIAN"},
+        )
+        result = feature_firewall.new_path_projection(privileged, public)
+        self.assertEqual(result["public_context"]["visible_map_graph"]["value"], [{"room_symbol": "R", "outgoing_room_symbols": ["boss_entry"]}])
+        self.assertEqual(result["public_context"]["immediately_legal_routes"]["value"][0]["destination"], {"location": "boss_entry"})
+        serialized = json.dumps(result, sort_keys=True)
+        feature_firewall.assert_index_free(result)
+        self.assertNotIn('"x"', serialized)
+        self.assertNotIn('"y"', serialized)
+        with self.assertRaisesRegex(ValueError, "does not resolve to a visible node"):
+            feature_firewall._map_graph_semantics([
+                {"x": 3, "y": 14, "room_symbol": "R", "outgoing_edges": [{"x": 4, "y": 15}]},
+            ])
+
 if __name__ == "__main__":
     unittest.main()
