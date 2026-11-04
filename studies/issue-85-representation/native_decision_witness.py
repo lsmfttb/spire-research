@@ -31,7 +31,7 @@ def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_legacy_encoder(path: Path, expected_sha256: str) -> Any:
+def load_legacy_encoder(path: Path, expected_sha256: str, *, dimension: int | None = None) -> Any:
     actual = sha256(path)
     if actual != expected_sha256:
         raise RuntimeError(f"legacy encoder SHA mismatch: expected {expected_sha256}, got {actual}")
@@ -44,7 +44,10 @@ def load_legacy_encoder(path: Path, expected_sha256: str) -> Any:
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    return module.SemanticHashEncoder(LOCK["model_runtime"]["architecture_dimension"])
+    selected_dimension = int(
+        LOCK["model_runtime"]["architecture_dimension"] if dimension is None else dimension
+    )
+    return module.SemanticHashEncoder(selected_dimension)
 
 
 def load_policy(checkpoint: Path, model_module: Any) -> Any:
