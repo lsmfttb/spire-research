@@ -302,6 +302,12 @@ def _check_privileged_projection(value: Any) -> None:
                 _check_snapshot(payload, _POTION_KEYS, f"candidates[{index}].features.potion.value")
             elif name == "item":
                 _check_known_semantic_tree(payload, frozenset(_CARD_KEYS | _POTION_KEYS | _RELIC_KEYS), f"candidates[{index}].features.item.value")
+            elif name == "public_destination":
+                _check_map_location(
+                    payload,
+                    f"candidates[{index}].features.public_destination.value",
+                    _ROUTE_MAP_LOCATION_VALUES,
+                )
             elif isinstance(payload, (Mapping, Sequence)) and not isinstance(payload, (str, bytes)):
                 raise ValueError(f"candidates[{index}].features.{name}.value must be a scalar")
 
@@ -649,7 +655,21 @@ def new_path_projection(
         candidate_rows.append({"kind": identity["kind"], "features": sanitize_executor_tree(features)})
         action_identities.append(identity)
 
-    public_context, choice_by_candidate = _normalize_public_context(public_projection, action_identities)
+    public_context, choice_by_candidate, semantic_by_coordinate = _normalize_public_context(
+        public_projection, action_identities
+    )
+    for candidate_row in candidate_rows:
+        destination = candidate_row["features"].get("public_destination")
+        if (
+            isinstance(destination, Mapping)
+            and destination.get("availability") == "available"
+            and isinstance(destination.get("value"), Mapping)
+        ):
+            destination["value"] = _map_location(
+                destination["value"],
+                semantic_by_coordinate,
+                _ROUTE_MAP_LOCATION_VALUES,
+            )
     for index, candidate_row in enumerate(candidate_rows):
         if index not in choice_by_candidate:
             continue
@@ -767,7 +787,11 @@ def _map_location(
 
 def _normalize_public_context(
     public: Mapping[str, Any], action_identities: Sequence[Mapping[str, Any]]
-) -> tuple[dict[str, Any], dict[int, dict[str, Any]]]:
+) -> tuple[
+    dict[str, Any],
+    dict[int, dict[str, Any]],
+    Mapping[tuple[int, int], Mapping[str, Any]],
+]:
     graph_available, graph_value = _available_value(public.get("visible_map_graph"))
     map_nodes, semantic_by_coordinate = _map_graph_semantics(graph_value) if graph_available else ([], {})
     choice_by_candidate: dict[int, dict[str, Any]] = {}
@@ -952,7 +976,7 @@ def _normalize_public_context(
             extras["visible_card_slots"] = sorted(board_slots.values(), key=_canonical_json)
         if extras:
             normalized["screen_payload_semantics"] = extras
-    return sanitize_executor_tree(normalized), choice_by_candidate
+    return sanitize_executor_tree(normalized), choice_by_candidate, semantic_by_coordinate
 
 
 def assert_index_free(value: Any, path: str = "root") -> None:

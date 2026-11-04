@@ -535,7 +535,20 @@ class FeatureFirewallTests(unittest.TestCase):
 
     def test_map_coordinates_are_joined_then_removed_while_topology_remains(self):
         action = {"scope": "game", "kind": "map", "idx1": 0, "idx2": 0, "idx3": 0}
-        features = [{"choice": {"availability": "available", "visibility": "public_now", "source": "source-backed map semantics", "value": {"choice_type": "map_route"}}}]
+        features = [{
+            "choice": {
+                "availability": "available",
+                "visibility": "public_now",
+                "source": "source-backed map semantics",
+                "value": {"choice_type": "map_route"},
+            },
+            "public_destination": {
+                "availability": "available",
+                "visibility": "public_now",
+                "source": "source-backed public route destination",
+                "value": {"location": "map_node", "x": 0, "y": 1, "room_symbol": "M"},
+            },
+        }]
         privileged = bound_privileged_projection("MAP_SCREEN", [action], features)
         graph = [
             {"x": 0, "y": 0, "room_symbol": "R", "outgoing_edges": [{"x": 0, "y": 1}]},
@@ -560,7 +573,14 @@ class FeatureFirewallTests(unittest.TestCase):
             return {**point, "x": point["x"] + 20, "y": point["y"] + 100}
 
         shifted_action = {**action, "idx1": action["idx1"] + 20}
-        shifted_privileged = bound_privileged_projection("MAP_SCREEN", [shifted_action], features)
+        shifted_features = [{
+            **features[0],
+            "public_destination": {
+                **features[0]["public_destination"],
+                "value": {"location": "map_node", "x": 20, "y": 101, "room_symbol": "M"},
+            },
+        }]
+        shifted_privileged = bound_privileged_projection("MAP_SCREEN", [shifted_action], shifted_features)
         shifted_graph = [
             {**shift(node), "outgoing_edges": [shift(edge) for edge in node["outgoing_edges"]]}
             for node in graph
@@ -579,11 +599,31 @@ class FeatureFirewallTests(unittest.TestCase):
         )
         second = feature_firewall.new_path_projection(shifted_privileged, shifted_public)
         self.assertEqual(first, second)
+        self.assertEqual(
+            first["candidates"][0]["features"]["public_destination"]["value"],
+            {"location": "map_node", "room_symbol": "M", "outgoing_room_symbols": ["S", "T"]},
+        )
         feature_firewall.assert_index_free(first)
         self.assertIn("outgoing_room_symbols", json.dumps(first, sort_keys=True))
         self.assertNotIn('"x"', json.dumps(first, sort_keys=True))
         self.assertNotIn('"y"', json.dumps(first, sort_keys=True))
 
+
+    def test_public_destination_feature_rejects_unknown_map_location(self):
+        action = {"scope": "game", "kind": "map", "idx1": 0, "idx2": 0, "idx3": 0}
+        privileged = bound_privileged_projection(
+            "MAP_SCREEN",
+            [action],
+            [{
+                "public_destination": {
+                    "availability": "available",
+                    "visibility": "public_now",
+                    "value": {"location": "native_target_index_17"},
+                }
+            }],
+        )
+        with self.assertRaisesRegex(ValueError, "not a native map-location enum"):
+            feature_firewall._check_privileged_projection(privileged)
 
     def test_native_final_map_edge_resolves_to_implicit_boss_entry(self):
         action = {"scope": "game", "kind": "map", "idx1": 3, "idx2": 0, "idx3": 0}
