@@ -66,7 +66,7 @@ def sample_payload(extra_offer: str = "Bash") -> dict:
     public = {
         "schema_id": "native-public-projection-v3",
         "screen_identity": {"availability": "available", "visibility": "public_now", "value": "CARD_REWARD"},
-        "persistent_resources": {"availability": "available", "visibility": "public_now", "value": {"gold": 88}},
+        "persistent_resources": {"availability": "available", "visibility": "public_now", "value": {"gold": {"availability": "available", "source": "GameContext::gold", "value": 88}}},
         "screen_payload": {"availability": "available", "visibility": "public_now", "value": {"coverage_status": "supported", "choices": choices}},
         "candidate_actions": {"availability": "available", "visibility": "public_now", "value": [
             *action_rows,

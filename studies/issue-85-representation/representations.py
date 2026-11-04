@@ -218,10 +218,34 @@ def _public_entity_set_vector(public_context: Any, dimension: int, *, device: to
     resources = public_context.get("persistent_resources", {})
     resource_value = resources.get("value", {}) if isinstance(resources, Mapping) else {}
     if isinstance(resource_value, Mapping):
-        for field in ("deck", "relics", "potion_identities", "keys"):
-            collection = resource_value.get(field)
-            if isinstance(collection, Sequence) and not isinstance(collection, (str, bytes)):
-                extend_sequence(field, collection)
+        for field in ("deck", "relics", "potion_identities"):
+            if field not in resource_value:
+                continue
+            field_envelope = resource_value[field]
+            if not isinstance(field_envelope, Mapping):
+                raise ValueError(f"public {field} resource is not an availability envelope")
+            availability = field_envelope.get("availability")
+            if availability == "available":
+                extend_sequence(field, field_envelope.get("value"))
+            elif availability == "unavailable":
+                if "value" in field_envelope:
+                    raise ValueError(f"unavailable public {field} resource carries a value")
+            else:
+                raise ValueError(f"public {field} resource has invalid availability")
+        if "keys" in resource_value:
+            key_envelope = resource_value["keys"]
+            if not isinstance(key_envelope, Mapping):
+                raise ValueError("public keys resource is not an availability envelope")
+            if key_envelope.get("availability") == "available":
+                key_flags = key_envelope.get("value")
+                if not isinstance(key_flags, Mapping):
+                    raise ValueError("available public key flags are not a mapping")
+                entities.append(("keys", key_flags))
+            elif key_envelope.get("availability") == "unavailable":
+                if "value" in key_envelope:
+                    raise ValueError("unavailable public keys resource carries a value")
+            else:
+                raise ValueError("public keys resource has invalid availability")
     extend_sequence("map_node", _nested_value(public_context.get("visible_map_graph")))
     extend_sequence("legal_route", _nested_value(public_context.get("immediately_legal_routes")))
     extend_sequence("screen_choice", public_context.get("screen_choices"))

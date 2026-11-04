@@ -342,22 +342,38 @@ def _check_public_projection(value: Any) -> None:
     if "persistent_resources" in root:
         envelope = _check_keys(root["persistent_resources"], _PUBLIC_ENVELOPE_KEYS, "persistent_resources")
         _check_public_envelope(envelope, "persistent_resources")
-        resources = _check_keys(envelope.get("value"), _PUBLIC_RESOURCE_KEYS, "persistent_resources.value")
-        for field in {"current_hp", "max_hp", "gold", "potion_count", "potion_capacity"}:
-            if field in resources and (isinstance(resources[field], bool) or not isinstance(resources[field], int)):
-                raise ValueError(f"persistent_resources.value.{field} must be an integer")
-        for field, allowed in (("deck", _CARD_KEYS), ("relics", _RELIC_KEYS), ("potion_identities", _POTION_KEYS)):
-            if field not in resources:
-                continue
-            entries = resources[field]
-            if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
-                raise ValueError(f"persistent_resources.value.{field} must be a sequence")
-            for i, item in enumerate(entries):
-                _check_snapshot(item, allowed, f"persistent_resources.value.{field}[{i}]")
-        if "keys" in resources:
-            flags = _check_keys(resources["keys"], _PUBLIC_KEY_FLAGS, "persistent_resources.value.keys")
-            if any(not isinstance(flag, bool) for flag in flags.values()):
-                raise ValueError("persistent_resources key flags must be booleans")
+        if envelope.get("availability") == "available":
+            resources = _check_keys(envelope.get("value"), _PUBLIC_RESOURCE_KEYS, "persistent_resources.value")
+            for field in {"current_hp", "max_hp", "gold", "potion_count", "potion_capacity"}:
+                if field not in resources:
+                    continue
+                available, field_value = _public_resource_field(
+                    resources[field], f"persistent_resources.value.{field}"
+                )
+                if available and (isinstance(field_value, bool) or not isinstance(field_value, int)):
+                    raise ValueError(f"persistent_resources.value.{field}.value must be an integer")
+            for field, allowed in (("deck", _CARD_KEYS), ("relics", _RELIC_KEYS), ("potion_identities", _POTION_KEYS)):
+                if field not in resources:
+                    continue
+                available, entries = _public_resource_field(
+                    resources[field], f"persistent_resources.value.{field}"
+                )
+                if not available:
+                    continue
+                if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
+                    raise ValueError(f"persistent_resources.value.{field}.value must be a sequence")
+                for i, item in enumerate(entries):
+                    _check_snapshot(item, allowed, f"persistent_resources.value.{field}.value[{i}]")
+            if "keys" in resources:
+                available, key_value = _public_resource_field(
+                    resources["keys"], "persistent_resources.value.keys"
+                )
+                if available:
+                    flags = _check_keys(key_value, _PUBLIC_KEY_FLAGS, "persistent_resources.value.keys.value")
+                    if any(not isinstance(flag, bool) for flag in flags.values()):
+                        raise ValueError("persistent_resources.value.keys.value flags must be booleans")
+        elif "value" in envelope:
+            raise ValueError("persistent_resources.value must be omitted when availability is unavailable")
     if "visible_map_graph" in root:
         envelope = _check_keys(root["visible_map_graph"], _PUBLIC_ENVELOPE_KEYS, "visible_map_graph")
         _check_public_envelope(envelope, "visible_map_graph")
@@ -490,6 +506,19 @@ def _check_public_envelope(envelope: Mapping[str, Any], path: str) -> None:
     for field in ("source", "reason"):
         if field in envelope and not isinstance(envelope[field], str):
             raise ValueError(f"{path}.{field} must be text")
+
+
+def _public_resource_field(value: Any, path: str) -> tuple[bool, Any]:
+    """Validate and unwrap one nested resource envelope from native V3."""
+    envelope = _check_keys(value, _PUBLIC_ENVELOPE_KEYS, path)
+    _check_public_envelope(envelope, path)
+    if envelope.get("availability") == "available":
+        if "value" not in envelope:
+            raise ValueError(f"{path} is available but has no value")
+        return True, envelope["value"]
+    if "value" in envelope:
+        raise ValueError(f"{path}.value must be omitted when availability is unavailable")
+    return False, None
 
 
 def _normalized_key(key: Any) -> str:
@@ -868,6 +897,21 @@ def _normalize_public_context(
                         clean.pop("candidate_index", None)
                         clean.pop("candidate_action", None)
                     semantic_value.append(sanitize_executor_tree(clean))
+        elif name == "persistent_resources":
+            semantic_value = {}
+            if not isinstance(value, Mapping):
+                raise ValueError("public persistent resource value is not a mapping")
+            for field_name, raw_field in value.items():
+                field_available, field_value = _public_resource_field(
+                    raw_field, f"persistent_resources.value.{field_name}"
+                )
+                if field_available:
+                    semantic_value[field_name] = {
+                        "availability": "available",
+                        "value": sanitize_executor_tree(field_value),
+                    }
+                else:
+                    semantic_value[field_name] = {"availability": "unavailable"}
         else:
             semantic_value = sanitize_executor_tree(value)
         return {"availability": "available", "visibility": "public_now", "value": semantic_value}

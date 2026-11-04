@@ -55,7 +55,21 @@ def public_projection(target_index: int) -> dict:
     return {
         "schema_id": "native-public-projection-v3",
         "screen_identity": {"availability": "available", "value": "CARD_SELECT"},
-        "persistent_resources": {"availability": "available", "value": {"deck": [{"id": 42, "name": "Strike_R", "upgraded": False}]}},
+        "persistent_resources": {
+            "availability": "available",
+            "source": "StepSimulator::publicProjection",
+            "value": {
+                "current_hp": {"availability": "available", "source": "GameContext::curHp", "value": 80},
+                "max_hp": {"availability": "available", "source": "GameContext::maxHp", "value": 80},
+                "gold": {"availability": "available", "source": "GameContext::gold", "value": 99},
+                "potion_count": {"availability": "available", "source": "GameContext::potionCount", "value": 0},
+                "potion_capacity": {"availability": "available", "source": "GameContext::potionCapacity", "value": 3},
+                "deck": {"availability": "available", "source": "GameContext::deck", "value": [{"id": 42, "name": "Strike_R", "upgraded": False}]},
+                "relics": {"availability": "available", "source": "GameContext::relics", "value": [{"id": 9, "name": "Burning Blood", "relic_index": 0}]},
+                "potion_identities": {"availability": "available", "source": "GameContext::potions", "value": []},
+                "keys": {"availability": "available", "source": "GameContext::keyFlags", "value": {"blue_key": False, "green_key": False, "red_key": False}},
+            },
+        },
         "screen_payload": {"availability": "available", "value": {"coverage_status": "supported", "choices": [{"candidate_index": 0, "candidate_action": {"scope": "event", "kind": "card_select", "idx1": target_index, "idx2": 0, "idx3": 0}, "choice_type": "card_select", "card": {"id": 42, "name": "Strike_R", "upgraded": False}}]}},
         "candidate_actions": {"availability": "available", "value": [{"scope": "event", "kind": "card_select", "idx1": target_index, "idx2": 0, "idx3": 0, "label": f"event.card_select idx1={target_index}"}]},
     }
@@ -103,20 +117,12 @@ def projection_with_legacy_indices(
 
 def public_projection_with_grandfathered_indices(target_index: int) -> dict:
     value = public_projection(target_index)
-    value["persistent_resources"] = {
-        "availability": "available",
-        "visibility": "public_now",
-        "value": {
-            "deck": [{"id": 42, "name": "Strike_R", "upgraded": False, "deck_index": target_index}],
-            "potion_identities": [{"id": 7, "name": "Fire Potion", "potion_index": target_index}],
-            "relics": [{"id": 9, "relicIndex": target_index}],
-            "potion_capacity": 3,
-            "potion_count": 2,
-        },
-    }
-    value["persistent_resources"]["value"]["relics"][0] = {
-        "id": 9, "name": "Burning Blood", "relic_index": target_index,
-    }
+    resources = value["persistent_resources"]["value"]
+    resources["deck"]["value"] = [{"id": 42, "name": "Strike_R", "upgraded": False, "deck_index": target_index}]
+    resources["potion_identities"]["value"] = [{"id": 7, "name": "Fire Potion", "potion_index": target_index}]
+    resources["relics"]["value"] = [{"id": 9, "name": "Burning Blood", "relic_index": target_index}]
+    resources["potion_capacity"]["value"] = 3
+    resources["potion_count"]["value"] = 2
     return value
 
 
@@ -179,6 +185,30 @@ class FeatureFirewallTests(unittest.TestCase):
             "immediately_legal_routes", "persistent_resources",
         ):
             self.assertEqual(result["public_context"][field]["visibility"], "public_now", field)
+
+    def test_native_public_v3_nested_resource_envelopes_are_unwrapped_and_sanitized(self):
+        result = feature_firewall.new_path_projection(projection(0), public_projection(0))
+        resources = result["public_context"]["persistent_resources"]["value"]
+        self.assertEqual(resources["gold"], {"availability": "available", "value": 99})
+        self.assertEqual(resources["potion_capacity"]["value"], 3)
+        self.assertEqual(resources["keys"]["value"]["blue_key"], False)
+        self.assertEqual(resources["deck"]["value"][0]["name"], "Strike_R")
+        self.assertNotIn("source", json.dumps(resources, sort_keys=True))
+        feature_firewall.assert_index_free(result)
+
+        malformed = public_projection(0)
+        malformed["persistent_resources"]["value"]["gold"] = 99
+        with self.assertRaisesRegex(ValueError, "persistent_resources.value.gold.*mapping"):
+            feature_firewall.new_path_projection(projection(0), malformed)
+
+    def test_unavailable_nested_public_resource_omits_the_value(self):
+        malformed = public_projection(0)
+        malformed["persistent_resources"]["value"]["gold"] = {
+            "availability": "unavailable",
+            "value": 99,
+        }
+        with self.assertRaisesRegex(ValueError, "gold.value must be omitted"):
+            feature_firewall.new_path_projection(projection(0), malformed)
 
     def test_unavailable_privileged_envelopes_cannot_carry_values(self):
         for target in ("shared", "candidate"):
@@ -278,8 +308,9 @@ class FeatureFirewallTests(unittest.TestCase):
             "relic_index",
         ):
             self.assertNotIn(key, serialized)
-        self.assertIn('"potion_capacity": 3', serialized)
-        self.assertIn('"potion_count": 2', serialized)
+        resources = first["public_context"]["persistent_resources"]["value"]
+        self.assertEqual(resources["potion_capacity"]["value"], 3)
+        self.assertEqual(resources["potion_count"]["value"], 2)
         self.assertIn("Strike_R", serialized)
         self.assertIn("Fire Potion", serialized)
         self.assertIn("Burning Blood", serialized)
@@ -379,9 +410,9 @@ class FeatureFirewallTests(unittest.TestCase):
 
         privileged = projection(3)
         public = public_projection(3)
-        public["persistent_resources"]["value"] = {
-            "deck": [{"id": 42, "name": "Strike_R", "upgraded": False, "deck_index": 3, "target_deck_hash": "sha256:3"}],
-        }
+        public["persistent_resources"]["value"]["deck"]["value"] = [
+            {"id": 42, "name": "Strike_R", "upgraded": False, "deck_index": 3, "target_deck_hash": "sha256:3"}
+        ]
         with self.assertRaisesRegex(ValueError, "unrecognized input field"):
             feature_firewall.new_path_projection(privileged, public)
 
@@ -521,7 +552,7 @@ class FeatureFirewallTests(unittest.TestCase):
             current_map_node={"availability": "available", "visibility": "public_now", "value": {"location": "map_node", "x": 0, "y": 0, "room_symbol": "R"}},
             immediately_legal_routes={"availability": "available", "visibility": "public_now", "value": [{**choice, "destination": choice["destination"].copy()}]},
             visible_act_boss={"availability": "available", "visibility": "public_now", "value": "THE_GUARDIAN"},
-            persistent_resources={"availability": "available", "visibility": "public_now", "value": {"gold": 88}},
+            persistent_resources={"availability": "available", "visibility": "public_now", "value": {"gold": {"availability": "available", "source": "GameContext::gold", "value": 88}}},
         )
         first = feature_firewall.new_path_projection(privileged, public)
 
@@ -544,7 +575,7 @@ class FeatureFirewallTests(unittest.TestCase):
             current_map_node={"availability": "available", "visibility": "public_now", "value": {"location": "map_node", "x": 20, "y": 100, "room_symbol": "R"}},
             immediately_legal_routes={"availability": "available", "visibility": "public_now", "value": [{**shifted_choice, "destination": shifted_destination.copy()}]},
             visible_act_boss={"availability": "available", "visibility": "public_now", "value": "THE_GUARDIAN"},
-            persistent_resources={"availability": "available", "visibility": "public_now", "value": {"gold": 88}},
+            persistent_resources={"availability": "available", "visibility": "public_now", "value": {"gold": {"availability": "available", "source": "GameContext::gold", "value": 88}}},
         )
         second = feature_firewall.new_path_projection(shifted_privileged, shifted_public)
         self.assertEqual(first, second)
