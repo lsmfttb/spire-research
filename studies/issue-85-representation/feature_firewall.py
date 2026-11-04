@@ -143,6 +143,8 @@ _PUBLIC_RESOURCE_KEYS = frozenset(
 _PUBLIC_KEY_FLAGS = frozenset({"blue_key", "green_key", "red_key"})
 _MAP_NODE_KEYS = frozenset({"x", "y", "room_symbol", "outgoing_edges"})
 _MAP_LOCATION_KEYS = frozenset({"location", "x", "y", "room_symbol"})
+_CURRENT_MAP_LOCATION_VALUES = frozenset({"before_first_route", "act_boss_entry", "map_node"})
+_ROUTE_MAP_LOCATION_VALUES = frozenset({"boss_entry", "map_node"})
 _SCREEN_PAYLOAD_KEYS = frozenset(
     {
         "coverage_status", "reason", "source", "choices", "map_graph",
@@ -364,8 +366,10 @@ def _check_public_projection(value: Any) -> None:
     if "current_map_node" in root:
         envelope = _check_keys(root["current_map_node"], _PUBLIC_ENVELOPE_KEYS, "current_map_node")
         _check_public_envelope(envelope, "current_map_node")
-        if isinstance(envelope.get("value"), Mapping):
-            _check_map_location(envelope["value"], "current_map_node.value")
+        if envelope.get("availability") == "available":
+            _check_map_location(
+                envelope.get("value"), "current_map_node.value", _CURRENT_MAP_LOCATION_VALUES
+            )
     if "immediately_legal_routes" in root:
         _check_public_route_list(root["immediately_legal_routes"], "immediately_legal_routes")
     if "screen_payload" in root:
@@ -405,8 +409,12 @@ def _check_public_projection(value: Any) -> None:
                         _check_snapshot(row["card"], _CARD_KEYS, f"screen_payload.value.cards[{i}].card")
             if "map_graph" in screen:
                 _check_map_graph(screen["map_graph"], "screen_payload.value.map_graph")
-            if "current_map_node" in screen and isinstance(screen["current_map_node"], Mapping):
-                _check_map_location(screen["current_map_node"], "screen_payload.value.current_map_node")
+            if "current_map_node" in screen:
+                _check_map_location(
+                    screen["current_map_node"],
+                    "screen_payload.value.current_map_node",
+                    _CURRENT_MAP_LOCATION_VALUES,
+                )
             if "legal_routes" in screen:
                 _check_public_route_list(
                     {"availability": "available", "value": screen["legal_routes"]},
@@ -432,8 +440,12 @@ def _check_public_route_list(envelope: Any, path: str) -> None:
             raise ValueError(f"{path}.value[{i}].sapphire_key_is_lost must be boolean")
         if "candidate_action" in item:
             _check_action(item["candidate_action"], f"{path}.value[{i}].candidate_action")
-        if isinstance(item.get("destination"), Mapping):
-            _check_keys(item["destination"], _MAP_LOCATION_KEYS, f"{path}.value[{i}].destination")
+        if "destination" in item:
+            _check_map_location(
+                item["destination"],
+                f"{path}.value[{i}].destination",
+                _ROUTE_MAP_LOCATION_VALUES,
+            )
         for key, allowed in (("card", _CARD_KEYS), ("relic", _RELIC_KEYS), ("relic_removed_with_key", _RELIC_KEYS), ("potion", _POTION_KEYS)):
             if isinstance(item.get(key), Mapping):
                 _check_snapshot(item[key], allowed, f"{path}.value[{i}].{key}")
@@ -457,10 +469,11 @@ def _check_map_graph(graph: Any, path: str) -> None:
                 raise ValueError(f"{path}[{i}].outgoing_edges[{j}] coordinates must be integers")
 
 
-def _check_map_location(value: Any, path: str) -> None:
+def _check_map_location(value: Any, path: str, allowed_locations: frozenset[str]) -> None:
     row = _check_keys(value, _MAP_LOCATION_KEYS, path)
-    if "location" in row and not isinstance(row["location"], str):
-        raise ValueError(f"{path}.location must be text")
+    location = row.get("location")
+    if not isinstance(location, str) or location not in allowed_locations:
+        raise ValueError(f"{path}.location is not a native map-location enum")
     if "room_symbol" in row and not isinstance(row["room_symbol"], str):
         raise ValueError(f"{path}.room_symbol must be text")
     for key in ("x", "y"):
@@ -699,19 +712,23 @@ def _map_graph_semantics(graph: Any) -> tuple[list[dict[str, Any]], dict[tuple[i
     return nodes, semantic_by_coordinate
 
 
-def _map_location(value: Any, semantic_by_coordinate: Mapping[tuple[int, int], Mapping[str, Any]]) -> Any:
+def _map_location(
+    value: Any,
+    semantic_by_coordinate: Mapping[tuple[int, int], Mapping[str, Any]],
+    allowed_locations: frozenset[str],
+) -> Any:
     if not isinstance(value, Mapping):
-        return sanitize_executor_tree(value)
+        raise ValueError("map location must be a source-defined mapping")
     location = value.get("location")
+    if not isinstance(location, str) or location not in allowed_locations:
+        raise ValueError("map location is not a native map-location enum")
     if location == "map_node":
         coordinate = (value.get("x"), value.get("y"))
         node = semantic_by_coordinate.get(coordinate)
         if node is None:
             raise ValueError("current/target map coordinate does not resolve to visible topology")
         return {"location": "map_node", **dict(node)}
-    if location in {"before_first_route", "act_boss_entry", "boss_entry"}:
-        return {"location": location}
-    return sanitize_executor_tree(value)
+    return {"location": location}
 
 
 def _normalize_public_context(
@@ -783,7 +800,9 @@ def _normalize_public_context(
                 if isinstance(destination_x, bool) or not isinstance(destination_x, int) or identity["kind"] != "map" or identity["idx1"] != destination_x:
                     raise ValueError("map-route action index does not bind to its visible destination")
         if isinstance(semantic.get("destination"), Mapping):
-            semantic["destination"] = _map_location(semantic["destination"], semantic_by_coordinate)
+            semantic["destination"] = _map_location(
+                semantic["destination"], semantic_by_coordinate, _ROUTE_MAP_LOCATION_VALUES
+            )
         choice_by_candidate[candidate_index] = sanitize_executor_tree(semantic)
 
         identity = action_identities[candidate_index]
@@ -818,7 +837,9 @@ def _normalize_public_context(
         if name in {"visible_map_graph"}:
             semantic_value = map_nodes
         elif name in {"current_map_node"}:
-            semantic_value = _map_location(value, semantic_by_coordinate)
+            semantic_value = _map_location(
+                value, semantic_by_coordinate, _CURRENT_MAP_LOCATION_VALUES
+            )
         elif name == "immediately_legal_routes":
             semantic_value = []
             if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
@@ -839,7 +860,11 @@ def _normalize_public_context(
                                 if isinstance(destination_x, bool) or not isinstance(destination_x, int) or action_identities[candidate_index]["kind"] != "map" or action_identities[candidate_index]["idx1"] != destination_x:
                                     raise ValueError("immediately legal map route does not bind to its visible destination")
                         if isinstance(clean.get("destination"), Mapping):
-                            clean["destination"] = _map_location(clean["destination"], semantic_by_coordinate)
+                            clean["destination"] = _map_location(
+                                clean["destination"],
+                                semantic_by_coordinate,
+                                _ROUTE_MAP_LOCATION_VALUES,
+                            )
                         clean.pop("candidate_index", None)
                         clean.pop("candidate_action", None)
                     semantic_value.append(sanitize_executor_tree(clean))

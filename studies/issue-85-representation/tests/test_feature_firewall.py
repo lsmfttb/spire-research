@@ -385,6 +385,123 @@ class FeatureFirewallTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unrecognized input field"):
             feature_firewall.new_path_projection(privileged, public)
 
+    def test_unknown_map_location_values_fail_closed_at_every_public_path(self):
+        action = {"scope": "game", "kind": "map", "idx1": 0, "idx2": 0, "idx3": 0}
+        features = [
+            {
+                "choice": {
+                    "availability": "available",
+                    "visibility": "public_now",
+                    "value": {"choice_type": "map_route"},
+                }
+            }
+        ]
+        graph = [
+            {"x": 0, "y": 0, "room_symbol": "R", "outgoing_edges": [{"x": 0, "y": 1}]},
+            {"x": 0, "y": 1, "room_symbol": "M", "outgoing_edges": []},
+        ]
+        destination = {"location": "map_node", "x": 0, "y": 1, "room_symbol": "M"}
+        choice = {
+            "candidate_index": 0,
+            "candidate_action": action.copy(),
+            "choice_type": "map_route",
+            "destination": destination.copy(),
+        }
+
+        def make_public():
+            return v3_projection(
+                "MAP_SCREEN",
+                [action],
+                {"coverage_status": "supported", "choices": [choice.copy()]},
+                visible_map_graph={
+                    "availability": "available",
+                    "visibility": "public_now",
+                    "value": graph,
+                },
+                current_map_node={
+                    "availability": "available",
+                    "visibility": "public_now",
+                    "value": {"location": "map_node", "x": 0, "y": 0, "room_symbol": "R"},
+                },
+                immediately_legal_routes={
+                    "availability": "available",
+                    "visibility": "public_now",
+                    "value": [choice.copy()],
+                },
+            )
+
+        def corrupt(public, path, location):
+            bad = {"location": location, "x": 0, "y": 1, "room_symbol": "M"}
+            if path == "current_map_node":
+                public["current_map_node"]["value"] = bad
+            elif path == "screen_current_map_node":
+                public["screen_payload"]["value"]["current_map_node"] = bad
+            elif path == "screen_choice_destination":
+                public["screen_payload"]["value"]["choices"][0]["destination"] = bad
+            elif path == "screen_legal_route_destination":
+                public["screen_payload"]["value"]["legal_routes"] = [choice.copy()]
+                public["screen_payload"]["value"]["legal_routes"][0]["destination"] = bad
+            elif path == "immediately_legal_route_destination":
+                public["immediately_legal_routes"]["value"][0]["destination"] = bad
+            else:
+                raise AssertionError(path)
+
+        paths = (
+            "current_map_node",
+            "screen_current_map_node",
+            "screen_choice_destination",
+            "screen_legal_route_destination",
+            "immediately_legal_route_destination",
+        )
+        for path in paths:
+            for location in ("native_target_index_17", "map_node_index_17"):
+                with self.subTest(path=path, location=location):
+                    public = make_public()
+                    corrupt(public, path, location)
+                    with self.assertRaisesRegex(ValueError, "not a native map-location enum"):
+                        feature_firewall.new_path_projection(
+                            bound_privileged_projection("MAP_SCREEN", [action], features),
+                            public,
+                        )
+
+    def test_map_location_sentinels_are_path_specific(self):
+        current_locations = ("before_first_route", "act_boss_entry")
+        route_locations = ("boss_entry",)
+        for location in current_locations:
+            with self.subTest(path="current", location=location):
+                feature_firewall._check_map_location(
+                    {"location": location}, "current_map_node.value",
+                    feature_firewall._CURRENT_MAP_LOCATION_VALUES,
+                )
+                self.assertEqual(
+                    feature_firewall._map_location(
+                        {"location": location}, {}, feature_firewall._CURRENT_MAP_LOCATION_VALUES
+                    ),
+                    {"location": location},
+                )
+        for location in route_locations:
+            with self.subTest(path="route", location=location):
+                feature_firewall._check_map_location(
+                    {"location": location}, "destination",
+                    feature_firewall._ROUTE_MAP_LOCATION_VALUES,
+                )
+                self.assertEqual(
+                    feature_firewall._map_location(
+                        {"location": location}, {}, feature_firewall._ROUTE_MAP_LOCATION_VALUES
+                    ),
+                    {"location": location},
+                )
+        with self.assertRaisesRegex(ValueError, "not a native map-location enum"):
+            feature_firewall._check_map_location(
+                {"location": "boss_entry"}, "current_map_node.value",
+                feature_firewall._CURRENT_MAP_LOCATION_VALUES,
+            )
+        with self.assertRaisesRegex(ValueError, "not a native map-location enum"):
+            feature_firewall._check_map_location(
+                {"location": "before_first_route"}, "destination",
+                feature_firewall._ROUTE_MAP_LOCATION_VALUES,
+            )
+
     def test_map_coordinates_are_joined_then_removed_while_topology_remains(self):
         action = {"scope": "game", "kind": "map", "idx1": 0, "idx2": 0, "idx3": 0}
         features = [{"choice": {"availability": "available", "visibility": "public_now", "source": "source-backed map semantics", "value": {"choice_type": "map_route"}}}]
