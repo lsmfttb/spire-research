@@ -160,6 +160,16 @@ def v3_projection(screen: str, actions: list[dict], payload: dict, **fields) -> 
     return result
 
 
+def native_public_room_symbol(value: str) -> dict:
+    """Mirror the nested privilegedChoiceFeature emitted by the locked native source."""
+    return {
+        "availability": "available",
+        "visibility": "public_now",
+        "source": "MapNode::getRoomSymbol",
+        "value": value,
+    }
+
+
 class FeatureFirewallTests(unittest.TestCase):
     def test_native_public_v3_envelopes_get_explicit_public_visibility(self):
         public = public_projection(0)
@@ -533,7 +543,7 @@ class FeatureFirewallTests(unittest.TestCase):
                 feature_firewall._ROUTE_MAP_LOCATION_VALUES,
             )
 
-    def test_map_coordinates_are_joined_then_removed_while_topology_remains(self):
+    def test_exact_native_map_destination_is_canonical_and_oracle_fields_are_excluded(self):
         action = {"scope": "game", "kind": "map", "idx1": 0, "idx2": 0, "idx3": 0}
         features = [{
             "choice": {
@@ -546,7 +556,18 @@ class FeatureFirewallTests(unittest.TestCase):
                 "availability": "available",
                 "visibility": "public_now",
                 "source": "source-backed public route destination",
-                "value": {"location": "map_node", "x": 0, "y": 1, "room_symbol": "M"},
+                "value": {
+                    "location": "map_node",
+                    "x": 0,
+                    "y": 1,
+                    "public_room_symbol": native_public_room_symbol("M"),
+                },
+            },
+            "oracle_destination_room": {
+                "availability": "available",
+                "visibility": "oracle_only",
+                "source": "MapNode::room; distinguishes hidden EVENT room contents",
+                "value": "EVENT",
             },
         }]
         privileged = bound_privileged_projection("MAP_SCREEN", [action], features)
@@ -577,7 +598,12 @@ class FeatureFirewallTests(unittest.TestCase):
             **features[0],
             "public_destination": {
                 **features[0]["public_destination"],
-                "value": {"location": "map_node", "x": 20, "y": 101, "room_symbol": "M"},
+                "value": {
+                    "location": "map_node",
+                    "x": 20,
+                    "y": 101,
+                    "public_room_symbol": native_public_room_symbol("M"),
+                },
             },
         }]
         shifted_privileged = bound_privileged_projection("MAP_SCREEN", [shifted_action], shifted_features)
@@ -603,6 +629,8 @@ class FeatureFirewallTests(unittest.TestCase):
             first["candidates"][0]["features"]["public_destination"]["value"],
             {"location": "map_node", "room_symbol": "M", "outgoing_room_symbols": ["S", "T"]},
         )
+        self.assertNotIn("oracle_destination_room", first["candidates"][0]["features"])
+        self.assertEqual(features[0]["oracle_destination_room"]["value"], "EVENT")
         feature_firewall.assert_index_free(first)
         self.assertIn("outgoing_room_symbols", json.dumps(first, sort_keys=True))
         self.assertNotIn('"x"', json.dumps(first, sort_keys=True))
@@ -627,7 +655,24 @@ class FeatureFirewallTests(unittest.TestCase):
 
     def test_native_final_map_edge_resolves_to_implicit_boss_entry(self):
         action = {"scope": "game", "kind": "map", "idx1": 3, "idx2": 0, "idx3": 0}
-        features = [{"choice": {"availability": "available", "visibility": "public_now", "value": {"choice_type": "map_route"}}}]
+        features = [{
+            "choice": {"availability": "available", "visibility": "public_now", "value": {"choice_type": "map_route"}},
+            "public_destination": {
+                "availability": "available",
+                "visibility": "public_now",
+                "source": "GameContext::map and MapNode public room symbols",
+                "value": {
+                    "location": "act_boss_entry",
+                    "public_room_symbol": native_public_room_symbol("B"),
+                },
+            },
+            "oracle_destination_encounter": {
+                "availability": "available",
+                "visibility": "oracle_only",
+                "source": "GameContext::boss; underlying room encounter",
+                "value": "THE_GUARDIAN",
+            },
+        }]
         privileged = bound_privileged_projection("MAP_SCREEN", [action], features)
         graph = [{"x": 3, "y": 14, "room_symbol": "R", "outgoing_edges": [{"x": 3, "y": 15}]}]
         choice = {"candidate_index": 0, "candidate_action": action.copy(), "choice_type": "map_route", "destination": {"location": "boss_entry"}}
@@ -643,14 +688,70 @@ class FeatureFirewallTests(unittest.TestCase):
         result = feature_firewall.new_path_projection(privileged, public)
         self.assertEqual(result["public_context"]["visible_map_graph"]["value"], [{"room_symbol": "R", "outgoing_room_symbols": ["boss_entry"]}])
         self.assertEqual(result["public_context"]["immediately_legal_routes"]["value"][0]["destination"], {"location": "boss_entry"})
+        self.assertEqual(
+            result["candidates"][0]["features"]["public_destination"]["value"],
+            {"location": "boss_entry"},
+        )
+        self.assertNotIn("oracle_destination_encounter", result["candidates"][0]["features"])
+        self.assertEqual(features[0]["oracle_destination_encounter"]["value"], "THE_GUARDIAN")
         serialized = json.dumps(result, sort_keys=True)
         feature_firewall.assert_index_free(result)
         self.assertNotIn('"x"', serialized)
         self.assertNotIn('"y"', serialized)
+        self.assertNotIn("act_boss_entry", serialized)
+        self.assertNotIn("oracle_destination_encounter", serialized)
         with self.assertRaisesRegex(ValueError, "does not resolve to a visible node"):
             feature_firewall._map_graph_semantics([
                 {"x": 3, "y": 14, "room_symbol": "R", "outgoing_edges": [{"x": 4, "y": 15}]},
             ])
+
+    def test_native_destination_nested_public_symbol_is_validated_and_topology_bound(self):
+        action = {"scope": "game", "kind": "map", "idx1": 0, "idx2": 0, "idx3": 0}
+        feature = {
+            "public_destination": {
+                "availability": "available",
+                "visibility": "public_now",
+                "value": {
+                    "location": "map_node",
+                    "x": 0,
+                    "y": 1,
+                    "public_room_symbol": native_public_room_symbol("M"),
+                },
+            }
+        }
+        privileged = bound_privileged_projection("MAP_SCREEN", [action], [feature])
+        graph = [
+            {"x": 0, "y": 0, "room_symbol": "R", "outgoing_edges": [{"x": 0, "y": 1}]},
+            {"x": 0, "y": 1, "room_symbol": "M", "outgoing_edges": []},
+        ]
+        public = v3_projection(
+            "MAP_SCREEN",
+            [action],
+            {
+                "coverage_status": "supported",
+                "choices": [{
+                    "candidate_index": 0,
+                    "candidate_action": action.copy(),
+                    "choice_type": "map_route",
+                    "destination": {"location": "map_node", "x": 0, "y": 1, "room_symbol": "M"},
+                }],
+            },
+            visible_map_graph={"availability": "available", "visibility": "public_now", "value": graph},
+        )
+        invalid_visibility = json.loads(json.dumps(privileged))
+        invalid_visibility["candidates"][0]["features"]["public_destination"]["value"]["public_room_symbol"]["visibility"] = "oracle_only"
+        with self.assertRaisesRegex(ValueError, "available public_now text symbol"):
+            feature_firewall.new_path_projection(invalid_visibility, public)
+
+        mismatched_symbol = json.loads(json.dumps(privileged))
+        mismatched_symbol["candidates"][0]["features"]["public_destination"]["value"]["public_room_symbol"]["value"] = "X"
+        with self.assertRaisesRegex(ValueError, "disagrees with visible topology"):
+            feature_firewall.new_path_projection(mismatched_symbol, public)
+
+        missing_symbol = json.loads(json.dumps(privileged))
+        del missing_symbol["candidates"][0]["features"]["public_destination"]["value"]["public_room_symbol"]
+        with self.assertRaisesRegex(ValueError, "public_room_symbol is required"):
+            feature_firewall.new_path_projection(missing_symbol, public)
         with self.assertRaisesRegex(ValueError, "does not resolve to a visible node"):
             feature_firewall._map_graph_semantics([
                 {"x": 1, "y": 3, "room_symbol": "M", "outgoing_edges": [{"x": 3, "y": 15}]},

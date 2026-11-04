@@ -94,6 +94,9 @@ _FEATURE_ROOT_KEYS = frozenset(
         "current_strength", "gold_available", "item", "price",
     }
 )
+_ORACLE_DESTINATION_FEATURE_KEYS = frozenset(
+    {"oracle_destination_encounter", "oracle_destination_room"}
+)
 _FEATURE_ENVELOPE_KEYS = frozenset(
     {"availability", "visibility", "source", "required_for_choice_semantics", "reason", "value"}
 )
@@ -142,9 +145,9 @@ _PUBLIC_RESOURCE_KEYS = frozenset(
 )
 _PUBLIC_KEY_FLAGS = frozenset({"blue_key", "green_key", "red_key"})
 _MAP_NODE_KEYS = frozenset({"x", "y", "room_symbol", "outgoing_edges"})
-_MAP_LOCATION_KEYS = frozenset({"location", "x", "y", "room_symbol"})
+_MAP_LOCATION_KEYS = frozenset({"location", "x", "y", "room_symbol", "public_room_symbol"})
 _CURRENT_MAP_LOCATION_VALUES = frozenset({"before_first_route", "act_boss_entry", "map_node"})
-_ROUTE_MAP_LOCATION_VALUES = frozenset({"boss_entry", "map_node"})
+_ROUTE_MAP_LOCATION_VALUES = frozenset({"act_boss_entry", "boss_entry", "map_node"})
 _SCREEN_PAYLOAD_KEYS = frozenset(
     {
         "coverage_status", "reason", "source", "choices", "map_graph",
@@ -303,10 +306,18 @@ def _check_privileged_projection(value: Any) -> None:
             elif name == "item":
                 _check_known_semantic_tree(payload, frozenset(_CARD_KEYS | _POTION_KEYS | _RELIC_KEYS), f"candidates[{index}].features.item.value")
             elif name == "public_destination":
+                if (
+                    envelope.get("availability") != "available"
+                    or envelope.get("visibility") != "public_now"
+                ):
+                    raise ValueError(
+                        f"candidates[{index}].features.public_destination must be available and public_now"
+                    )
                 _check_map_location(
                     payload,
                     f"candidates[{index}].features.public_destination.value",
                     _ROUTE_MAP_LOCATION_VALUES,
+                    require_public_room_symbol=True,
                 )
             elif isinstance(payload, (Mapping, Sequence)) and not isinstance(payload, (str, bytes)):
                 raise ValueError(f"candidates[{index}].features.{name}.value must be a scalar")
@@ -491,13 +502,31 @@ def _check_map_graph(graph: Any, path: str) -> None:
                 raise ValueError(f"{path}[{i}].outgoing_edges[{j}] coordinates must be integers")
 
 
-def _check_map_location(value: Any, path: str, allowed_locations: frozenset[str]) -> None:
+def _check_map_location(
+    value: Any,
+    path: str,
+    allowed_locations: frozenset[str],
+    *,
+    require_public_room_symbol: bool = False,
+) -> None:
     row = _check_keys(value, _MAP_LOCATION_KEYS, path)
     location = row.get("location")
     if not isinstance(location, str) or location not in allowed_locations:
         raise ValueError(f"{path}.location is not a native map-location enum")
     if "room_symbol" in row and not isinstance(row["room_symbol"], str):
         raise ValueError(f"{path}.room_symbol must be text")
+    if require_public_room_symbol and "public_room_symbol" not in row:
+        raise ValueError(f"{path}.public_room_symbol is required by the locked native route schema")
+    if "public_room_symbol" in row:
+        symbol_path = f"{path}.public_room_symbol"
+        symbol_envelope = _check_keys(row["public_room_symbol"], _FEATURE_ENVELOPE_KEYS, symbol_path)
+        symbol = _check_feature_envelope(symbol_envelope, symbol_path)
+        if (
+            symbol_envelope.get("availability") != "available"
+            or symbol_envelope.get("visibility") != "public_now"
+            or not isinstance(symbol, str)
+        ):
+            raise ValueError(f"{symbol_path} must contain an available public_now text symbol")
     for key in ("x", "y"):
         if key in row and (isinstance(row[key], bool) or not isinstance(row[key], int)):
             raise ValueError(f"{path}.{key} must be an integer")
@@ -652,7 +681,12 @@ def new_path_projection(
         features = candidate.get("features")
         if not isinstance(features, Mapping):
             raise ValueError("candidate has no semantic feature mapping")
-        candidate_rows.append({"kind": identity["kind"], "features": sanitize_executor_tree(features)})
+        learned_features = {
+            name: envelope
+            for name, envelope in features.items()
+            if name not in _ORACLE_DESTINATION_FEATURE_KEYS
+        }
+        candidate_rows.append({"kind": identity["kind"], "features": sanitize_executor_tree(learned_features)})
         action_identities.append(identity)
 
     public_context, choice_by_candidate, semantic_by_coordinate = _normalize_public_context(
@@ -781,7 +815,18 @@ def _map_location(
         node = semantic_by_coordinate.get(coordinate)
         if node is None:
             raise ValueError("current/target map coordinate does not resolve to visible topology")
+        source_symbol = value.get("room_symbol")
+        nested_symbol = value.get("public_room_symbol")
+        if isinstance(nested_symbol, Mapping):
+            source_symbol = nested_symbol.get("value")
+        if source_symbol is not None and source_symbol != node["room_symbol"]:
+            raise ValueError("map destination public room symbol disagrees with visible topology")
         return {"location": "map_node", **dict(node)}
+    if location == "act_boss_entry" and allowed_locations == _ROUTE_MAP_LOCATION_VALUES:
+        symbol = value.get("public_room_symbol")
+        if isinstance(symbol, Mapping) and symbol.get("value") != "B":
+            raise ValueError("native act_boss_entry public room symbol is not the boss-entry marker")
+        return {"location": "boss_entry"}
     return {"location": location}
 
 
