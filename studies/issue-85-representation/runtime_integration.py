@@ -477,6 +477,43 @@ def install_issue85_runtime(
 
     executor._decode_trial = decode_trial
 
+    def owner_training_outcome(value: Any):
+        """Adapt the locked #84 wrapper without changing its saved trial data."""
+        base = getattr(value, "base", None)
+        if base is None:
+            raise ValueError("Issue 85 training outcome is missing its #84 base trial")
+
+        owner_seed = getattr(value, "owner_seed", None)
+        if isinstance(owner_seed, (bool, np.bool_)) or not isinstance(owner_seed, (int, np.integer)):
+            raise ValueError("Issue 85 training outcome has an invalid owner seed")
+
+        complete = getattr(base, "complete", None)
+        heart_win = getattr(base, "heart_win", None)
+        terminal_floor = getattr(base, "terminal_floor", None)
+        decisions = getattr(base, "decisions", None)
+        if not isinstance(complete, (bool, np.bool_)) or not bool(complete):
+            raise ValueError("Issue 85 actor updates require complete #84 base trials")
+        if not isinstance(heart_win, (bool, np.bool_)):
+            raise ValueError("Issue 85 training outcome has an invalid Heart-win flag")
+        if isinstance(terminal_floor, (bool, np.bool_)) or not isinstance(
+            terminal_floor, (int, float, np.integer, np.floating),
+        ) or not np.isfinite(float(terminal_floor)):
+            raise ValueError("Issue 85 training outcome has a non-finite terminal floor")
+        if decisions is None or isinstance(decisions, (str, bytes)):
+            raise ValueError("Issue 85 training outcome is missing its #84 decisions")
+        try:
+            decisions = tuple(decisions)
+        except TypeError as exc:
+            raise ValueError("Issue 85 training outcome decisions are not iterable") from exc
+
+        return gradients.OwnerOutcome(
+            owner_seed=int(owner_seed),
+            heart_win=bool(heart_win),
+            terminal_floor=float(terminal_floor),
+            decisions=decisions,
+            complete=bool(complete),
+        )
+
     def owner_loss(actor: Any, example: Any, *, arm: str, block_examples: Any, **kwargs: Any):
         if not _is_issue85_arm(actor, arm_type):
             return original_owner_loss(actor, example, arm=arm, block_examples=block_examples, **kwargs)
@@ -487,6 +524,8 @@ def install_issue85_runtime(
             raise ValueError("Issue 85 actor updates are limited to the registered B–F arms")
         if selected_arm != str(actor.arm).upper():
             raise ValueError("Issue 85 training arm does not match the actor's registered arm")
+        example = owner_training_outcome(example)
+        block_examples = [owner_training_outcome(row) for row in block_examples]
         gradients._check_block(block_examples)
         matched = [i for i, row in enumerate(block_examples) if int(row.owner_seed) == int(example.owner_seed)]
         if not example.complete or len(matched) != 1 or float(block_examples[matched[0]].reward) != float(example.reward):

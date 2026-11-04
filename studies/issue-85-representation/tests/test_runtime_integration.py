@@ -96,14 +96,28 @@ class BaseDecision:
 class Trial:
     complete: bool
     decisions: tuple
+    heart_win: bool = False
+    terminal_floor: float = 0.0
 
 
 @dataclass(frozen=True)
-class Owner:
+class OwnerTrainingExample:
     owner_seed: int
-    reward: float
-    complete: bool
+    base: Trial | None
+    joint_trajectories: tuple = ()
+
+
+@dataclass(frozen=True)
+class OwnerOutcome:
+    owner_seed: int
+    heart_win: bool
+    terminal_floor: float
     decisions: tuple
+    complete: bool = True
+
+    @property
+    def reward(self):
+        return 100.0 * float(self.heart_win) + float(self.terminal_floor)
 
 
 class RuntimeIntegrationTests(unittest.TestCase):
@@ -157,7 +171,12 @@ class RuntimeIntegrationTests(unittest.TestCase):
                     )
                     for row in rows
                 )
-                return Trial(complete=payload["complete"], decisions=decisions)
+                return Trial(
+                    complete=payload["complete"],
+                    decisions=decisions,
+                    heart_win=payload.get("heart_win", False),
+                    terminal_floor=payload.get("terminal_floor", 0.0),
+                )
 
         class Runtime:
             @staticmethod
@@ -180,10 +199,29 @@ class RuntimeIntegrationTests(unittest.TestCase):
         class Gradients:
             T_REF = 36.6474609375
             ENTROPY_COEFFICIENT = 0.01
+            OwnerOutcome = OwnerOutcome
 
-            @staticmethod
-            def _check_block(_block):
-                return None
+            def __init__(gradient_self):
+                gradient_self.checked_blocks = []
+
+            def _check_block(gradient_self, block):
+                gradient_self.checked_blocks.append(block)
+                if not block or any(not row.complete for row in block):
+                    raise ValueError("actor updates require nonempty complete owner outcomes")
+                if len({row.owner_seed for row in block}) != len(block):
+                    raise ValueError("owner seeds must be unique")
+
+            def minibatch_loss(gradient_self, actor, examples, **kwargs):
+                losses = [
+                    gradient_self.owner_loss(
+                        actor,
+                        row,
+                        arm=kwargs["arm"],
+                        block_examples=kwargs["block_examples"],
+                    )[0]
+                    for row in examples
+                ]
+                return torch.stack(losses).mean()
 
             @staticmethod
             def _feature_matrix(decision):
@@ -369,7 +407,7 @@ class RuntimeIntegrationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported feature width"):
             _pack_matrix(np.ones((2, 2), dtype=np.float32))
 
-    def test_owner_loss_uses_exact_registered_length_only_formula(self):
+    def test_minibatch_loss_adapts_locked_training_wrappers_and_preserves_length_only_formula(self):
         legacy = np.zeros((3, 2048), dtype=np.float32)
         legacy[:, 0] = [1.0, 2.0, 3.0]
         wide = np.zeros((3, 8192), dtype=np.float32)
@@ -389,13 +427,18 @@ class RuntimeIntegrationTests(unittest.TestCase):
                     wide_candidate_features=wide if arm in {"B", "D"} else None,
                     legacy_sha256="fixture-legacy-digest",
                 )
-                owner = Owner(1, 2.0, True, (decision,))
+                owner = OwnerTrainingExample(
+                    1, Trial(True, (decision,), heart_win=True, terminal_floor=2.0),
+                )
                 block = [
                     owner,
-                    Owner(2, 0.0, True, (decision,)),
+                    OwnerTrainingExample(
+                        2, Trial(True, (decision,), heart_win=False, terminal_floor=0.0),
+                    ),
                 ]
-                loss, diagnostics = self.gradients.owner_loss(
-                    actor, owner, arm=arm, block_examples=block,
+                self.gradients.checked_blocks.clear()
+                loss = self.gradients.minibatch_loss(
+                    actor, [owner], arm=arm, block_examples=block,
                 )
                 features = wide if arm in {"B", "D"} else legacy
                 _logits, logp, entropy = actor.distribution(
@@ -406,9 +449,34 @@ class RuntimeIntegrationTests(unittest.TestCase):
                     - self.gradients.ENTROPY_COEFFICIENT * entropy
                 )
                 torch.testing.assert_close(loss, expected)
-                self.assertEqual(diagnostics["decision_count"], 1.0)
+                normalized = self.gradients.checked_blocks[-1]
+                self.assertTrue(all(isinstance(row, OwnerOutcome) for row in normalized))
+                self.assertEqual([row.owner_seed for row in normalized], [1, 2])
+                self.assertEqual([row.reward for row in normalized], [102.0, 0.0])
+                self.assertTrue(normalized[0].heart_win)
+                self.assertIs(normalized[0].decisions[0], decision)
                 loss.backward()
                 self.assertNotEqual(float(actor.weight.grad), 0.0)
+
+    def test_owner_loss_rejects_invalid_locked_owner_training_wrappers(self):
+        actor = FakeIssue85Policy("B")
+        decision = Issue85Decision(
+            BaseDecision(np.zeros((3, 2048), dtype=np.float32), 0),
+            payload=None,
+            wide_candidate_features=np.zeros((3, 8192), dtype=np.float32),
+            legacy_sha256="fixture-legacy-digest",
+        )
+        valid = OwnerTrainingExample(1, Trial(True, (decision,), False, 2.0))
+        invalid = [
+            (OwnerTrainingExample(1, None), "missing its #84 base trial"),
+            (OwnerTrainingExample(True, Trial(True, (decision,), False, 2.0)), "invalid owner seed"),
+            (OwnerTrainingExample(1, Trial(False, (decision,), False, 2.0)), "require complete #84 base trials"),
+            (OwnerTrainingExample(1, Trial(True, (decision,), False, float("nan"))), "non-finite terminal floor"),
+        ]
+        for owner, message in invalid:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    self.gradients.owner_loss(actor, owner, arm="B", block_examples=[valid])
 
     def test_owner_loss_rejects_an_arm_label_that_differs_from_actor(self):
         actor = FakeIssue85Policy("C")
@@ -418,7 +486,7 @@ class RuntimeIntegrationTests(unittest.TestCase):
             wide_candidate_features=None,
             legacy_sha256="fixture-legacy-digest",
         )
-        owner = Owner(1, 2.0, True, (decision,))
+        owner = OwnerTrainingExample(1, Trial(True, (decision,), False, 2.0))
         with self.assertRaisesRegex(ValueError, "does not match"):
             self.gradients.owner_loss(
                 actor, owner, arm="B", block_examples=[owner],
