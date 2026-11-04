@@ -1,0 +1,95 @@
+{
+  "schema_id": "issue85-representation-contract-v1",
+  "study_id": "issue-85-representation",
+  "scope": "STUDY_ONLY",
+  "authority": {
+    "github_issue": "https://github.com/lsmfttb/spire-research/issues/85",
+    "planner_decision": "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-6621197800",
+    "superseded_planner_decision": "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-6619666950",
+    "decision_code": "PRE_PILOT_LEGACY_INDEX_AMENDMENT_APPROVED",
+    "source_contract_amendment": true
+  },
+  "legacy_backbone_index_amendment": {
+    "decision_comment_id": 6621197800,
+    "legacy_encoder": {
+      "repository": "lsmfttb/spire-research",
+      "commit": "40191f365d9b64390dab0025c77ea9c1c2915175",
+      "file": "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
+      "sha256": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381"
+    },
+    "allowed_paths": [
+      {
+        "path": "candidates[*].features.target_deck_index",
+        "visibility": "oracle_only",
+        "source": "SelectScreenCard::deckIdx / native physical target occurrence",
+        "scope": "unchanged historical encoder backbone only"
+      },
+      {
+        "path": "shared_context.deck.value[*].deck_index",
+        "visibility": "public_now",
+        "source": "GameContext::deck / cardIdentitySnapshot",
+        "scope": "unchanged historical encoder backbone only"
+      },
+      {
+        "path": "shared_context.potions.value[*].potion_index",
+        "visibility": "public_now",
+        "source": "GameContext::potions / gamePotionSnapshot",
+        "scope": "unchanged historical encoder backbone only"
+      },
+      {
+        "path": "shared_context.relics.value[*].relic_index",
+        "visibility": "public_now",
+        "source": "GameContext::relics / relicSnapshot",
+        "scope": "unchanged historical encoder backbone only"
+      }
+    ],
+    "new_learned_paths": "strictly index-free: exclude raw values, aliases, and numeric/string/hashed encodings of executor positions and identifiers",
+    "unanticipated_legacy_position_fields": "Log exact path, visibility, source, and interpretation in the same provenance note without changing the frozen baseline or automatically requesting another Planner exception. Escalate if the field carries hidden future/outcome information, requires a changed native/legacy schema, or is proposed for a new learned path.",
+    "interpretation": "All P/A and B-F actors retain the same historical index-bearing backbone. Contrasts are relative to that frozen legacy input, not an index-free policy. Widened-hash effects may also reflect changed use of inherited positional signals.",
+    "out_of_domain_mutation_warning": "The 0-to-100000 controlled index mutations are structural transmission witnesses, not natural-game effect sizes or causal gameplay estimates."
+  },
+  "registered_design_unchanged": {
+    "parent": "exact frozen Issue 82 pi12; no training",
+    "baseline": "exact Issue 84 B1024; no retraining",
+    "new_training_arms": ["B", "C", "D", "E", "F"],
+    "training_owners_per_arm": 1024,
+    "validation": {"owners": [8510001, 8510064], "policies": 7, "games": 448},
+    "test": {"owners": [8520001, 8520320], "policies": 7, "games": 2240},
+    "formal_games": 7808,
+    "pilot_owners": [8530001, 8530016],
+    "pilot_is_nonformal_and_only_if_needed": true
+  },
+  "arms": {
+    "A": "reused B1024; original 2048 signed-hash scorer",
+    "B": "8192-dimensional hash lift; same registered semantics",
+    "C": "2048 scorer plus flat candidate-context residual",
+    "D": "8192 hash lift plus flat candidate-context residual",
+    "E": "2048 scorer plus typed relational residual over A's existing information",
+    "F": "full context plus typed all-choice-set/entity/reward-group/map relational residual"
+  },
+  "training": {
+    "algorithm": "Issue 84 B LENGTH_ONLY",
+    "t_ref": 36.6474609375,
+    "entropy_coefficient": 0.01,
+    "adamw_learning_rate": 0.0003,
+    "owners_per_block": 128,
+    "updates_per_block": 64,
+    "minibatch_owners": 32,
+    "first_block_optimizer_steps": [64, 128],
+    "later_block_optimizer_steps": [0, 64],
+    "battle_search": "frozen full-state Battle Search-v2@400 with original potion-capable semantics"
+  },
+  "analysis": {
+    "primary_endpoint": "mean terminal floor on 320 fresh TEST owners",
+    "confirmatory_contrasts": ["B-A", "C-A", "E-A", "F-A"],
+    "bootstrap_resamples": 20000,
+    "owner_clustered_paired_resampling": true,
+    "familywise_error_control": "Holm step-down on preregistered owner-bootstrap two-sided tests"
+  },
+  "runtime_policy": {
+    "do_not_infer_new_cap_from_issue84": true,
+    "measure_actual_representative_cost_before_formal": true,
+    "record_active_physical_wall_time_and_real_concurrency": true,
+    "escalate_only_if_materially_infeasible_under_owner_policy": true
+  }
+}

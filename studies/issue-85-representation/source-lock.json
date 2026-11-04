@@ -1,0 +1,156 @@
+{
+  "schema_id": "issue85-source-lock-v2",
+  "study_id": "issue-85-representation",
+  "scope": "STUDY_ONLY",
+  "registered_issue": 85,
+  "planner_decision_comment_id": 6621197800,
+  "superseded_planner_decision_comment_id": 6619666950,
+  "issue85_base_source_commit": "b94849ba643c9a3be7d02602a3a9d889aeb1b2ca",
+  "legacy_backbone_index_amendment": {
+    "decision_code": "PRE_PILOT_LEGACY_INDEX_AMENDMENT_APPROVED",
+    "legacy_encoder_commit": "40191f365d9b64390dab0025c77ea9c1c2915175",
+    "legacy_encoder_file": "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
+    "legacy_encoder_sha256": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
+    "historical_legacy_index_paths": [
+      {
+        "path": "candidates[*].features.target_deck_index",
+        "visibility": "oracle_only",
+        "native_source": "SelectScreenCard::deckIdx; physical target occurrence for execution"
+      },
+      {
+        "path": "shared_context.deck.value[*].deck_index",
+        "visibility": "public_now",
+        "native_source": "GameContext::deck / cardIdentitySnapshot"
+      },
+      {
+        "path": "shared_context.potions.value[*].potion_index",
+        "visibility": "public_now",
+        "native_source": "GameContext::potions / gamePotionSnapshot"
+      },
+      {
+        "path": "shared_context.relics.value[*].relic_index",
+        "visibility": "public_now",
+        "native_source": "GameContext::relics / relicSnapshot"
+      }
+    ],
+    "shared_context_native_source_lines": {
+      "potion_index": {"snapshot_lines": [595, 602], "projection_lines": [5099, 5100]},
+      "deck_index": {"snapshot_lines": [605, 615], "projection_lines": [5101, 5102]},
+      "relic_index": {"snapshot_lines": [681, 688], "projection_lines": [5103, 5104]}
+    },
+    "scope": "Existing locked #73 encoder path only; retained in exact P/A and inherited B-F backbone inputs.",
+    "new_learned_paths": "Must exclude all four raw values, aliases and numeric/string/hashed encodings, plus other opaque executor identifiers/indices/bits.",
+    "unanticipated_legacy_position_fields": "Log exact path, visibility, source and interpretation in the same provenance note without changing the frozen baseline or automatically requesting another Planner exception; escalate hidden future/outcome information, native/legacy schema changes, or proposed use in a new learned path.",
+    "interpretation_limit": "Registered contrasts are against the historical index-bearing backbone, not an index-free policy; widened hash may change use of inherited positional signals.",
+    "out_of_domain_mutation_warning": "The archived 0-to-100000 changes establish structural transmission only, not natural-game effect sizes or causal gameplay estimates.",
+    "audit_report_data_path": "issue85/preflight/historical-backbone-index-audit-20261104T0240Z.json",
+    "audit_report_sha256": "a447994b0bf8ca18da64f6cf704cd804b52d2e635eaf6ab5ba7d4549c7521365"
+  },
+  "native": {
+    "repository": "lsmfttb/sts_lightspeed",
+    "branch": "stsrl/main",
+    "commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+    "source_file": "bindings/slaythespire.cpp",
+    "source_file_git_blob_sha1": "24e1cad5f2d405f55f8ccb038078d9f49e78adf7",
+    "target_deck_index_paths": [
+      {"line": 1691, "source": "ScreenStateInfo::skillCardDeckIdx/powerCardDeckIdx/attackCardDeckIdx"},
+      {"line": 1816, "source": "ScreenStateInfo::cardIdx"},
+      {"line": 2068, "source": "SelectScreenCard::deckIdx; physical target occurrence for execution"}
+    ],
+    "compiled_module_data_path": "stsrl-spikes/build-issue71-8ded-py313/slaythespire.cpython-313-x86_64-linux-gnu.so",
+    "compiled_module_sha256": "bb22332a4a7108e8f9691482df2624b3b132d75ca07e1aa7b394b932193e5cad"
+  },
+  "prior_preflight_evidence": [
+    {
+      "report_data_path": "issue85/preflight/baseline-source-verification-20261104T0140Z.json",
+      "sha256": "5824874a926b340c25cd98184ef5a232ee593289372dde3ac0d4e8904a68c4b3",
+      "purpose": "Existing P/A checkpoint, ancestry and source-lock verification; retained without rerun."
+    },
+    {
+      "report_data_path": "issue85/preflight/native-card-select-witness-20261104T0213Z.json",
+      "sha256": "ad8c81b0817c5b39f0651173eff64cabe04d6c92a266cd2d56acbc21e3f3913c",
+      "purpose": "Existing authentic P/A CARD_SELECT output and target_deck_index path witness; retained without rerun."
+    }
+  ],
+  "native_decision_witness": {
+    "source_snapshot_data_path": "issue84/sources/issue73-40191f365d9b64390dab0025c77ea9c1c2915175-issue84-runtime-v2/source-snapshot.json",
+    "source_snapshot_sha256": "ad708cac50493e29a9e00d3fbceb1fb4046bbe5517a1a33918b1c088cefee5fd",
+    "source_commit": "40191f365d9b64390dab0025c77ea9c1c2915175",
+    "root_data_path": "issue84/sources/issue73-40191f365d9b64390dab0025c77ea9c1c2915175-issue84-runtime-v2/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/stage0/roots/root-173730003-0003.json",
+    "root_sha256": "d1751f4bbb083b547d5e0fcb8b93fbe1edeaeecae7a53069c1a15e7133f492f7",
+    "run_receipt_data_path": "issue84/sources/issue73-40191f365d9b64390dab0025c77ea9c1c2915175-issue84-runtime-v2/studies/issue-73-privileged-noncombat-oracle-stage0/receipts/stage0/debug-owner-runs/173730003.json",
+    "run_receipt_sha256": "5f8774d472ed143fa0efae480e8436f6dd74b4f4be60dc900a10d34d1210309d",
+    "run_id": "DEBUG_173730003",
+    "owner_seed": 173730003,
+    "root_id": "root-173730003-0003",
+    "owner_decision_index": 3,
+    "screen": "CARD_SELECT",
+    "target_deck_index_source": "SelectScreenCard::deckIdx; physical target occurrence for execution"
+  },
+  "stsr_source": {
+    "repository": "lsmfttb/STSRL",
+    "commit": "7d172f7c24c9d29429b6946ba44f6b59760b0d96",
+    "data_path": "issue81/sources/STSRL"
+  },
+  "model_source": {
+    "repository": "lsmfttb/spire-research",
+    "commit": "556128df66797bf979d36b56b6920ac88bab5b35",
+    "files": [
+      {
+        "path": "studies/issue-84-six-arm/upstream/issue-75-no-expert-oracle/model.py",
+        "sha256": "a13ad1e1094b795bf87548fea42a7aaf22c8867550b30a3523484318bc6825e6"
+      },
+      {
+        "path": "studies/issue-84-six-arm/upstream/issue-75-no-expert-oracle/algorithm.py",
+        "sha256": "7bf537dab5cadc5098b494ab9c25197706f036662bbdbe0034a46326f1b5451b"
+      }
+    ],
+    "same_files_in_training_and_accepted_commits": [
+      "d7e7ac5e93255787e6b55e25bd3f1197c396c8c2",
+      "556128df66797bf979d36b56b6920ac88bab5b35"
+    ]
+  },
+  "legacy_encoder": {
+    "repository": "lsmfttb/spire-research",
+    "commit": "40191f365d9b64390dab0025c77ea9c1c2915175",
+    "file": "studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
+    "sha256": "574e879acaef423eaf6e7b31762c372138e7204d717b42c54052dc793a455381",
+    "data_path": "issue84/sources/issue73-40191f365d9b64390dab0025c77ea9c1c2915175-issue84-runtime-v2/studies/issue-73-privileged-noncombat-oracle-stage0/policy.py",
+    "local_vendored_path": "upstream/issue73-policy.py",
+    "target_deck_index_in_forbidden_keys": false
+  },
+  "baseline_P": {
+    "issue82_execution_commit": "8f88f1554821707db6228d2de384f2334ec2615b",
+    "checkpoint_data_path": "issue82/artifacts/formal/8f88f1554821707db6228d2de384f2334ec2615b/models/pi12.pt",
+    "checkpoint_sha256": "6f72fdd60d684e4667f2357ba578f84f6e087a18d4d3944c65bf1e0aabd0cf19",
+    "model_digest": "7c530520b5e107702575f9c8e612bff70e345b5c73715c33aa16eb75e00653ee",
+    "optimizer_data_path": "issue82/artifacts/formal/8f88f1554821707db6228d2de384f2334ec2615b/models/block-11-step.pt",
+    "optimizer_sha256": "96a5599f389be0a90adfab2a245b88359a166b5b859101688200a492be893993",
+    "optimizer_step": 64
+  },
+  "baseline_A": {
+    "issue84_training_package_commit": "d7e7ac5e93255787e6b55e25bd3f1197c396c8c2",
+    "issue84_training_source_lock_sha256": "be8df93a5116e4412c3bdb1eea408bc3ba5378b2a4cec494b091efc38bd23c24",
+    "issue84_final_accepted_source_commit": "556128df66797bf979d36b56b6920ac88bab5b35",
+    "issue84_final_accepted_source_lock_sha256": "58ce736dbab1ac750e6e5771f644391610930ec4e9a87876f013bfd28838ef52",
+    "issue84_contract_sha256": "9f6b9da60092ad8162310f64c66ebd5dab628e0b1e8e56c363b664c06cdd31b5",
+    "checkpoint_data_path": "issue84/artifacts/formal/d7e7ac5e93255787e6b55e25bd3f1197c396c8c2/B/models/pi20.pt",
+    "checkpoint_sha256": "6503bfac29b2a2f2f57550171df290b58b40986530e700240ee6bfa919ad07ac",
+    "model_digest": "40b7ba96aac7e79d477339acc01d501c3cc9b6bc9aab794fbb52c784a9b4105a",
+    "training_owners": [8400001, 8401024],
+    "training_owner_count": 1024,
+    "completed_blocks": [0, 7],
+    "block_count": 8,
+    "source_lock_sha256_in_block_receipts": "be8df93a5116e4412c3bdb1eea408bc3ba5378b2a4cec494b091efc38bd23c24"
+  },
+  "model_runtime": {
+    "python_data_path": "stsrl-spikes/py313-torch/bin/python3.13",
+    "python_sha256": "bd6137c8855ac3b679cde2b7b4620518f2a017bbb5a15d7c3b3b5a23ea30c18a",
+    "python_version": "3.13.13",
+    "numpy_version": "2.4.6",
+    "torch_version": "2.12.0+cpu",
+    "architecture_dimension": 2048,
+    "initial_model_seed": 73507501,
+    "final_weight_std": 0.01
+  }
+}
