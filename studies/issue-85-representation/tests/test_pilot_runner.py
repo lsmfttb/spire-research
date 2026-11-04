@@ -74,6 +74,30 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertFalse(pilot_runner._pilot_training_example_is_usable(decision_free))
         self.assertFalse(pilot_runner._pilot_training_example_is_usable(wrong_shape))
 
+    def test_initial_parity_uses_locked_wrapper_and_widened_hash_helper(self):
+        import torch
+
+        class FakePolicy:
+            def eval(self):
+                return self
+
+            def logits(self, features, payload=None):
+                return torch.zeros(features.shape[0], dtype=torch.float32)
+
+        decision = SimpleNamespace(
+            candidate_features=torch.zeros((2, 2048), dtype=torch.float32),
+            wide_candidate_features=torch.zeros((2, 8192), dtype=torch.float32),
+            issue85_payload={},
+        )
+        example = SimpleNamespace(base=SimpleNamespace(decisions=[decision]))
+
+        result = pilot_runner._initial_parity(
+            FakePolicy(), FakePolicy(), [example], arm="B",
+        )
+
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["captured_native_training_decisions"], 1)
+
     def test_predecessor_progress_requires_exact_fixed_successful_b_cohort(self):
         rows = [
             {

@@ -1225,7 +1225,7 @@ def _verify_baselines(backend: Any, issue84_driver: Any, pilot_root: Path) -> di
 
 def _initial_parity(actor: Any, parent: Any, examples: Sequence[Any], *, arm: str) -> dict[str, Any]:
     import torch
-    from feature_firewall import fold_widened_hash_features
+    from representations import fold_widened_hash_features
 
     max_logit_error = 0.0
     max_probability_error = 0.0
@@ -1234,7 +1234,13 @@ def _initial_parity(actor: Any, parent: Any, examples: Sequence[Any], *, arm: st
     parent.eval()
     with torch.no_grad():
         for owner in examples:
-            for decision in owner.decisions:
+            base = getattr(owner, "base", None)
+            if base is None:
+                raise RuntimeError("captured Issue 84 training example has no base wrapper")
+            owner_decisions = getattr(base, "decisions", None)
+            if owner_decisions is None:
+                raise RuntimeError("captured Issue 84 training example base has no decisions")
+            for decision in owner_decisions:
                 legacy = torch.as_tensor(decision.candidate_features, dtype=torch.float32)
                 if arm in {"B", "D"}:
                     wide = torch.as_tensor(decision.wide_candidate_features, dtype=torch.float32)
