@@ -611,6 +611,10 @@ class FeatureFirewallTests(unittest.TestCase):
             feature_firewall._map_graph_semantics([
                 {"x": 3, "y": 14, "room_symbol": "R", "outgoing_edges": [{"x": 4, "y": 15}]},
             ])
+        with self.assertRaisesRegex(ValueError, "does not resolve to a visible node"):
+            feature_firewall._map_graph_semantics([
+                {"x": 1, "y": 3, "room_symbol": "M", "outgoing_edges": [{"x": 3, "y": 15}]},
+            ])
 
 if __name__ == "__main__":
     unittest.main()

@@ -729,9 +729,9 @@ def _map_graph_semantics(graph: Any) -> tuple[list[dict[str, Any]], dict[tuple[i
                 or not isinstance(child_y, int)
             ):
                 raise ValueError("visible map edge lacks source-backed x/y association coordinates")
-            # Locked native Map.cpp adds (3, 15) as a synthetic boss-entry target;
-            # publicMapGraphSnapshot emits its edge but intentionally no vertex.
-            if (child_x, child_y) == (3, 15):
+            # Locked native Map.cpp adds (3, 15) only from source row 14;
+            # publicMapGraphSnapshot emits the edge but intentionally no vertex.
+            if coordinate[1] == 14 and (child_x, child_y) == (3, 15):
                 children.append("boss_entry")
                 continue
             target = by_coordinate.get((child_x, child_y))
