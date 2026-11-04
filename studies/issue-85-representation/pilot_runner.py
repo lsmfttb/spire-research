@@ -1303,6 +1303,16 @@ def _load_pilot_training_examples(
     return examples
 
 
+def _pilot_training_example_is_usable(example: Any) -> bool:
+    """Check completeness through the locked #84 OwnerTrainingExample.base API."""
+    base = getattr(example, "base", None)
+    return (
+        base is not None
+        and bool(getattr(base, "complete", False))
+        and bool(getattr(base, "decisions", ()))
+    )
+
+
 def _train_pilot_arm(
     backend: Any,
     issue84_driver: Any,
@@ -1332,7 +1342,7 @@ def _train_pilot_arm(
     )
     if len(examples) != len(PILOT_OWNERS) or len({int(row.owner_seed) for row in examples}) != len(PILOT_OWNERS):
         raise RuntimeError(f"pilot actor update for {arm} needs 16 unique complete owner outcomes")
-    if any(not row.complete or not row.decisions for row in examples):
+    if any(not _pilot_training_example_is_usable(row) for row in examples):
         raise RuntimeError(f"pilot actor update for {arm} contains an incomplete/decision-free game")
     owner_sha = sha256(",".join(str(int(row.owner_seed)) for row in examples).encode("ascii"))
     update_root = root / "pilot-updates" / arm

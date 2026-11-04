@@ -54,6 +54,26 @@ class PilotRunnerTests(unittest.TestCase):
             "package": pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
         })
 
+    def test_training_example_eligibility_matches_locked_issue84_wrapper(self):
+        complete = SimpleNamespace(
+            owner_seed=8530001,
+            base=SimpleNamespace(complete=True, decisions=[object()]),
+        )
+        incomplete = SimpleNamespace(
+            owner_seed=8530002,
+            base=SimpleNamespace(complete=False, decisions=[object()]),
+        )
+        decision_free = SimpleNamespace(
+            owner_seed=8530003,
+            base=SimpleNamespace(complete=True, decisions=[]),
+        )
+        wrong_shape = SimpleNamespace(owner_seed=8530004, complete=True, decisions=[object()])
+
+        self.assertTrue(pilot_runner._pilot_training_example_is_usable(complete))
+        self.assertFalse(pilot_runner._pilot_training_example_is_usable(incomplete))
+        self.assertFalse(pilot_runner._pilot_training_example_is_usable(decision_free))
+        self.assertFalse(pilot_runner._pilot_training_example_is_usable(wrong_shape))
+
     def test_predecessor_progress_requires_exact_fixed_successful_b_cohort(self):
         rows = [
             {
