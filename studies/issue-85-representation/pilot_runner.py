@@ -172,13 +172,29 @@ def trailing_failure_streak(events: Sequence[tuple[str, float, str]]) -> int:
     return streak
 
 
-def pilot_plan() -> dict[str, Any]:
+def pilot_plan(*, resume_from: str | None = None) -> dict[str, Any]:
+    if resume_from not in (None, PILOT_RESUME_PREDECESSOR_SHA):
+        raise ValueError("pilot plan names an unregistered predecessor source")
+    training_cohort_games = len(NEW_ARMS) * len(PILOT_OWNERS)
+    evaluation_cohort_games = len(POLICIES) * len(PILOT_OWNERS)
+    planned_reused_receipts = len(PILOT_OWNERS) if resume_from is not None else 0
+    new_training_slots = training_cohort_games - planned_reused_receipts
+    new_evaluation_slots = evaluation_cohort_games
+    new_slots = new_training_slots + new_evaluation_slots
     return {
         "scope": "PILOT_ONLY / NONFORMAL",
+        "resume_from": resume_from,
         "owner_ids": list(PILOT_OWNERS),
-        "training_games": len(NEW_ARMS) * len(PILOT_OWNERS),
-        "evaluation_games": len(POLICIES) * len(PILOT_OWNERS),
-        "pilot_game_executions": (len(NEW_ARMS) + len(POLICIES)) * len(PILOT_OWNERS),
+        "training_cohort_games": training_cohort_games,
+        "evaluation_cohort_games": evaluation_cohort_games,
+        "training_games": training_cohort_games,
+        "evaluation_games": evaluation_cohort_games,
+        "planned_reused_predecessor_training_receipts": planned_reused_receipts,
+        "new_training_game_slots_before_retries": new_training_slots,
+        "new_evaluation_game_slots_before_retries": new_evaluation_slots,
+        "new_game_slots_before_retries": new_slots,
+        "unique_pilot_game_outcomes": training_cohort_games + evaluation_cohort_games,
+        "pilot_game_executions": new_slots,
         "formal_games": 0,
         "concurrency": 8,
         "retry_limit_per_owner": MAX_ATTEMPTS_PER_OWNER,
@@ -613,7 +629,7 @@ def _load_predecessor_b_training(
         "summary": summary,
         "receipt_root": receipt_root,
         "unit_receipts": unit_receipts,
-        "active_wall_seconds_before_resume": float(progress["cumulative_active_wall_seconds"]),
+        "predecessor_progress_snapshot_active_wall_seconds": float(progress["cumulative_active_wall_seconds"]),
         "source_diff_paths": changed_paths,
     }
 
@@ -636,7 +652,9 @@ def _predecessor_receipt_document(predecessor: Mapping[str, Any], *, current_ide
         "successful_unit_ids": sorted(str(row["unit_id"]) for row in predecessor["rows"]),
         "validated_unit_receipts": predecessor["unit_receipts"],
         "successful_game_count": len(predecessor["rows"]),
-        "active_wall_seconds_before_resume": predecessor["active_wall_seconds_before_resume"],
+        "predecessor_progress_snapshot_active_wall_seconds": predecessor[
+            "predecessor_progress_snapshot_active_wall_seconds"
+        ],
         "reuse_rule": "reference the immutable predecessor receipt chains; do not copy, relabel, or rerun those games",
     }
 
@@ -2251,7 +2269,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--resume-from", help="reuse strict completed pilot receipts from the exact registered predecessor source")
     args = parser.parse_args(argv)
     if args.plan:
-        print(json.dumps(pilot_plan(), sort_keys=True))
+        print(json.dumps(pilot_plan(resume_from=args.resume_from), sort_keys=True))
         return 0
 
     if args.issue84_source is None:

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import io
+import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -435,11 +438,71 @@ class PilotRunnerTests(unittest.TestCase):
 
     def test_plan_keeps_formal_cohorts_out_of_pilot(self):
         plan = pilot_runner.pilot_plan()
+        self.assertIsNone(plan["resume_from"])
+        self.assertEqual(plan["training_cohort_games"], 80)
+        self.assertEqual(plan["evaluation_cohort_games"], 112)
         self.assertEqual(plan["training_games"], 80)
         self.assertEqual(plan["evaluation_games"], 112)
+        self.assertEqual(plan["planned_reused_predecessor_training_receipts"], 0)
+        self.assertEqual(plan["new_training_game_slots_before_retries"], 80)
+        self.assertEqual(plan["new_evaluation_game_slots_before_retries"], 112)
+        self.assertEqual(plan["new_game_slots_before_retries"], 192)
+        self.assertEqual(plan["unique_pilot_game_outcomes"], 192)
         self.assertEqual(plan["pilot_game_executions"], 192)
         self.assertEqual(plan["formal_games"], 0)
         self.assertEqual(plan["owner_ids"], list(range(8_530_001, 8_530_017)))
+
+    def test_continuation_plan_separates_reused_receipts_new_slots_and_outcomes(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = pilot_runner.main([
+                "--plan",
+                "--resume-from",
+                pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
+            ])
+
+        self.assertEqual(result, 0)
+        plan = json.loads(output.getvalue())
+        self.assertEqual(plan["resume_from"], pilot_runner.PILOT_RESUME_PREDECESSOR_SHA)
+        self.assertEqual(plan["training_cohort_games"], 80)
+        self.assertEqual(plan["evaluation_cohort_games"], 112)
+        self.assertEqual(plan["training_games"], 80)
+        self.assertEqual(plan["evaluation_games"], 112)
+        self.assertEqual(plan["planned_reused_predecessor_training_receipts"], 16)
+        self.assertEqual(plan["new_training_game_slots_before_retries"], 64)
+        self.assertEqual(plan["new_evaluation_game_slots_before_retries"], 112)
+        self.assertEqual(plan["new_game_slots_before_retries"], 176)
+        self.assertEqual(plan["unique_pilot_game_outcomes"], 192)
+        self.assertEqual(plan["pilot_game_executions"], 176)
+        self.assertEqual(plan["formal_games"], 0)
+
+    def test_plan_rejects_unregistered_predecessor(self):
+        with self.assertRaisesRegex(ValueError, "unregistered predecessor source"):
+            pilot_runner.pilot_plan(resume_from="a" * 40)
+
+    def test_reuse_manifest_names_the_progress_snapshot_clock_value(self):
+        predecessor = {
+            "source_commit": pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
+            "root": Path("predecessor-root"),
+            "progress_sha256": "progress-sha",
+            "seed_table_sha256": "seed-sha",
+            "seed_table": {"rows_sha256": "rows-sha"},
+            "summary": {"successful_completions": 16},
+            "source_diff_paths": ["pilot_runner.py"],
+            "rows": [{"unit_id": "PILOT-TRAIN:B:8530001"}],
+            "unit_receipts": [{"unit_id": "PILOT-TRAIN:B:8530001"}],
+            "predecessor_progress_snapshot_active_wall_seconds": 94.170648168,
+        }
+        document = pilot_runner._predecessor_receipt_document(
+            predecessor,
+            current_identity={
+                "package_commit": "b" * 40,
+                "source_lock_sha256": "lock-sha",
+            },
+        )
+
+        self.assertEqual(document["predecessor_progress_snapshot_active_wall_seconds"], 94.170648168)
+        self.assertNotIn("active_wall_seconds_before_resume", document)
 
     def test_forecast_does_not_mislabel_partial_components_as_all_in(self):
         training = {
