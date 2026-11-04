@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -153,22 +154,178 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertFalse(pilot_runner.stage_summary_is_complete(incomplete, 16))
         self.assertFalse(pilot_runner.stage_summary_is_complete({**complete, "status": "INCOMPLETE"}, 16))
 
-    def test_resume_skip_requires_a_valid_receipt_for_every_owner(self):
-        class Receipts:
-            valid = {"owner-1"}
+    @staticmethod
+    def _receipt_backend():
+        class Backend:
+            @staticmethod
+            def unit_key(unit_id):
+                return str(unit_id)
 
-            @classmethod
-            def existing_success(cls, _root, row, _commit):
-                return {"status": "SUCCEEDED"} if row["unit_id"] in cls.valid else None
+            @staticmethod
+            def source_lock_sha():
+                return "source-lock-sha"
 
-        rows = [{"unit_id": "owner-1"}, {"unit_id": "owner-2"}]
-        self.assertFalse(pilot_runner.stage_receipts_are_complete(
-            Receipts, root=Path("unused"), rows=rows, package_commit="commit",
-        ))
-        Receipts.valid = {"owner-1", "owner-2"}
-        self.assertTrue(pilot_runner.stage_receipts_are_complete(
-            Receipts, root=Path("unused"), rows=rows, package_commit="commit",
-        ))
+        return Backend
+
+    def _write_pilot_success_chain(self, root, row, *, attempt_name="attempt-0001"):
+        root = Path(root)
+        attempt = root / "units" / str(row["unit_id"]) / attempt_name
+        attempt.mkdir(parents=True)
+        run_id = f"{row['unit_id']}-{attempt_name}"
+        package_commit = "a" * 40
+        result_path = attempt / "result.json"
+        job = {
+            "schema_id": "issue79-owner-worker-job-v1",
+            "artifact_root": str(root.resolve()),
+            "attempt_dir": str(attempt.resolve()),
+            "result_path": str(result_path.resolve()),
+            "output_dir": str((attempt / "native").resolve()),
+            "run_id": run_id,
+            "unit_id": row["unit_id"],
+            "phase": row["phase"],
+            "row": dict(row),
+            "pilot": True,
+            "package_commit": package_commit,
+            "runner_code_commit": package_commit,
+            "source_lock_sha256": "source-lock-sha",
+        }
+        started = {
+            "schema_id": "issue79-owner-attempt-start-v1",
+            "unit_id": row["unit_id"],
+            "owner_seed": row["owner_seed"],
+            "arm": row["arm"],
+            "run_id": run_id,
+            "pid": 1234,
+            "started_utc": "2026-11-03T00:00:00Z",
+            "started_monotonic": 1.0,
+            "package_commit": package_commit,
+            "seed_row_sha256": pilot_runner.sha256(pilot_runner.canonical(dict(row))),
+        }
+        result = {
+            "schema_id": "issue75-stage1-unit-result-v1",
+            "status": "SUCCEEDED",
+            "package_commit": package_commit,
+            "source_lock_sha256": "source-lock-sha",
+            "runner_code_commit": package_commit,
+            "unit_id": row["unit_id"],
+            "phase": row["phase"],
+            "formal": False,
+            "owner_seed": row["owner_seed"],
+            "game_seed": row["game_seed"],
+            "arm": row["arm"],
+            "paired_owner_key": row["paired_owner_key"],
+            "terminal_outcome": "WIN",
+            "terminal_floor": 16,
+            "resource": {
+                "worker_process_cpu_seconds": 0.5,
+                "worker_wall_seconds": 1.0,
+                "ledger_run_id": run_id,
+            },
+        }
+        pilot_runner._write_once(attempt / "worker-job.json", job)
+        pilot_runner._write_once(attempt / "started.json", started)
+        pilot_runner._write_once(result_path, result)
+        pilot_runner._write_once(attempt / "finished.json", {
+            "schema_id": "issue79-owner-attempt-finish-v1",
+            "unit_id": row["unit_id"],
+            "run_id": run_id,
+            "status": "SUCCEEDED",
+            "finished_utc": "2026-11-03T00:00:01Z",
+            "finished_monotonic": 2.0,
+            "result_sha256": pilot_runner.file_sha256(result_path),
+        })
+        return attempt, result_path
+
+    @staticmethod
+    def _pilot_row(unit_id="owner-1", owner_seed=1):
+        return {
+            "unit_id": unit_id,
+            "phase": "evaluation",
+            "arm": "A",
+            "formal": False,
+            "owner_seed": owner_seed,
+            "game_seed": owner_seed,
+            "paired_owner_key": f"pilot-{owner_seed}",
+        }
+
+    def test_resume_skip_requires_a_valid_receipt_chain_for_every_owner(self):
+        rows = [self._pilot_row("owner-1", 1), self._pilot_row("owner-2", 2)]
+        backend = self._receipt_backend()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "evaluation" / "A"
+            self._write_pilot_success_chain(root, rows[0])
+            self.assertFalse(pilot_runner.stage_receipts_are_complete(
+                backend, root=root, rows=rows, package_commit="a" * 40,
+            ))
+            self._write_pilot_success_chain(root, rows[1])
+            self.assertTrue(pilot_runner.stage_receipts_are_complete(
+                backend, root=root, rows=rows, package_commit="a" * 40,
+            ))
+
+    def test_success_rejects_missing_job_start_or_finish_receipt(self):
+        backend = self._receipt_backend()
+        row = self._pilot_row()
+        for missing in ("worker-job.json", "started.json", "finished.json"):
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary) / "evaluation" / "A"
+                attempt, _ = self._write_pilot_success_chain(root, row)
+                (attempt / missing).unlink()
+                with self.assertRaisesRegex(RuntimeError, "complete job/start/finish/result chain"):
+                    pilot_runner.pilot_success_record(
+                        backend, root=root, row=row, package_commit="a" * 40,
+                    )
+
+    def test_success_rejects_source_and_frozen_row_binding_mismatches(self):
+        backend = self._receipt_backend()
+        row = self._pilot_row()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "evaluation" / "A"
+            attempt, _ = self._write_pilot_success_chain(root, row)
+            path = attempt / "worker-job.json"
+            job = pilot_runner.read_json(path)
+            job["source_lock_sha256"] = "wrong-source-lock"
+            path.write_bytes(pilot_runner.canonical(job) + b"\n")
+            with self.assertRaisesRegex(RuntimeError, "worker-job receipt"):
+                pilot_runner.pilot_success_record(
+                    backend, root=root, row=row, package_commit="a" * 40,
+                )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "evaluation" / "A"
+            attempt, _ = self._write_pilot_success_chain(root, row)
+            path = attempt / "worker-job.json"
+            job = pilot_runner.read_json(path)
+            job["row"]["owner_seed"] = 999
+            path.write_bytes(pilot_runner.canonical(job) + b"\n")
+            with self.assertRaisesRegex(RuntimeError, "worker-job receipt"):
+                pilot_runner.pilot_success_record(
+                    backend, root=root, row=row, package_commit="a" * 40,
+                )
+
+    def test_success_rejects_broken_result_hash(self):
+        backend = self._receipt_backend()
+        row = self._pilot_row()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "evaluation" / "A"
+            attempt, result_path = self._write_pilot_success_chain(root, row)
+            result = pilot_runner.read_json(result_path)
+            result["resource"]["worker_wall_seconds"] = 2.0
+            result_path.write_bytes(pilot_runner.canonical(result) + b"\n")
+            with self.assertRaisesRegex(RuntimeError, "start/finish receipts"):
+                pilot_runner.pilot_success_record(
+                    backend, root=root, row=row, package_commit="a" * 40,
+                )
+
+    def test_success_rejects_duplicate_success_attempts(self):
+        backend = self._receipt_backend()
+        row = self._pilot_row()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "evaluation" / "A"
+            self._write_pilot_success_chain(root, row)
+            self._write_pilot_success_chain(root, row, attempt_name="attempt-0002")
+            with self.assertRaisesRegex(RuntimeError, "multiple successful attempts"):
+                pilot_runner.pilot_success_record(
+                    backend, root=root, row=row, package_commit="a" * 40,
+                )
 
     def test_failure_stop_policy_is_bounded_and_not_a_game_count(self):
         self.assertEqual(pilot_runner.MAX_ATTEMPTS_PER_OWNER, 2)

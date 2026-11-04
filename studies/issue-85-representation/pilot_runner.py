@@ -314,11 +314,144 @@ def stage_summary_is_complete(
     )
 
 
+def _receipt_path_matches(saved: Any, expected: Path) -> bool:
+    return (
+        isinstance(saved, str)
+        and Path(saved).is_absolute()
+        and Path(saved).resolve() == Path(expected).resolve()
+    )
+
+
+def _receipt_number(value: Any, *, description: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise RuntimeError(f"{description} is not a numeric receipt")
+    number = float(value)
+    if not math.isfinite(number) or number < 0:
+        raise RuntimeError(f"{description} is not finite and non-negative")
+    return number
+
+
+def pilot_success_record(
+    backend: Any, *, root: Path, row: Mapping[str, Any], package_commit: str
+) -> tuple[dict[str, Any], Path] | None:
+    # Return the one successful pilot only after verifying its complete receipt chain.
+    root = Path(root)
+    unit_id = str(row["unit_id"])
+    unit_root = root / "units" / backend.unit_key(unit_id)
+    attempts = sorted(path for path in unit_root.glob("attempt-*") if path.is_dir())
+    successes = []
+    for attempt in attempts:
+        result_path = attempt / "result.json"
+        if not result_path.is_file():
+            continue
+        result = read_json(result_path)
+        if result.get("status") == "SUCCEEDED":
+            successes.append((result, result_path))
+    if len(successes) > 1:
+        raise RuntimeError(f"pilot owner {unit_id} has multiple successful attempts")
+    if not successes:
+        return None
+
+    result, result_path = successes[0]
+    attempt = result_path.parent
+    job_path = attempt / "worker-job.json"
+    started_path = attempt / "started.json"
+    finished_path = attempt / "finished.json"
+    if not all(path.is_file() for path in (job_path, started_path, finished_path)):
+        raise RuntimeError(f"pilot success {unit_id} lacks its complete job/start/finish/result chain")
+    job = read_json(job_path)
+    started = read_json(started_path)
+    finished = read_json(finished_path)
+    source_lock_sha256 = backend.source_lock_sha()
+    run_id = f"{unit_id}-{attempt.name}"
+
+    if (
+        job.get("schema_id") != "issue79-owner-worker-job-v1"
+        or not _receipt_path_matches(job.get("artifact_root"), root)
+        or not _receipt_path_matches(job.get("attempt_dir"), attempt)
+        or not _receipt_path_matches(job.get("result_path"), result_path)
+        or not _receipt_path_matches(job.get("output_dir"), attempt / "native")
+        or job.get("run_id") != run_id
+        or job.get("unit_id") != unit_id
+        or job.get("phase") != row.get("phase")
+        or job.get("row") != dict(row)
+        or job.get("pilot") is not True
+        or job.get("package_commit") != package_commit
+        or job.get("runner_code_commit") != package_commit
+        or job.get("source_lock_sha256") != source_lock_sha256
+    ):
+        raise RuntimeError(f"pilot worker-job receipt differs from the frozen source/row: {unit_id}")
+
+    started_monotonic = _receipt_number(
+        started.get("started_monotonic"), description=f"pilot start time for {unit_id}",
+    )
+    finished_monotonic = _receipt_number(
+        finished.get("finished_monotonic"), description=f"pilot finish time for {unit_id}",
+    )
+    if (
+        started.get("schema_id") != "issue79-owner-attempt-start-v1"
+        or started.get("unit_id") != unit_id
+        or started.get("owner_seed") != row.get("owner_seed")
+        or started.get("arm") != row.get("arm")
+        or started.get("run_id") != run_id
+        or started.get("package_commit") != package_commit
+        or started.get("seed_row_sha256") != sha256(canonical(dict(row)))
+        or not isinstance(started.get("started_utc"), str)
+        or not started.get("started_utc")
+        or isinstance(started.get("pid"), bool)
+        or not isinstance(started.get("pid"), int)
+        or started["pid"] <= 0
+        or finished.get("schema_id") != "issue79-owner-attempt-finish-v1"
+        or finished.get("unit_id") != unit_id
+        or finished.get("run_id") != run_id
+        or finished.get("status") != "SUCCEEDED"
+        or not isinstance(finished.get("finished_utc"), str)
+        or not finished.get("finished_utc")
+        or finished_monotonic < started_monotonic
+        or finished.get("result_sha256") != file_sha256(result_path)
+    ):
+        raise RuntimeError(f"pilot start/finish receipts disagree with the successful result: {unit_id}")
+
+    resource = result.get("resource")
+    if not isinstance(resource, dict):
+        raise RuntimeError(f"pilot success {unit_id} lacks worker resource accounting")
+    worker_wall = _receipt_number(
+        resource.get("worker_wall_seconds"), description=f"pilot worker wall time for {unit_id}",
+    )
+    worker_cpu = _receipt_number(
+        resource.get("worker_process_cpu_seconds"), description=f"pilot worker CPU time for {unit_id}",
+    )
+    terminal_floor = result.get("terminal_floor")
+    if (
+        result.get("schema_id") != "issue75-stage1-unit-result-v1"
+        or result.get("status") != "SUCCEEDED"
+        or result.get("unit_id") != unit_id
+        or result.get("owner_seed") != row.get("owner_seed")
+        or result.get("phase") != row.get("phase")
+        or result.get("arm") != row.get("arm")
+        or result.get("formal") is not False
+        or result.get("package_commit") != package_commit
+        or result.get("runner_code_commit") != package_commit
+        or result.get("source_lock_sha256") != source_lock_sha256
+        or result.get("game_seed") != row.get("game_seed")
+        or result.get("paired_owner_key") != row.get("paired_owner_key")
+        or resource.get("ledger_run_id") != run_id
+        or isinstance(terminal_floor, bool)
+        or not isinstance(terminal_floor, int)
+        or not isinstance(result.get("terminal_outcome"), str)
+        or not result.get("terminal_outcome")
+        or worker_wall < 0
+        or worker_cpu < 0
+    ):
+        raise RuntimeError(f"pilot result receipt differs from the frozen source/row or terminal: {unit_id}")
+    return result, result_path
+
+
 def stage_receipts_are_complete(
     backend: Any, *, root: Path, rows: Sequence[Mapping[str, Any]], package_commit: str
 ) -> bool:
     return all(
-        backend.existing_success(root, dict(row), package_commit) is not None
+        pilot_success_record(backend, root=root, row=row, package_commit=package_commit) is not None
         for row in rows
     )
 
@@ -552,11 +685,13 @@ def run_units_bounded(
                     exact_successes.append(result_path)
             if len(exact_successes) > 1:
                 raise RuntimeError(f"multiple success receipts exist for pilot owner {row['unit_id']}; refusing to choose one")
-            prior = backend.existing_success(root, row, package_commit)
-            if exact_successes and prior is None:
+            prior_record = pilot_success_record(
+                backend, root=root, row=row, package_commit=package_commit,
+            )
+            if exact_successes and prior_record is None:
                 raise RuntimeError(f"prior pilot success receipt failed validation: {exact_successes[0]}")
-            if prior is not None:
-                complete[row["unit_id"]] = prior
+            if prior_record is not None:
+                complete[row["unit_id"]] = prior_record[0]
                 continue
             attempt_number = len(prior_attempts) + 1
             if attempt_number > MAX_ATTEMPTS_PER_OWNER:
@@ -610,13 +745,15 @@ def run_units_bounded(
             result = read_json(result_path) if result_path.is_file() else None
             del active[run_id]
             if exit_code == 0 and result and result.get("status") == "SUCCEEDED":
-                verified = backend.existing_success(root, row, package_commit)
+                verified = pilot_success_record(
+                    backend, root=root, row=row, package_commit=package_commit,
+                )
                 if verified is None:
                     failed_attempts.append({"unit_id": row["unit_id"], "attempt": job["run_id"], "failure": "success_receipt_failed_validation"})
                     consecutive_failures += 1
                     stop_reason = "INVALID_SUCCESS_RECEIPT"
                 else:
-                    complete[row["unit_id"]] = verified
+                    complete[row["unit_id"]] = verified[0]
                     consecutive_failures = 0
             else:
                 failed_attempts.append({
@@ -1515,15 +1652,9 @@ def _validate_completed_pilot(
         stage = "training" if row["phase"] == "training" else "evaluation"
         group = str(row["issue85_arm"] if stage == "training" else row["arm"])
         root = package_root / stage / group
-        unit_root = root / "units" / backend.unit_key(str(row["unit_id"]))
-        matching_successes = []
-        for result_path in sorted(unit_root.glob("attempt-*/result.json")):
-            value = read_json(result_path)
-            if value.get("status") == "SUCCEEDED" and value.get("package_commit") == identity["package_commit"] and value.get("source_lock_sha256") == identity["source_lock_sha256"]:
-                matching_successes.append(result_path)
-        if len(matching_successes) != 1:
-            raise RuntimeError(f"pilot report owner {row['unit_id']} has {len(matching_successes)} exact-source success receipts")
-        if backend.existing_success(root, dict(row), identity["package_commit"]) is None:
+        if pilot_success_record(
+            backend, root=root, row=row, package_commit=identity["package_commit"],
+        ) is None:
             raise RuntimeError(f"pilot report owner {row['unit_id']} lacks a fully validated success receipt")
         (successful_ids if stage == "training" else successful_eval_ids)[group].append(str(row["unit_id"]))
     for arm, summary in training.items():
