@@ -30,6 +30,7 @@ ISSUE85_ARMS = frozenset({"B", "C", "D", "E", "F"})
 class DecisionInput:
     """Inputs bound to one live native legal-action occurrence list."""
 
+    arm: str
     legacy_sha256: str
     actor_features: np.ndarray
     payload: Mapping[str, Any] | None
@@ -118,6 +119,7 @@ class ContextualEncoder:
                 raise ValueError("new-path payload candidate count differs from the live legal list")
 
         _CURRENT_DECISION.set(DecisionInput(
+            arm=self.arm,
             legacy_sha256=_sha256(legacy_bytes),
             actor_features=actor_features.copy(),
             payload=payload,
@@ -134,6 +136,7 @@ class ContextTrace(list):
             if current is not None:
                 item = {
                     **item,
+                    "issue85_arm": current.arm,
                     "issue85_payload": current.payload,
                     "issue85_actor_features": current.actor_features,
                     "issue85_legacy_sha256": current.legacy_sha256,
@@ -214,6 +217,64 @@ def _is_issue85_arm(actor: Any, arm_type: type) -> bool:
     return isinstance(actor, arm_type) and str(getattr(actor, "arm", "")).upper() in ISSUE85_ARMS
 
 
+def _issue85_actor_from_model(model: Any, arm_type: type) -> Any | None:
+    """Accept both the pinned controller's model object and PolicyAdapter shape."""
+    if _is_issue85_arm(model, arm_type):
+        return model
+    policy = getattr(model, "policy", None)
+    if _is_issue85_arm(policy, arm_type):
+        return policy
+    return None
+
+
+def _decision_with_issue85_inputs(base: Any, row: Mapping[str, Any]) -> Any:
+    """Bind runtime-created #75 decisions to their exact categorical trace row."""
+    arm = str(row.get("issue85_arm", "")).upper()
+    if arm not in ISSUE85_ARMS:
+        raise ValueError("Issue 85 training trace has no registered arm identity")
+    legacy, legacy_bytes = _matrix_bytes(base.candidate_features)
+    if legacy.shape[1] != HASH_DIMENSION:
+        raise ValueError("runtime decision does not contain the locked 2048-wide legacy matrix")
+    legacy_digest = _sha256(legacy_bytes)
+    if row.get("issue85_legacy_sha256") != legacy_digest:
+        raise ValueError("training trace Issue 85 context does not bind to its candidate matrix")
+
+    actor_value = row.get("issue85_actor_features")
+    if actor_value is None:
+        raise ValueError("Issue 85 training trace lost its actor feature matrix")
+    actor_features, _ = _matrix_bytes(actor_value)
+    if actor_features.shape[0] != legacy.shape[0]:
+        raise ValueError("Issue 85 training matrix candidate count differs from the legacy matrix")
+    expected_width = WIDE_HASH_DIMENSION if arm in {"B", "D"} else HASH_DIMENSION
+    if actor_features.shape[1] != expected_width:
+        raise ValueError(f"Issue 85 {arm} trace has the wrong actor feature width")
+    wide = None
+    if expected_width == WIDE_HASH_DIMENSION:
+        folded = actor_features.reshape(len(actor_features), 4, HASH_DIMENSION).sum(axis=1)
+        if not np.allclose(folded, legacy, rtol=1e-6, atol=1e-6):
+            raise ValueError("Issue 85 widened training matrix does not fold to legacy features")
+        wide = actor_features
+    elif not np.array_equal(actor_features, legacy):
+        raise ValueError("Issue 85 legacy-width actor features differ from the pinned matrix")
+
+    payload = row.get("issue85_payload")
+    if arm in {"C", "D", "E", "F"}:
+        if not isinstance(payload, Mapping):
+            raise ValueError(f"Issue 85 {arm} training trace lost its semantic payload")
+        assert_index_free(payload)
+        if len(payload.get("candidates", ())) != len(legacy):
+            raise ValueError("Issue 85 training payload candidate count differs from the native matrix")
+    elif payload is not None:
+        raise ValueError("Issue 85 B HASH trace unexpectedly carries a contextual payload")
+
+    return Issue85Decision(
+        base,
+        payload=payload,
+        wide_candidate_features=wide,
+        legacy_sha256=legacy_digest,
+    )
+
+
 def install_issue85_runtime(
     runtime: Any,
     executor: Any,
@@ -234,6 +295,7 @@ def install_issue85_runtime(
     original_policy_adapter = runtime.PolicyAdapter
     original_loader = runtime.load_issue73_runner
     original_decision_from_trace = executor._decision_from_trace
+    original_decision_rows = runtime._decision_rows
     original_hash_only_decisions = runtime._hash_only_decisions
     original_decode_trial = executor._decode_trial
     original_owner_loss = gradients.owner_loss
@@ -270,8 +332,9 @@ def install_issue85_runtime(
         original_select_action = controller_type.select_action
 
         def select_action(controller: Any, adapter: Any, snapshot: Any, actions: Any, context: Any, step_index: int):
-            actor = getattr(getattr(controller, "model", None), "policy", None)
-            if not _is_issue85_arm(actor, arm_type):
+            original_model = controller.model
+            actor = _issue85_actor_from_model(original_model, arm_type)
+            if actor is None:
                 return original_select_action(controller, adapter, snapshot, actions, context, step_index)
             arm = str(actor.arm).upper()
             if not isinstance(controller.trace, ContextTrace):
@@ -291,10 +354,16 @@ def install_issue85_runtime(
             )
             token = _CURRENT_DECISION.set(None)
             controller.encoder = proxy
+            # The locked StudyController calls ``self.model.choose`` directly.
+            # Its model may be an adapter or the arm object itself, so normalize
+            # both shapes only for this selection and then restore the caller's object.
+            if not isinstance(original_model, Issue85PolicyAdapter) or original_model.policy is not actor:
+                controller.model = Issue85PolicyAdapter(actor)
             try:
                 return original_select_action(controller, adapter, snapshot, actions, context, step_index)
             finally:
                 controller.encoder = legacy_encoder
+                controller.model = original_model
                 _CURRENT_DECISION.reset(token)
 
         controller_type.select_action = select_action
@@ -305,26 +374,43 @@ def install_issue85_runtime(
 
     def decision_from_trace(row: Mapping[str, Any], index: int, *, is_root: bool):
         base = original_decision_from_trace(row, index, is_root=is_root)
-        payload = row.get("issue85_payload")
-        actor_features = row.get("issue85_actor_features")
-        if payload is None and actor_features is None:
+        if "issue85_arm" not in row:
             return base
-        legacy, raw = _matrix_bytes(row["candidate_features"])
-        expected_legacy_sha = _sha256(raw)
-        if row.get("issue85_legacy_sha256") != expected_legacy_sha:
-            raise ValueError("training trace Issue 85 context does not bind to its candidate matrix")
-        if actor_features is not None:
-            actor_features, _ = _matrix_bytes(actor_features)
-            if actor_features.shape[0] != legacy.shape[0]:
-                raise ValueError("widened training matrix candidate count differs from the legacy matrix")
-        return Issue85Decision(
-            base,
-            payload=payload,
-            wide_candidate_features=actor_features if actor_features is not None and actor_features.shape[1] == WIDE_HASH_DIMENSION else None,
-            legacy_sha256=expected_legacy_sha,
-        )
+        return _decision_with_issue85_inputs(base, row)
 
     executor._decision_from_trace = decision_from_trace
+
+    def decision_rows(runner: Any, result: dict[str, Any], *, is_root_run: bool):
+        # The pinned #75 runtime builds Decision rows directly here; it does not
+        # call executor._decision_from_trace. Snapshot only the trace-row
+        # references before the original function pops/clears its volatile roots.
+        trace = result.get("decisions", ())
+        roots = result.get("_volatile_roots")
+        ordered_trace_rows: list[Mapping[str, Any]] = []
+        if roots is not None:
+            indices = [int(root["decision_index"]) for root in roots]
+            if len(indices) != len(set(indices)):
+                raise ValueError("runtime roots contain duplicate Issue 85 trace indices")
+            for index in sorted(indices):
+                if not 0 <= index < len(trace):
+                    raise ValueError("runtime root does not map to an Issue 85 trace row")
+                ordered_trace_rows.append(trace[index])
+
+        decisions = original_decision_rows(runner, result, is_root_run=is_root_run)
+        if not any("issue85_arm" in row for row in trace):
+            return decisions
+        if len(decisions) != len(ordered_trace_rows):
+            raise ValueError("Issue 85 runtime decisions do not align with captured native roots")
+        updated = []
+        for decision, row in zip(decisions, ordered_trace_rows, strict=True):
+            if "issue85_arm" not in row:
+                raise ValueError("Issue 85 runtime root maps to an unenriched categorical trace row")
+            if int(getattr(decision, "chosen_index")) != int(row["chosen_index"]):
+                raise ValueError("Issue 85 training decision choice differs from its native trace row")
+            updated.append(_decision_with_issue85_inputs(decision, row))
+        return tuple(updated)
+
+    runtime._decision_rows = decision_rows
 
     def hash_only_decisions(decisions: Any) -> list[dict[str, Any]]:
         packed = original_hash_only_decisions(decisions)

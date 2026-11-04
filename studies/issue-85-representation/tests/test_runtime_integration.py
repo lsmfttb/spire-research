@@ -136,6 +136,24 @@ class RuntimeIntegrationTests(unittest.TestCase):
                 )
                 return Trial(complete=payload["complete"], decisions=decisions)
 
+        class Runtime:
+            @staticmethod
+            def decision_rows(_runner, result, *, is_root_run):
+                del is_root_run
+                roots = result.pop("_volatile_roots")
+                trace = result["decisions"]
+                try:
+                    return tuple(
+                        BaseDecision(
+                            candidate_features=np.asarray(root["feature_matrix"], dtype=np.float32).copy(),
+                            chosen_index=int(trace[int(root["decision_index"])]["chosen_index"]),
+                        )
+                        for root in sorted(roots, key=lambda item: int(item["decision_index"]))
+                    )
+                finally:
+                    for root in roots:
+                        root.clear()
+
         class Gradients:
             T_REF = 36.6474609375
             ENTROPY_COEFFICIENT = 0.01
@@ -155,6 +173,7 @@ class RuntimeIntegrationTests(unittest.TestCase):
         self.runtime = SimpleNamespace(
             PolicyAdapter=PolicyAdapter,
             load_issue73_runner=lambda _config: Runner(),
+            _decision_rows=Runtime.decision_rows,
             _hash_only_decisions=lambda decisions: [
                 {
                     "candidate_features": np.asarray(row.candidate_features, dtype=np.float32).tolist(),
@@ -205,6 +224,51 @@ class RuntimeIntegrationTests(unittest.TestCase):
         self.assertIsInstance(restored.decisions[0], Issue85Decision)
         self.assertEqual(restored.decisions[0].issue85_payload, decision.issue85_payload)
         np.testing.assert_array_equal(restored.decisions[0].candidate_features, decision.candidate_features)
+
+    def test_pinned_direct_model_shape_and_runtime_decision_rows_keep_context_and_wide_features(self):
+        actor = FakeIssue85Policy("D")
+        runner = self.runtime.load_issue73_runner({})
+        controller = runner.StudyController(actor)
+        original_model = controller.model
+        adapter = SimpleNamespace(public_projection=lambda _snapshot: {
+            "schema_id": "native-public-projection-v3",
+        })
+        privileged = {"candidates": [{}, {}, {}]}
+        controller.select_action(adapter, object(), ["a", "b", "c"], privileged, 21)
+
+        # The pinned StudyController receives a model and calls model.choose;
+        # the integration temporarily supplies its compatible sampler, then
+        # restores the exact original direct model object.
+        self.assertIs(controller.model, original_model)
+        trace = controller.trace
+        self.assertEqual(trace[0]["issue85_arm"], "D")
+        self.assertIn("issue85_payload", trace[0])
+        roots = [{
+            "decision_index": 0,
+            "feature_matrix": FakeEncoder(2048).encode(privileged, 3)[0],
+            "native_state_sha256": "state",
+        }]
+        decisions = self.runtime._decision_rows(
+            runner,
+            {"decisions": trace, "_volatile_roots": roots},
+            is_root_run=True,
+        )
+        self.assertIsInstance(decisions[0], Issue85Decision)
+        self.assertEqual(decisions[0].issue85_payload, trace[0]["issue85_payload"])
+        self.assertEqual(decisions[0].wide_candidate_features.shape, (3, 8192))
+        folded = decisions[0].wide_candidate_features.reshape(3, 4, 2048).sum(axis=1)
+        np.testing.assert_allclose(folded, decisions[0].candidate_features, rtol=1e-6, atol=1e-6)
+
+        packed = self.runtime._hash_only_decisions(decisions)
+        self.assertIn("issue85_payload", packed[0])
+        self.assertIn("issue85_wide_features", packed[0])
+        restored = self.executor._decode_trial({"complete": True, "decisions": packed})
+        self.assertIsInstance(restored.decisions[0], Issue85Decision)
+        self.assertEqual(restored.decisions[0].issue85_payload, decisions[0].issue85_payload)
+        np.testing.assert_array_equal(
+            restored.decisions[0].wide_candidate_features,
+            decisions[0].wide_candidate_features,
+        )
 
     def test_widened_hash_requires_real_fold_identity_and_keeps_native_sampling(self):
         encoder = FakeEncoder(2048)
