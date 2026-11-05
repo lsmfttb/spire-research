@@ -35,6 +35,7 @@ PILOT_OWNERS = tuple(range(8_530_001, 8_530_017))
 NEW_ARMS = ("B", "C", "D", "E", "F")
 POLICIES = ("PARENT", "A", *NEW_ARMS)
 PILOT_RESUME_PREDECESSOR_SHA = "0297d60382e5dfe64d8de93f6ca383e96b655f40"
+PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA = "62382663fd5612d55f662190dc389cc0664a2f98"
 MAX_ATTEMPTS_PER_OWNER = 2
 STOP_AFTER_CONSECUTIVE_FAILURES = 3
 ACTOR_STEPS = 64
@@ -190,6 +191,11 @@ def pilot_plan(*, resume_from: str | None = None) -> dict[str, Any]:
         "training_games": training_cohort_games,
         "evaluation_games": evaluation_cohort_games,
         "planned_reused_predecessor_training_receipts": planned_reused_receipts,
+        "planned_reused_predecessor_actor_updates": 1 if resume_from is not None else 0,
+        "actor_update_carry_forward_source_commit": (
+            PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA if resume_from is not None else None
+        ),
+        "prior_failed_C_attempts_preserved_for_accounting": 10 if resume_from is not None else 0,
         "new_training_game_slots_before_retries": new_training_slots,
         "new_evaluation_game_slots_before_retries": new_evaluation_slots,
         "new_game_slots_before_retries": new_slots,
@@ -533,9 +539,11 @@ def _validate_predecessor_progress(
 
 
 def _validate_predecessor_reuse_source_diff(changed_paths: Sequence[str]) -> None:
-    """Accept only the independently reviewed runner and owner-outcome API repairs."""
+    """Accept only reviewed runner/API fixes and the reviewed public-schema repair."""
     expected_paths = sorted((
+        "studies/issue-85-representation/feature_firewall.py",
         "studies/issue-85-representation/pilot_runner.py",
+        "studies/issue-85-representation/tests/test_feature_firewall.py",
         "studies/issue-85-representation/tests/test_pilot_runner.py",
         "studies/issue-85-representation/runtime_integration.py",
         "studies/issue-85-representation/tests/test_runtime_integration.py",
@@ -543,9 +551,271 @@ def _validate_predecessor_reuse_source_diff(changed_paths: Sequence[str]) -> Non
     observed_paths = sorted(filter(None, (str(path) for path in changed_paths)))
     if observed_paths != expected_paths:
         raise RuntimeError(
-            "Issue 85 predecessor reuse requires only the reviewed runner and locked "
-            "#84 outcome API repairs and their tests"
+            "Issue 85 predecessor reuse requires only reviewed runner/API repairs, "
+            "the public-schema repair and their tests"
         )
+
+
+def _validate_b_actor_update_carry_forward_source_diff(changed_paths: Sequence[str]) -> None:
+    """Bind B actor reuse to the reviewed public-schema and continuation changes."""
+    expected_paths = sorted((
+        "studies/issue-85-representation/feature_firewall.py",
+        "studies/issue-85-representation/pilot_runner.py",
+        "studies/issue-85-representation/tests/test_feature_firewall.py",
+        "studies/issue-85-representation/tests/test_pilot_runner.py",
+    ))
+    observed_paths = sorted(filter(None, (str(path) for path in changed_paths)))
+    if observed_paths != expected_paths:
+        raise RuntimeError(
+            "B actor-update carry-forward requires only the reviewed public-schema "
+            "repair and this runner's carry-forward validation"
+        )
+
+
+def _load_predecessor_b_actor_update(
+    backend: Any,
+    *,
+    identity: Mapping[str, str],
+    current_seed_table: Mapping[str, Any],
+    b_game_predecessor: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate and reference the completed B update from the failed C pilot."""
+    predecessor_commit = PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA
+    if predecessor_commit == identity.get("package_commit"):
+        raise RuntimeError("B actor-update predecessor must differ from the current source")
+    is_ancestor = subprocess.run(
+        ["git", "-C", str(REPO), "merge-base", "--is-ancestor", predecessor_commit, identity["package_commit"]],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+    )
+    if is_ancestor.returncode != 0:
+        raise RuntimeError("B actor-update carry-forward source is not an ancestor of the current source")
+    changed_paths = sorted(filter(None, _git(REPO, "diff", "--name-only", predecessor_commit, identity["package_commit"]).splitlines()))
+    _validate_b_actor_update_carry_forward_source_diff(changed_paths)
+
+    prior_root = PILOT_ROOT / predecessor_commit
+    progress_path = prior_root / "pilot-progress.json"
+    seed_path = prior_root / "pilot-seed-table.json"
+    if not progress_path.is_file() or not seed_path.is_file() or (prior_root / "pilot-report.json").exists():
+        raise RuntimeError("B actor-update predecessor lacks failed-run progress/seed evidence or has a final report")
+    progress = read_json(progress_path)
+    prior_seed_table = read_json(seed_path)
+    if (
+        file_sha256(seed_path) != progress.get("seed_table_sha256")
+        or prior_seed_table != current_seed_table
+        or progress.get("schema_id") != "issue85-pilot-progress-v1"
+        or progress.get("status") != "FAILED_OR_INCOMPLETE"
+        or progress.get("package_commit") != predecessor_commit
+        or progress.get("source_lock_sha256") != identity.get("source_lock_sha256")
+        or progress.get("issue84_source_commit") != ISSUE84_ACCEPTED_COMMIT
+        or progress.get("active_stage") != "training-games"
+        or progress.get("active_arm") != "C"
+        or progress.get("evaluation_runs") != {}
+        or set(progress.get("training_runs", {})) != {"B", "C"}
+        or set(progress.get("actor_updates", {})) != {"B"}
+    ):
+        raise RuntimeError("B actor-update predecessor is not the reviewed failed C-game continuation")
+
+    predecessor_manifest_path = prior_root / "pilot-predecessor-training-reuse.json"
+    predecessor_manifest = read_json(predecessor_manifest_path) if predecessor_manifest_path.is_file() else None
+    if (
+        not isinstance(predecessor_manifest, dict)
+        or predecessor_manifest != progress.get("predecessor_training_reuse")
+        or file_sha256(predecessor_manifest_path) != progress.get("predecessor_training_reuse_sha256")
+        or predecessor_manifest.get("current_package_commit") != predecessor_commit
+        or predecessor_manifest.get("predecessor_package_commit") != PILOT_RESUME_PREDECESSOR_SHA
+        or predecessor_manifest.get("source_lock_sha256") != identity.get("source_lock_sha256")
+        or predecessor_manifest.get("rows_sha256") != prior_seed_table.get("rows_sha256")
+        or predecessor_manifest.get("successful_game_count") != len(PILOT_OWNERS)
+        or progress.get("training_runs", {}).get("B") != b_game_predecessor.get("summary")
+    ):
+        raise RuntimeError("B actor-update predecessor does not preserve the validated 16-owner B game reuse")
+
+    c_rows = [
+        dict(row) for row in prior_seed_table.get("rows", [])
+        if row.get("phase") == "training" and row.get("issue85_arm") == "C"
+    ]
+    expected_c_ids = {str(row["unit_id"]): row for row in c_rows}
+    c_summary = progress.get("training_runs", {}).get("C")
+    failed = c_summary.get("failed_attempts") if isinstance(c_summary, dict) else None
+    if (
+        len(c_rows) != len(PILOT_OWNERS)
+        or not isinstance(failed, list)
+        or c_summary.get("status") != "REPEATED_FAILED_ATTEMPTS"
+        or c_summary.get("expected") != len(PILOT_OWNERS)
+        or c_summary.get("successful_completions") != 0
+        or c_summary.get("successful_unit_ids") != []
+        or c_summary.get("incomplete_attempts") != []
+        or len(failed) != 10
+        or set(c_summary.get("attempt_count_by_owner", {})) != set(expected_c_ids)
+        or sum(int(value) for value in c_summary.get("attempt_count_by_owner", {}).values()) != len(failed)
+        or sum(int(value) == 0 for value in c_summary.get("attempt_count_by_owner", {}).values()) != 6
+    ):
+        raise RuntimeError("B actor-update predecessor C ledger is not 10 failed, 0 successful and 6 unstarted owners")
+    failure_rows: dict[str, Mapping[str, Any]] = {}
+    for failure in failed:
+        unit_id = str(failure.get("unit_id", ""))
+        if unit_id not in expected_c_ids or unit_id in failure_rows:
+            raise RuntimeError("B actor-update predecessor contains duplicate/unregistered C failures")
+        if failure.get("attempt") != f"{unit_id}-attempt-0001":
+            raise RuntimeError("B actor-update predecessor C failure is not the retained first attempt")
+        failure_rows[unit_id] = failure
+    failure_receipts = []
+    for unit_id, row in expected_c_ids.items():
+        owner_root = prior_root / "training" / "C" / "units" / str(backend.unit_key(unit_id))
+        attempt = owner_root / "attempt-0001"
+        count = int(c_summary["attempt_count_by_owner"][unit_id])
+        if unit_id in failure_rows:
+            if count != 1 or not attempt.is_dir():
+                raise RuntimeError(f"B actor-update predecessor C failed owner receipt is missing: {unit_id}")
+            job_path = attempt / "worker-job.json"
+            started_path = attempt / "started.json"
+            finished_path = attempt / "finished.json"
+            result_path = attempt / "result.json"
+            if not all(path.is_file() for path in (job_path, started_path, finished_path, result_path)):
+                raise RuntimeError(f"B actor-update predecessor C attempt chain is incomplete: {unit_id}")
+            job, started = read_json(job_path), read_json(started_path)
+            finished, result = read_json(finished_path), read_json(result_path)
+            run_id = f"{unit_id}-attempt-0001"
+            detail = (
+                f"TRAIN_{row['owner_seed']} is incomplete or invalid: "
+                "['candidates[0].features.public_destination.value must be a scalar']"
+            )
+            if (
+                job.get("schema_id") != "issue79-owner-worker-job-v1"
+                or job.get("unit_id") != unit_id
+                or job.get("row") != row
+                or job.get("run_id") != run_id
+                or job.get("package_commit") != predecessor_commit
+                or job.get("runner_code_commit") != predecessor_commit
+                or job.get("source_lock_sha256") != identity.get("source_lock_sha256")
+                or Path(job.get("artifact_root", "")).resolve() != prior_root.resolve()
+                or Path(job.get("attempt_dir", "")).resolve() != attempt.resolve()
+                or Path(job.get("result_path", "")).resolve() != result_path.resolve()
+                or started.get("schema_id") != "issue79-owner-attempt-start-v1"
+                or started.get("unit_id") != unit_id
+                or started.get("run_id") != run_id
+                or started.get("package_commit") != predecessor_commit
+                or started.get("seed_row_sha256") != sha256(canonical(row))
+                or finished.get("schema_id") != "issue79-owner-attempt-finish-v1"
+                or finished.get("unit_id") != unit_id
+                or finished.get("run_id") != run_id
+                or finished.get("status") != "FAILED"
+                or finished.get("result_sha256") != file_sha256(result_path)
+                or result.get("schema_id") != "issue79-owner-attempt-result-v1"
+                or result.get("unit_id") != unit_id
+                or result.get("package_commit") != predecessor_commit
+                or result.get("runner_code_commit") != predecessor_commit
+                or result.get("source_lock_sha256") != identity.get("source_lock_sha256")
+                or result.get("status") != "FAILED"
+                or result.get("terminal_outcome") is not None
+                or result.get("failure_detail") != detail
+                or failure_rows[unit_id].get("failure") != detail
+            ):
+                raise RuntimeError(f"B actor-update predecessor C failed receipt binding differs: {unit_id}")
+            failure_receipts.append({
+                "unit_id": unit_id,
+                "attempt": "attempt-0001",
+                "worker_job_sha256": file_sha256(job_path),
+                "started_sha256": file_sha256(started_path),
+                "finished_sha256": file_sha256(finished_path),
+                "result_sha256": file_sha256(result_path),
+                "failure_detail": detail,
+            })
+        elif count != 0 or owner_root.exists():
+            raise RuntimeError(f"B actor-update predecessor claims unstarted C owner has attempt evidence: {unit_id}")
+    live = progress.get("live_stage_progress", {})
+    if (
+        live.get("stage") != "training-games"
+        or live.get("arm") != "C"
+        or live.get("expected") != len(PILOT_OWNERS)
+        or live.get("successful_completions") != 0
+        or live.get("failed_attempt_count") != len(failed)
+        or progress.get("failure", {}).get("type") != "RuntimeError"
+        or progress.get("failure", {}).get("detail")
+        != "Issue 85 pilot training games for C stopped with REPEATED_FAILED_ATTEMPTS: 0/16"
+    ):
+        raise RuntimeError("B actor-update predecessor does not retain the expected C repeated-failure stop evidence")
+
+    update_root = prior_root / "training" / "B" / "pilot-updates" / "B"
+    attempts = sorted(path for path in update_root.glob("attempt-*") if path.is_dir())
+    if [path.name for path in attempts] != ["attempt-0001"]:
+        raise RuntimeError("B actor-update predecessor does not contain exactly one retained B update attempt")
+    update_attempt = attempts[0]
+    receipt_path = update_attempt / "receipt.json"
+    update_progress_path = update_attempt / "progress.json"
+    if not receipt_path.is_file() or not update_progress_path.is_file():
+        raise RuntimeError("B actor-update predecessor lacks its immutable receipt or progress")
+    receipt = read_json(receipt_path)
+    update_progress = read_json(update_progress_path)
+    if progress.get("actor_updates", {}).get("B") != receipt:
+        raise RuntimeError("B actor-update receipt differs from the prior run's durable ledger")
+    owner_sha = sha256(",".join(str(owner) for owner in PILOT_OWNERS).encode("ascii"))
+    if (
+        receipt.get("schema_id") != "issue85-pilot-actor-update-v1"
+        or receipt.get("status") != "SUCCEEDED"
+        or receipt.get("scope") != "PILOT_ONLY / NONFORMAL"
+        or receipt.get("arm") != "B"
+        or receipt.get("package_commit") != predecessor_commit
+        or receipt.get("source_lock_sha256") != identity.get("source_lock_sha256")
+        or receipt.get("owner_seed_sha256") != owner_sha
+        or receipt.get("owner_count") != len(PILOT_OWNERS)
+        or receipt.get("minibatch_owner_count") != len(PILOT_OWNERS)
+        or receipt.get("objective") != "issue84-B-LENGTH_ONLY"
+        or receipt.get("completed_steps") != ACTOR_STEPS
+        or receipt.get("optimizer_parameter_step_values") != [128]
+        or receipt.get("loss_summary", {}).get("finite_all_steps") is not True
+        or receipt.get("initial_probability_parity", {}).get("status") != "PASS"
+        or receipt.get("initial_probability_parity", {}).get("uses_outcomes_for_efficacy") is not False
+        or receipt.get("model_digest") is None
+        or not math.isfinite(float(receipt.get("elapsed_seconds", -1)))
+        or float(receipt.get("elapsed_seconds", -1)) < 0
+        or update_progress.get("schema_id") != "issue85-pilot-actor-update-progress-v1"
+        or update_progress.get("status") != "SUCCEEDED"
+        or update_progress.get("arm") != "B"
+        or update_progress.get("package_commit") != predecessor_commit
+        or update_progress.get("source_lock_sha256") != identity.get("source_lock_sha256")
+        or update_progress.get("owner_seed_sha256") != owner_sha
+        or update_progress.get("completed_steps") != ACTOR_STEPS
+        or update_progress.get("model_digest") != receipt.get("model_digest")
+        or update_progress.get("checkpoint_sha256") != receipt.get("checkpoint_sha256")
+        or update_progress.get("optimizer_sha256") != receipt.get("optimizer_sha256")
+    ):
+        raise RuntimeError("B actor-update predecessor receipt/progress is not a completed, bound 64-step update")
+    checkpoint_path = (prior_root / str(receipt.get("checkpoint_path", ""))).resolve()
+    optimizer_path = (prior_root / str(receipt.get("optimizer_path", ""))).resolve()
+    if (
+        prior_root.resolve() not in checkpoint_path.parents
+        or prior_root.resolve() not in optimizer_path.parents
+        or not checkpoint_path.is_file()
+        or not optimizer_path.is_file()
+        or file_sha256(checkpoint_path) != receipt.get("checkpoint_sha256")
+        or file_sha256(optimizer_path) != receipt.get("optimizer_sha256")
+    ):
+        raise RuntimeError("B actor-update predecessor checkpoint/optimizer is missing or hash-invalid")
+
+    document = {
+        "schema_id": "issue85-pilot-actor-update-reuse-v1",
+        "scope": "PILOT_ONLY / NONFORMAL",
+        "current_package_commit": identity["package_commit"],
+        "predecessor_package_commit": predecessor_commit,
+        "source_lock_sha256": identity["source_lock_sha256"],
+        "issue84_source_commit": ISSUE84_ACCEPTED_COMMIT,
+        "source_diff_paths": changed_paths,
+        "progress_sha256": file_sha256(progress_path),
+        "seed_table_sha256": file_sha256(seed_path),
+        "b_training_game_reuse_sha256": file_sha256(predecessor_manifest_path),
+        "actor_update_attempt": update_attempt.name,
+        "actor_update_progress_sha256": file_sha256(update_progress_path),
+        "actor_update_receipt_sha256": file_sha256(receipt_path),
+        "actor_update_receipt": receipt,
+        "checkpoint_sha256": receipt["checkpoint_sha256"],
+        "optimizer_sha256": receipt["optimizer_sha256"],
+        "prior_C_failed_attempts": failure_receipts,
+        "prior_C_successful_games": 0,
+        "prior_C_unstarted_owners": 6,
+        "reuse_rule": "reference the exact successful B update checkpoint and optimizer; do not repeat the completed B actor update; preserve prior failed C attempts and retry only under the reviewed current source",
+    }
+    return {"source_commit": predecessor_commit, "root": prior_root, "receipt": receipt, "document": document}
 
 
 def _load_predecessor_b_training(
@@ -1163,7 +1433,23 @@ def _configure_runtime(issue84_root: Path, pilot_root: Path, identity: Mapping[s
             receipt = progress.get("actor_updates", {}).get(group)
             if not isinstance(receipt, dict) or receipt.get("status") != "SUCCEEDED":
                 raise RuntimeError(f"pilot actor update is incomplete for {group}")
-            checkpoint = pilot_root / receipt["checkpoint_path"]
+            checkpoint_root = pilot_root
+            if group == "B" and receipt.get("package_commit") != identity["package_commit"]:
+                reuse_path = pilot_root / "pilot-actor-update-reuse.json"
+                reuse = read_json(reuse_path) if reuse_path.is_file() else None
+                if (
+                    not isinstance(reuse, dict)
+                    or reuse != progress.get("actor_update_reuse")
+                    or progress.get("actor_update_reuse_sha256") != file_sha256(reuse_path)
+                    or reuse.get("current_package_commit") != identity["package_commit"]
+                    or reuse.get("predecessor_package_commit") != PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA
+                    or reuse.get("actor_update_receipt") != receipt
+                ):
+                    raise RuntimeError("carried B actor update lacks its exact source-bound reuse manifest")
+                checkpoint_root = PILOT_ROOT / str(reuse["predecessor_package_commit"])
+            checkpoint = (checkpoint_root / receipt["checkpoint_path"]).resolve()
+            if checkpoint_root.resolve() not in checkpoint.parents or not checkpoint.is_file():
+                raise RuntimeError(f"pilot actor checkpoint path is outside its bound source root for {group}")
             if file_sha256(checkpoint) != receipt.get("checkpoint_sha256"):
                 raise RuntimeError(f"pilot actor checkpoint hash differs for {group}")
             actor, parent_digest, _source = make_new_arm(group)
@@ -1888,6 +2174,24 @@ def _validate_completed_pilot(
         or progress.get("predecessor_training_reuse_sha256") != file_sha256(predecessor_manifest_path)
     ):
         raise RuntimeError("successful pilot report lacks its validated immutable predecessor-game reference")
+    b_actor_update = _load_predecessor_b_actor_update(
+        backend,
+        identity=identity,
+        current_seed_table=seed_table,
+        b_game_predecessor=predecessor,
+    )
+    actor_reuse_document = b_actor_update["document"]
+    actor_reuse_path = package_root / "pilot-actor-update-reuse.json"
+    if (
+        not actor_reuse_path.is_file()
+        or read_json(actor_reuse_path) != actor_reuse_document
+        or progress.get("actor_update_reuse") != actor_reuse_document
+        or report.get("actor_update_reuse") != actor_reuse_document
+        or progress.get("actor_update_reuse_sha256") != file_sha256(actor_reuse_path)
+        or report.get("actor_update_reuse_sha256") != file_sha256(actor_reuse_path)
+        or progress.get("actor_updates", {}).get("B") != b_actor_update["receipt"]
+    ):
+        raise RuntimeError("successful pilot report lacks the validated immutable B actor-update reuse reference")
     expected_training = set(NEW_ARMS)
     expected_evaluation = set(POLICIES)
     expected_updates = set(NEW_ARMS)
@@ -2009,7 +2313,8 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
         )
         return report
 
-    if progress_path.is_file():
+    progress_exists = progress_path.is_file()
+    if progress_exists:
         progress = read_json(progress_path)
         if progress.get("package_commit") != identity["package_commit"] or progress.get("source_lock_sha256") != identity["source_lock_sha256"] or progress.get("seed_table_sha256") != seed_hash:
             raise RuntimeError("pilot progress is bound to another source, lock or fixed seed table")
@@ -2024,15 +2329,40 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
                 f"{PILOT_RESUME_PREDECESSOR_SHA}; refusing to replay completed B owners"
             )
         predecessor_commit = resume_from
-        predecessor = _load_predecessor_b_training(
-            backend,
-            identity=identity,
-            current_seed_table=rows_document,
-            predecessor_commit=predecessor_commit,
-        )
-        predecessor_document = _predecessor_receipt_document(predecessor, current_identity=identity)
-        predecessor_manifest_path = package_root / "pilot-predecessor-training-reuse.json"
+    if predecessor_commit != PILOT_RESUME_PREDECESSOR_SHA:
+        raise RuntimeError("Issue 85 pilot continuation changed its immutable B-game predecessor")
+    predecessor = _load_predecessor_b_training(
+        backend,
+        identity=identity,
+        current_seed_table=rows_document,
+        predecessor_commit=predecessor_commit,
+    )
+    predecessor_document = _predecessor_receipt_document(predecessor, current_identity=identity)
+    predecessor_manifest_path = package_root / "pilot-predecessor-training-reuse.json"
+    actor_update_reuse = _load_predecessor_b_actor_update(
+        backend,
+        identity=identity,
+        current_seed_table=rows_document,
+        b_game_predecessor=predecessor,
+    )
+    actor_reuse_document = actor_update_reuse["document"]
+    actor_reuse_path = package_root / "pilot-actor-update-reuse.json"
+    if progress_exists:
+        if (
+            not predecessor_manifest_path.is_file()
+            or read_json(predecessor_manifest_path) != predecessor_document
+            or progress.get("predecessor_training_reuse") != predecessor_document
+            or progress.get("predecessor_training_reuse_sha256") != file_sha256(predecessor_manifest_path)
+            or not actor_reuse_path.is_file()
+            or read_json(actor_reuse_path) != actor_reuse_document
+            or progress.get("actor_update_reuse") != actor_reuse_document
+            or progress.get("actor_update_reuse_sha256") != file_sha256(actor_reuse_path)
+            or progress.get("actor_updates", {}).get("B") != actor_update_reuse["receipt"]
+        ):
+            raise RuntimeError("pilot continuation predecessor game/update references are missing or changed")
+    else:
         predecessor_manifest_sha = _write_or_verify_once(predecessor_manifest_path, predecessor_document)
+        actor_reuse_sha = _write_or_verify_once(actor_reuse_path, actor_reuse_document)
         progress = {
             "schema_id": "issue85-pilot-progress-v1",
             "status": "READY",
@@ -2046,30 +2376,16 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
             "training_runs": {"B": predecessor["summary"]},
             "predecessor_training_reuse": predecessor_document,
             "predecessor_training_reuse_sha256": predecessor_manifest_sha,
-            "actor_updates": {},
+            "actor_updates": {"B": actor_update_reuse["receipt"]},
+            "actor_update_reuse": actor_reuse_document,
+            "actor_update_reuse_sha256": actor_reuse_sha,
             "evaluation_runs": {},
             "concurrency": int(backend.CONCURRENCY),
             "run_history": [],
         }
         backend.atomic_json(progress_path, progress)
-    if progress.get("predecessor_training_reuse") is not None:
-        predecessor = _load_predecessor_b_training(
-            backend,
-            identity=identity,
-            current_seed_table=rows_document,
-            predecessor_commit=predecessor_commit,
-        )
-        predecessor_document = _predecessor_receipt_document(predecessor, current_identity=identity)
-        predecessor_manifest_path = package_root / "pilot-predecessor-training-reuse.json"
-        if (
-            not predecessor_manifest_path.is_file()
-            or read_json(predecessor_manifest_path) != predecessor_document
-            or progress.get("predecessor_training_reuse") != predecessor_document
-            or progress.get("predecessor_training_reuse_sha256") != file_sha256(predecessor_manifest_path)
-        ):
-            raise RuntimeError("pilot continuation predecessor reference is missing or changed")
-    else:
-        raise RuntimeError("pilot progress has no immutable predecessor-training reference")
+    if progress.get("predecessor_training_reuse") != predecessor_document:
+        raise RuntimeError("pilot progress has no immutable B-game predecessor reference")
     old_status = progress.get("status")
     if old_status == "RUNNING":
         prior_pid = int(progress.get("supervisor_pid", -1))
@@ -2175,6 +2491,14 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
                 backend.atomic_json(progress_path, progress)
                 if not stage_summary_is_complete(summary, len(rows), [str(row["unit_id"]) for row in rows]):
                     raise RuntimeError(f"Issue 85 pilot training games for {arm} stopped with {summary['status']}: {summary['successful_completions']}/{summary['expected']}")
+
+            if arm == "B":
+                if (
+                    actor_update_reuse["receipt"] != progress.get("actor_updates", {}).get("B")
+                    or progress.get("actor_update_reuse") != actor_reuse_document
+                ):
+                    raise RuntimeError("completed B actor update is not bound to the immutable carry-forward record")
+                continue
 
             actor_resume_clock = clock.elapsed()
             progress["active_stage"] = "pilot-actor-update"
@@ -2283,6 +2607,8 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
         ) + sum(item["successful_completions"] for item in progress["evaluation_runs"].values()),
         "training_runs": progress["training_runs"],
         "predecessor_training_reuse": progress["predecessor_training_reuse"],
+        "actor_update_reuse": progress["actor_update_reuse"],
+        "actor_update_reuse_sha256": progress["actor_update_reuse_sha256"],
         "actor_updates": progress["actor_updates"],
         "evaluation_runs": progress["evaluation_runs"],
         "baseline_verification": progress["baseline_verification"],

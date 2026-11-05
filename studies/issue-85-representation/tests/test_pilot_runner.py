@@ -518,6 +518,9 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(plan["training_games"], 80)
         self.assertEqual(plan["evaluation_games"], 112)
         self.assertEqual(plan["planned_reused_predecessor_training_receipts"], 0)
+        self.assertEqual(plan["planned_reused_predecessor_actor_updates"], 0)
+        self.assertIsNone(plan["actor_update_carry_forward_source_commit"])
+        self.assertEqual(plan["prior_failed_C_attempts_preserved_for_accounting"], 0)
         self.assertEqual(plan["new_training_game_slots_before_retries"], 80)
         self.assertEqual(plan["new_evaluation_game_slots_before_retries"], 112)
         self.assertEqual(plan["new_game_slots_before_retries"], 192)
@@ -543,6 +546,12 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(plan["training_games"], 80)
         self.assertEqual(plan["evaluation_games"], 112)
         self.assertEqual(plan["planned_reused_predecessor_training_receipts"], 16)
+        self.assertEqual(plan["planned_reused_predecessor_actor_updates"], 1)
+        self.assertEqual(
+            plan["actor_update_carry_forward_source_commit"],
+            pilot_runner.PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA,
+        )
+        self.assertEqual(plan["prior_failed_C_attempts_preserved_for_accounting"], 10)
         self.assertEqual(plan["new_training_game_slots_before_retries"], 64)
         self.assertEqual(plan["new_evaluation_game_slots_before_retries"], 112)
         self.assertEqual(plan["new_game_slots_before_retries"], 176)
@@ -554,20 +563,35 @@ class PilotRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unregistered predecessor source"):
             pilot_runner.pilot_plan(resume_from="a" * 40)
 
-    def test_predecessor_reuse_allows_only_reviewed_runner_and_adapter_repairs(self):
+    def test_predecessor_reuse_allows_only_reviewed_runner_api_and_public_schema_repairs(self):
         approved_paths = (
+            "studies/issue-85-representation/feature_firewall.py",
             "studies/issue-85-representation/pilot_runner.py",
+            "studies/issue-85-representation/tests/test_feature_firewall.py",
             "studies/issue-85-representation/tests/test_pilot_runner.py",
             "studies/issue-85-representation/runtime_integration.py",
             "studies/issue-85-representation/tests/test_runtime_integration.py",
         )
         pilot_runner._validate_predecessor_reuse_source_diff(approved_paths)
-        with self.assertRaisesRegex(RuntimeError, "reviewed runner and locked #84 outcome API repairs"):
+        with self.assertRaisesRegex(RuntimeError, "reviewed runner/API repairs"):
             pilot_runner._validate_predecessor_reuse_source_diff(
                 (*approved_paths, "studies/issue-85-representation/contract.json"),
             )
-        with self.assertRaisesRegex(RuntimeError, "reviewed runner and locked #84 outcome API repairs"):
+        with self.assertRaisesRegex(RuntimeError, "reviewed runner/API repairs"):
             pilot_runner._validate_predecessor_reuse_source_diff(approved_paths[:-1])
+
+    def test_b_actor_update_carry_forward_only_allows_reviewed_paths(self):
+        approved_paths = (
+            "studies/issue-85-representation/feature_firewall.py",
+            "studies/issue-85-representation/pilot_runner.py",
+            "studies/issue-85-representation/tests/test_feature_firewall.py",
+            "studies/issue-85-representation/tests/test_pilot_runner.py",
+        )
+        pilot_runner._validate_b_actor_update_carry_forward_source_diff(approved_paths)
+        with self.assertRaisesRegex(RuntimeError, "B actor-update carry-forward"):
+            pilot_runner._validate_b_actor_update_carry_forward_source_diff(
+                (*approved_paths, "studies/issue-85-representation/contract.json"),
+            )
 
     def test_reuse_manifest_names_the_progress_snapshot_clock_value(self):
         predecessor = {
