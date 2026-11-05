@@ -142,9 +142,18 @@ class PilotRunnerTests(unittest.TestCase):
             def logits(self, features, payload=None):
                 return torch.zeros(features.shape[0], dtype=torch.float32)
 
+        legacy = torch.zeros((2, 2048), dtype=torch.float32)
+        wide = torch.zeros((2, 8192), dtype=torch.float32)
+        wide[0, 0] = 0.5
+        legacy[0, 0] = torch.nextafter(
+            torch.tensor(0.5, dtype=torch.float32),
+            torch.tensor(1.0, dtype=torch.float32),
+        )
+        folded = wide.reshape(2, 4, 2048).sum(dim=1)
+        self.assertFalse(torch.equal(folded, legacy))
         decision = SimpleNamespace(
-            candidate_features=torch.zeros((2, 2048), dtype=torch.float32),
-            wide_candidate_features=torch.zeros((2, 8192), dtype=torch.float32),
+            candidate_features=legacy,
+            wide_candidate_features=wide,
             issue85_payload={},
         )
         example = SimpleNamespace(base=SimpleNamespace(decisions=[decision]))
@@ -155,6 +164,10 @@ class PilotRunnerTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "PASS")
         self.assertEqual(result["captured_native_training_decisions"], 1)
+
+        legacy[0, 0] = 0.51
+        with self.assertRaisesRegex(RuntimeError, "exceeds FP32 fold tolerance"):
+            pilot_runner._initial_parity(FakePolicy(), FakePolicy(), [example], arm="D")
 
     def test_predecessor_progress_requires_exact_fixed_successful_b_cohort(self):
         rows = [

@@ -40,6 +40,7 @@ PILOT_C_OUTCOME_CARRY_FORWARD_SHA = "fafbb59770f14aea14915090714b51538f8c4d85"
 ACTOR_STEPS = 64
 ACTOR_CHECKPOINT_INTERVAL = 8
 PILOT_MINIBATCH_OWNERS = len(PILOT_OWNERS)
+WIDENED_FOLD_ATOL = 1e-7
 _CURRENT_ROW: ContextVar[Mapping[str, Any] | None] = ContextVar("issue85_pilot_current_row", default=None)
 
 
@@ -1874,8 +1875,15 @@ def _initial_parity(actor: Any, parent: Any, examples: Sequence[Any], *, arm: st
                 if arm in {"B", "D"}:
                     wide = torch.as_tensor(decision.wide_candidate_features, dtype=torch.float32)
                     folded = fold_widened_hash_features(wide)
-                    if not torch.equal(folded, legacy):
-                        raise RuntimeError(f"pilot widened matrix for {arm} fails exact fold identity")
+                    # The legacy and widened encoders independently accumulate
+                    # float32 values, so folding can differ by rounding order.
+                    # Keep this tighter than the policy-level parity tolerance.
+                    if not torch.allclose(folded, legacy, rtol=0.0, atol=WIDENED_FOLD_ATOL):
+                        max_fold_error = float(torch.max(torch.abs(folded - legacy)).item())
+                        raise RuntimeError(
+                            f"pilot widened matrix for {arm} exceeds FP32 fold tolerance "
+                            f"(max_abs_error={max_fold_error:.9g}, atol={WIDENED_FOLD_ATOL:.9g})"
+                        )
                     candidate = wide
                 else:
                     candidate = legacy
