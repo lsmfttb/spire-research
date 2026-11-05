@@ -87,8 +87,9 @@ _FEATURE_ROOT_KEYS = frozenset(
         "effect_amount_max_hp", "free_slots", "result_potions", "event", "choice",
         "revealed_card_identity", "first_card_identity", "second_card_identity",
         "cards_match", "random_relic", "result_card", "result_potion", "result_relic", "target_card",
-        "result_card_target", "result_card_targets", "result_gold", "result_book_relic",
-        "search_result", "battle_rewards", "battle_and_reward",
+        "result_card_target", "result_card_targets", "result_cards", "result_gold", "result_book_relic",
+        "bet_result", "generated_card_choices", "search_result", "battle_rewards", "battle_and_reward",
+        "writhe_result", "wheel_result",
         "target_deck_index", "target_relic", "oracle_destination_encounter",
         "oracle_destination_room", "public_destination", "offered_relic",
         "selection_purpose", "selection_count", "chest_size", "relic_tier",
@@ -98,8 +99,9 @@ _FEATURE_ROOT_KEYS = frozenset(
 )
 _FUTURE_UNAVAILABLE_FEATURE_KEYS = frozenset(
     {
-        "result_card_target", "result_card_targets", "result_gold", "result_book_relic",
-        "search_result", "battle_rewards", "battle_and_reward", "result_relic",
+        "result_card_target", "result_card_targets", "result_cards", "result_gold", "result_book_relic",
+        "bet_result", "generated_card_choices", "search_result", "battle_rewards", "battle_and_reward",
+        "writhe_result", "wheel_result", "result_relic",
     }
 )
 _ORACLE_DESTINATION_FEATURE_KEYS = frozenset(

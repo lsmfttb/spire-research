@@ -14,6 +14,29 @@ sys.path.insert(0, str(ROOT))
 import feature_firewall  # noqa: E402
 
 
+# Exact setFutureUnavailable() field inventory from
+# lsmfttb/sts_lightspeed:bindings/slaythespire.cpp at
+# 8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2
+# (locked source blob 24e1cad5f2d405f55f8ccb038078d9f49e78adf7).
+LOCKED_NATIVE_FUTURE_UNAVAILABLE_FIELDS = frozenset(
+    {
+        "result_relic",
+        "result_book_relic",
+        "search_result",
+        "result_card_targets",
+        "result_card_target",
+        "result_gold",
+        "battle_rewards",
+        "battle_and_reward",
+        "result_cards",
+        "bet_result",
+        "generated_card_choices",
+        "writhe_result",
+        "wheel_result",
+    }
+)
+
+
 def load_legacy_encoder():
     spec = importlib.util.spec_from_file_location("issue85_issue73_policy", LEGACY_POLICY)
     if spec is None or spec.loader is None:
@@ -171,6 +194,20 @@ def native_public_room_symbol(value: str) -> dict:
 
 
 class FeatureFirewallTests(unittest.TestCase):
+    def test_future_result_allowlists_match_exact_locked_native_inventory(self):
+        self.assertEqual(
+            feature_firewall._LOCKED_NATIVE_SOURCE_COMMIT,
+            "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2",
+        )
+        self.assertEqual(
+            feature_firewall._FEATURE_ROOT_KEYS & LOCKED_NATIVE_FUTURE_UNAVAILABLE_FIELDS,
+            LOCKED_NATIVE_FUTURE_UNAVAILABLE_FIELDS,
+        )
+        self.assertEqual(
+            feature_firewall._FUTURE_UNAVAILABLE_FEATURE_KEYS,
+            LOCKED_NATIVE_FUTURE_UNAVAILABLE_FIELDS,
+        )
+
     def test_native_public_v3_envelopes_get_explicit_public_visibility(self):
         public = public_projection(0)
         self.assertTrue(
@@ -234,7 +271,7 @@ class FeatureFirewallTests(unittest.TestCase):
                 feature_firewall.new_path_projection(privileged, public_projection(0))
 
     def test_locked_future_result_fields_allow_only_explicit_unavailable_markers(self):
-        names = sorted(feature_firewall._FUTURE_UNAVAILABLE_FEATURE_KEYS)
+        names = sorted(LOCKED_NATIVE_FUTURE_UNAVAILABLE_FIELDS)
         for name in names:
             privileged = projection(0)
             privileged["candidates"][0]["features"][name] = {
