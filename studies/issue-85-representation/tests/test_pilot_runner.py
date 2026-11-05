@@ -984,6 +984,56 @@ class PilotRunnerTests(unittest.TestCase):
                 (*approved_paths, "studies/issue-85-representation/contract.json"),
             )
 
+    def test_resumed_progress_reuse_only_allows_the_pilot_dispatch_repair(self):
+        approved_paths = (
+            "studies/issue-85-representation/pilot_runner.py",
+            "studies/issue-85-representation/tests/test_pilot_runner.py",
+        )
+        pilot_runner._validate_resume_progress_source_diff(approved_paths)
+        with self.assertRaisesRegex(RuntimeError, "PARENT dispatch repair"):
+            pilot_runner._validate_resume_progress_source_diff(
+                (*approved_paths, "studies/issue-85-representation/contract.json"),
+            )
+
+    def test_parent_resume_offsets_preserve_exactly_eight_failed_receipts(self):
+        rows = [
+            {"unit_id": f"PILOT-EVAL:{owner}:PARENT"}
+            for owner in pilot_runner.PILOT_OWNERS
+        ]
+        attempted_ids = [str(row["unit_id"]) for row in rows[:8]]
+        summary = {
+            "status": "PAUSED_AFTER_FAILED_ATTEMPT",
+            "expected": len(rows),
+            "successful_completions": 0,
+            "successful_unit_ids": [],
+            "incomplete_attempts": [],
+            "attempt_count_by_owner": {
+                str(row["unit_id"]): int(row["unit_id"] in attempted_ids) for row in rows
+            },
+            "failed_attempts": [
+                {
+                    "unit_id": unit_id,
+                    "attempt": f"{unit_id}-attempt-0001",
+                    "failure_type": "ValueError",
+                    "failure": "unknown study arm PARENT",
+                    "exit_code": 1,
+                }
+                for unit_id in attempted_ids
+            ],
+        }
+
+        offsets = pilot_runner._parent_failure_attempt_offsets(summary, rows)
+
+        self.assertEqual(sum(offsets.values()), 8)
+        self.assertEqual({unit_id for unit_id, count in offsets.items() if count}, set(attempted_ids))
+        for invalid in (
+            {**summary, "failed_attempts": summary["failed_attempts"][:-1]},
+            {**summary, "attempt_count_by_owner": {**summary["attempt_count_by_owner"], attempted_ids[0]: 0}},
+            {**summary, "status": "SUCCEEDED"},
+        ):
+            with self.assertRaisesRegex(RuntimeError, "retained PARENT"):
+                pilot_runner._parent_failure_attempt_offsets(invalid, rows)
+
     def test_reuse_manifest_names_the_progress_snapshot_clock_value(self):
         predecessor = {
             "source_commit": pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
