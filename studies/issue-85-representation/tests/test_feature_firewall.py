@@ -233,6 +233,48 @@ class FeatureFirewallTests(unittest.TestCase):
             ):
                 feature_firewall.new_path_projection(privileged, public_projection(0))
 
+    def test_locked_future_result_fields_allow_only_explicit_unavailable_markers(self):
+        names = sorted(feature_firewall._FUTURE_UNAVAILABLE_FEATURE_KEYS)
+        for name in names:
+            privileged = projection(0)
+            privileged["candidates"][0]["features"][name] = {
+                "availability": "unavailable",
+                "required_for_choice_semantics": False,
+                "reason": "locked native future RNG explanation",
+            }
+            with self.subTest(name=name):
+                projected = feature_firewall.new_path_projection(privileged, public_projection(0))
+                learned = projected["candidates"][0]["features"][name]
+                self.assertEqual(learned["availability"], "unavailable")
+                self.assertFalse(learned["required_for_choice_semantics"])
+                self.assertNotIn("value", learned)
+                self.assertNotIn("reason", learned)
+                self.assertNotIn("source", learned)
+                self.assertNotIn("locked native future RNG explanation", json.dumps(projected))
+
+                available = projection(0)
+                available["candidates"][0]["features"][name] = {
+                    "availability": "available",
+                    "visibility": "oracle_only",
+                    "source": "locked native future result",
+                    "value": "must-not-enter-learned-inputs",
+                }
+                with self.assertRaisesRegex(ValueError, f"features\\.{name} must remain explicitly unavailable"):
+                    feature_firewall.new_path_projection(available, public_projection(0))
+                available["candidates"][0]["features"][name] = {
+                    "availability": "unavailable",
+                    "visibility": "public_now",
+                    "required_for_choice_semantics": False,
+                }
+                with self.assertRaisesRegex(ValueError, f"features\\.{name} must remain explicitly unavailable"):
+                    feature_firewall.new_path_projection(available, public_projection(0))
+                available["candidates"][0]["features"][name] = {
+                    "availability": "unavailable",
+                    "required_for_choice_semantics": True,
+                }
+                with self.assertRaisesRegex(ValueError, f"features\\.{name} must remain explicitly unavailable"):
+                    feature_firewall.new_path_projection(available, public_projection(0))
+
     def test_match_and_keep_card_state_uses_native_scalar_enum(self):
         public = public_projection(0)
         action = public["candidate_actions"]["value"][0]

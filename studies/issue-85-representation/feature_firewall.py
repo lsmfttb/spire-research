@@ -87,11 +87,19 @@ _FEATURE_ROOT_KEYS = frozenset(
         "effect_amount_max_hp", "free_slots", "result_potions", "event", "choice",
         "revealed_card_identity", "first_card_identity", "second_card_identity",
         "cards_match", "random_relic", "result_card", "result_potion", "result_relic", "target_card",
+        "result_card_target", "result_card_targets", "result_gold", "result_book_relic",
+        "search_result", "battle_rewards", "battle_and_reward",
         "target_deck_index", "target_relic", "oracle_destination_encounter",
         "oracle_destination_room", "public_destination", "offered_relic",
         "selection_purpose", "selection_count", "chest_size", "relic_tier",
         "unrevealed_loot", "heal_amount", "target_family", "key",
         "current_strength", "gold_available", "item", "price",
+    }
+)
+_FUTURE_UNAVAILABLE_FEATURE_KEYS = frozenset(
+    {
+        "result_card_target", "result_card_targets", "result_gold", "result_book_relic",
+        "search_result", "battle_rewards", "battle_and_reward", "result_relic",
     }
 )
 _ORACLE_DESTINATION_FEATURE_KEYS = frozenset(
@@ -296,6 +304,14 @@ def _check_privileged_projection(value: Any) -> None:
         features = _check_keys(row.get("features"), _FEATURE_ROOT_KEYS, f"candidates[{index}].features")
         for name, envelope in features.items():
             payload = _check_feature_envelope(envelope, f"candidates[{index}].features.{name}")
+            if name in _FUTURE_UNAVAILABLE_FEATURE_KEYS and (
+                envelope.get("availability") != "unavailable"
+                or envelope.get("required_for_choice_semantics") is not False
+                or envelope.get("visibility") == "public_now"
+            ):
+                raise ValueError(
+                    f"candidates[{index}].features.{name} must remain explicitly unavailable under the locked native schema"
+                )
             if payload is None:
                 continue
             if name == "choice":

@@ -36,8 +36,7 @@ NEW_ARMS = ("B", "C", "D", "E", "F")
 POLICIES = ("PARENT", "A", *NEW_ARMS)
 PILOT_RESUME_PREDECESSOR_SHA = "0297d60382e5dfe64d8de93f6ca383e96b655f40"
 PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA = "62382663fd5612d55f662190dc389cc0664a2f98"
-MAX_ATTEMPTS_PER_OWNER = 2
-STOP_AFTER_CONSECUTIVE_FAILURES = 3
+PILOT_C_OUTCOME_CARRY_FORWARD_SHA = "fafbb59770f14aea14915090714b51538f8c4d85"
 ACTOR_STEPS = 64
 ACTOR_CHECKPOINT_INTERVAL = 8
 PILOT_MINIBATCH_OWNERS = len(PILOT_OWNERS)
@@ -153,14 +152,6 @@ def derive_seed(*parts: object) -> int:
     return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:4], "big") & 0x7FFFFFFF
 
 
-def failure_disposition(attempt_number: int, consecutive_failures: int) -> str:
-    if int(consecutive_failures) >= STOP_AFTER_CONSECUTIVE_FAILURES:
-        return "STOP_REPEATED_FAILURES"
-    if int(attempt_number) >= MAX_ATTEMPTS_PER_OWNER:
-        return "STOP_OWNER_RETRY_LIMIT"
-    return "RETRY_ONCE"
-
-
 def _effective_attempt_count(carried_attempt_count: int, package_attempt_count: int) -> int:
     counts = (carried_attempt_count, package_attempt_count)
     if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in counts):
@@ -174,6 +165,7 @@ def _next_attempt_number(carried_attempt_count: int, package_attempt_count: int)
 
 def _carried_c_attempt_counts(
     rows: Sequence[Mapping[str, Any]], actor_update_reuse: Mapping[str, Any],
+    c_outcome_reuse: Mapping[str, Any] | None = None,
 ) -> dict[str, int]:
     failures = actor_update_reuse.get("prior_C_failed_attempts")
     if not isinstance(failures, list) or len(failures) != 10:
@@ -187,7 +179,16 @@ def _carried_c_attempt_counts(
         or not set(failed_ids).issubset(row_ids)
     ):
         raise RuntimeError("carried Issue 85 C failures do not bind uniquely to the current owner rows")
-    return {unit_id: 1 for unit_id in failed_ids}
+    counts = {unit_id: 1 for unit_id in failed_ids}
+    if c_outcome_reuse is not None:
+        prior_counts = c_outcome_reuse.get("prior_C_attempt_count_by_owner")
+        if not isinstance(prior_counts, dict) or set(prior_counts) != row_ids:
+            raise RuntimeError("carried Issue 85 C package attempts do not bind every fixed owner")
+        for unit_id, count in prior_counts.items():
+            if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+                raise RuntimeError("carried Issue 85 C package attempts contain an invalid count")
+            counts[unit_id] = counts.get(unit_id, 0) + count
+    return counts
 
 
 def trailing_failure_streak(events: Sequence[tuple[str, float, str]]) -> int:
@@ -207,7 +208,7 @@ def pilot_plan(*, resume_from: str | None = None) -> dict[str, Any]:
         raise ValueError("pilot plan names an unregistered predecessor source")
     training_cohort_games = len(NEW_ARMS) * len(PILOT_OWNERS)
     evaluation_cohort_games = len(POLICIES) * len(PILOT_OWNERS)
-    planned_reused_receipts = len(PILOT_OWNERS) if resume_from is not None else 0
+    planned_reused_receipts = len(PILOT_OWNERS) + (len(PILOT_OWNERS) // 4) if resume_from is not None else 0
     new_training_slots = training_cohort_games - planned_reused_receipts
     new_evaluation_slots = evaluation_cohort_games
     new_slots = new_training_slots + new_evaluation_slots
@@ -220,11 +221,16 @@ def pilot_plan(*, resume_from: str | None = None) -> dict[str, Any]:
         "training_games": training_cohort_games,
         "evaluation_games": evaluation_cohort_games,
         "planned_reused_predecessor_training_receipts": planned_reused_receipts,
+        "planned_reused_C_training_receipts": len(PILOT_OWNERS) // 4 if resume_from is not None else 0,
+        "C_training_outcome_carry_forward_source_commit": (
+            PILOT_C_OUTCOME_CARRY_FORWARD_SHA if resume_from is not None else None
+        ),
         "planned_reused_predecessor_actor_updates": 1 if resume_from is not None else 0,
         "actor_update_carry_forward_source_commit": (
             PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA if resume_from is not None else None
         ),
-        "prior_failed_C_attempts_preserved_for_accounting": 10 if resume_from is not None else 0,
+        "prior_failed_C_attempts_preserved_for_accounting": (10 + len(PILOT_OWNERS) // 4) if resume_from is not None else 0,
+        "prior_C_package_attempts_preserved_for_accounting": len(PILOT_OWNERS) // 2 if resume_from is not None else 0,
         "new_training_game_slots_before_retries": new_training_slots,
         "new_evaluation_game_slots_before_retries": new_evaluation_slots,
         "new_game_slots_before_retries": new_slots,
@@ -232,8 +238,7 @@ def pilot_plan(*, resume_from: str | None = None) -> dict[str, Any]:
         "pilot_game_executions": new_slots,
         "formal_games": 0,
         "concurrency": 8,
-        "retry_limit_per_owner": MAX_ATTEMPTS_PER_OWNER,
-        "stop_after_consecutive_failed_attempts": STOP_AFTER_CONSECUTIVE_FAILURES,
+        "failed_attempt_handling": "pause_current_batch_for_diagnosis; preserve attempts and resume after cause is corrected",
     }
 
 
@@ -501,10 +506,16 @@ def pilot_success_record(
 
 
 def stage_receipts_are_complete(
-    backend: Any, *, root: Path, rows: Sequence[Mapping[str, Any]], package_commit: str
+    backend: Any, *, root: Path, rows: Sequence[Mapping[str, Any]], package_commit: str,
+    receipt_roots_by_owner: Mapping[str, tuple[Path, str]] | None = None,
 ) -> bool:
     return all(
-        pilot_success_record(backend, root=root, row=row, package_commit=package_commit) is not None
+        pilot_success_record(
+            backend,
+            root=(receipt_roots_by_owner or {}).get(str(row["unit_id"]), (root, package_commit))[0],
+            row=row,
+            package_commit=(receipt_roots_by_owner or {}).get(str(row["unit_id"]), (root, package_commit))[1],
+        ) is not None
         for row in rows
     )
 
@@ -991,6 +1002,246 @@ def _predecessor_receipt_document(predecessor: Mapping[str, Any], *, current_ide
     }
 
 
+def _load_predecessor_c_training_outcomes(
+    backend: Any,
+    *,
+    identity: Mapping[str, str],
+    current_seed_table: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate fafbb's four completed C games and carry them by immutable reference."""
+    predecessor_commit = PILOT_C_OUTCOME_CARRY_FORWARD_SHA
+    is_ancestor = subprocess.run(
+        ["git", "-C", str(REPO), "merge-base", "--is-ancestor", predecessor_commit, identity["package_commit"]],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+    )
+    if is_ancestor.returncode != 0:
+        raise RuntimeError("Issue 85 C outcome source is not an ancestor of the current source")
+    changed_paths = sorted(filter(None, _git(REPO, "diff", "--name-only", predecessor_commit, identity["package_commit"]).splitlines()))
+    expected_paths = sorted((
+        "studies/issue-85-representation/feature_firewall.py",
+        "studies/issue-85-representation/pilot_runner.py",
+        "studies/issue-85-representation/tests/test_feature_firewall.py",
+        "studies/issue-85-representation/tests/test_pilot_runner.py",
+    ))
+    if changed_paths != expected_paths:
+        raise RuntimeError("Issue 85 C outcome reuse is limited to the reviewed schema/runner repair and tests")
+
+    prior_root = PILOT_ROOT / predecessor_commit
+    progress_path = prior_root / "pilot-progress.json"
+    seed_path = prior_root / "pilot-seed-table.json"
+    actor_reuse_path = prior_root / "pilot-actor-update-reuse.json"
+    if not all(path.is_file() for path in (progress_path, seed_path, actor_reuse_path)):
+        raise RuntimeError("Issue 85 C outcome predecessor is missing immutable progress, seed, or actor-reuse evidence")
+    progress = read_json(progress_path)
+    prior_seed_table = read_json(seed_path)
+    actor_reuse = read_json(actor_reuse_path)
+    if (
+        prior_seed_table != current_seed_table
+        or file_sha256(seed_path) != progress.get("seed_table_sha256")
+        or progress.get("schema_id") != "issue85-pilot-progress-v1"
+        or progress.get("status") != "FAILED_OR_INCOMPLETE"
+        or progress.get("package_commit") != predecessor_commit
+        or progress.get("source_lock_sha256") != identity.get("source_lock_sha256")
+        or progress.get("issue84_source_commit") != ISSUE84_ACCEPTED_COMMIT
+        or progress.get("active_stage") != "training-games"
+        or progress.get("active_arm") != "C"
+        or progress.get("failure") != {
+            "type": "RuntimeError",
+            "detail": "Issue 85 pilot training games for C stopped with OWNER_RETRY_LIMIT_REACHED: 4/16",
+        }
+        or progress.get("evaluation_runs") != {}
+        or set(progress.get("training_runs", {})) != set(("B", "C"))
+        or set(progress.get("actor_updates", {})) != {"B"}
+        or actor_reuse != progress.get("actor_update_reuse")
+        or file_sha256(actor_reuse_path) != progress.get("actor_update_reuse_sha256")
+        or actor_reuse.get("current_package_commit") != predecessor_commit
+        or actor_reuse.get("prior_C_successful_games") != 0
+        or actor_reuse.get("prior_C_unstarted_owners") != 6
+        or len(actor_reuse.get("prior_C_failed_attempts", [])) != 10
+    ):
+        raise RuntimeError("Issue 85 C outcome predecessor does not match the immutable four-success/eight-attempt pilot")
+
+    rows = [
+        dict(row) for row in prior_seed_table.get("rows", [])
+        if row.get("phase") == "training" and row.get("issue85_arm") == "C"
+    ]
+    row_by_id = {str(row["unit_id"]): row for row in rows}
+    summary = progress.get("training_runs", {}).get("C")
+    original_failure_ids = {
+        str(item.get("unit_id", "")) for item in actor_reuse["prior_C_failed_attempts"]
+    }
+    if (
+        not isinstance(summary, dict)
+        or len(rows) != len(PILOT_OWNERS)
+        or len(row_by_id) != len(rows)
+        or summary.get("status") != "OWNER_RETRY_LIMIT_REACHED"
+        or summary.get("expected") != len(PILOT_OWNERS)
+        or summary.get("successful_completions") != len(PILOT_OWNERS) // 4
+        or len(summary.get("successful_unit_ids", [])) != len(PILOT_OWNERS) // 4
+        or len(summary.get("failed_attempts", [])) != len(PILOT_OWNERS) // 4
+        or summary.get("incomplete_attempts") != []
+        or set(summary.get("attempt_count_by_owner", {})) != set(row_by_id)
+        or set(summary.get("carried_attempt_count_by_owner", {})) != {
+            str(row["unit_id"]) for row in rows[:10]
+        }
+        or len(original_failure_ids) != 10
+        or "" in original_failure_ids
+        or summary.get("carried_attempt_count_by_owner") != {unit_id: 1 for unit_id in original_failure_ids}
+    ):
+        raise RuntimeError("Issue 85 C outcome predecessor summary has inconsistent owner or attempt counts")
+
+    successful_ids = [str(value) for value in summary["successful_unit_ids"]]
+    failed_rows = {str(item.get("unit_id", "")): item for item in summary["failed_attempts"]}
+    first_attempted_owner_ids = {str(row["unit_id"]) for row in rows[:8]}
+    successful_id_set = set(successful_ids)
+    failed_id_set = set(failed_rows)
+    expected_incomplete_ids = failed_id_set | {str(row["unit_id"]) for row in rows[8:]}
+    if (
+        len(set(successful_ids)) != len(successful_ids)
+        or successful_id_set.intersection(failed_id_set)
+        or successful_id_set.union(failed_id_set) != first_attempted_owner_ids
+        or set(summary.get("incomplete", [])) != expected_incomplete_ids
+        or len(failed_rows) != len(summary["failed_attempts"])
+    ):
+        raise RuntimeError("Issue 85 C outcome predecessor success/failure owner ledger is inconsistent")
+
+    success_roots: dict[str, tuple[Path, str]] = {}
+    success_receipts: list[dict[str, str]] = []
+    failed_receipts: list[dict[str, str]] = []
+    prior_local_counts: dict[str, int] = {}
+    for row in rows:
+        unit_id = str(row["unit_id"])
+        count = summary["attempt_count_by_owner"][unit_id]
+        expected_local_count = 1 if PILOT_OWNERS.index(int(row["owner_seed"])) < 8 else 0
+        if isinstance(count, bool) or not isinstance(count, int) or count != expected_local_count:
+            raise RuntimeError(f"Issue 85 C predecessor attempt count differs for {unit_id}")
+        prior_local_counts[unit_id] = count
+        unit_root = prior_root / "training" / "C" / "units" / str(backend.unit_key(unit_id))
+        attempts = sorted(path.name for path in unit_root.glob("attempt-*") if path.is_dir())
+        expected_attempts = ["attempt-0002"] if count else []
+        if attempts != expected_attempts:
+            raise RuntimeError(f"Issue 85 C predecessor attempt directories differ for {unit_id}")
+        if unit_id in successful_ids:
+            if count != 1 or unit_id in failed_rows:
+                raise RuntimeError(f"Issue 85 completed C predecessor owner has no unique attempt: {unit_id}")
+            record = pilot_success_record(
+                backend, root=prior_root / "training" / "C", row=row,
+                package_commit=predecessor_commit,
+            )
+            if record is None:
+                raise RuntimeError(f"Issue 85 C predecessor success receipt failed validation: {unit_id}")
+            result, result_path = record
+            attempt = result_path.parent
+            success_roots[unit_id] = (prior_root / "training" / "C", predecessor_commit)
+            success_receipts.append({
+                "unit_id": unit_id,
+                "attempt": attempt.name,
+                "worker_job_sha256": file_sha256(attempt / "worker-job.json"),
+                "started_sha256": file_sha256(attempt / "started.json"),
+                "finished_sha256": file_sha256(attempt / "finished.json"),
+                "result_sha256": file_sha256(result_path),
+            })
+            continue
+        if unit_id not in failed_rows:
+            if count != 0:
+                raise RuntimeError(f"Issue 85 C predecessor has an unclassified attempt for {unit_id}")
+            continue
+        if count != 1:
+            raise RuntimeError(f"Issue 85 C predecessor has an unexplained incomplete owner: {unit_id}")
+        attempt = unit_root / "attempt-0002"
+        job_path = attempt / "worker-job.json"
+        started_path = attempt / "started.json"
+        finished_path = attempt / "finished.json"
+        result_path = attempt / "result.json"
+        if not all(path.is_file() for path in (job_path, started_path, finished_path, result_path)):
+            raise RuntimeError(f"Issue 85 C predecessor failure chain is incomplete: {unit_id}")
+        job, started = read_json(job_path), read_json(started_path)
+        finished, result = read_json(finished_path), read_json(result_path)
+        run_id = f"{unit_id}-attempt-0002"
+        failure = failed_rows[unit_id]
+        if (
+            job.get("schema_id") != "issue79-owner-worker-job-v1"
+            or job.get("unit_id") != unit_id
+            or job.get("row") != row
+            or job.get("run_id") != run_id
+            or job.get("package_commit") != predecessor_commit
+            or job.get("runner_code_commit") != predecessor_commit
+            or job.get("source_lock_sha256") != identity.get("source_lock_sha256")
+            or not _worker_job_paths_match(
+                job, stage_root=prior_root / "training" / "C", attempt_dir=attempt,
+                result_path=result_path,
+            )
+            or started.get("schema_id") != "issue79-owner-attempt-start-v1"
+            or started.get("unit_id") != unit_id
+            or started.get("run_id") != run_id
+            or started.get("package_commit") != predecessor_commit
+            or started.get("seed_row_sha256") != sha256(canonical(row))
+            or finished.get("schema_id") != "issue79-owner-attempt-finish-v1"
+            or finished.get("unit_id") != unit_id
+            or finished.get("run_id") != run_id
+            or finished.get("status") != "FAILED"
+            or finished.get("result_sha256") != file_sha256(result_path)
+            or result.get("schema_id") != "issue79-owner-attempt-result-v1"
+            or result.get("unit_id") != unit_id
+            or not _optional_receipt_field_matches(result, "package_commit", predecessor_commit)
+            or not _optional_receipt_field_matches(result, "runner_code_commit", predecessor_commit)
+            or not _optional_receipt_field_matches(
+                result, "source_lock_sha256", str(identity.get("source_lock_sha256")),
+            )
+            or result.get("status") != "FAILED"
+            or result.get("terminal_outcome") is not None
+            or result.get("failure_detail") != failure.get("failure")
+            or failure.get("attempt") != run_id
+            or failure.get("failure_type") != "StudyFailure"
+            or failure.get("exit_code") != 1
+        ):
+            raise RuntimeError(f"Issue 85 C predecessor failed receipt binding differs: {unit_id}")
+        failed_receipts.append({
+            "unit_id": unit_id,
+            "attempt": attempt.name,
+            "worker_job_sha256": file_sha256(job_path),
+            "started_sha256": file_sha256(started_path),
+            "finished_sha256": file_sha256(finished_path),
+            "result_sha256": file_sha256(result_path),
+            "failure_detail": str(failure.get("failure", "")),
+        })
+
+    prior_c_attempt_counts = {
+        unit_id: prior_local_counts[unit_id] + (1 if unit_id in original_failure_ids else 0)
+        for unit_id in row_by_id
+    }
+    document = {
+        "schema_id": "issue85-pilot-C-outcome-reuse-v1",
+        "scope": "PILOT_ONLY / NONFORMAL",
+        "current_package_commit": identity["package_commit"],
+        "predecessor_package_commit": predecessor_commit,
+        "source_lock_sha256": identity["source_lock_sha256"],
+        "issue84_source_commit": ISSUE84_ACCEPTED_COMMIT,
+        "source_diff_paths": changed_paths,
+        "progress_sha256": file_sha256(progress_path),
+        "seed_table_sha256": file_sha256(seed_path),
+        "prior_actor_update_reuse_sha256": file_sha256(actor_reuse_path),
+        "prior_C_summary_sha256": sha256(canonical(summary)),
+        "prior_C_successful_unit_ids": sorted(successful_ids),
+        "prior_C_successful_games": len(successful_ids),
+        "prior_C_failed_attempt_receipts": sorted(failed_receipts, key=lambda item: item["unit_id"]),
+        "prior_C_failed_attempt_count": len(failed_receipts),
+        "prior_C_attempt_count_by_owner": prior_local_counts,
+        "prior_C_attempt_receipts": sorted(success_receipts + failed_receipts, key=lambda item: item["unit_id"]),
+        "prior_C_cumulative_attempt_count_by_owner": prior_c_attempt_counts,
+        "prior_inherited_failed_attempt_count": len(original_failure_ids),
+        "prior_C_inherited_failed_attempt_receipts": actor_reuse["prior_C_failed_attempts"],
+        "reuse_rule": "reference the exact four validated C success chains; preserve all eight later package attempts and the ten earlier failures; resume only incomplete owners with cumulative attempt numbers",
+    }
+    return {
+        "source_commit": predecessor_commit,
+        "root": prior_root,
+        "document": document,
+        "summary": summary,
+        "success_receipt_roots_by_owner": success_roots,
+    }
+
+
 def actor_update_resume_wall(progress: Mapping[str, Any], current_clock_elapsed: float | None) -> tuple[float, float]:
     elapsed = float(progress.get("elapsed_seconds", 0.0))
     checkpoint_clock_elapsed = progress.get("active_clock_elapsed_seconds")
@@ -1013,12 +1264,14 @@ def run_units_bounded(
     package_commit: str,
     progress_callback: Any | None = None,
     initial_attempt_count_by_owner: Mapping[str, int] | None = None,
+    prior_success_receipt_roots_by_owner: Mapping[str, tuple[Path, str]] | None = None,
 ) -> dict[str, Any]:
-    """Use the locked #84 worker with one retry, then stop on repeated failures.
+    """Run the fixed owner rows without an implementation-defined retry cap.
 
-    Successful immutable receipts are reused. Failed receipts stay in place;
-    this pilot wrapper never retries a failed owner more than once and stops
-    launching new owners after three consecutive failed attempts.
+    Successful immutable receipts are reused and failed receipts remain in
+    place. A failure pauses new scheduling for this invocation so the cause
+    can be diagnosed; a later explicit resume can continue the same owner
+    after repair, with cumulative attempt numbers preserved.
     """
     started = time.monotonic()
     pending = list(rows)
@@ -1034,6 +1287,12 @@ def run_units_bounded(
         for value in carried_attempt_counts.values()
     ):
         raise ValueError("carried pilot attempt counts must be nonnegative integers for current owner rows")
+    carried_successes = {
+        str(unit_id): (Path(binding[0]), str(binding[1]))
+        for unit_id, binding in (prior_success_receipt_roots_by_owner or {}).items()
+    }
+    if not set(carried_successes).issubset(set(row_ids)):
+        raise ValueError("carried pilot success receipts must bind current owner rows")
     active: dict[str, tuple[Any, Any, dict[str, Any], float]] = {}
     complete: dict[str, dict[str, Any]] = {}
     failed_attempts: list[dict[str, Any]] = []
@@ -1133,12 +1392,22 @@ def run_units_bounded(
                 })
                 if result is not None or finished is not None:
                     raise RuntimeError(f"prior pilot attempt has an unrecognized/inconsistent terminal receipt: {prior_attempt}")
+    row_by_id = {str(row["unit_id"]): row for row in rows}
+    for unit_id, (receipt_root, receipt_commit) in carried_successes.items():
+        local_attempts = list((root / "units" / backend.unit_key(unit_id)).glob("attempt-*"))
+        if local_attempts:
+            raise RuntimeError(f"carried-success owner already has current-source attempts: {unit_id}")
+        record = pilot_success_record(
+            backend, root=receipt_root, row=row_by_id[unit_id], package_commit=receipt_commit,
+        )
+        if record is None:
+            raise RuntimeError(f"carried-success receipt chain failed validation: {unit_id}")
+        complete[unit_id] = record[0]
+        finished = read_json(record[1].parent / "finished.json")
+        utc, monotonic = event_time(finished, record[0], read_json(record[1].parent / "started.json"))
+        prior_events.append((utc, monotonic, "SUCCEEDED"))
     consecutive_failures = trailing_failure_streak(prior_events)
-    stop_reason: str | None = (
-        "REPEATED_FAILED_ATTEMPTS"
-        if consecutive_failures >= STOP_AFTER_CONSECUTIVE_FAILURES
-        else None
-    )
+    stop_reason: str | None = None
     last_heartbeat = time.monotonic()
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
@@ -1222,6 +1491,8 @@ def run_units_bounded(
                     raise RuntimeError(f"cannot verify unfinished prior worker PID {prior_pid}; refusing a duplicate owner run") from exc
                 else:
                     raise RuntimeError(f"unfinished prior worker PID {prior_pid} is alive; refusing a duplicate owner run")
+            if str(row["unit_id"]) in carried_successes:
+                continue
             exact_successes = []
             for prior_attempt in prior_attempts:
                 result_path = prior_attempt / "result.json"
@@ -1245,10 +1516,6 @@ def run_units_bounded(
             attempt_number = _next_attempt_number(
                 carried_attempt_counts.get(str(row["unit_id"]), 0), len(prior_attempts),
             )
-            if attempt_number > MAX_ATTEMPTS_PER_OWNER:
-                stop_reason = "RETRY_LIMIT_ALREADY_REACHED"
-                pending.insert(0, row)
-                break
             attempt = base / f"attempt-{attempt_number:04d}"
             attempt.mkdir(parents=True, exist_ok=False)
             run_id = f"{row['unit_id']}-attempt-{attempt_number:04d}"
@@ -1320,13 +1587,7 @@ def run_units_bounded(
                     carried_attempt_counts.get(str(row["unit_id"]), 0),
                     len(list(base.glob("attempt-*"))),
                 )
-                disposition = failure_disposition(attempt_number, consecutive_failures)
-                if disposition == "STOP_REPEATED_FAILURES":
-                    stop_reason = "REPEATED_FAILED_ATTEMPTS"
-                elif disposition == "RETRY_ONCE" and stop_reason is None:
-                    pending.append(row)
-                else:
-                    stop_reason = "OWNER_RETRY_LIMIT_REACHED"
+                stop_reason = "PAUSED_AFTER_FAILED_ATTEMPT"
             if clock is not None:
                 clock.set_processes({item[0].pid for item in active.values()})
             snapshot()
@@ -1667,13 +1928,28 @@ def _load_pilot_training_examples(
     root: Path,
     executor: Any,
     package_commit: str,
+    receipt_roots_by_owner: Mapping[str, tuple[Path, str]] | None = None,
 ) -> list[Any]:
     loader = getattr(issue84_driver, "load_training_outcomes", None)
     if not callable(loader):
         raise RuntimeError("locked Issue 84 driver lacks its training-outcome loader")
-    examples, _outcomes = loader(
-        rows, root=root, executor=executor, package=package_commit,
-    )
+    bindings = receipt_roots_by_owner or {}
+    if not bindings:
+        examples, _outcomes = loader(
+            rows, root=root, executor=executor, package=package_commit,
+        )
+        return examples
+    examples: list[Any] = []
+    for row in rows:
+        selected_root, selected_package = bindings.get(
+            str(row["unit_id"]), (root, package_commit),
+        )
+        owner_examples, _outcomes = loader(
+            [row], root=Path(selected_root), executor=executor, package=selected_package,
+        )
+        if len(owner_examples) != 1:
+            raise RuntimeError(f"training-outcome loader returned no unique example for {row['unit_id']}")
+        examples.extend(owner_examples)
     return examples
 
 
@@ -1716,6 +1992,7 @@ def _train_pilot_arm(
     identity: Mapping[str, str],
     examples_root: Path | None = None,
     examples_package_commit: str | None = None,
+    example_receipt_roots_by_owner: Mapping[str, tuple[Path, str]] | None = None,
     active_clock: Any | None = None,
     resume_clock_elapsed: float | None = None,
     progress_callback: Any | None = None,
@@ -1732,6 +2009,7 @@ def _train_pilot_arm(
         root=Path(examples_root) if examples_root is not None else root,
         executor=executor,
         package_commit=examples_package_commit or identity["package_commit"],
+        receipt_roots_by_owner=example_receipt_roots_by_owner,
     )
     if len(examples) != len(PILOT_OWNERS) or len({int(row.owner_seed) for row in examples}) != len(PILOT_OWNERS):
         raise RuntimeError(f"pilot actor update for {arm} needs 16 unique complete owner outcomes")
@@ -2196,15 +2474,36 @@ def _forecast(progress: Mapping[str, Any]) -> dict[str, Any]:
         or len(set(carried_c_failure_ids)) != len(carried_c_failure_ids)
     ):
         raise RuntimeError("pilot forecast cannot count unbound or duplicate carried C failures")
-    carried_attempt_count = len(carried_c_failure_ids)
-    if carried_attempt_count:
-        c_run = training["C"]
-        c_attempt_counts = c_run.get("attempt_count_by_owner", {})
-        if not set(carried_c_failure_ids).issubset(set(c_attempt_counts)):
-            raise RuntimeError("pilot forecast carried C failures do not match the C training owner ledger")
-        c_carried_counts = c_run.get("carried_attempt_count_by_owner", {})
-        if c_carried_counts != {unit_id: 1 for unit_id in carried_c_failure_ids}:
+    c_run = training["C"]
+    c_attempt_counts = c_run.get("attempt_count_by_owner", {})
+    if not set(carried_c_failure_ids).issubset(set(c_attempt_counts)):
+        raise RuntimeError("pilot forecast carried C failures do not match the C training owner ledger")
+    c_carried_counts = c_run.get("carried_attempt_count_by_owner", {})
+    c_outcome_reuse = progress.get("pilot_C_outcome_reuse")
+    if isinstance(c_outcome_reuse, Mapping):
+        c_prior_counts = c_outcome_reuse.get("prior_C_attempt_count_by_owner")
+        original_failure_ids = set(carried_c_failure_ids)
+        if not isinstance(c_prior_counts, dict) or set(c_prior_counts) != set(c_attempt_counts):
+            raise RuntimeError("pilot forecast cannot verify all historical C attempt offsets")
+        expected_carried_counts = {
+            unit_id: int(c_prior_counts[unit_id]) + (1 if unit_id in original_failure_ids else 0)
+            for unit_id in c_attempt_counts
+        }
+        if (
+            c_carried_counts != expected_carried_counts
+            or c_outcome_reuse.get("prior_C_cumulative_attempt_count_by_owner") != expected_carried_counts
+            or c_outcome_reuse.get("prior_C_successful_games") != len(PILOT_OWNERS) // 4
+            or c_outcome_reuse.get("prior_C_failed_attempt_count") != len(PILOT_OWNERS) // 4
+        ):
+            raise RuntimeError("pilot forecast C attempt offsets differ from the immutable carry-forward manifests")
+        carried_attempt_count = sum(expected_carried_counts.values())
+        carried_failure_count = len(carried_c_failure_ids) + int(c_outcome_reuse["prior_C_failed_attempt_count"])
+    else:
+        expected_carried_counts = {unit_id: 1 for unit_id in carried_c_failure_ids}
+        if c_carried_counts != expected_carried_counts:
             raise RuntimeError("pilot forecast C attempt offsets differ from the immutable carry-forward manifest")
+        carried_attempt_count = len(carried_c_failure_ids)
+        carried_failure_count = carried_attempt_count
     return {
         "schema_id": "issue85-pilot-formal-wall-forecast-v1",
         "status": "PARTIAL_COMPONENT_PROJECTION_NOT_AN_ALL_IN_ESTIMATE_OR_CAP",
@@ -2229,8 +2528,10 @@ def _forecast(progress: Mapping[str, Any]) -> dict[str, Any]:
         "all_in_study_wall_estimate_seconds": None,
         "all_in_estimate_status": "UNKNOWN_UNTIL_UNMEASURED_REQUIRED_WORK_IS_ESTIMATED",
         "carried_prior_C_attempt_count": carried_attempt_count,
-        "pilot_failed_attempt_count": carried_attempt_count + sum(len(item.get("failed_attempts", [])) for group in (training, evaluation) for item in group.values()),
+        "pilot_failed_attempt_count": carried_failure_count + sum(len(item.get("failed_attempts", [])) for group in (training, evaluation) for item in group.values()),
         "pilot_total_attempt_count": carried_attempt_count + sum(sum(int(value) for value in item.get("attempt_count_by_owner", {}).values()) for group in (training, evaluation) for item in group.values()),
+        "carried_prior_C_failed_attempt_count": carried_failure_count,
+        "carried_prior_C_successful_game_count": 0 if not isinstance(c_outcome_reuse, Mapping) else int(c_outcome_reuse["prior_C_successful_games"]),
         "projection_components": ["formal training game groups", "formal evaluation game groups", "formal actor-update work"],
         "pilot_batch_size_limitation": "training estimate scales the 16-owner pilot update to the registered 32-owner minibatch; this is an explicit linear cost assumption, not an equivalence result",
         "pilot_concurrency_limitation": "projection assumes the registered formal run uses the same measured concurrency and resource availability as this pilot",
@@ -2286,6 +2587,24 @@ def _validate_completed_pilot(
         or progress.get("actor_updates", {}).get("B") != b_actor_update["receipt"]
     ):
         raise RuntimeError("successful pilot report lacks the validated immutable B actor-update reuse reference")
+    c_outcome_reuse = _load_predecessor_c_training_outcomes(
+        backend, identity=identity, current_seed_table=seed_table,
+    )
+    c_outcome_document = c_outcome_reuse["document"]
+    c_outcome_path = package_root / "pilot-C-training-outcome-reuse.json"
+    if c_outcome_document.get("prior_C_inherited_failed_attempt_receipts") != actor_reuse_document.get("prior_C_failed_attempts"):
+        raise RuntimeError("C outcome reuse does not preserve the independently validated original failure receipts")
+    if (
+        not c_outcome_path.is_file()
+        or read_json(c_outcome_path) != c_outcome_document
+        or progress.get("pilot_C_outcome_reuse") != c_outcome_document
+        or report.get("C_outcome_reuse") != c_outcome_document
+        or report.get("pilot_C_outcome_reuse") != c_outcome_document
+        or progress.get("pilot_C_outcome_reuse_sha256") != file_sha256(c_outcome_path)
+        or report.get("C_outcome_reuse_sha256") != file_sha256(c_outcome_path)
+        or report.get("pilot_C_outcome_reuse_sha256") != file_sha256(c_outcome_path)
+    ):
+        raise RuntimeError("successful pilot report lacks the validated immutable C outcome receipt reference")
     expected_training = set(NEW_ARMS)
     expected_evaluation = set(POLICIES)
     expected_updates = set(NEW_ARMS)
@@ -2309,6 +2628,20 @@ def _validate_completed_pilot(
         for group in groups.values():
             if group.get("status") != "SUCCEEDED" or group.get("expected") != len(PILOT_OWNERS) or group.get("successful_completions") != len(PILOT_OWNERS):
                 raise RuntimeError("durable progress ledger contains an incomplete pilot game group")
+    c_rows = [row for row in seed_rows if row.get("phase") == "training" and row.get("issue85_arm") == "C"]
+    c_summary = progress["training_runs"]["C"]
+    current_c_attempt_counts = {
+        str(row["unit_id"]): len(list((package_root / "training" / "C" / "units" / backend.unit_key(row["unit_id"])).glob("attempt-*")))
+        for row in c_rows
+    }
+    if (
+        c_summary.get("carried_attempt_count_by_owner")
+        != c_outcome_document.get("prior_C_cumulative_attempt_count_by_owner")
+        or c_summary.get("attempt_count_by_owner") != current_c_attempt_counts
+        or c_summary.get("successful_completions") != len(c_rows)
+        or c_summary.get("successful_unit_ids") != sorted(str(row["unit_id"]) for row in c_rows)
+    ):
+        raise RuntimeError("successful pilot report C attempt counts differ from the immutable receipt references")
     for update in progress.get("actor_updates", {}).values():
         if update.get("status") != "SUCCEEDED" or update.get("completed_steps") != ACTOR_STEPS:
             raise RuntimeError("durable progress ledger contains an incomplete actor update")
@@ -2319,8 +2652,9 @@ def _validate_completed_pilot(
         or report.get("source_lock_sha256") != identity["source_lock_sha256"]
         or report.get("pilot_owner_ids") != list(PILOT_OWNERS)
         or report.get("training_game_count") != len(NEW_ARMS) * len(PILOT_OWNERS)
-        or report.get("new_training_game_count") != (len(NEW_ARMS) - 1) * len(PILOT_OWNERS)
-        or report.get("reused_predecessor_training_game_count") != len(PILOT_OWNERS)
+        or report.get("new_training_game_count") != (len(NEW_ARMS) - 1) * len(PILOT_OWNERS) - int(c_outcome_document["prior_C_successful_games"])
+        or report.get("reused_predecessor_training_game_count") != len(PILOT_OWNERS) + int(c_outcome_document["prior_C_successful_games"])
+        or report.get("reused_predecessor_C_training_game_count") != int(c_outcome_document["prior_C_successful_games"])
         or report.get("new_evaluation_game_count") != len(POLICIES) * len(PILOT_OWNERS)
         or report.get("unique_pilot_game_count") != len(NEW_ARMS) * len(PILOT_OWNERS) + len(POLICIES) * len(PILOT_OWNERS)
         or report.get("evaluation_game_count") != len(POLICIES) * len(PILOT_OWNERS)
@@ -2348,6 +2682,8 @@ def _validate_completed_pilot(
         if stage == "training" and group == "B":
             root = predecessor["receipt_root"]
             receipt_commit = predecessor["source_commit"]
+        elif stage == "training" and group == "C" and str(row["unit_id"]) in c_outcome_reuse["success_receipt_roots_by_owner"]:
+            root, receipt_commit = c_outcome_reuse["success_receipt_roots_by_owner"][str(row["unit_id"])]
         else:
             root = package_root / stage / group
             receipt_commit = identity["package_commit"]
@@ -2441,6 +2777,13 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
     )
     actor_reuse_document = actor_update_reuse["document"]
     actor_reuse_path = package_root / "pilot-actor-update-reuse.json"
+    c_outcome_reuse = _load_predecessor_c_training_outcomes(
+        backend, identity=identity, current_seed_table=rows_document,
+    )
+    c_outcome_document = c_outcome_reuse["document"]
+    c_outcome_path = package_root / "pilot-C-training-outcome-reuse.json"
+    if c_outcome_document.get("prior_C_inherited_failed_attempt_receipts") != actor_reuse_document.get("prior_C_failed_attempts"):
+        raise RuntimeError("C outcome reuse does not preserve the independently validated original failure receipts")
     if progress_exists:
         if (
             not predecessor_manifest_path.is_file()
@@ -2452,11 +2795,16 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
             or progress.get("actor_update_reuse") != actor_reuse_document
             or progress.get("actor_update_reuse_sha256") != file_sha256(actor_reuse_path)
             or progress.get("actor_updates", {}).get("B") != actor_update_reuse["receipt"]
+            or not c_outcome_path.is_file()
+            or read_json(c_outcome_path) != c_outcome_document
+            or progress.get("pilot_C_outcome_reuse") != c_outcome_document
+            or progress.get("pilot_C_outcome_reuse_sha256") != file_sha256(c_outcome_path)
         ):
-            raise RuntimeError("pilot continuation predecessor game/update references are missing or changed")
+            raise RuntimeError("pilot continuation predecessor game/update/C-outcome references are missing or changed")
     else:
         predecessor_manifest_sha = _write_or_verify_once(predecessor_manifest_path, predecessor_document)
         actor_reuse_sha = _write_or_verify_once(actor_reuse_path, actor_reuse_document)
+        c_outcome_sha = _write_or_verify_once(c_outcome_path, c_outcome_document)
         progress = {
             "schema_id": "issue85-pilot-progress-v1",
             "status": "READY",
@@ -2473,6 +2821,8 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
             "actor_updates": {"B": actor_update_reuse["receipt"]},
             "actor_update_reuse": actor_reuse_document,
             "actor_update_reuse_sha256": actor_reuse_sha,
+            "pilot_C_outcome_reuse": c_outcome_document,
+            "pilot_C_outcome_reuse_sha256": c_outcome_sha,
             "evaluation_runs": {},
             "concurrency": int(backend.CONCURRENCY),
             "run_history": [],
@@ -2568,15 +2918,24 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
                     prior_training, len(rows), [str(row["unit_id"]) for row in rows],
                 ) and stage_receipts_are_complete(
                     backend, root=root, rows=rows, package_commit=identity["package_commit"],
+                    receipt_roots_by_owner=(
+                        c_outcome_reuse["success_receipt_roots_by_owner"] if arm == "C" else None
+                    ),
                 )
             if not training_complete:
                 preserve_stage_summary("training-games", arm, prior_training)
                 stage_clock_start, stage_base, record_live_stage = start_game_stage("training-games", arm, rows)
-                attempt_offsets = _carried_c_attempt_counts(rows, actor_reuse_document) if arm == "C" else {}
+                attempt_offsets = (
+                    _carried_c_attempt_counts(rows, actor_reuse_document, c_outcome_document)
+                    if arm == "C" else {}
+                )
                 result = run_units_bounded(
                     backend, rows, root=root, clock=clock,
                     package_commit=identity["package_commit"], progress_callback=record_live_stage,
                     initial_attempt_count_by_owner=attempt_offsets,
+                    prior_success_receipt_roots_by_owner=(
+                        c_outcome_reuse["success_receipt_roots_by_owner"] if arm == "C" else None
+                    ),
                 )
                 summary = summarize_stage(result, rows)
                 summary = stage_summary_with_cumulative_wall(
@@ -2622,6 +2981,9 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
                 pilot_root=package_root, identity=identity,
                 examples_root=predecessor["receipt_root"] if arm == "B" else None,
                 examples_package_commit=predecessor["source_commit"] if arm == "B" else None,
+                example_receipt_roots_by_owner=(
+                    c_outcome_reuse["success_receipt_roots_by_owner"] if arm == "C" else None
+                ),
                 active_clock=clock, resume_clock_elapsed=actor_resume_clock,
                 progress_callback=record_actor_update,
             )
@@ -2690,9 +3052,15 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
         "new_training_game_count": sum(
             item["successful_completions"]
             for arm, item in progress["training_runs"].items()
-            if arm != "B"
+            if arm not in ("B", "C")
+        ) + max(
+            0,
+            int(progress["training_runs"]["C"]["successful_completions"])
+            - int(c_outcome_document["prior_C_successful_games"]),
         ),
-        "reused_predecessor_training_game_count": len(predecessor["rows"]),
+        "reused_predecessor_training_game_count": len(predecessor["rows"])
+        + int(c_outcome_document["prior_C_successful_games"]),
+        "reused_predecessor_C_training_game_count": int(c_outcome_document["prior_C_successful_games"]),
         "evaluation_game_count": sum(item["successful_completions"] for item in progress["evaluation_runs"].values()),
         "new_evaluation_game_count": sum(
             item["successful_completions"]
@@ -2705,6 +3073,10 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
         "predecessor_training_reuse": progress["predecessor_training_reuse"],
         "actor_update_reuse": progress["actor_update_reuse"],
         "actor_update_reuse_sha256": progress["actor_update_reuse_sha256"],
+        "C_outcome_reuse": c_outcome_document,
+        "C_outcome_reuse_sha256": file_sha256(c_outcome_path),
+        "pilot_C_outcome_reuse": progress["pilot_C_outcome_reuse"],
+        "pilot_C_outcome_reuse_sha256": progress["pilot_C_outcome_reuse_sha256"],
         "actor_updates": progress["actor_updates"],
         "evaluation_runs": progress["evaluation_runs"],
         "baseline_verification": progress["baseline_verification"],

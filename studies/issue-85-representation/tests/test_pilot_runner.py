@@ -85,6 +85,33 @@ class PilotRunnerTests(unittest.TestCase):
             "package": pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
         })
 
+    def test_training_examples_can_read_carry_forward_receipts_per_owner(self):
+        calls = []
+
+        def load_training_outcomes(rows, *, root, executor, package):
+            calls.append((rows, root, executor, package))
+            return [rows[0]["unit_id"]], [{"status": "SUCCEEDED"}]
+
+        rows = [
+            {"unit_id": "PILOT-TRAIN:C:8530001"},
+            {"unit_id": "PILOT-TRAIN:C:8530002"},
+        ]
+        old_binding = (Path("old-training"), "b" * 40)
+        loaded = pilot_runner._load_pilot_training_examples(
+            SimpleNamespace(load_training_outcomes=load_training_outcomes),
+            rows,
+            root=Path("current-training"),
+            executor="executor",
+            package_commit="c" * 40,
+            receipt_roots_by_owner={rows[0]["unit_id"]: old_binding},
+        )
+
+        self.assertEqual(loaded, [row["unit_id"] for row in rows])
+        self.assertEqual(calls, [
+            ([rows[0]], Path("old-training"), "executor", "b" * 40),
+            ([rows[1]], Path("current-training"), "executor", "c" * 40),
+        ])
+
     def test_training_example_eligibility_matches_locked_issue84_wrapper(self):
         complete = SimpleNamespace(
             owner_seed=8530001,
@@ -247,7 +274,7 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(len(summary["failed_attempts"]), 1)
         self.assertEqual(len(summary["incomplete_attempts"]), 1)
 
-    def test_carried_c_failure_has_only_one_new_attempt_under_owner_cap(self):
+    def test_carried_c_failure_is_resumable_without_an_automatic_retry_loop(self):
         class Backend:
             CONCURRENCY = 1
             PINNED_PYTHON = Path("/pinned/python")
@@ -288,18 +315,54 @@ class PilotRunnerTests(unittest.TestCase):
             result = pilot_runner.run_units_bounded(
                 Backend(), rows, root=Path(directory), clock=None,
                 package_commit="commit", progress_callback=snapshots.append,
-                initial_attempt_count_by_owner={unit_id: 1},
+                initial_attempt_count_by_owner={unit_id: 3},
             )
             attempt_names = sorted(
                 path.name for path in (Path(directory) / "units" / unit_id).glob("attempt-*")
             )
 
-        self.assertEqual(attempt_names, ["attempt-0002"])
+        self.assertEqual(attempt_names, ["attempt-0004"])
         self.assertEqual(popen.call_count, 1)
-        self.assertEqual(result["status"], "OWNER_RETRY_LIMIT_REACHED")
+        self.assertEqual(result["status"], "PAUSED_AFTER_FAILED_ATTEMPT")
         self.assertEqual(result["tries"][unit_id], 1)
-        self.assertEqual(result["carried_attempt_count_by_owner"], {unit_id: 1})
-        self.assertEqual(snapshots[-1]["carried_attempt_counts"], {unit_id: 1})
+        self.assertEqual(result["carried_attempt_count_by_owner"], {unit_id: 3})
+        self.assertEqual(snapshots[-1]["carried_attempt_counts"], {unit_id: 3})
+
+    def test_carried_c_success_is_reused_without_a_new_worker_attempt(self):
+        row = self._pilot_row("PILOT-TRAIN:C:8530001", 8530001)
+        row.update(phase="training", issue85_arm="C", arm="TRAIN")
+        backend = self._receipt_backend()
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            prior_root = base / "prior"
+            current_root = base / "current"
+            self._write_pilot_success_chain(prior_root, row)
+            with mock.patch.dict(
+                "os.environ",
+                {
+                    "STS_LIGHTSPEED_SOURCE_DIR": "/locked/sts_lightspeed",
+                    "STSRL_SOURCE_DIR": "/locked/spire-research",
+                    "ISSUE84_SOURCE_DIR": "/locked/issue84",
+                    "ISSUE85_PILOT_ROOT": "/pilot",
+                },
+            ), mock.patch.object(pilot_runner.subprocess, "Popen") as popen:
+                result = pilot_runner.run_units_bounded(
+                    backend,
+                    [row],
+                    root=current_root,
+                    clock=None,
+                    package_commit="c" * 40,
+                    initial_attempt_count_by_owner={row["unit_id"]: 2},
+                    prior_success_receipt_roots_by_owner={
+                        row["unit_id"]: (prior_root, "a" * 40),
+                    },
+                )
+
+        self.assertEqual(result["status"], "SUCCEEDED")
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(result["tries"][row["unit_id"]], 0)
+        self.assertEqual(result["carried_attempt_count_by_owner"], {row["unit_id"]: 2})
+        popen.assert_not_called()
 
     def test_ten_carried_c_failures_bind_one_prior_attempt_to_each_owner(self):
         rows = [
@@ -394,6 +457,8 @@ class PilotRunnerTests(unittest.TestCase):
     @staticmethod
     def _receipt_backend():
         class Backend:
+            CONCURRENCY = 1
+
             @staticmethod
             def unit_key(unit_id):
                 return str(unit_id)
@@ -499,6 +564,24 @@ class PilotRunnerTests(unittest.TestCase):
                 backend, root=root, rows=rows, package_commit="a" * 40,
             ))
 
+    def test_stage_receipts_accept_a_per_owner_immutable_predecessor_binding(self):
+        rows = [self._pilot_row("owner-1", 1), self._pilot_row("owner-2", 2)]
+        backend = self._receipt_backend()
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            current_root = base / "current"
+            old_root = base / "old"
+            self._write_pilot_success_chain(current_root, rows[1])
+            self._write_pilot_success_chain(old_root, rows[0])
+
+            self.assertTrue(pilot_runner.stage_receipts_are_complete(
+                backend,
+                root=current_root,
+                rows=rows,
+                package_commit="a" * 40,
+                receipt_roots_by_owner={rows[0]["unit_id"]: (old_root, "a" * 40)},
+            ))
+
     def test_success_rejects_missing_job_start_or_finish_receipt(self):
         backend = self._receipt_backend()
         row = self._pilot_row()
@@ -564,12 +647,7 @@ class PilotRunnerTests(unittest.TestCase):
                     backend, root=root, row=row, package_commit="a" * 40,
                 )
 
-    def test_failure_stop_policy_is_bounded_and_not_a_game_count(self):
-        self.assertEqual(pilot_runner.MAX_ATTEMPTS_PER_OWNER, 2)
-        self.assertEqual(pilot_runner.STOP_AFTER_CONSECUTIVE_FAILURES, 3)
-        self.assertEqual(pilot_runner.failure_disposition(1, 1), "RETRY_ONCE")
-        self.assertEqual(pilot_runner.failure_disposition(2, 1), "STOP_OWNER_RETRY_LIMIT")
-        self.assertEqual(pilot_runner.failure_disposition(1, 3), "STOP_REPEATED_FAILURES")
+    def test_failure_streak_is_reported_but_is_not_a_permanent_stop_rule(self):
         events = [
             ("2026-11-01T00:00:00Z", 1.0, "FAILED"),
             ("2026-11-01T00:00:01Z", 2.0, "FAILED"),
@@ -579,6 +657,13 @@ class PilotRunnerTests(unittest.TestCase):
         ]
         self.assertEqual(pilot_runner.trailing_failure_streak(events), 2)
         self.assertEqual(pilot_runner.trailing_failure_streak(events + [("2026-11-01T00:00:05Z", 6.0, "FAILED")]), 3)
+        plan = pilot_runner.pilot_plan(resume_from=pilot_runner.PILOT_RESUME_PREDECESSOR_SHA)
+        self.assertNotIn("retry_limit_per_owner", plan)
+        self.assertNotIn("stop_after_consecutive_failed_attempts", plan)
+        self.assertEqual(
+            plan["failed_attempt_handling"],
+            "pause_current_batch_for_diagnosis; preserve attempts and resume after cause is corrected",
+        )
 
     def test_plan_keeps_formal_cohorts_out_of_pilot(self):
         plan = pilot_runner.pilot_plan()
@@ -591,6 +676,8 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(plan["planned_reused_predecessor_actor_updates"], 0)
         self.assertIsNone(plan["actor_update_carry_forward_source_commit"])
         self.assertEqual(plan["prior_failed_C_attempts_preserved_for_accounting"], 0)
+        self.assertEqual(plan["prior_C_package_attempts_preserved_for_accounting"], 0)
+        self.assertIsNone(plan["C_training_outcome_carry_forward_source_commit"])
         self.assertEqual(plan["new_training_game_slots_before_retries"], 80)
         self.assertEqual(plan["new_evaluation_game_slots_before_retries"], 112)
         self.assertEqual(plan["new_game_slots_before_retries"], 192)
@@ -615,18 +702,21 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(plan["evaluation_cohort_games"], 112)
         self.assertEqual(plan["training_games"], 80)
         self.assertEqual(plan["evaluation_games"], 112)
-        self.assertEqual(plan["planned_reused_predecessor_training_receipts"], 16)
+        self.assertEqual(plan["planned_reused_predecessor_training_receipts"], 20)
+        self.assertEqual(plan["planned_reused_C_training_receipts"], 4)
+        self.assertEqual(plan["C_training_outcome_carry_forward_source_commit"], pilot_runner.PILOT_C_OUTCOME_CARRY_FORWARD_SHA)
         self.assertEqual(plan["planned_reused_predecessor_actor_updates"], 1)
         self.assertEqual(
             plan["actor_update_carry_forward_source_commit"],
             pilot_runner.PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA,
         )
-        self.assertEqual(plan["prior_failed_C_attempts_preserved_for_accounting"], 10)
-        self.assertEqual(plan["new_training_game_slots_before_retries"], 64)
+        self.assertEqual(plan["prior_failed_C_attempts_preserved_for_accounting"], 14)
+        self.assertEqual(plan["prior_C_package_attempts_preserved_for_accounting"], 8)
+        self.assertEqual(plan["new_training_game_slots_before_retries"], 60)
         self.assertEqual(plan["new_evaluation_game_slots_before_retries"], 112)
-        self.assertEqual(plan["new_game_slots_before_retries"], 176)
+        self.assertEqual(plan["new_game_slots_before_retries"], 172)
         self.assertEqual(plan["unique_pilot_game_outcomes"], 192)
-        self.assertEqual(plan["pilot_game_executions"], 176)
+        self.assertEqual(plan["pilot_game_executions"], 172)
         self.assertEqual(plan["formal_games"], 0)
 
     def test_plan_rejects_unregistered_predecessor(self):
@@ -773,6 +863,67 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(forecast["carried_prior_C_attempt_count"], 10)
         self.assertEqual(forecast["pilot_failed_attempt_count"], 11)
         self.assertEqual(forecast["pilot_total_attempt_count"], 203)
+
+    def test_forecast_counts_prior_c_package_attempts_and_failures(self):
+        training = {
+            arm: {
+                "status": "SUCCEEDED",
+                "expected": 16,
+                "successful_completions": 16,
+                "elapsed_seconds": 10.0,
+                "failed_attempts": [],
+                "attempt_count_by_owner": {f"PILOT-TRAIN:{arm}:{owner}": 1 for owner in pilot_runner.PILOT_OWNERS},
+            }
+            for arm in pilot_runner.NEW_ARMS
+        }
+        carried_failures = [f"PILOT-TRAIN:C:{owner}" for owner in pilot_runner.PILOT_OWNERS[:10]]
+        c_ids = [f"PILOT-TRAIN:C:{owner}" for owner in pilot_runner.PILOT_OWNERS]
+        training["C"]["attempt_count_by_owner"] = {
+            unit_id: (0 if owner_index < 4 else 1)
+            for owner_index, unit_id in enumerate(c_ids)
+        }
+        c_prior_counts = {
+            unit_id: (1 if owner_index < 8 else 0)
+            for owner_index, unit_id in enumerate(c_ids)
+        }
+        carried_counts = {
+            unit_id: c_prior_counts[unit_id] + (1 if unit_id in carried_failures else 0)
+            for unit_id in c_ids
+        }
+        training["C"]["carried_attempt_count_by_owner"] = carried_counts
+        evaluation = {
+            policy: {
+                "status": "SUCCEEDED",
+                "expected": 16,
+                "successful_completions": 16,
+                "elapsed_seconds": 20.0,
+                "failed_attempts": [],
+                "attempt_count_by_owner": {f"PILOT-EVAL:{policy}:{owner}": 1 for owner in pilot_runner.PILOT_OWNERS},
+            }
+            for policy in pilot_runner.POLICIES
+        }
+        forecast = pilot_runner._forecast({
+            "training_runs": training,
+            "evaluation_runs": evaluation,
+            "actor_updates": {arm: {"elapsed_seconds": 5.0} for arm in pilot_runner.NEW_ARMS},
+            "cumulative_active_wall_seconds": 3.0,
+            "source_lock_sha256": "lock",
+            "package_commit": "commit",
+            "concurrency": 8,
+            "actor_update_reuse": {"prior_C_failed_attempts": [{"unit_id": unit_id} for unit_id in carried_failures]},
+            "pilot_C_outcome_reuse": {
+                "prior_C_attempt_count_by_owner": c_prior_counts,
+                "prior_C_cumulative_attempt_count_by_owner": carried_counts,
+                "prior_C_successful_games": 4,
+                "prior_C_failed_attempt_count": 4,
+            },
+        })
+
+        self.assertEqual(forecast["carried_prior_C_attempt_count"], 18)
+        self.assertEqual(forecast["carried_prior_C_failed_attempt_count"], 14)
+        self.assertEqual(forecast["carried_prior_C_successful_game_count"], 4)
+        self.assertEqual(forecast["pilot_failed_attempt_count"], 14)
+        self.assertEqual(forecast["pilot_total_attempt_count"], 206)
 
 
 if __name__ == "__main__":
