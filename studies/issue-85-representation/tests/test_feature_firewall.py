@@ -513,6 +513,7 @@ class FeatureFirewallTests(unittest.TestCase):
                 feature_firewall._check_map_location(
                     {"location": location}, "current_map_node.value",
                     feature_firewall._CURRENT_MAP_LOCATION_VALUES,
+                    allowed_keys=feature_firewall._PUBLIC_CURRENT_MAP_LOCATION_KEYS,
                 )
                 self.assertEqual(
                     feature_firewall._map_location(
@@ -524,11 +525,12 @@ class FeatureFirewallTests(unittest.TestCase):
             with self.subTest(path="route", location=location):
                 feature_firewall._check_map_location(
                     {"location": location}, "destination",
-                    feature_firewall._ROUTE_MAP_LOCATION_VALUES,
+                    feature_firewall._PUBLIC_ROUTE_MAP_LOCATION_VALUES,
+                    allowed_keys=feature_firewall._PUBLIC_ROUTE_MAP_LOCATION_KEYS,
                 )
                 self.assertEqual(
                     feature_firewall._map_location(
-                        {"location": location}, {}, feature_firewall._ROUTE_MAP_LOCATION_VALUES
+                        {"location": location}, {}, feature_firewall._PUBLIC_ROUTE_MAP_LOCATION_VALUES
                     ),
                     {"location": location},
                 )
@@ -536,12 +538,43 @@ class FeatureFirewallTests(unittest.TestCase):
             feature_firewall._check_map_location(
                 {"location": "boss_entry"}, "current_map_node.value",
                 feature_firewall._CURRENT_MAP_LOCATION_VALUES,
+                allowed_keys=feature_firewall._PUBLIC_CURRENT_MAP_LOCATION_KEYS,
             )
         with self.assertRaisesRegex(ValueError, "not a native map-location enum"):
             feature_firewall._check_map_location(
                 {"location": "before_first_route"}, "destination",
-                feature_firewall._ROUTE_MAP_LOCATION_VALUES,
+                feature_firewall._PUBLIC_ROUTE_MAP_LOCATION_VALUES,
+                allowed_keys=feature_firewall._PUBLIC_ROUTE_MAP_LOCATION_KEYS,
             )
+
+
+    def test_public_route_schema_rejects_privileged_destination_shapes(self):
+        invalid_cases = (
+            (
+                "act_boss_entry enum",
+                {"location": "act_boss_entry"},
+                "not a native map-location enum",
+            ),
+            (
+                "nested public_room_symbol envelope",
+                {
+                    "location": "map_node",
+                    "x": 0,
+                    "y": 1,
+                    "public_room_symbol": native_public_room_symbol("M"),
+                },
+                "unrecognized input field.*public_room_symbol",
+            ),
+        )
+        for name, destination, message in invalid_cases:
+            with self.subTest(name=name):
+                envelope = {
+                    "availability": "available",
+                    "visibility": "public_now",
+                    "value": [{"choice_type": "map_route", "destination": destination}],
+                }
+                with self.assertRaisesRegex(ValueError, message):
+                    feature_firewall._check_public_route_list(envelope, "routes")
 
     def test_exact_native_map_destination_is_canonical_and_oracle_fields_are_excluded(self):
         action = {"scope": "game", "kind": "map", "idx1": 0, "idx2": 0, "idx3": 0}

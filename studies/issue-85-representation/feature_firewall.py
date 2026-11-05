@@ -145,9 +145,12 @@ _PUBLIC_RESOURCE_KEYS = frozenset(
 )
 _PUBLIC_KEY_FLAGS = frozenset({"blue_key", "green_key", "red_key"})
 _MAP_NODE_KEYS = frozenset({"x", "y", "room_symbol", "outgoing_edges"})
-_MAP_LOCATION_KEYS = frozenset({"location", "x", "y", "room_symbol", "public_room_symbol"})
+_PUBLIC_CURRENT_MAP_LOCATION_KEYS = frozenset({"location", "x", "y", "room_symbol"})
+_PUBLIC_ROUTE_MAP_LOCATION_KEYS = frozenset({"location", "x", "y", "room_symbol"})
+_PRIVILEGED_CANDIDATE_DESTINATION_KEYS = frozenset({"location", "x", "y", "public_room_symbol"})
 _CURRENT_MAP_LOCATION_VALUES = frozenset({"before_first_route", "act_boss_entry", "map_node"})
-_ROUTE_MAP_LOCATION_VALUES = frozenset({"act_boss_entry", "boss_entry", "map_node"})
+_PUBLIC_ROUTE_MAP_LOCATION_VALUES = frozenset({"boss_entry", "map_node"})
+_PRIVILEGED_CANDIDATE_DESTINATION_VALUES = frozenset({"act_boss_entry", "map_node"})
 _SCREEN_PAYLOAD_KEYS = frozenset(
     {
         "coverage_status", "reason", "source", "choices", "map_graph",
@@ -316,7 +319,8 @@ def _check_privileged_projection(value: Any) -> None:
                 _check_map_location(
                     payload,
                     f"candidates[{index}].features.public_destination.value",
-                    _ROUTE_MAP_LOCATION_VALUES,
+                    _PRIVILEGED_CANDIDATE_DESTINATION_VALUES,
+                    allowed_keys=_PRIVILEGED_CANDIDATE_DESTINATION_KEYS,
                     require_public_room_symbol=True,
                 )
             elif isinstance(payload, (Mapping, Sequence)) and not isinstance(payload, (str, bytes)):
@@ -401,7 +405,10 @@ def _check_public_projection(value: Any) -> None:
         _check_public_envelope(envelope, "current_map_node")
         if envelope.get("availability") == "available":
             _check_map_location(
-                envelope.get("value"), "current_map_node.value", _CURRENT_MAP_LOCATION_VALUES
+                envelope.get("value"),
+                "current_map_node.value",
+                _CURRENT_MAP_LOCATION_VALUES,
+                allowed_keys=_PUBLIC_CURRENT_MAP_LOCATION_KEYS,
             )
     if "immediately_legal_routes" in root:
         _check_public_route_list(root["immediately_legal_routes"], "immediately_legal_routes")
@@ -447,6 +454,7 @@ def _check_public_projection(value: Any) -> None:
                     screen["current_map_node"],
                     "screen_payload.value.current_map_node",
                     _CURRENT_MAP_LOCATION_VALUES,
+                    allowed_keys=_PUBLIC_CURRENT_MAP_LOCATION_KEYS,
                 )
             if "legal_routes" in screen:
                 _check_public_route_list(
@@ -477,7 +485,8 @@ def _check_public_route_list(envelope: Any, path: str) -> None:
             _check_map_location(
                 item["destination"],
                 f"{path}.value[{i}].destination",
-                _ROUTE_MAP_LOCATION_VALUES,
+                _PUBLIC_ROUTE_MAP_LOCATION_VALUES,
+                allowed_keys=_PUBLIC_ROUTE_MAP_LOCATION_KEYS,
             )
         for key, allowed in (("card", _CARD_KEYS), ("relic", _RELIC_KEYS), ("relic_removed_with_key", _RELIC_KEYS), ("potion", _POTION_KEYS)):
             if isinstance(item.get(key), Mapping):
@@ -507,9 +516,10 @@ def _check_map_location(
     path: str,
     allowed_locations: frozenset[str],
     *,
+    allowed_keys: frozenset[str],
     require_public_room_symbol: bool = False,
 ) -> None:
-    row = _check_keys(value, _MAP_LOCATION_KEYS, path)
+    row = _check_keys(value, allowed_keys, path)
     location = row.get("location")
     if not isinstance(location, str) or location not in allowed_locations:
         raise ValueError(f"{path}.location is not a native map-location enum")
@@ -702,7 +712,8 @@ def new_path_projection(
             destination["value"] = _map_location(
                 destination["value"],
                 semantic_by_coordinate,
-                _ROUTE_MAP_LOCATION_VALUES,
+                _PRIVILEGED_CANDIDATE_DESTINATION_VALUES,
+                canonicalize_act_boss_entry=True,
             )
     for index, candidate_row in enumerate(candidate_rows):
         if index not in choice_by_candidate:
@@ -804,6 +815,8 @@ def _map_location(
     value: Any,
     semantic_by_coordinate: Mapping[tuple[int, int], Mapping[str, Any]],
     allowed_locations: frozenset[str],
+    *,
+    canonicalize_act_boss_entry: bool = False,
 ) -> Any:
     if not isinstance(value, Mapping):
         raise ValueError("map location must be a source-defined mapping")
@@ -822,7 +835,7 @@ def _map_location(
         if source_symbol is not None and source_symbol != node["room_symbol"]:
             raise ValueError("map destination public room symbol disagrees with visible topology")
         return {"location": "map_node", **dict(node)}
-    if location == "act_boss_entry" and allowed_locations == _ROUTE_MAP_LOCATION_VALUES:
+    if location == "act_boss_entry" and canonicalize_act_boss_entry:
         symbol = value.get("public_room_symbol")
         if isinstance(symbol, Mapping) and symbol.get("value") != "B":
             raise ValueError("native act_boss_entry public room symbol is not the boss-entry marker")
@@ -904,7 +917,7 @@ def _normalize_public_context(
                     raise ValueError("map-route action index does not bind to its visible destination")
         if isinstance(semantic.get("destination"), Mapping):
             semantic["destination"] = _map_location(
-                semantic["destination"], semantic_by_coordinate, _ROUTE_MAP_LOCATION_VALUES
+                semantic["destination"], semantic_by_coordinate, _PUBLIC_ROUTE_MAP_LOCATION_VALUES
             )
         choice_by_candidate[candidate_index] = sanitize_executor_tree(semantic)
 
@@ -966,7 +979,7 @@ def _normalize_public_context(
                             clean["destination"] = _map_location(
                                 clean["destination"],
                                 semantic_by_coordinate,
-                                _ROUTE_MAP_LOCATION_VALUES,
+                                _PUBLIC_ROUTE_MAP_LOCATION_VALUES,
                             )
                         clean.pop("candidate_index", None)
                         clean.pop("candidate_action", None)
