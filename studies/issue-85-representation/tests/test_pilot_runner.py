@@ -422,6 +422,92 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(summary["invocation_elapsed_seconds"], 4.0)
         self.assertEqual(summary["elapsed_seconds"], 22.0)
 
+    @staticmethod
+    def _clock_reconciliation_fixture(directory):
+        package_root = Path(directory) / "package"
+        package_root.mkdir()
+        progress_path = package_root / "pilot-progress.json"
+        progress = {"schema_id": "issue85-pilot-progress-v1", "status": "READY", "cumulative_active_wall_seconds": 50.0}
+        pilot_runner._atomic_json(progress_path, progress)
+        identity = {"package_commit": "e" * 40}
+        completed_reuse = {
+            "source_commit": "c" * 40,
+            "progress_sha256": "d" * 64,
+            "progress": {"cumulative_active_wall_seconds": 40.0},
+        }
+        return package_root, progress_path, progress, identity, completed_reuse
+
+    def test_pilot_clock_rejects_rollback_below_current_package_high_water(self):
+        with tempfile.TemporaryDirectory() as directory:
+            package_root, progress_path, progress, identity, completed_reuse = self._clock_reconciliation_fixture(directory)
+            predecessor_wall = 13_592.161178517
+            saved_high_water = 13_650.42375135
+            completed_reuse["progress"]["cumulative_active_wall_seconds"] = predecessor_wall
+            progress["cumulative_active_wall_seconds"] = saved_high_water
+            progress["clock_reconciliation"] = {
+                "shared_clock_active_wall_seconds_before_resume": saved_high_water,
+            }
+            progress["clock_reconciliation_sha256"] = "a" * 64
+            write_progress = mock.Mock()
+
+            with self.assertRaisesRegex(RuntimeError, "below a persisted pilot high-water"):
+                pilot_runner._reconcile_pilot_task_clock(
+                    package_root, progress_path, progress,
+                    identity=identity, completed_reuse=completed_reuse, before=13_600.0,
+                    atomic_json=write_progress,
+                )
+
+            write_progress.assert_not_called()
+            self.assertFalse((package_root / "pilot-progress-clock-reconciliation.json").exists())
+
+    def test_pilot_clock_reconstructs_if_crash_precedes_receipt_write(self):
+        with tempfile.TemporaryDirectory() as directory:
+            package_root, progress_path, progress, identity, completed_reuse = self._clock_reconciliation_fixture(directory)
+            receipt_path = package_root / "pilot-progress-clock-reconciliation.json"
+            with mock.patch.object(pilot_runner, "_write_or_verify_once", side_effect=OSError("simulated crash before receipt write")):
+                with self.assertRaisesRegex(OSError, "simulated crash"):
+                    pilot_runner._reconcile_pilot_task_clock(
+                        package_root, progress_path, progress,
+                        identity=identity, completed_reuse=completed_reuse, before=100.0,
+                    )
+            self.assertFalse(receipt_path.exists())
+            self.assertNotIn("clock_reconciliation", pilot_runner.read_json(progress_path))
+
+            receipt, receipt_sha = pilot_runner._reconcile_pilot_task_clock(
+                package_root, progress_path, pilot_runner.read_json(progress_path),
+                identity=identity, completed_reuse=completed_reuse, before=101.0,
+            )
+            self.assertEqual(receipt["shared_clock_active_wall_seconds_before_resume"], 101.0)
+            self.assertEqual(pilot_runner.read_json(progress_path)["clock_reconciliation_sha256"], receipt_sha)
+
+    def test_pilot_clock_adopts_orphan_receipt_after_progress_write_crash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            package_root, progress_path, progress, identity, completed_reuse = self._clock_reconciliation_fixture(directory)
+            receipt_path = package_root / "pilot-progress-clock-reconciliation.json"
+
+            def crash_before_progress_reference(path, value):
+                raise OSError("simulated crash after receipt write")
+
+            with self.assertRaisesRegex(OSError, "after receipt write"):
+                pilot_runner._reconcile_pilot_task_clock(
+                    package_root, progress_path, progress,
+                    identity=identity, completed_reuse=completed_reuse, before=100.0,
+                    atomic_json=crash_before_progress_reference,
+                )
+            self.assertTrue(receipt_path.is_file())
+            receipt_sha_before_recovery = pilot_runner.file_sha256(receipt_path)
+            self.assertNotIn("clock_reconciliation", pilot_runner.read_json(progress_path))
+
+            receipt, receipt_sha = pilot_runner._reconcile_pilot_task_clock(
+                package_root, progress_path, pilot_runner.read_json(progress_path),
+                identity=identity, completed_reuse=completed_reuse, before=101.0,
+            )
+            self.assertEqual(receipt_sha, receipt_sha_before_recovery)
+            self.assertEqual(receipt["shared_clock_active_wall_seconds_before_resume"], 100.0)
+            recovered = pilot_runner.read_json(progress_path)
+            self.assertEqual(recovered["clock_reconciliation"], receipt)
+            self.assertEqual(recovered["cumulative_active_wall_seconds"], 101.0)
+
     def test_legacy_stage_snapshot_does_not_invent_missing_elapsed_time(self):
         self.assertEqual(
             pilot_runner.stage_resume_wall_base(

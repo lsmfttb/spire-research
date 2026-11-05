@@ -385,6 +385,156 @@ def stage_summary_with_cumulative_wall(
     return result
 
 
+_PILOT_TASK_CLOCK_KEYS = frozenset({
+    "active_clock_elapsed_seconds",
+    "clock_elapsed_before",
+    "clock_elapsed_seconds",
+    "cumulative_active_wall_seconds",
+    "predecessor_progress_snapshot_active_wall_seconds",
+    "predecessor_snapshot_active_wall_seconds",
+    "persisted_task_clock_high_water_seconds",
+    "shared_clock_active_wall_seconds_before_resume",
+})
+
+
+def _pilot_task_clock_high_water(*documents: object) -> float:
+    """Return the maximum durable task-clock value, rejecting malformed evidence."""
+    values: list[float] = []
+
+    def visit(value: object) -> None:
+        if isinstance(value, Mapping):
+            for key, nested in value.items():
+                if key in _PILOT_TASK_CLOCK_KEYS and nested is not None:
+                    if isinstance(nested, bool) or not isinstance(nested, (int, float)):
+                        raise RuntimeError(f"durable pilot clock field {key} is not a JSON number")
+                    number = float(nested)
+                    if not math.isfinite(number) or number < 0:
+                        raise RuntimeError(f"durable pilot clock field {key} is not finite and nonnegative")
+                    values.append(number)
+                visit(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                visit(nested)
+
+    for document in documents:
+        visit(document)
+    return max(values, default=0.0)
+
+
+def _validate_pilot_clock_reconciliation(
+    receipt: object,
+    *,
+    identity: Mapping[str, Any],
+    completed_reuse: Mapping[str, Any],
+    prior_wall: float,
+) -> dict[str, Any]:
+    if not isinstance(receipt, dict):
+        raise RuntimeError("pilot clock-reconciliation receipt is not an object")
+    before = receipt.get("shared_clock_active_wall_seconds_before_resume")
+    persisted_high_water = receipt.get("persisted_task_clock_high_water_seconds")
+    difference = receipt.get("reconciled_difference_seconds")
+    for label, value in (("resume clock", before), ("persisted high-water", persisted_high_water), ("reconciled difference", difference)):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            raise RuntimeError(f"pilot clock-reconciliation {label} is invalid")
+    before = float(before)
+    persisted_high_water = float(persisted_high_water)
+    difference = float(difference)
+    if (
+        receipt.get("schema_id") != "issue85-pilot-clock-reconciliation-v1"
+        or receipt.get("current_package_commit") != identity["package_commit"]
+        or receipt.get("predecessor_package_commit") != completed_reuse["source_commit"]
+        or receipt.get("predecessor_progress_sha256") != completed_reuse["progress_sha256"]
+        or receipt.get("predecessor_snapshot_active_wall_seconds") != prior_wall
+        or before < prior_wall
+        or persisted_high_water < prior_wall
+        or persisted_high_water > before
+        or difference != before - prior_wall
+        or receipt.get("authority") != "shared active-wall task clock; preserve its higher cumulative value"
+    ):
+        raise RuntimeError("pilot clock-reconciliation receipt does not match the locked package and predecessor")
+    return receipt
+
+
+def _reconcile_pilot_task_clock(
+    package_root: Path,
+    progress_path: Path,
+    progress: dict[str, Any],
+    *,
+    identity: Mapping[str, Any],
+    completed_reuse: Mapping[str, Any],
+    before: float,
+    atomic_json: Any = _atomic_json,
+) -> tuple[dict[str, Any], str]:
+    """Validate the shared clock and idempotently persist its predecessor receipt."""
+    if isinstance(before, bool) or not isinstance(before, (int, float)) or not math.isfinite(float(before)) or before < 0:
+        raise RuntimeError("shared active-wall task clock is invalid")
+    before = float(before)
+    predecessor_progress = completed_reuse.get("progress")
+    if not isinstance(predecessor_progress, Mapping):
+        raise RuntimeError("completed-package reuse has no validated predecessor progress")
+    prior_value = predecessor_progress.get("cumulative_active_wall_seconds")
+    if isinstance(prior_value, bool) or not isinstance(prior_value, (int, float)):
+        raise RuntimeError("completed-package progress has no numeric cumulative active-wall snapshot")
+    prior_wall = float(prior_value)
+    if not math.isfinite(prior_wall) or prior_wall < 0:
+        raise RuntimeError("completed-package progress has an invalid cumulative active-wall snapshot")
+
+    receipt_path = Path(package_root) / "pilot-progress-clock-reconciliation.json"
+    has_receipt_document = "clock_reconciliation" in progress
+    has_receipt_hash = "clock_reconciliation_sha256" in progress
+    if has_receipt_document != has_receipt_hash:
+        raise RuntimeError("pilot progress has an incomplete clock-reconciliation reference")
+    receipt_exists = receipt_path.is_file()
+    disk_receipt = read_json(receipt_path) if receipt_exists else None
+    high_water = _pilot_task_clock_high_water(progress, predecessor_progress, disk_receipt)
+    if before < high_water:
+        raise RuntimeError(
+            "shared active-wall task clock is below a persisted pilot high-water "
+            f"({before:.9f} < {high_water:.9f}); refusing to undercount resource use"
+        )
+
+    if has_receipt_document:
+        if not receipt_exists:
+            raise RuntimeError("pilot progress references a missing immutable clock-reconciliation receipt")
+        receipt = disk_receipt
+        if (
+            receipt != progress["clock_reconciliation"]
+            or progress["clock_reconciliation_sha256"] != file_sha256(receipt_path)
+        ):
+            raise RuntimeError("pilot clock-reconciliation receipt does not match its progress hash binding")
+        receipt = _validate_pilot_clock_reconciliation(
+            receipt, identity=identity, completed_reuse=completed_reuse, prior_wall=prior_wall,
+        )
+    elif receipt_exists:
+        # A crash may have committed the immutable receipt just before the
+        # mutable progress reference. Validate and adopt that exact orphan.
+        receipt = _validate_pilot_clock_reconciliation(
+            disk_receipt, identity=identity, completed_reuse=completed_reuse, prior_wall=prior_wall,
+        )
+    else:
+        receipt = {
+            "schema_id": "issue85-pilot-clock-reconciliation-v1",
+            "current_package_commit": identity["package_commit"],
+            "predecessor_package_commit": completed_reuse["source_commit"],
+            "predecessor_progress_sha256": completed_reuse["progress_sha256"],
+            "predecessor_snapshot_active_wall_seconds": prior_wall,
+            "shared_clock_active_wall_seconds_before_resume": before,
+            "persisted_task_clock_high_water_seconds": high_water,
+            "reconciled_difference_seconds": before - prior_wall,
+            "authority": "shared active-wall task clock; preserve its higher cumulative value",
+        }
+        _write_or_verify_once(receipt_path, receipt)
+
+    receipt_sha = file_sha256(receipt_path)
+    progress["clock_reconciliation"] = receipt
+    progress["clock_reconciliation_sha256"] = receipt_sha
+    progress["cumulative_active_wall_seconds"] = before
+    progress["status"] = "READY"
+    progress.pop("supervisor_pid", None)
+    atomic_json(progress_path, progress)
+    return receipt, receipt_sha
+
+
 def stage_summary_is_complete(
     summary: Mapping[str, Any] | None,
     expected: int,
@@ -2954,6 +3104,15 @@ def _validate_completed_pilot(
             < float(clock_reconciliation.get("shared_clock_active_wall_seconds_before_resume", float("inf")))
         ):
             raise RuntimeError("successful pilot progress lacks the immutable shared-clock reconciliation")
+        predecessor_wall = completed_reuse["progress"]["cumulative_active_wall_seconds"]
+        _validate_pilot_clock_reconciliation(
+            clock_reconciliation, identity=identity, completed_reuse=completed_reuse,
+            prior_wall=float(predecessor_wall),
+        )
+        if float(progress.get("cumulative_active_wall_seconds", -1.0)) < _pilot_task_clock_high_water(
+            progress, completed_reuse["progress"],
+        ):
+            raise RuntimeError("successful pilot cumulative clock is below a persisted task-clock high-water")
     elif clock_reconciliation is not None or clock_reconciliation_sha256 is not None:
         raise RuntimeError("pilot contains an unrelated clock-reconciliation receipt")
     expected_training = set(NEW_ARMS)
@@ -3280,42 +3439,15 @@ def run_pilot(
     clock = backend.ActiveClock("issue85-task", None)
     before = clock.elapsed_before
     if completed_reuse is not None:
-        prior_wall = float(completed_reuse["progress"].get("cumulative_active_wall_seconds", -1.0))
-        if not math.isfinite(prior_wall) or prior_wall < 0 or before + 1e-6 < prior_wall:
+        try:
+            _reconcile_pilot_task_clock(
+                package_root, progress_path, progress,
+                identity=identity, completed_reuse=completed_reuse, before=before,
+                atomic_json=backend.atomic_json,
+            )
+        except BaseException:
             clock.close()
-            raise RuntimeError("shared task clock is behind the completed-package progress snapshot; refusing wall-time rollback")
-        clock_reconciliation_path = package_root / "pilot-progress-clock-reconciliation.json"
-        if progress_exists:
-            clock_reconciliation = read_json(clock_reconciliation_path) if clock_reconciliation_path.is_file() else None
-            if (
-                not isinstance(clock_reconciliation, dict)
-                or clock_reconciliation != progress.get("clock_reconciliation")
-                or progress.get("clock_reconciliation_sha256") != file_sha256(clock_reconciliation_path)
-                or clock_reconciliation.get("schema_id") != "issue85-pilot-clock-reconciliation-v1"
-                or clock_reconciliation.get("current_package_commit") != identity["package_commit"]
-                or clock_reconciliation.get("predecessor_package_commit") != completed_reuse["source_commit"]
-                or clock_reconciliation.get("predecessor_progress_sha256") != completed_reuse["progress_sha256"]
-                or clock_reconciliation.get("predecessor_snapshot_active_wall_seconds") != prior_wall
-                or float(clock_reconciliation.get("shared_clock_active_wall_seconds_before_resume", -1.0)) < prior_wall
-            ):
-                clock.close()
-                raise RuntimeError("resumed pilot has no immutable, hash-bound clock reconciliation receipt")
-            clock_reconciliation_sha = progress["clock_reconciliation_sha256"]
-        else:
-            clock_reconciliation = {
-                "schema_id": "issue85-pilot-clock-reconciliation-v1",
-                "current_package_commit": identity["package_commit"],
-                "predecessor_package_commit": completed_reuse["source_commit"],
-                "predecessor_progress_sha256": completed_reuse["progress_sha256"],
-                "predecessor_snapshot_active_wall_seconds": prior_wall,
-                "shared_clock_active_wall_seconds_before_resume": before,
-                "reconciled_difference_seconds": before - prior_wall,
-                "authority": "shared active-wall task clock; preserve its higher cumulative value",
-            }
-            clock_reconciliation_sha = _write_or_verify_once(clock_reconciliation_path, clock_reconciliation)
-        progress["clock_reconciliation"] = clock_reconciliation
-        progress["clock_reconciliation_sha256"] = clock_reconciliation_sha
-        progress["cumulative_active_wall_seconds"] = before
+            raise
     progress.update({
         "status": "RUNNING",
         "supervisor_pid": os.getpid(),
