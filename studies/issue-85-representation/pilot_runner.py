@@ -572,6 +572,11 @@ def _validate_b_actor_update_carry_forward_source_diff(changed_paths: Sequence[s
         )
 
 
+def _optional_receipt_field_matches(receipt: Mapping[str, Any], field: str, expected: str) -> bool:
+    """Allow absent wrapper fields on failures, but reject conflicting bindings."""
+    return field not in receipt or receipt.get(field) == expected
+
+
 def _load_predecessor_b_actor_update(
     backend: Any,
     *,
@@ -703,13 +708,17 @@ def _load_predecessor_b_actor_update(
                 or finished.get("result_sha256") != file_sha256(result_path)
                 or result.get("schema_id") != "issue79-owner-attempt-result-v1"
                 or result.get("unit_id") != unit_id
-                or result.get("package_commit") != predecessor_commit
-                or result.get("runner_code_commit") != predecessor_commit
-                or result.get("source_lock_sha256") != identity.get("source_lock_sha256")
+                or not _optional_receipt_field_matches(result, "package_commit", predecessor_commit)
+                or not _optional_receipt_field_matches(result, "runner_code_commit", predecessor_commit)
+                or not _optional_receipt_field_matches(
+                    result, "source_lock_sha256", str(identity.get("source_lock_sha256")),
+                )
                 or result.get("status") != "FAILED"
                 or result.get("terminal_outcome") is not None
                 or result.get("failure_detail") != detail
                 or failure_rows[unit_id].get("failure") != detail
+            or failure_rows[unit_id].get("failure_type") != "StudyFailure"
+            or failure_rows[unit_id].get("exit_code") != 1
             ):
                 raise RuntimeError(f"B actor-update predecessor C failed receipt binding differs: {unit_id}")
             failure_receipts.append({

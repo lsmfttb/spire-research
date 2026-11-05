@@ -580,6 +580,15 @@ class PilotRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "reviewed runner/API repairs"):
             pilot_runner._validate_predecessor_reuse_source_diff(approved_paths[:-1])
 
+    def test_failed_result_receipt_fields_may_be_absent_but_not_conflicting(self):
+        self.assertTrue(pilot_runner._optional_receipt_field_matches({}, "package_commit", "source"))
+        self.assertTrue(pilot_runner._optional_receipt_field_matches(
+            {"package_commit": "source"}, "package_commit", "source",
+        ))
+        self.assertFalse(pilot_runner._optional_receipt_field_matches(
+            {"package_commit": "other"}, "package_commit", "source",
+        ))
+
     def test_b_actor_update_carry_forward_only_allows_reviewed_paths(self):
         approved_paths = (
             "studies/issue-85-representation/feature_firewall.py",
