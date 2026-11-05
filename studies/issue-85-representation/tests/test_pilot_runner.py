@@ -1038,6 +1038,80 @@ class PilotRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "retained PARENT"):
                 pilot_runner._parent_failure_attempt_offsets(invalid, rows)
 
+    def test_evaluation_attempt_inventory_matches_carried_offsets_and_rejects_extras(self):
+        rows = [self._pilot_row("owner-1", 1), self._pilot_row("owner-2", 2)]
+        for row in rows:
+            row["arm"] = "PARENT"
+        unit_ids = [row["unit_id"] for row in rows]
+        summary = {
+            "successful_completions": 2,
+            "successful_unit_ids": unit_ids,
+            "incomplete": [],
+            "incomplete_attempts": [],
+            "failed_attempts": [],
+            "attempt_count_by_owner": {unit_id: 1 for unit_id in unit_ids},
+            "carried_attempt_count_by_owner": {unit_ids[0]: 1, unit_ids[1]: 0},
+        }
+        backend = self._receipt_backend()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "evaluation" / "PARENT"
+            self._write_pilot_success_chain(root, rows[0], attempt_name="attempt-0002")
+            self._write_pilot_success_chain(root, rows[1], attempt_name="attempt-0001")
+
+            inventory = pilot_runner._validate_evaluation_attempt_inventory(
+                backend,
+                stage_root=root,
+                rows=rows,
+                summary=summary,
+                carried_attempt_count_by_owner=summary["carried_attempt_count_by_owner"],
+            )
+
+            self.assertEqual([path.name for path in inventory[unit_ids[0]]], ["attempt-0002"])
+            self.assertEqual([path.name for path in inventory[unit_ids[1]]], ["attempt-0001"])
+            malformed_counts = {**summary, "attempt_count_by_owner": {unit_ids[0]: 1}}
+            with self.assertRaisesRegex(RuntimeError, "attempt counts are malformed"):
+                pilot_runner._validate_evaluation_attempt_inventory(
+                    backend,
+                    stage_root=root,
+                    rows=rows,
+                    summary=malformed_counts,
+                    carried_attempt_count_by_owner=summary["carried_attempt_count_by_owner"],
+                )
+            (root / "units" / unit_ids[0] / "attempt-0003").mkdir()
+            with self.assertRaisesRegex(RuntimeError, "attempt directories disagree"):
+                pilot_runner._validate_evaluation_attempt_inventory(
+                    backend,
+                    stage_root=root,
+                    rows=rows,
+                    summary=summary,
+                    carried_attempt_count_by_owner=summary["carried_attempt_count_by_owner"],
+                )
+
+    def test_evaluation_attempt_inventory_rejects_an_unlisted_attempt_owner(self):
+        rows = [self._pilot_row("owner-1", 1), self._pilot_row("owner-2", 2)]
+        unit_ids = [row["unit_id"] for row in rows]
+        summary = {
+            "successful_completions": 0,
+            "successful_unit_ids": [],
+            "incomplete": unit_ids,
+            "incomplete_attempts": [],
+            "failed_attempts": [],
+            "attempt_count_by_owner": {unit_ids[0]: 0, unit_ids[1]: 0},
+            "carried_attempt_count_by_owner": {},
+        }
+        backend = self._receipt_backend()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "evaluation" / "A"
+            (root / "units" / unit_ids[1] / "attempt-0001").mkdir(parents=True)
+            with self.assertRaisesRegex(RuntimeError, "owner directories do not match"):
+                pilot_runner._validate_evaluation_attempt_inventory(
+                    backend,
+                    stage_root=root,
+                    rows=rows,
+                    summary=summary,
+                    carried_attempt_count_by_owner={},
+                )
+
     def test_evaluation_resume_offsets_preserve_eight_failed_policy_attempts(self):
         rows = [
             {"unit_id": f"PILOT-EVAL:{owner}:A"}

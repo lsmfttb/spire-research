@@ -2045,6 +2045,75 @@ def _evaluation_failure_attempt_offsets(
     return offsets
 
 
+def _validate_evaluation_attempt_inventory(
+    backend: Any,
+    *,
+    stage_root: Path,
+    rows: Sequence[Mapping[str, Any]],
+    summary: Mapping[str, Any],
+    carried_attempt_count_by_owner: Mapping[str, int],
+) -> dict[str, list[Path]]:
+    """Require every physical predecessor attempt directory to match its ledger."""
+    unit_ids = [str(row["unit_id"]) for row in rows]
+    expected_ids = set(unit_ids)
+    counts = summary.get("attempt_count_by_owner")
+    carried = summary.get("carried_attempt_count_by_owner")
+    if (
+        len(unit_ids) != len(expected_ids)
+        or not isinstance(counts, dict)
+        or set(counts) != expected_ids
+        or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in counts.values())
+        or not isinstance(carried, dict)
+        or carried != dict(carried_attempt_count_by_owner)
+        or not set(carried).issubset(expected_ids)
+        or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in carried.values())
+    ):
+        raise RuntimeError("predecessor evaluation attempt counts are malformed or disagree with carried offsets")
+
+    unit_keys = {unit_id: str(backend.unit_key(unit_id)) for unit_id in expected_ids}
+    if len(set(unit_keys.values())) != len(unit_keys):
+        raise RuntimeError("predecessor evaluation owners map to duplicate physical directories")
+    units_root = Path(stage_root) / "units"
+    expected_owner_directories = {
+        unit_keys[unit_id] for unit_id in expected_ids if counts[unit_id] > 0
+    }
+    if units_root.exists():
+        if not units_root.is_dir():
+            raise RuntimeError("predecessor evaluation units root is not a directory")
+        actual_owner_entries = list(units_root.iterdir())
+        actual_owner_directories = {path.name for path in actual_owner_entries if path.is_dir()}
+        if (
+            actual_owner_directories != expected_owner_directories
+            or any(not path.is_dir() for path in actual_owner_entries)
+        ):
+            raise RuntimeError("predecessor evaluation owner directories do not match the attempt ledger")
+    elif expected_owner_directories:
+        raise RuntimeError("predecessor evaluation owner directories are missing")
+
+    inventory: dict[str, list[Path]] = {}
+    for unit_id in sorted(expected_ids):
+        owner_root = units_root / unit_keys[unit_id]
+        owner_entries = list(owner_root.iterdir()) if owner_root.is_dir() else []
+        actual_attempts = [path for path in owner_entries if path.name.startswith("attempt-")]
+        if len(actual_attempts) != len(owner_entries) or any(not path.is_dir() for path in actual_attempts):
+            raise RuntimeError(f"predecessor evaluation owner has unexpected entries: {unit_id}")
+        numbered_attempts: list[tuple[int, Path]] = []
+        for attempt in actual_attempts:
+            number_text = attempt.name.removeprefix("attempt-")
+            if len(number_text) < 4 or not number_text.isdecimal():
+                raise RuntimeError(f"predecessor evaluation attempt directory has an invalid name: {attempt}")
+            numbered_attempts.append((int(number_text), attempt))
+        numbered_attempts.sort(key=lambda item: item[0])
+        actual_attempts = [attempt for _number, attempt in numbered_attempts]
+        offset = int(carried.get(unit_id, 0))
+        expected_numbers = range(offset + 1, offset + counts[unit_id] + 1)
+        expected_names = [f"attempt-{number:04d}" for number in expected_numbers]
+        if [path.name for path in actual_attempts] != expected_names:
+            raise RuntimeError(f"predecessor evaluation attempt directories disagree with local counts and carried offsets: {unit_id}")
+        inventory[unit_id] = actual_attempts
+    return inventory
+
+
 def _evaluation_failed_attempt_receipts(
     backend: Any,
     *,
@@ -2202,11 +2271,18 @@ def _load_pilot_resume_evaluation_carry_forward(
         or parent_summary.get("carried_attempt_count_by_owner") != prior_parent_offsets
     ):
         raise RuntimeError("completed PARENT evaluation summary does not match its 607 carry-forward and sixteen source receipts")
+    parent_root = prior_root / "evaluation" / "PARENT"
+    _validate_evaluation_attempt_inventory(
+        backend,
+        stage_root=parent_root,
+        rows=parent_rows,
+        summary=parent_summary,
+        carried_attempt_count_by_owner=prior_parent_offsets,
+    )
     parent_cumulative_counts = {
         unit_id: int(parent_local_counts[unit_id]) + int(prior_parent_offsets[unit_id])
         for unit_id in sorted(expected_ids)
     }
-    parent_root = prior_root / "evaluation" / "PARENT"
     if not stage_receipts_are_complete(
         backend, root=parent_root, rows=parent_rows, package_commit=source_commit,
     ):
@@ -2228,6 +2304,14 @@ def _load_pilot_resume_evaluation_carry_forward(
         })
 
     arm_a_summary = prior_progress["evaluation_runs"]["A"]
+    arm_a_root = prior_root / "evaluation" / "A"
+    _validate_evaluation_attempt_inventory(
+        backend,
+        stage_root=arm_a_root,
+        rows=arm_a_rows,
+        summary=arm_a_summary,
+        carried_attempt_count_by_owner={},
+    )
     arm_a_offsets = _evaluation_failure_attempt_offsets(arm_a_summary, arm_a_rows, policy="A")
     if arm_a_summary.get("carried_attempt_count_by_owner") != {}:
         raise RuntimeError("A evaluation failures unexpectedly contain another carried-attempt layer")
