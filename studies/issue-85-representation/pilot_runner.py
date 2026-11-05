@@ -577,6 +577,17 @@ def _optional_receipt_field_matches(receipt: Mapping[str, Any], field: str, expe
     return field not in receipt or receipt.get(field) == expected
 
 
+def _worker_job_paths_match(
+    job: Mapping[str, Any], *, stage_root: Path, attempt_dir: Path, result_path: Path,
+) -> bool:
+    """Bind a worker receipt to its stage root and exact per-owner attempt files."""
+    return (
+        Path(str(job.get("artifact_root", ""))).resolve() == Path(stage_root).resolve()
+        and Path(str(job.get("attempt_dir", ""))).resolve() == Path(attempt_dir).resolve()
+        and Path(str(job.get("result_path", ""))).resolve() == Path(result_path).resolve()
+    )
+
+
 def _load_predecessor_b_actor_update(
     backend: Any,
     *,
@@ -693,9 +704,10 @@ def _load_predecessor_b_actor_update(
                 or job.get("package_commit") != predecessor_commit
                 or job.get("runner_code_commit") != predecessor_commit
                 or job.get("source_lock_sha256") != identity.get("source_lock_sha256")
-                or Path(job.get("artifact_root", "")).resolve() != prior_root.resolve()
-                or Path(job.get("attempt_dir", "")).resolve() != attempt.resolve()
-                or Path(job.get("result_path", "")).resolve() != result_path.resolve()
+                or not _worker_job_paths_match(
+                    job, stage_root=prior_root / "training" / "C",
+                    attempt_dir=attempt, result_path=result_path,
+                )
                 or started.get("schema_id") != "issue79-owner-attempt-start-v1"
                 or started.get("unit_id") != unit_id
                 or started.get("run_id") != run_id

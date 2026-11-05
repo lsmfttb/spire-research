@@ -580,6 +580,28 @@ class PilotRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "reviewed runner/API repairs"):
             pilot_runner._validate_predecessor_reuse_source_diff(approved_paths[:-1])
 
+    def test_failed_worker_receipt_binds_the_exact_stage_root_and_attempt_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            package = Path(directory)
+            stage = package / "training" / "C"
+            attempt = stage / "units" / "PILOT-TRAIN-C-8530001" / "attempt-0001"
+            result = attempt / "result.json"
+            job = {
+                "artifact_root": str(stage),
+                "attempt_dir": str(attempt),
+                "result_path": str(result),
+            }
+            self.assertTrue(pilot_runner._worker_job_paths_match(
+                job, stage_root=stage, attempt_dir=attempt, result_path=result,
+            ))
+            self.assertFalse(pilot_runner._worker_job_paths_match(
+                job, stage_root=package, attempt_dir=attempt, result_path=result,
+            ))
+            job["result_path"] = str(attempt / "other.json")
+            self.assertFalse(pilot_runner._worker_job_paths_match(
+                job, stage_root=stage, attempt_dir=attempt, result_path=result,
+            ))
+
     def test_failed_result_receipt_fields_may_be_absent_but_not_conflicting(self):
         self.assertTrue(pilot_runner._optional_receipt_field_matches({}, "package_commit", "source"))
         self.assertTrue(pilot_runner._optional_receipt_field_matches(
