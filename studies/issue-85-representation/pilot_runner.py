@@ -37,6 +37,7 @@ POLICIES = ("PARENT", "A", *NEW_ARMS)
 PILOT_RESUME_PREDECESSOR_SHA = "0297d60382e5dfe64d8de93f6ca383e96b655f40"
 PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA = "62382663fd5612d55f662190dc389cc0664a2f98"
 PILOT_C_OUTCOME_CARRY_FORWARD_SHA = "fafbb59770f14aea14915090714b51538f8c4d85"
+PILOT_COMPLETED_TRAINING_CARRY_FORWARD_SHA = "643766496a6eb9b94bcc3af4bf52afb2180fab7a"
 ACTOR_STEPS = 64
 ACTOR_CHECKPOINT_INTERVAL = 8
 PILOT_MINIBATCH_OWNERS = len(PILOT_OWNERS)
@@ -138,6 +139,18 @@ def source_identity(*, require_clean: bool = True) -> dict[str, str]:
     return {"package_commit": commit, "source_lock_sha256": lock_sha}
 
 
+def _recorded_completed_package(progress: Mapping[str, Any]) -> str | None:
+    reuse = progress.get("pilot_completed_training_reuse")
+    if reuse is None:
+        return None
+    if not isinstance(reuse, Mapping):
+        raise RuntimeError("resumed pilot has a malformed completed-package reuse record")
+    predecessor = reuse.get("predecessor_package_commit")
+    if predecessor is not None and not isinstance(predecessor, str):
+        raise RuntimeError("resumed pilot has an invalid completed-package source identity")
+    return predecessor
+
+
 def validate_issue84_source(path: Path) -> Path:
     root = Path(path).resolve(strict=True)
     actual = _git(root, "rev-parse", "HEAD")
@@ -204,12 +217,20 @@ def trailing_failure_streak(events: Sequence[tuple[str, float, str]]) -> int:
     return streak
 
 
-def pilot_plan(*, resume_from: str | None = None) -> dict[str, Any]:
+def pilot_plan(
+    *, resume_from: str | None = None, reuse_completed_package: str | None = None,
+) -> dict[str, Any]:
     if resume_from not in (None, PILOT_RESUME_PREDECESSOR_SHA):
         raise ValueError("pilot plan names an unregistered predecessor source")
+    if reuse_completed_package not in (None, PILOT_COMPLETED_TRAINING_CARRY_FORWARD_SHA):
+        raise ValueError("pilot plan names an unregistered completed package")
+    if reuse_completed_package is not None and resume_from != PILOT_RESUME_PREDECESSOR_SHA:
+        raise ValueError("completed-package reuse requires the registered pilot predecessor")
     training_cohort_games = len(NEW_ARMS) * len(PILOT_OWNERS)
     evaluation_cohort_games = len(POLICIES) * len(PILOT_OWNERS)
-    planned_reused_receipts = len(PILOT_OWNERS) + (len(PILOT_OWNERS) // 4) if resume_from is not None else 0
+    reused_base_receipts = len(PILOT_OWNERS) + (len(PILOT_OWNERS) // 4) if resume_from is not None else 0
+    reused_completed_receipts = 28 if reuse_completed_package is not None else 0
+    planned_reused_receipts = reused_base_receipts + reused_completed_receipts
     new_training_slots = training_cohort_games - planned_reused_receipts
     new_evaluation_slots = evaluation_cohort_games
     new_slots = new_training_slots + new_evaluation_slots
@@ -222,11 +243,21 @@ def pilot_plan(*, resume_from: str | None = None) -> dict[str, Any]:
         "training_games": training_cohort_games,
         "evaluation_games": evaluation_cohort_games,
         "planned_reused_predecessor_training_receipts": planned_reused_receipts,
-        "planned_reused_C_training_receipts": len(PILOT_OWNERS) // 4 if resume_from is not None else 0,
+        "planned_reused_completed_package_training_receipts": reused_completed_receipts,
+        "planned_reused_C_training_receipts": (
+            len(PILOT_OWNERS) // 4 + (len(PILOT_OWNERS) - len(PILOT_OWNERS) // 4) if reuse_completed_package is not None
+            else len(PILOT_OWNERS) // 4 if resume_from is not None else 0
+        ),
+        "planned_reused_D_training_receipts": len(PILOT_OWNERS) if reuse_completed_package is not None else 0,
+        "reuse_completed_package": reuse_completed_package,
         "C_training_outcome_carry_forward_source_commit": (
             PILOT_C_OUTCOME_CARRY_FORWARD_SHA if resume_from is not None else None
         ),
-        "planned_reused_predecessor_actor_updates": 1 if resume_from is not None else 0,
+        "planned_reused_predecessor_actor_updates": (2 if reuse_completed_package is not None else 1) if resume_from is not None else 0,
+        "actor_update_carry_forward_source_commits_by_arm": {
+            "B": PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA,
+            **({"C": PILOT_COMPLETED_TRAINING_CARRY_FORWARD_SHA} if reuse_completed_package is not None else {}),
+        } if resume_from is not None else {},
         "actor_update_carry_forward_source_commit": (
             PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA if resume_from is not None else None
         ),
@@ -1243,6 +1274,255 @@ def _load_predecessor_c_training_outcomes(
     }
 
 
+def _validate_completed_package_reuse_source_diff(changed_paths: Sequence[str]) -> None:
+    expected_paths = sorted((
+        "studies/issue-85-representation/pilot_runner.py",
+        "studies/issue-85-representation/tests/test_pilot_runner.py",
+    ))
+    observed_paths = sorted(filter(None, (str(path) for path in changed_paths)))
+    if observed_paths != expected_paths:
+        raise RuntimeError(
+            "completed Issue 85 training reuse only allows the reviewed fold-tolerance runner repair and its test"
+        )
+
+
+def _load_completed_package_training_reuse(
+    backend: Any,
+    *,
+    identity: Mapping[str, str],
+    current_seed_table: Mapping[str, Any],
+    c_outcome_reuse: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Reference C/D outcomes from the failed 643 package without copying or replaying them."""
+    predecessor_commit = PILOT_COMPLETED_TRAINING_CARRY_FORWARD_SHA
+    if identity.get("package_commit") == predecessor_commit:
+        raise RuntimeError("completed training package must differ from the current runner source")
+    is_ancestor = subprocess.run(
+        ["git", "-C", str(REPO), "merge-base", "--is-ancestor", predecessor_commit, identity["package_commit"]],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+    )
+    if is_ancestor.returncode != 0:
+        raise RuntimeError("completed training package is not an ancestor of the current runner source")
+    changed_paths = sorted(filter(None, _git(REPO, "diff", "--name-only", predecessor_commit, identity["package_commit"]).splitlines()))
+    _validate_completed_package_reuse_source_diff(changed_paths)
+
+    prior_root = PILOT_ROOT / predecessor_commit
+    progress_path = prior_root / "pilot-progress.json"
+    seed_path = prior_root / "pilot-seed-table.json"
+    if not progress_path.is_file() or not seed_path.is_file() or (prior_root / "pilot-report.json").exists():
+        raise RuntimeError("completed training package lacks its failed progress/seed evidence or has a final report")
+    progress = read_json(progress_path)
+    prior_seed_table = read_json(seed_path)
+    if (
+        progress.get("schema_id") != "issue85-pilot-progress-v1"
+        or progress.get("status") != "FAILED_OR_INCOMPLETE"
+        or progress.get("package_commit") != predecessor_commit
+        or progress.get("source_lock_sha256") != identity.get("source_lock_sha256")
+        or progress.get("issue84_source_commit") != ISSUE84_ACCEPTED_COMMIT
+        or progress.get("active_stage") != "pilot-actor-update"
+        or progress.get("active_arm") != "D"
+        or progress.get("failure") != {
+            "type": "RuntimeError",
+            "detail": "pilot widened matrix for D fails exact fold identity",
+        }
+        or set(progress.get("training_runs", {})) != {"B", "C", "D"}
+        or progress.get("evaluation_runs") != {}
+        or set(progress.get("actor_updates", {})) != {"B", "C"}
+        or file_sha256(seed_path) != progress.get("seed_table_sha256")
+        or prior_seed_table != current_seed_table
+        or prior_seed_table.get("rows_sha256") != current_seed_table.get("rows_sha256")
+    ):
+        raise RuntimeError("completed training package is not the exact failed D-update attempt with the unchanged seed table")
+
+    roots_by_arm: dict[str, dict[str, tuple[Path, str]]] = {}
+    summaries: dict[str, dict[str, Any]] = {}
+    summary_hashes: dict[str, str] = {}
+    receipt_records: list[dict[str, str]] = []
+    prior_c_success_roots = dict(c_outcome_reuse.get("success_receipt_roots_by_owner", {}))
+    for arm in ("C", "D"):
+        rows = [
+            dict(row) for row in current_seed_table["rows"]
+            if row.get("phase") == "training" and row.get("issue85_arm") == arm
+        ]
+        expected_ids = sorted(str(row["unit_id"]) for row in rows)
+        summary = progress.get("training_runs", {}).get(arm)
+        if (
+            len(rows) != len(PILOT_OWNERS)
+            or len(set(expected_ids)) != len(rows)
+            or not stage_summary_is_complete(summary, len(rows), expected_ids)
+            or summary.get("failed_attempts") != []
+            or summary.get("incomplete_attempts") != []
+            or summary.get("incomplete") != []
+            or set(summary.get("attempt_count_by_owner", {})) != set(expected_ids)
+        ):
+            raise RuntimeError(f"completed package {arm} training summary is not a complete fixed-owner cohort")
+        if arm == "C" and summary.get("carried_attempt_count_by_owner") != c_outcome_reuse.get(
+            "document", {},
+        ).get("prior_C_cumulative_attempt_count_by_owner"):
+            raise RuntimeError("completed package C summary changed the immutable prior-attempt accounting")
+        if arm == "D" and (
+            summary.get("carried_attempt_count_by_owner") != {}
+            or any(int(count) != 1 for count in summary.get("attempt_count_by_owner", {}).values())
+        ):
+            raise RuntimeError("completed package D cohort contains an unaccounted attempt history")
+
+        arm_roots: dict[str, tuple[Path, str]] = {}
+        for row in rows:
+            unit_id = str(row["unit_id"])
+            local_count = summary["attempt_count_by_owner"][unit_id]
+            binding = prior_c_success_roots.get(unit_id) if arm == "C" else None
+            carried_count = summary.get("carried_attempt_count_by_owner", {}).get(unit_id, 0)
+            if isinstance(carried_count, bool) or not isinstance(carried_count, int) or carried_count < 0:
+                raise RuntimeError(f"completed package {arm} owner has an invalid carried attempt count: {unit_id}")
+            if binding is None:
+                if isinstance(local_count, bool) or not isinstance(local_count, int) or local_count != 1:
+                    raise RuntimeError(f"completed package {arm} owner lacks exactly one local terminal attempt: {unit_id}")
+                root = prior_root / "training" / arm
+                package_commit = predecessor_commit
+                unit_root = root / "units" / str(backend.unit_key(unit_id))
+                attempt_names = sorted(path.name for path in unit_root.glob("attempt-*") if path.is_dir())
+                expected_attempt_name = f"attempt-{carried_count + local_count:04d}"
+                if attempt_names != [expected_attempt_name]:
+                    raise RuntimeError(f"completed package {arm} owner has missing or unregistered attempt directories: {unit_id}")
+            else:
+                root, package_commit = Path(binding[0]), str(binding[1])
+                if isinstance(local_count, bool) or not isinstance(local_count, int) or local_count != 0:
+                    raise RuntimeError(f"completed package C owner has both inherited and local attempts: {unit_id}")
+                local_unit_root = prior_root / "training" / "C" / "units" / str(backend.unit_key(unit_id))
+                if any(path.is_dir() for path in local_unit_root.glob("attempt-*")):
+                    raise RuntimeError(f"completed package C inherited owner has unaccounted local attempt directories: {unit_id}")
+            record = pilot_success_record(backend, root=root, row=row, package_commit=package_commit)
+            if record is None:
+                raise RuntimeError(f"completed package {arm} terminal receipt failed strict validation: {unit_id}")
+            _result, result_path = record
+            attempt = result_path.parent
+            arm_roots[unit_id] = (root, package_commit)
+            receipt_records.append({
+                "arm": arm,
+                "unit_id": unit_id,
+                "evidence_root": str(root.resolve()),
+                "package_commit": package_commit,
+                "attempt": attempt.name,
+                "worker_job_sha256": file_sha256(attempt / "worker-job.json"),
+                "started_sha256": file_sha256(attempt / "started.json"),
+                "finished_sha256": file_sha256(attempt / "finished.json"),
+                "result_sha256": file_sha256(result_path),
+            })
+        if set(arm_roots) != set(expected_ids):
+            raise RuntimeError(f"completed package {arm} receipt roots do not cover every fixed owner")
+        roots_by_arm[arm] = arm_roots
+        summaries[arm] = dict(summary)
+        summary_hashes[arm] = sha256(canonical(summary))
+
+    actor_receipt = progress["actor_updates"]["C"]
+    actor_attempt = prior_root / "training" / "C" / "pilot-updates" / "C" / "attempt-0001"
+    actor_receipt_path = actor_attempt / "receipt.json"
+    actor_progress_path = actor_attempt / "progress.json"
+    actor_progress = read_json(actor_progress_path) if actor_progress_path.is_file() else {}
+    checkpoint = (prior_root / str(actor_receipt.get("checkpoint_path", ""))).resolve()
+    optimizer = (prior_root / str(actor_receipt.get("optimizer_path", ""))).resolve()
+    if (
+        not actor_receipt_path.is_file()
+        or not actor_progress_path.is_file()
+        or read_json(actor_receipt_path) != actor_receipt
+        or actor_receipt.get("schema_id") != "issue85-pilot-actor-update-v1"
+        or actor_receipt.get("status") != "SUCCEEDED"
+        or actor_receipt.get("arm") != "C"
+        or actor_receipt.get("package_commit") != predecessor_commit
+        or actor_receipt.get("source_lock_sha256") != identity.get("source_lock_sha256")
+        or actor_receipt.get("owner_seed_sha256") != sha256(",".join(str(owner) for owner in PILOT_OWNERS).encode("ascii"))
+        or actor_receipt.get("owner_count") != len(PILOT_OWNERS)
+        or actor_receipt.get("minibatch_owner_count") != len(PILOT_OWNERS)
+        or actor_receipt.get("completed_steps") != ACTOR_STEPS
+        or actor_receipt.get("loss_summary", {}).get("finite_all_steps") is not True
+        or actor_progress.get("schema_id") != "issue85-pilot-actor-update-progress-v1"
+        or actor_progress.get("status") != "SUCCEEDED"
+        or actor_progress.get("arm") != "C"
+        or actor_progress.get("package_commit") != predecessor_commit
+        or actor_progress.get("source_lock_sha256") != identity.get("source_lock_sha256")
+        or actor_progress.get("completed_steps") != ACTOR_STEPS
+        or actor_progress.get("model_digest") != actor_receipt.get("model_digest")
+        or actor_progress.get("checkpoint_sha256") != actor_receipt.get("checkpoint_sha256")
+        or actor_progress.get("optimizer_sha256") != actor_receipt.get("optimizer_sha256")
+        or actor_attempt.resolve() not in checkpoint.parents
+        or actor_attempt.resolve() not in optimizer.parents
+        or not checkpoint.is_file()
+        or not optimizer.is_file()
+        or file_sha256(checkpoint) != actor_receipt.get("checkpoint_sha256")
+        or file_sha256(optimizer) != actor_receipt.get("optimizer_sha256")
+    ):
+        raise RuntimeError("completed package C actor update receipt/progress/checkpoint chain failed strict validation")
+    actor_reuse_document = {
+        "schema_id": "issue85-pilot-actor-update-reuse-v1",
+        "scope": "PILOT_ONLY / NONFORMAL",
+        "current_package_commit": identity["package_commit"],
+        "predecessor_package_commit": predecessor_commit,
+        "source_lock_sha256": identity["source_lock_sha256"],
+        "issue84_source_commit": ISSUE84_ACCEPTED_COMMIT,
+        "source_diff_paths": changed_paths,
+        "predecessor_progress_sha256": file_sha256(progress_path),
+        "predecessor_seed_table_sha256": file_sha256(seed_path),
+        "actor_update_attempt": actor_attempt.name,
+        "actor_update_progress_sha256": file_sha256(actor_progress_path),
+        "actor_update_receipt_sha256": file_sha256(actor_receipt_path),
+        "actor_update_receipt": actor_receipt,
+        "checkpoint_sha256": actor_receipt["checkpoint_sha256"],
+        "optimizer_sha256": actor_receipt["optimizer_sha256"],
+        "reuse_rule": "reference the completed C actor update and immutable checkpoint; do not repeat or relabel it",
+    }
+    completed_package_receipts = [
+        record for record in receipt_records if record["package_commit"] == predecessor_commit
+    ]
+    completed_package_c_receipts = [
+        record for record in completed_package_receipts if record["arm"] == "C"
+    ]
+    completed_package_d_receipts = [
+        record for record in completed_package_receipts if record["arm"] == "D"
+    ]
+    if (
+        len(receipt_records) != 32
+        or len(completed_package_receipts) != 28
+        or len(completed_package_c_receipts) != 12
+        or len(completed_package_d_receipts) != 16
+    ):
+        raise RuntimeError("completed package must contribute exactly 12 new C and 16 D terminal receipts")
+    document = {
+        "schema_id": "issue85-pilot-completed-training-reuse-v1",
+        "scope": "PILOT_ONLY / NONFORMAL",
+        "current_package_commit": identity["package_commit"],
+        "predecessor_package_commit": predecessor_commit,
+        "source_lock_sha256": identity["source_lock_sha256"],
+        "issue84_source_commit": ISSUE84_ACCEPTED_COMMIT,
+        "source_diff_paths": changed_paths,
+        "progress_sha256": file_sha256(progress_path),
+        "seed_table_sha256": file_sha256(seed_path),
+        "rows_sha256": current_seed_table["rows_sha256"],
+        "training_arms": ["C", "D"],
+        "training_summaries": summaries,
+        "training_summary_sha256": summary_hashes,
+        "validated_unit_receipts": sorted(receipt_records, key=lambda item: (item["arm"], item["unit_id"])),
+        "validated_training_cohort_receipt_count": len(receipt_records),
+        "successful_game_count": len(completed_package_receipts),
+        "C_successful_game_count": len(completed_package_c_receipts),
+        "D_successful_game_count": len(completed_package_d_receipts),
+        "actor_update_reuse": actor_reuse_document,
+        "actor_update_reuse_sha256": sha256(canonical(actor_reuse_document)),
+        "reuse_rule": "reference 12 current-package C terminals, 16 current-package D terminals, and the four older inherited C terminals in their original source packages; do not copy, relabel, or replay them",
+    }
+    return {
+        "source_commit": predecessor_commit,
+        "root": prior_root,
+        "progress": progress,
+        "progress_sha256": file_sha256(progress_path),
+        "seed_table_sha256": file_sha256(seed_path),
+        "document": document,
+        "actor_update_reuse_document": actor_reuse_document,
+        "actor_update_receipt": actor_receipt,
+        "receipt_roots_by_arm": roots_by_arm,
+        "summaries": summaries,
+    }
+
+
 def actor_update_resume_wall(progress: Mapping[str, Any], current_clock_elapsed: float | None) -> tuple[float, float]:
     elapsed = float(progress.get("elapsed_seconds", 0.0))
     checkpoint_clock_elapsed = progress.get("active_clock_elapsed_seconds")
@@ -1767,19 +2047,38 @@ def _configure_runtime(issue84_root: Path, pilot_root: Path, identity: Mapping[s
             if not isinstance(receipt, dict) or receipt.get("status") != "SUCCEEDED":
                 raise RuntimeError(f"pilot actor update is incomplete for {group}")
             checkpoint_root = pilot_root
-            if group == "B" and receipt.get("package_commit") != identity["package_commit"]:
-                reuse_path = pilot_root / "pilot-actor-update-reuse.json"
-                reuse = read_json(reuse_path) if reuse_path.is_file() else None
-                if (
-                    not isinstance(reuse, dict)
-                    or reuse != progress.get("actor_update_reuse")
-                    or progress.get("actor_update_reuse_sha256") != file_sha256(reuse_path)
-                    or reuse.get("current_package_commit") != identity["package_commit"]
-                    or reuse.get("predecessor_package_commit") != PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA
-                    or reuse.get("actor_update_receipt") != receipt
-                ):
-                    raise RuntimeError("carried B actor update lacks its exact source-bound reuse manifest")
-                checkpoint_root = PILOT_ROOT / str(reuse["predecessor_package_commit"])
+            if receipt.get("package_commit") != identity["package_commit"]:
+                if group == "B":
+                    reuse_path = pilot_root / "pilot-actor-update-reuse.json"
+                    reuse = read_json(reuse_path) if reuse_path.is_file() else None
+                    if (
+                        not isinstance(reuse, dict)
+                        or reuse != progress.get("actor_update_reuse")
+                        or progress.get("actor_update_reuse_sha256") != file_sha256(reuse_path)
+                        or reuse.get("current_package_commit") != identity["package_commit"]
+                        or reuse.get("predecessor_package_commit") != PILOT_B_ACTOR_UPDATE_CARRY_FORWARD_SHA
+                        or reuse.get("actor_update_receipt") != receipt
+                    ):
+                        raise RuntimeError("carried B actor update lacks its exact source-bound reuse manifest")
+                    checkpoint_root = PILOT_ROOT / str(reuse["predecessor_package_commit"])
+                else:
+                    reuse_path = pilot_root / f"pilot-{group}-actor-update-reuse.json"
+                    reuse = read_json(reuse_path) if reuse_path.is_file() else None
+                    expected_reuse = progress.get("actor_update_reuse_by_arm", {}).get(group)
+                    if (
+                        not isinstance(reuse, dict)
+                        or reuse != expected_reuse
+                        or reuse.get("current_package_commit") != identity["package_commit"]
+                        or reuse.get("predecessor_package_commit") != receipt.get("package_commit")
+                        or reuse.get("source_lock_sha256") != identity["source_lock_sha256"]
+                        or reuse.get("actor_update_receipt") != receipt
+                        or reuse.get("actor_update_receipt_sha256") != file_sha256(
+                            PILOT_ROOT / str(reuse["predecessor_package_commit"]) / "training" / group
+                            / "pilot-updates" / group / str(reuse["actor_update_attempt"]) / "receipt.json"
+                        )
+                    ):
+                        raise RuntimeError(f"carried {group} actor update lacks its exact source-bound reuse manifest")
+                    checkpoint_root = PILOT_ROOT / str(reuse["predecessor_package_commit"])
             checkpoint = (checkpoint_root / receipt["checkpoint_path"]).resolve()
             if checkpoint_root.resolve() not in checkpoint.parents or not checkpoint.is_file():
                 raise RuntimeError(f"pilot actor checkpoint path is outside its bound source root for {group}")
@@ -2613,6 +2912,50 @@ def _validate_completed_pilot(
         or report.get("pilot_C_outcome_reuse_sha256") != file_sha256(c_outcome_path)
     ):
         raise RuntimeError("successful pilot report lacks the validated immutable C outcome receipt reference")
+    completed_reuse = None
+    completed_reuse_roots_by_arm: dict[str, dict[str, tuple[Path, str]]] = {}
+    completed_reuse_doc = progress.get("pilot_completed_training_reuse")
+    if completed_reuse_doc is not None:
+        completed_reuse = _load_completed_package_training_reuse(
+            backend, identity=identity, current_seed_table=seed_table,
+            c_outcome_reuse=c_outcome_reuse,
+        )
+        completed_reuse_path = package_root / "pilot-completed-training-reuse.json"
+        actor_c_reuse_path = package_root / "pilot-C-actor-update-reuse.json"
+        if (
+            not completed_reuse_path.is_file()
+            or read_json(completed_reuse_path) != completed_reuse["document"]
+            or file_sha256(completed_reuse_path) != progress.get("pilot_completed_training_reuse_sha256")
+            or completed_reuse_doc != completed_reuse["document"]
+            or not actor_c_reuse_path.is_file()
+            or read_json(actor_c_reuse_path) != completed_reuse["actor_update_reuse_document"]
+            or progress.get("actor_update_reuse_by_arm", {}).get("C") != completed_reuse["actor_update_reuse_document"]
+            or file_sha256(actor_c_reuse_path) != progress.get("actor_update_reuse_by_arm_sha256", {}).get("C")
+            or progress.get("actor_updates", {}).get("C") != completed_reuse["actor_update_receipt"]
+            or progress.get("training_runs", {}).get("C") != completed_reuse["summaries"].get("C")
+            or progress.get("training_runs", {}).get("D") != completed_reuse["summaries"].get("D")
+        ):
+            raise RuntimeError("successful pilot lacks the immutable C/D completed-package receipt references")
+        completed_reuse_roots_by_arm = completed_reuse["receipt_roots_by_arm"]
+    elif progress.get("actor_update_reuse_by_arm"):
+        raise RuntimeError("pilot has carried actor updates without a completed-package training reuse record")
+    clock_reconciliation = progress.get("clock_reconciliation")
+    clock_reconciliation_sha256 = progress.get("clock_reconciliation_sha256")
+    if completed_reuse is not None:
+        clock_reconciliation_path = package_root / "pilot-progress-clock-reconciliation.json"
+        if (
+            not isinstance(clock_reconciliation, dict)
+            or not clock_reconciliation_path.is_file()
+            or read_json(clock_reconciliation_path) != clock_reconciliation
+            or file_sha256(clock_reconciliation_path) != clock_reconciliation_sha256
+            or clock_reconciliation.get("predecessor_progress_sha256") != completed_reuse["progress_sha256"]
+            or clock_reconciliation.get("predecessor_package_commit") != completed_reuse["source_commit"]
+            or float(progress.get("cumulative_active_wall_seconds", -1.0))
+            < float(clock_reconciliation.get("shared_clock_active_wall_seconds_before_resume", float("inf")))
+        ):
+            raise RuntimeError("successful pilot progress lacks the immutable shared-clock reconciliation")
+    elif clock_reconciliation is not None or clock_reconciliation_sha256 is not None:
+        raise RuntimeError("pilot contains an unrelated clock-reconciliation receipt")
     expected_training = set(NEW_ARMS)
     expected_evaluation = set(POLICIES)
     expected_updates = set(NEW_ARMS)
@@ -2638,10 +2981,13 @@ def _validate_completed_pilot(
                 raise RuntimeError("durable progress ledger contains an incomplete pilot game group")
     c_rows = [row for row in seed_rows if row.get("phase") == "training" and row.get("issue85_arm") == "C"]
     c_summary = progress["training_runs"]["C"]
-    current_c_attempt_counts = {
-        str(row["unit_id"]): len(list((package_root / "training" / "C" / "units" / backend.unit_key(row["unit_id"])).glob("attempt-*")))
-        for row in c_rows
-    }
+    if completed_reuse is None:
+        current_c_attempt_counts = {
+            str(row["unit_id"]): len(list((package_root / "training" / "C" / "units" / backend.unit_key(row["unit_id"])).glob("attempt-*")))
+            for row in c_rows
+        }
+    else:
+        current_c_attempt_counts = dict(completed_reuse["summaries"]["C"]["attempt_count_by_owner"])
     if (
         c_summary.get("carried_attempt_count_by_owner")
         != c_outcome_document.get("prior_C_cumulative_attempt_count_by_owner")
@@ -2660,9 +3006,20 @@ def _validate_completed_pilot(
         or report.get("source_lock_sha256") != identity["source_lock_sha256"]
         or report.get("pilot_owner_ids") != list(PILOT_OWNERS)
         or report.get("training_game_count") != len(NEW_ARMS) * len(PILOT_OWNERS)
-        or report.get("new_training_game_count") != (len(NEW_ARMS) - 1) * len(PILOT_OWNERS) - int(c_outcome_document["prior_C_successful_games"])
-        or report.get("reused_predecessor_training_game_count") != len(PILOT_OWNERS) + int(c_outcome_document["prior_C_successful_games"])
-        or report.get("reused_predecessor_C_training_game_count") != int(c_outcome_document["prior_C_successful_games"])
+        or report.get("new_training_game_count") != (
+            len(NEW_ARMS) * len(PILOT_OWNERS)
+            - len(PILOT_OWNERS)
+            - int(c_outcome_document["prior_C_successful_games"])
+            - (0 if completed_reuse is None else int(completed_reuse["document"]["successful_game_count"]))
+        )
+        or report.get("reused_predecessor_training_game_count") != (
+            len(PILOT_OWNERS) + int(c_outcome_document["prior_C_successful_games"])
+            + (0 if completed_reuse is None else int(completed_reuse["document"]["successful_game_count"]))
+        )
+        or report.get("reused_predecessor_C_training_game_count") != (
+            int(c_outcome_document["prior_C_successful_games"])
+            + (0 if completed_reuse is None else int(completed_reuse["document"]["C_successful_game_count"]))
+        )
         or report.get("new_evaluation_game_count") != len(POLICIES) * len(PILOT_OWNERS)
         or report.get("unique_pilot_game_count") != len(NEW_ARMS) * len(PILOT_OWNERS) + len(POLICIES) * len(PILOT_OWNERS)
         or report.get("evaluation_game_count") != len(POLICIES) * len(PILOT_OWNERS)
@@ -2670,6 +3027,12 @@ def _validate_completed_pilot(
         or report.get("formal_cohorts_changed") is not False
         or report.get("pilot_weights_used_formally") is not False
         or report.get("baseline_verification", {}).get("status") != "VERIFIED_NO_NEW_GAMES"
+        or report.get("completed_training_reuse") != completed_reuse_doc
+        or report.get("completed_training_reuse_sha256") != (
+            None if completed_reuse is None else progress.get("pilot_completed_training_reuse_sha256")
+        )
+        or report.get("clock_reconciliation") != clock_reconciliation
+        or report.get("clock_reconciliation_sha256") != clock_reconciliation_sha256
     ):
         raise RuntimeError("successful pilot report identity/count/scope validation failed")
     if (
@@ -2692,6 +3055,8 @@ def _validate_completed_pilot(
             receipt_commit = predecessor["source_commit"]
         elif stage == "training" and group == "C" and str(row["unit_id"]) in c_outcome_reuse["success_receipt_roots_by_owner"]:
             root, receipt_commit = c_outcome_reuse["success_receipt_roots_by_owner"][str(row["unit_id"])]
+        elif stage == "training" and group in completed_reuse_roots_by_arm and str(row["unit_id"]) in completed_reuse_roots_by_arm[group]:
+            root, receipt_commit = completed_reuse_roots_by_arm[group][str(row["unit_id"])]
         else:
             root = package_root / stage / group
             receipt_commit = identity["package_commit"]
@@ -2724,7 +3089,10 @@ def _validate_completed_pilot(
         raise RuntimeError("successful pilot report's forecast is not the bounded partial projection")
 
 
-def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[str, Any]:
+def run_pilot(
+    issue84_source: Path, *, resume_from: str | None = None,
+    reuse_completed_package: str | None = None,
+) -> dict[str, Any]:
     identity = source_identity(require_clean=True)
     issue84_root = validate_issue84_source(issue84_source)
     python_path = _path_from_wsl("/mnt/d/DeadlyCatCoding/stsrl-data/stsrl-spikes/py313-torch/bin/python3.13")
@@ -2792,6 +3160,24 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
     c_outcome_path = package_root / "pilot-C-training-outcome-reuse.json"
     if c_outcome_document.get("prior_C_inherited_failed_attempt_receipts") != actor_reuse_document.get("prior_C_failed_attempts"):
         raise RuntimeError("C outcome reuse does not preserve the independently validated original failure receipts")
+    recorded_completed_package = None
+    if progress_exists:
+        recorded_completed_package = _recorded_completed_package(progress)
+        if reuse_completed_package is not None and reuse_completed_package != recorded_completed_package:
+            raise RuntimeError("resumed pilot must preserve its already-recorded completed-package evidence")
+    completed_package_commit = recorded_completed_package or reuse_completed_package
+    if completed_package_commit is not None and completed_package_commit != PILOT_COMPLETED_TRAINING_CARRY_FORWARD_SHA:
+        raise RuntimeError("Issue 85 continuation names an unregistered completed training package")
+    completed_reuse = None
+    completed_reuse_path = package_root / "pilot-completed-training-reuse.json"
+    actor_c_reuse_path = package_root / "pilot-C-actor-update-reuse.json"
+    if completed_package_commit is not None:
+        completed_reuse = _load_completed_package_training_reuse(
+            backend, identity=identity, current_seed_table=rows_document,
+            c_outcome_reuse=c_outcome_reuse,
+        )
+    completed_reuse_document = None if completed_reuse is None else completed_reuse["document"]
+    actor_c_reuse_document = None if completed_reuse is None else completed_reuse["actor_update_reuse_document"]
     if progress_exists:
         if (
             not predecessor_manifest_path.is_file()
@@ -2807,12 +3193,43 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
             or read_json(c_outcome_path) != c_outcome_document
             or progress.get("pilot_C_outcome_reuse") != c_outcome_document
             or progress.get("pilot_C_outcome_reuse_sha256") != file_sha256(c_outcome_path)
+            or (
+                completed_reuse is not None
+                and (
+                    not completed_reuse_path.is_file()
+                    or read_json(completed_reuse_path) != completed_reuse_document
+                    or progress.get("pilot_completed_training_reuse") != completed_reuse_document
+                    or progress.get("pilot_completed_training_reuse_sha256") != file_sha256(completed_reuse_path)
+                    or not actor_c_reuse_path.is_file()
+                    or read_json(actor_c_reuse_path) != actor_c_reuse_document
+                    or progress.get("actor_update_reuse_by_arm", {}).get("C") != actor_c_reuse_document
+                    or progress.get("actor_update_reuse_by_arm_sha256", {}).get("C") != file_sha256(actor_c_reuse_path)
+                    or progress.get("actor_updates", {}).get("C") != completed_reuse["actor_update_receipt"]
+                    or progress.get("training_runs", {}).get("C") != completed_reuse["summaries"].get("C")
+                    or progress.get("training_runs", {}).get("D") != completed_reuse["summaries"].get("D")
+                )
+            )
+            or (completed_reuse is None and progress.get("pilot_completed_training_reuse") is not None)
         ):
             raise RuntimeError("pilot continuation predecessor game/update/C-outcome references are missing or changed")
     else:
         predecessor_manifest_sha = _write_or_verify_once(predecessor_manifest_path, predecessor_document)
         actor_reuse_sha = _write_or_verify_once(actor_reuse_path, actor_reuse_document)
         c_outcome_sha = _write_or_verify_once(c_outcome_path, c_outcome_document)
+        completed_reuse_sha = None
+        actor_c_reuse_sha = None
+        if completed_reuse is not None:
+            completed_reuse_sha = _write_or_verify_once(completed_reuse_path, completed_reuse_document)
+            actor_c_reuse_sha = _write_or_verify_once(actor_c_reuse_path, actor_c_reuse_document)
+        training_runs = {"B": predecessor["summary"]}
+        actor_updates = {"B": actor_update_reuse["receipt"]}
+        actor_update_reuse_by_arm: dict[str, Any] = {}
+        actor_update_reuse_by_arm_sha256: dict[str, str] = {}
+        if completed_reuse is not None:
+            training_runs.update(completed_reuse["summaries"])
+            actor_updates["C"] = completed_reuse["actor_update_receipt"]
+            actor_update_reuse_by_arm["C"] = actor_c_reuse_document
+            actor_update_reuse_by_arm_sha256["C"] = str(actor_c_reuse_sha)
         progress = {
             "schema_id": "issue85-pilot-progress-v1",
             "status": "READY",
@@ -2823,14 +3240,18 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
             "seed_table_sha256": seed_hash,
             "seed_table_rows": len(rows_document["rows"]),
             "baseline_verification": baseline,
-            "training_runs": {"B": predecessor["summary"]},
+            "training_runs": training_runs,
             "predecessor_training_reuse": predecessor_document,
             "predecessor_training_reuse_sha256": predecessor_manifest_sha,
-            "actor_updates": {"B": actor_update_reuse["receipt"]},
+            "actor_updates": actor_updates,
             "actor_update_reuse": actor_reuse_document,
             "actor_update_reuse_sha256": actor_reuse_sha,
             "pilot_C_outcome_reuse": c_outcome_document,
             "pilot_C_outcome_reuse_sha256": c_outcome_sha,
+            "pilot_completed_training_reuse": completed_reuse_document,
+            "pilot_completed_training_reuse_sha256": completed_reuse_sha,
+            "actor_update_reuse_by_arm": actor_update_reuse_by_arm,
+            "actor_update_reuse_by_arm_sha256": actor_update_reuse_by_arm_sha256,
             "evaluation_runs": {},
             "concurrency": int(backend.CONCURRENCY),
             "run_history": [],
@@ -2858,6 +3279,43 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
         })
     clock = backend.ActiveClock("issue85-task", None)
     before = clock.elapsed_before
+    if completed_reuse is not None:
+        prior_wall = float(completed_reuse["progress"].get("cumulative_active_wall_seconds", -1.0))
+        if not math.isfinite(prior_wall) or prior_wall < 0 or before + 1e-6 < prior_wall:
+            clock.close()
+            raise RuntimeError("shared task clock is behind the completed-package progress snapshot; refusing wall-time rollback")
+        clock_reconciliation_path = package_root / "pilot-progress-clock-reconciliation.json"
+        if progress_exists:
+            clock_reconciliation = read_json(clock_reconciliation_path) if clock_reconciliation_path.is_file() else None
+            if (
+                not isinstance(clock_reconciliation, dict)
+                or clock_reconciliation != progress.get("clock_reconciliation")
+                or progress.get("clock_reconciliation_sha256") != file_sha256(clock_reconciliation_path)
+                or clock_reconciliation.get("schema_id") != "issue85-pilot-clock-reconciliation-v1"
+                or clock_reconciliation.get("current_package_commit") != identity["package_commit"]
+                or clock_reconciliation.get("predecessor_package_commit") != completed_reuse["source_commit"]
+                or clock_reconciliation.get("predecessor_progress_sha256") != completed_reuse["progress_sha256"]
+                or clock_reconciliation.get("predecessor_snapshot_active_wall_seconds") != prior_wall
+                or float(clock_reconciliation.get("shared_clock_active_wall_seconds_before_resume", -1.0)) < prior_wall
+            ):
+                clock.close()
+                raise RuntimeError("resumed pilot has no immutable, hash-bound clock reconciliation receipt")
+            clock_reconciliation_sha = progress["clock_reconciliation_sha256"]
+        else:
+            clock_reconciliation = {
+                "schema_id": "issue85-pilot-clock-reconciliation-v1",
+                "current_package_commit": identity["package_commit"],
+                "predecessor_package_commit": completed_reuse["source_commit"],
+                "predecessor_progress_sha256": completed_reuse["progress_sha256"],
+                "predecessor_snapshot_active_wall_seconds": prior_wall,
+                "shared_clock_active_wall_seconds_before_resume": before,
+                "reconciled_difference_seconds": before - prior_wall,
+                "authority": "shared active-wall task clock; preserve its higher cumulative value",
+            }
+            clock_reconciliation_sha = _write_or_verify_once(clock_reconciliation_path, clock_reconciliation)
+        progress["clock_reconciliation"] = clock_reconciliation
+        progress["clock_reconciliation_sha256"] = clock_reconciliation_sha
+        progress["cumulative_active_wall_seconds"] = before
     progress.update({
         "status": "RUNNING",
         "supervisor_pid": os.getpid(),
@@ -2914,6 +3372,8 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
             rows = [row for row in rows_document["rows"] if row["phase"] == "training" and row["issue85_arm"] == arm]
             root = package_root / "training" / arm
             prior_training = progress["training_runs"].get(arm)
+            reused_receipt_roots = dict(c_outcome_reuse["success_receipt_roots_by_owner"]) if arm == "C" else {}
+            reused_receipt_roots.update(completed_reuse["receipt_roots_by_arm"].get(arm, {}) if completed_reuse is not None else {})
             if arm == "B":
                 training_complete = stage_summary_is_complete(
                     prior_training, len(rows), [str(row["unit_id"]) for row in rows],
@@ -2926,11 +3386,11 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
                     prior_training, len(rows), [str(row["unit_id"]) for row in rows],
                 ) and stage_receipts_are_complete(
                     backend, root=root, rows=rows, package_commit=identity["package_commit"],
-                    receipt_roots_by_owner=(
-                        c_outcome_reuse["success_receipt_roots_by_owner"] if arm == "C" else None
-                    ),
+                    receipt_roots_by_owner=reused_receipt_roots or None,
                 )
             if not training_complete:
+                if arm in (completed_reuse["receipt_roots_by_arm"] if completed_reuse is not None else {}):
+                    raise RuntimeError(f"immutable completed-package {arm} training reuse failed validation; refusing to rerun owners")
                 preserve_stage_summary("training-games", arm, prior_training)
                 stage_clock_start, stage_base, record_live_stage = start_game_stage("training-games", arm, rows)
                 attempt_offsets = (
@@ -2962,6 +3422,17 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
                 ):
                     raise RuntimeError("completed B actor update is not bound to the immutable carry-forward record")
                 continue
+            if arm in progress.get("actor_update_reuse_by_arm", {}):
+                expected_receipt = (completed_reuse or {}).get("actor_update_receipt")
+                expected_manifest = (completed_reuse or {}).get("actor_update_reuse_document")
+                if (
+                    expected_receipt != progress.get("actor_updates", {}).get(arm)
+                    or expected_manifest != progress.get("actor_update_reuse_by_arm", {}).get(arm)
+                    or progress.get("actor_update_reuse_by_arm_sha256", {}).get(arm)
+                    != file_sha256(package_root / f"pilot-{arm}-actor-update-reuse.json")
+                ):
+                    raise RuntimeError(f"completed {arm} actor update is not bound to its immutable carry-forward record")
+                continue
 
             actor_resume_clock = clock.elapsed()
             progress["active_stage"] = "pilot-actor-update"
@@ -2989,9 +3460,7 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
                 pilot_root=package_root, identity=identity,
                 examples_root=predecessor["receipt_root"] if arm == "B" else None,
                 examples_package_commit=predecessor["source_commit"] if arm == "B" else None,
-                example_receipt_roots_by_owner=(
-                    c_outcome_reuse["success_receipt_roots_by_owner"] if arm == "C" else None
-                ),
+                example_receipt_roots_by_owner=reused_receipt_roots or None,
                 active_clock=clock, resume_clock_elapsed=actor_resume_clock,
                 progress_callback=record_actor_update,
             )
@@ -3061,14 +3530,17 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
             item["successful_completions"]
             for arm, item in progress["training_runs"].items()
             if arm not in ("B", "C")
-        ) + max(
+        ) - (0 if completed_reuse is None else int(completed_reuse["document"]["D_successful_game_count"])) + max(
             0,
             int(progress["training_runs"]["C"]["successful_completions"])
-            - int(c_outcome_document["prior_C_successful_games"]),
+            - int(c_outcome_document["prior_C_successful_games"])
+            - (0 if completed_reuse is None else int(completed_reuse["document"]["C_successful_game_count"])),
         ),
         "reused_predecessor_training_game_count": len(predecessor["rows"])
-        + int(c_outcome_document["prior_C_successful_games"]),
-        "reused_predecessor_C_training_game_count": int(c_outcome_document["prior_C_successful_games"]),
+        + int(c_outcome_document["prior_C_successful_games"])
+        + (0 if completed_reuse is None else int(completed_reuse["document"]["successful_game_count"])),
+        "reused_predecessor_C_training_game_count": int(c_outcome_document["prior_C_successful_games"])
+        + (0 if completed_reuse is None else int(completed_reuse["document"]["C_successful_game_count"])),
         "evaluation_game_count": sum(item["successful_completions"] for item in progress["evaluation_runs"].values()),
         "new_evaluation_game_count": sum(
             item["successful_completions"]
@@ -3085,6 +3557,10 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
         "C_outcome_reuse_sha256": file_sha256(c_outcome_path),
         "pilot_C_outcome_reuse": progress["pilot_C_outcome_reuse"],
         "pilot_C_outcome_reuse_sha256": progress["pilot_C_outcome_reuse_sha256"],
+        "completed_training_reuse": progress.get("pilot_completed_training_reuse"),
+        "completed_training_reuse_sha256": progress.get("pilot_completed_training_reuse_sha256"),
+        "clock_reconciliation": progress.get("clock_reconciliation"),
+        "clock_reconciliation_sha256": progress.get("clock_reconciliation_sha256"),
         "actor_updates": progress["actor_updates"],
         "evaluation_runs": progress["evaluation_runs"],
         "baseline_verification": progress["baseline_verification"],
@@ -3115,9 +3591,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     group.add_argument("--worker", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--issue84-source", type=Path, default=os.environ.get("ISSUE84_SOURCE_DIR"))
     parser.add_argument("--resume-from", help="reuse strict completed pilot receipts from the exact registered predecessor source")
+    parser.add_argument(
+        "--reuse-completed-package",
+        help="reference the exact registered failed package's completed C/D pilot terminals without replaying them",
+    )
     args = parser.parse_args(argv)
     if args.plan:
-        print(json.dumps(pilot_plan(resume_from=args.resume_from), sort_keys=True))
+        print(json.dumps(
+            pilot_plan(resume_from=args.resume_from, reuse_completed_package=args.reuse_completed_package),
+            sort_keys=True,
+        ))
         return 0
 
     if args.issue84_source is None:
@@ -3137,7 +3620,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             _CURRENT_ROW.reset(token)
 
     identity = source_identity(require_clean=True)
-    result = run_pilot(Path(args.issue84_source), resume_from=args.resume_from)
+    result = run_pilot(
+        Path(args.issue84_source), resume_from=args.resume_from,
+        reuse_completed_package=args.reuse_completed_package,
+    )
     print(json.dumps(result, sort_keys=True))
     return 0
 

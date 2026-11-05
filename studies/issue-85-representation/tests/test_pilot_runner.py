@@ -732,9 +732,46 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(plan["pilot_game_executions"], 172)
         self.assertEqual(plan["formal_games"], 0)
 
+    def test_completed_package_plan_carries_forward_terminal_C_and_D_without_replaying_them(self):
+        plan = pilot_runner.pilot_plan(
+            resume_from=pilot_runner.PILOT_RESUME_PREDECESSOR_SHA,
+            reuse_completed_package=pilot_runner.PILOT_COMPLETED_TRAINING_CARRY_FORWARD_SHA,
+        )
+
+        self.assertEqual(plan["planned_reused_predecessor_training_receipts"], 48)
+        self.assertEqual(plan["planned_reused_completed_package_training_receipts"], 28)
+        self.assertEqual(plan["planned_reused_C_training_receipts"], 16)
+        self.assertEqual(plan["planned_reused_D_training_receipts"], 16)
+        self.assertEqual(plan["planned_reused_predecessor_actor_updates"], 2)
+        self.assertEqual(plan["new_training_game_slots_before_retries"], 32)
+        self.assertEqual(plan["new_evaluation_game_slots_before_retries"], 112)
+        self.assertEqual(plan["new_game_slots_before_retries"], 144)
+        self.assertEqual(plan["pilot_game_executions"], 144)
+        self.assertEqual(plan["unique_pilot_game_outcomes"], 192)
+        self.assertEqual(plan["formal_games"], 0)
+
+        with self.assertRaisesRegex(ValueError, "requires the registered pilot predecessor"):
+            pilot_runner.pilot_plan(
+                reuse_completed_package=pilot_runner.PILOT_COMPLETED_TRAINING_CARRY_FORWARD_SHA,
+            )
+
     def test_plan_rejects_unregistered_predecessor(self):
         with self.assertRaisesRegex(ValueError, "unregistered predecessor source"):
             pilot_runner.pilot_plan(resume_from="a" * 40)
+
+    def test_recorded_completed_package_handles_fresh_and_carried_progress(self):
+        self.assertIsNone(pilot_runner._recorded_completed_package({}))
+        self.assertIsNone(pilot_runner._recorded_completed_package({"pilot_completed_training_reuse": None}))
+        self.assertEqual(
+            pilot_runner._recorded_completed_package({
+                "pilot_completed_training_reuse": {
+                    "predecessor_package_commit": pilot_runner.PILOT_COMPLETED_TRAINING_CARRY_FORWARD_SHA,
+                },
+            }),
+            pilot_runner.PILOT_COMPLETED_TRAINING_CARRY_FORWARD_SHA,
+        )
+        with self.assertRaisesRegex(RuntimeError, "malformed completed-package"):
+            pilot_runner._recorded_completed_package({"pilot_completed_training_reuse": "bad"})
 
     def test_predecessor_reuse_allows_only_reviewed_runner_api_and_public_schema_repairs(self):
         approved_paths = (
@@ -794,6 +831,17 @@ class PilotRunnerTests(unittest.TestCase):
         pilot_runner._validate_b_actor_update_carry_forward_source_diff(approved_paths)
         with self.assertRaisesRegex(RuntimeError, "B actor-update carry-forward"):
             pilot_runner._validate_b_actor_update_carry_forward_source_diff(
+                (*approved_paths, "studies/issue-85-representation/contract.json"),
+            )
+
+    def test_completed_package_reuse_only_allows_the_reviewed_fold_runner_repair(self):
+        approved_paths = (
+            "studies/issue-85-representation/pilot_runner.py",
+            "studies/issue-85-representation/tests/test_pilot_runner.py",
+        )
+        pilot_runner._validate_completed_package_reuse_source_diff(approved_paths)
+        with self.assertRaisesRegex(RuntimeError, "completed Issue 85 training reuse"):
+            pilot_runner._validate_completed_package_reuse_source_diff(
                 (*approved_paths, "studies/issue-85-representation/contract.json"),
             )
 
