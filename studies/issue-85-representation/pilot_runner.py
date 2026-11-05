@@ -2093,6 +2093,73 @@ def _load_checkpoint(model_module: Any, checkpoint: Path, expected_sha: str, exp
     return actor
 
 
+def _install_issue85_pilot_parent_evaluation_compat(executor, issue84_driver) -> None:
+    """Dispatch pilot PARENT through #73's supported BRANCH arm without relabeling it.
+
+    PARENT is the frozen pi12 policy, not a #73 study arm. Keep the original
+    row in the pilot context for exact pi12 model loading and change only the
+    transient executor dispatch label required by the pinned #73 controller.
+    """
+    if getattr(executor, "_issue85_pilot_parent_evaluation_compat_installed", False):
+        return
+    original_worker_owner = executor._worker_owner
+    original_arm_context = getattr(issue84_driver, "_ISSUE84_HELDOUT_ORIGINAL_ARM", None)
+    original_group_context = getattr(issue84_driver, "_ISSUE84_HELDOUT_ORIGINAL_GROUP", None)
+    if not all(
+        hasattr(context, method)
+        for context in (original_arm_context, original_group_context)
+        for method in ("set", "reset")
+    ):
+        raise RuntimeError("pinned Issue 84 driver lacks its reviewed held-out dispatch context")
+
+    def worker_owner_with_parent_pilot_compat(job, ledger):
+        if not isinstance(job, Mapping):
+            return original_worker_owner(job, ledger)
+        row = job.get("row")
+        if (
+            job.get("pilot") is not True
+            or job.get("phase") != "evaluation"
+            or not isinstance(row, Mapping)
+            or row.get("phase") != "evaluation"
+            or row.get("arm") != "PARENT"
+        ):
+            return original_worker_owner(job, ledger)
+        if (
+            row.get("issue84_arm") is not None
+            or row.get("issue84_policy_label") != "pi12"
+            or row.get("issue85_arm") is not None
+        ):
+            raise RuntimeError("Issue 85 pilot PARENT evaluation row is not bound to the frozen pi12 policy")
+
+        dispatch_job = dict(job)
+        dispatch_row = dict(row)
+        dispatch_row["arm"] = "BRANCH"
+        dispatch_job["row"] = dispatch_row
+        arm_token = original_arm_context.set(None)
+        group_token = original_group_context.set("PARENT")
+        row_token = _CURRENT_ROW.set(row)
+        try:
+            result = original_worker_owner(dispatch_job, ledger)
+        finally:
+            _CURRENT_ROW.reset(row_token)
+            original_group_context.reset(group_token)
+            original_arm_context.reset(arm_token)
+
+        if (
+            not isinstance(result, dict)
+            or result.get("status") != "SUCCEEDED"
+            or result.get("unit_id") != row.get("unit_id")
+            or result.get("arm") != "BRANCH"
+        ):
+            raise RuntimeError("Issue 85 pilot PARENT compatibility changed the dispatched unit identity")
+        result = dict(result)
+        result["arm"] = "PARENT"
+        return result
+
+    executor._worker_owner = worker_owner_with_parent_pilot_compat
+    executor._issue85_pilot_parent_evaluation_compat_installed = True
+
+
 def _configure_runtime(issue84_root: Path, pilot_root: Path, identity: Mapping[str, str]) -> tuple[Any, Any]:
     issue84_driver = _load_issue84_driver(issue84_root)
     issue84_identity = issue84_driver.verify_source_lock(require_clean_worktree=True)
@@ -2135,6 +2202,7 @@ def _configure_runtime(issue84_root: Path, pilot_root: Path, identity: Mapping[s
             runtime, executor, gradients, arm_type=Issue85Arm,
             payload_builder=new_path_projection,
         )
+        _install_issue85_pilot_parent_evaluation_compat(executor, issue84_driver)
         original_load_model = executor._load_model
         parent_lock = LOCK["baseline_P"]
         baseline_lock = LOCK["baseline_A"]

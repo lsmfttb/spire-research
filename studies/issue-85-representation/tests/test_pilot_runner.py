@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextvars import ContextVar
 import io
 import json
 import tempfile
@@ -255,6 +256,58 @@ class PilotRunnerTests(unittest.TestCase):
         )
         self.assertTrue(all(row["issue84_policy_label"] == "pi12" for row in training))
         self.assertTrue(all(row["phase"] != "formal" for row in rows))
+
+    def test_pilot_parent_evaluation_dispatch_uses_branch_but_retains_parent_identity(self):
+        parent_arm = ContextVar("test_parent_arm", default="unset")
+        parent_group = ContextVar("test_parent_group", default="unset")
+        calls = []
+
+        def worker_owner(job, ledger):
+            row = job["row"]
+            calls.append({
+                "job": job,
+                "current_row": pilot_runner._CURRENT_ROW.get(),
+                "parent_arm": parent_arm.get(),
+                "parent_group": parent_group.get(),
+            })
+            return {"status": "SUCCEEDED", "unit_id": row["unit_id"], "arm": row["arm"]}
+
+        executor = SimpleNamespace(_worker_owner=worker_owner)
+        issue84_driver = SimpleNamespace(
+            _ISSUE84_HELDOUT_ORIGINAL_ARM=parent_arm,
+            _ISSUE84_HELDOUT_ORIGINAL_GROUP=parent_group,
+        )
+        pilot_runner._install_issue85_pilot_parent_evaluation_compat(executor, issue84_driver)
+        row = {
+            "unit_id": "PILOT-EVAL:8530001:PARENT",
+            "phase": "evaluation",
+            "arm": "PARENT",
+            "issue84_arm": None,
+            "issue84_policy_label": "pi12",
+        }
+        job = {"pilot": True, "phase": "evaluation", "row": row}
+        current_row_token = pilot_runner._CURRENT_ROW.set(row)
+        try:
+            result = executor._worker_owner(job, object())
+        finally:
+            pilot_runner._CURRENT_ROW.reset(current_row_token)
+
+        self.assertEqual(calls[0]["job"]["row"]["arm"], "BRANCH")
+        self.assertIs(calls[0]["current_row"], row)
+        self.assertIsNone(calls[0]["parent_arm"])
+        self.assertEqual(calls[0]["parent_group"], "PARENT")
+        self.assertEqual(row["arm"], "PARENT")
+        self.assertEqual(job["row"]["arm"], "PARENT")
+        self.assertEqual(result["unit_id"], row["unit_id"])
+        self.assertEqual(result["arm"], "PARENT")
+        self.assertEqual(parent_arm.get(), "unset")
+        self.assertEqual(parent_group.get(), "unset")
+
+        other_row = {**row, "unit_id": "PILOT-EVAL:8530001:A", "arm": "A"}
+        other_job = {"pilot": True, "phase": "evaluation", "row": other_row}
+        other_result = executor._worker_owner(other_job, object())
+        self.assertIs(calls[1]["job"], other_job)
+        self.assertEqual(other_result["arm"], "A")
 
     def test_policy_and_search_rng_are_arm_specific_and_stable(self):
         first = pilot_runner.build_seed_rows(FakeBackend)["rows"]
