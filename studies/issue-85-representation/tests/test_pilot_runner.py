@@ -7,6 +7,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 import pilot_runner
 
@@ -245,6 +246,75 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(summary["attempt_count_by_owner"][row["unit_id"]], 4)
         self.assertEqual(len(summary["failed_attempts"]), 1)
         self.assertEqual(len(summary["incomplete_attempts"]), 1)
+
+    def test_carried_c_failure_has_only_one_new_attempt_under_owner_cap(self):
+        class Backend:
+            CONCURRENCY = 1
+            PINNED_PYTHON = Path("/pinned/python")
+            REPO = Path("/repo")
+
+            @staticmethod
+            def unit_key(unit_id):
+                return unit_id
+
+            @staticmethod
+            def source_lock_sha():
+                return "source-lock"
+
+            @staticmethod
+            def write_json_once(path, value):
+                with Path(path).open("x", encoding="utf-8") as handle:
+                    json.dump(value, handle)
+
+        class FailedWorker:
+            pid = 12345
+
+            @staticmethod
+            def poll():
+                return 1
+
+        unit_id = "PILOT-TRAIN:C:8530001"
+        rows = [{"unit_id": unit_id, "phase": "training", "arm": "C", "owner_seed": 8530001}]
+        snapshots = []
+        with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
+            "os.environ",
+            {
+                "STS_LIGHTSPEED_SOURCE_DIR": "/locked/sts_lightspeed",
+                "STSRL_SOURCE_DIR": "/locked/spire-research",
+                "ISSUE84_SOURCE_DIR": "/locked/issue84",
+                "ISSUE85_PILOT_ROOT": "/pilot",
+            },
+        ), mock.patch.object(pilot_runner.subprocess, "Popen", return_value=FailedWorker()) as popen:
+            result = pilot_runner.run_units_bounded(
+                Backend(), rows, root=Path(directory), clock=None,
+                package_commit="commit", progress_callback=snapshots.append,
+                initial_attempt_count_by_owner={unit_id: 1},
+            )
+            attempt_names = sorted(
+                path.name for path in (Path(directory) / "units" / unit_id).glob("attempt-*")
+            )
+
+        self.assertEqual(attempt_names, ["attempt-0002"])
+        self.assertEqual(popen.call_count, 1)
+        self.assertEqual(result["status"], "OWNER_RETRY_LIMIT_REACHED")
+        self.assertEqual(result["tries"][unit_id], 1)
+        self.assertEqual(result["carried_attempt_count_by_owner"], {unit_id: 1})
+        self.assertEqual(snapshots[-1]["carried_attempt_counts"], {unit_id: 1})
+
+    def test_ten_carried_c_failures_bind_one_prior_attempt_to_each_owner(self):
+        rows = [
+            row for row in pilot_runner.build_seed_rows(FakeBackend)["rows"]
+            if row["phase"] == "training" and row["issue85_arm"] == "C"
+        ]
+        carried_ids = [str(row["unit_id"]) for row in rows[:10]]
+
+        offsets = pilot_runner._carried_c_attempt_counts(
+            rows,
+            {"prior_C_failed_attempts": [{"unit_id": unit_id} for unit_id in carried_ids]},
+        )
+
+        self.assertEqual(offsets, {unit_id: 1 for unit_id in carried_ids})
+        self.assertEqual(len(offsets), 10)
 
     def test_resumed_stage_clock_includes_active_tail_since_last_snapshot(self):
         progress = {
@@ -671,6 +741,13 @@ class PilotRunnerTests(unittest.TestCase):
             }
             for policy in pilot_runner.POLICIES
         }
+        carried_c_ids = [f"PILOT-TRAIN:C:{owner}" for owner in pilot_runner.PILOT_OWNERS[:10]]
+        training["C"]["attempt_count_by_owner"] = {
+            f"PILOT-TRAIN:C:{owner}": 1 for owner in pilot_runner.PILOT_OWNERS
+        }
+        training["C"]["attempt_count_by_owner"][carried_c_ids[0]] = 2
+        training["C"]["failed_attempts"] = [{"unit_id": carried_c_ids[0], "failure": "new source retry"}]
+        training["C"]["carried_attempt_count_by_owner"] = {unit_id: 1 for unit_id in carried_c_ids}
         updates = {arm: {"elapsed_seconds": 5.0} for arm in pilot_runner.NEW_ARMS}
         forecast = pilot_runner._forecast({
             "training_runs": training,
@@ -680,6 +757,9 @@ class PilotRunnerTests(unittest.TestCase):
             "source_lock_sha256": "lock",
             "package_commit": "commit",
             "concurrency": 8,
+            "actor_update_reuse": {
+                "prior_C_failed_attempts": [{"unit_id": unit_id} for unit_id in carried_c_ids],
+            },
         })
 
         self.assertEqual(forecast["status"], "PARTIAL_COMPONENT_PROJECTION_NOT_AN_ALL_IN_ESTIMATE_OR_CAP")
@@ -690,7 +770,9 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(forecast["pilot_plus_projected_games_and_actor_updates_active_wall_seconds"], 6963.0)
         self.assertIsNone(forecast["all_in_study_wall_estimate_seconds"])
         self.assertIn("independent Reviewer review and Planner disposition", forecast["unmeasured_required_work"])
-        self.assertEqual(forecast["pilot_total_attempt_count"], 192)
+        self.assertEqual(forecast["carried_prior_C_attempt_count"], 10)
+        self.assertEqual(forecast["pilot_failed_attempt_count"], 11)
+        self.assertEqual(forecast["pilot_total_attempt_count"], 203)
 
 
 if __name__ == "__main__":

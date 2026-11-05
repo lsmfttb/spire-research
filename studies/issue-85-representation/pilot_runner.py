@@ -161,6 +161,35 @@ def failure_disposition(attempt_number: int, consecutive_failures: int) -> str:
     return "RETRY_ONCE"
 
 
+def _effective_attempt_count(carried_attempt_count: int, package_attempt_count: int) -> int:
+    counts = (carried_attempt_count, package_attempt_count)
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in counts):
+        raise ValueError("pilot owner attempt counts must be nonnegative integers")
+    return sum(counts)
+
+
+def _next_attempt_number(carried_attempt_count: int, package_attempt_count: int) -> int:
+    return _effective_attempt_count(carried_attempt_count, package_attempt_count) + 1
+
+
+def _carried_c_attempt_counts(
+    rows: Sequence[Mapping[str, Any]], actor_update_reuse: Mapping[str, Any],
+) -> dict[str, int]:
+    failures = actor_update_reuse.get("prior_C_failed_attempts")
+    if not isinstance(failures, list) or len(failures) != 10:
+        raise RuntimeError("Issue 85 C continuation must carry exactly ten verified prior failed attempts")
+    row_ids = {str(row["unit_id"]) for row in rows}
+    failed_ids = [str(item.get("unit_id", "")) for item in failures if isinstance(item, Mapping)]
+    if (
+        len(failed_ids) != len(failures)
+        or any(not unit_id for unit_id in failed_ids)
+        or len(set(failed_ids)) != len(failed_ids)
+        or not set(failed_ids).issubset(row_ids)
+    ):
+        raise RuntimeError("carried Issue 85 C failures do not bind uniquely to the current owner rows")
+    return {unit_id: 1 for unit_id in failed_ids}
+
+
 def trailing_failure_streak(events: Sequence[tuple[str, float, str]]) -> int:
     streak = 0
     for _finished_utc, _finished_monotonic, status in sorted(events):
@@ -279,6 +308,7 @@ def summarize_stage(result: Mapping[str, Any], rows: Sequence[Mapping[str, Any]]
         "successful_completions": len(completed_ids),
         "incomplete": sorted(str(row["unit_id"]) for row in rows if row["unit_id"] not in results),
         "attempt_count_by_owner": dict(result.get("tries", {})),
+        "carried_attempt_count_by_owner": dict(result.get("carried_attempt_count_by_owner", {})),
         "failed_attempts": list(result.get("failed_attempts", [])),
         "incomplete_attempts": list(result.get("incomplete_attempts", [])),
         "elapsed_seconds": float(result.get("elapsed_seconds", 0.0)),
@@ -982,6 +1012,7 @@ def run_units_bounded(
     clock: Any,
     package_commit: str,
     progress_callback: Any | None = None,
+    initial_attempt_count_by_owner: Mapping[str, int] | None = None,
 ) -> dict[str, Any]:
     """Use the locked #84 worker with one retry, then stop on repeated failures.
 
@@ -991,6 +1022,18 @@ def run_units_bounded(
     """
     started = time.monotonic()
     pending = list(rows)
+    row_ids = [str(row["unit_id"]) for row in rows]
+    if len(set(row_ids)) != len(row_ids):
+        raise ValueError("pilot stage rows contain duplicate unit IDs")
+    carried_attempt_counts = {
+        str(unit_id): count
+        for unit_id, count in (initial_attempt_count_by_owner or {}).items()
+    }
+    if not set(carried_attempt_counts).issubset(set(row_ids)) or any(
+        isinstance(value, bool) or not isinstance(value, int) or value < 0
+        for value in carried_attempt_counts.values()
+    ):
+        raise ValueError("carried pilot attempt counts must be nonnegative integers for current owner rows")
     active: dict[str, tuple[Any, Any, dict[str, Any], float]] = {}
     complete: dict[str, dict[str, Any]] = {}
     failed_attempts: list[dict[str, Any]] = []
@@ -1118,6 +1161,7 @@ def run_units_bounded(
                 str(row["unit_id"]): len(list((root / "units" / backend.unit_key(row["unit_id"])).glob("attempt-*")))
                 for row in rows
             },
+            "carried_attempt_counts": dict(carried_attempt_counts),
             "failed_attempt_count": len(failed_attempts),
             "recent_failures": failed_attempts[-5:],
             "incomplete_attempt_count": len(incomplete_attempts),
@@ -1198,7 +1242,9 @@ def run_units_bounded(
             if prior_record is not None:
                 complete[row["unit_id"]] = prior_record[0]
                 continue
-            attempt_number = len(prior_attempts) + 1
+            attempt_number = _next_attempt_number(
+                carried_attempt_counts.get(str(row["unit_id"]), 0), len(prior_attempts),
+            )
             if attempt_number > MAX_ATTEMPTS_PER_OWNER:
                 stop_reason = "RETRY_LIMIT_ALREADY_REACHED"
                 pending.insert(0, row)
@@ -1270,7 +1316,10 @@ def run_units_bounded(
                 })
                 consecutive_failures += 1
                 base = root / "units" / backend.unit_key(row["unit_id"])
-                attempt_number = len(list(base.glob("attempt-*")))
+                attempt_number = _effective_attempt_count(
+                    carried_attempt_counts.get(str(row["unit_id"]), 0),
+                    len(list(base.glob("attempt-*"))),
+                )
                 disposition = failure_disposition(attempt_number, consecutive_failures)
                 if disposition == "STOP_REPEATED_FAILURES":
                     stop_reason = "REPEATED_FAILED_ATTEMPTS"
@@ -1319,6 +1368,7 @@ def run_units_bounded(
         "row_wall_seconds": row_wall,
         "native_wall_seconds_by_unit": native_wall,
         "tries": tries,
+        "carried_attempt_count_by_owner": dict(carried_attempt_counts),
     }
 
 
@@ -2133,6 +2183,28 @@ def _forecast(progress: Mapping[str, Any]) -> dict[str, Any]:
     actor_estimate = sum(float(updates[arm]["elapsed_seconds"]) * 8 * (32 / len(PILOT_OWNERS)) for arm in NEW_ARMS)
     game_projection = train_estimate + eval_estimate
     formal_component_projection = game_projection + actor_estimate
+    actor_update_reuse = progress.get("actor_update_reuse", {})
+    carried_c_failures = actor_update_reuse.get("prior_C_failed_attempts", [])
+    if not isinstance(carried_c_failures, list):
+        raise RuntimeError("pilot forecast cannot count malformed carried C failure records")
+    carried_c_failure_ids = [
+        str(item.get("unit_id", "")) for item in carried_c_failures if isinstance(item, Mapping)
+    ]
+    if (
+        len(carried_c_failure_ids) != len(carried_c_failures)
+        or any(not unit_id for unit_id in carried_c_failure_ids)
+        or len(set(carried_c_failure_ids)) != len(carried_c_failure_ids)
+    ):
+        raise RuntimeError("pilot forecast cannot count unbound or duplicate carried C failures")
+    carried_attempt_count = len(carried_c_failure_ids)
+    if carried_attempt_count:
+        c_run = training["C"]
+        c_attempt_counts = c_run.get("attempt_count_by_owner", {})
+        if not set(carried_c_failure_ids).issubset(set(c_attempt_counts)):
+            raise RuntimeError("pilot forecast carried C failures do not match the C training owner ledger")
+        c_carried_counts = c_run.get("carried_attempt_count_by_owner", {})
+        if c_carried_counts != {unit_id: 1 for unit_id in carried_c_failure_ids}:
+            raise RuntimeError("pilot forecast C attempt offsets differ from the immutable carry-forward manifest")
     return {
         "schema_id": "issue85-pilot-formal-wall-forecast-v1",
         "status": "PARTIAL_COMPONENT_PROJECTION_NOT_AN_ALL_IN_ESTIMATE_OR_CAP",
@@ -2156,8 +2228,9 @@ def _forecast(progress: Mapping[str, Any]) -> dict[str, Any]:
         ],
         "all_in_study_wall_estimate_seconds": None,
         "all_in_estimate_status": "UNKNOWN_UNTIL_UNMEASURED_REQUIRED_WORK_IS_ESTIMATED",
-        "pilot_failed_attempt_count": sum(len(item.get("failed_attempts", [])) for group in (training, evaluation) for item in group.values()),
-        "pilot_total_attempt_count": sum(sum(int(value) for value in item.get("attempt_count_by_owner", {}).values()) for group in (training, evaluation) for item in group.values()),
+        "carried_prior_C_attempt_count": carried_attempt_count,
+        "pilot_failed_attempt_count": carried_attempt_count + sum(len(item.get("failed_attempts", [])) for group in (training, evaluation) for item in group.values()),
+        "pilot_total_attempt_count": carried_attempt_count + sum(sum(int(value) for value in item.get("attempt_count_by_owner", {}).values()) for group in (training, evaluation) for item in group.values()),
         "projection_components": ["formal training game groups", "formal evaluation game groups", "formal actor-update work"],
         "pilot_batch_size_limitation": "training estimate scales the 16-owner pilot update to the registered 32-owner minibatch; this is an explicit linear cost assumption, not an equivalence result",
         "pilot_concurrency_limitation": "projection assumes the registered formal run uses the same measured concurrency and resource availability as this pilot",
@@ -2499,9 +2572,11 @@ def run_pilot(issue84_source: Path, *, resume_from: str | None = None) -> dict[s
             if not training_complete:
                 preserve_stage_summary("training-games", arm, prior_training)
                 stage_clock_start, stage_base, record_live_stage = start_game_stage("training-games", arm, rows)
+                attempt_offsets = _carried_c_attempt_counts(rows, actor_reuse_document) if arm == "C" else {}
                 result = run_units_bounded(
                     backend, rows, root=root, clock=clock,
                     package_commit=identity["package_commit"], progress_callback=record_live_stage,
+                    initial_attempt_count_by_owner=attempt_offsets,
                 )
                 summary = summarize_stage(result, rows)
                 summary = stage_summary_with_cumulative_wall(
