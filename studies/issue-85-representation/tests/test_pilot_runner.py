@@ -257,7 +257,7 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertTrue(all(row["issue84_policy_label"] == "pi12" for row in training))
         self.assertTrue(all(row["phase"] != "formal" for row in rows))
 
-    def test_pilot_parent_evaluation_dispatch_uses_branch_but_retains_parent_identity(self):
+    def test_pilot_evaluation_dispatch_uses_branch_but_retains_registered_policy_identity(self):
         parent_arm = ContextVar("test_parent_arm", default="unset")
         parent_group = ContextVar("test_parent_group", default="unset")
         calls = []
@@ -277,37 +277,41 @@ class PilotRunnerTests(unittest.TestCase):
             _ISSUE84_HELDOUT_ORIGINAL_ARM=parent_arm,
             _ISSUE84_HELDOUT_ORIGINAL_GROUP=parent_group,
         )
-        pilot_runner._install_issue85_pilot_parent_evaluation_compat(executor, issue84_driver)
-        row = {
-            "unit_id": "PILOT-EVAL:8530001:PARENT",
-            "phase": "evaluation",
-            "arm": "PARENT",
-            "issue84_arm": None,
-            "issue84_policy_label": "pi12",
-        }
-        job = {"pilot": True, "phase": "evaluation", "row": row}
-        current_row_token = pilot_runner._CURRENT_ROW.set(row)
-        try:
-            result = executor._worker_owner(job, object())
-        finally:
-            pilot_runner._CURRENT_ROW.reset(current_row_token)
+        pilot_runner._install_issue85_pilot_evaluation_dispatch_compat(executor, issue84_driver)
+        for policy in pilot_runner.POLICIES:
+            row = {
+                "unit_id": f"PILOT-EVAL:8530001:{policy}",
+                "phase": "evaluation",
+                "arm": policy,
+                "issue84_arm": None if policy == "PARENT" else policy,
+                "issue84_policy_label": "pi12" if policy == "PARENT" else "pi20",
+            }
+            if policy in pilot_runner.NEW_ARMS:
+                row["issue85_arm"] = policy
+            job = {"pilot": True, "phase": "evaluation", "row": row}
+            current_row_token = pilot_runner._CURRENT_ROW.set(row)
+            try:
+                result = executor._worker_owner(job, object())
+            finally:
+                pilot_runner._CURRENT_ROW.reset(current_row_token)
 
-        self.assertEqual(calls[0]["job"]["row"]["arm"], "BRANCH")
-        self.assertIs(calls[0]["current_row"], row)
-        self.assertIsNone(calls[0]["parent_arm"])
-        self.assertEqual(calls[0]["parent_group"], "PARENT")
-        self.assertEqual(row["arm"], "PARENT")
-        self.assertEqual(job["row"]["arm"], "PARENT")
-        self.assertEqual(result["unit_id"], row["unit_id"])
-        self.assertEqual(result["arm"], "PARENT")
+            call = calls[-1]
+            self.assertEqual(call["job"]["row"]["arm"], "BRANCH")
+            self.assertIs(call["current_row"], row)
+            self.assertEqual(call["parent_arm"], row["issue84_arm"])
+            self.assertEqual(call["parent_group"], policy)
+            self.assertEqual(row["arm"], policy)
+            self.assertEqual(job["row"]["arm"], policy)
+            self.assertEqual(result["unit_id"], row["unit_id"])
+            self.assertEqual(result["arm"], policy)
         self.assertEqual(parent_arm.get(), "unset")
         self.assertEqual(parent_group.get(), "unset")
 
-        other_row = {**row, "unit_id": "PILOT-EVAL:8530001:A", "arm": "A"}
-        other_job = {"pilot": True, "phase": "evaluation", "row": other_row}
+        other_row = {"unit_id": "TRAIN:8530001:B", "phase": "training", "arm": "TRAIN"}
+        other_job = {"pilot": True, "phase": "training", "row": other_row}
         other_result = executor._worker_owner(other_job, object())
-        self.assertIs(calls[1]["job"], other_job)
-        self.assertEqual(other_result["arm"], "A")
+        self.assertIs(calls[-1]["job"], other_job)
+        self.assertEqual(other_result["arm"], "TRAIN")
 
     def test_policy_and_search_rng_are_arm_specific_and_stable(self):
         first = pilot_runner.build_seed_rows(FakeBackend)["rows"]
@@ -990,7 +994,7 @@ class PilotRunnerTests(unittest.TestCase):
             "studies/issue-85-representation/tests/test_pilot_runner.py",
         )
         pilot_runner._validate_resume_progress_source_diff(approved_paths)
-        with self.assertRaisesRegex(RuntimeError, "PARENT dispatch repair"):
+        with self.assertRaisesRegex(RuntimeError, "evaluation-dispatch repair"):
             pilot_runner._validate_resume_progress_source_diff(
                 (*approved_paths, "studies/issue-85-representation/contract.json"),
             )
@@ -1033,6 +1037,46 @@ class PilotRunnerTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(RuntimeError, "retained PARENT"):
                 pilot_runner._parent_failure_attempt_offsets(invalid, rows)
+
+    def test_evaluation_resume_offsets_preserve_eight_failed_policy_attempts(self):
+        rows = [
+            {"unit_id": f"PILOT-EVAL:{owner}:A"}
+            for owner in pilot_runner.PILOT_OWNERS
+        ]
+        attempted_ids = [str(row["unit_id"]) for row in rows[:8]]
+        summary = {
+            "status": "PAUSED_AFTER_FAILED_ATTEMPT",
+            "expected": len(rows),
+            "successful_completions": 0,
+            "successful_unit_ids": [],
+            "incomplete": sorted(str(row["unit_id"]) for row in rows),
+            "incomplete_attempts": [],
+            "attempt_count_by_owner": {
+                str(row["unit_id"]): int(row["unit_id"] in attempted_ids) for row in rows
+            },
+            "failed_attempts": [
+                {
+                    "unit_id": unit_id,
+                    "attempt": f"{unit_id}-attempt-0001",
+                    "failure_type": "ValueError",
+                    "failure": "unknown study arm A",
+                    "exit_code": 1,
+                }
+                for unit_id in attempted_ids
+            ],
+        }
+
+        offsets = pilot_runner._evaluation_failure_attempt_offsets(summary, rows, policy="A")
+
+        self.assertEqual(sum(offsets.values()), 8)
+        self.assertEqual({unit_id for unit_id, count in offsets.items() if count}, set(attempted_ids))
+        for invalid in (
+            {**summary, "failed_attempts": summary["failed_attempts"][:-1]},
+            {**summary, "attempt_count_by_owner": {**summary["attempt_count_by_owner"], attempted_ids[0]: 0}},
+            {**summary, "failed_attempts": [{**summary["failed_attempts"][0], "failure": "other"}, *summary["failed_attempts"][1:]]},
+        ):
+            with self.assertRaisesRegex(RuntimeError, "retained A evaluation"):
+                pilot_runner._evaluation_failure_attempt_offsets(invalid, rows, policy="A")
 
     def test_reuse_manifest_names_the_progress_snapshot_clock_value(self):
         predecessor = {
