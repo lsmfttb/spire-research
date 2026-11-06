@@ -26,6 +26,7 @@ REPO = STUDY.parents[1]
 LOCK = pilot.LOCK
 CONTRACT = pilot.CONTRACT
 DATA_ROOT = pilot.DATA_ROOT
+DATA_ROOT_WSL = pilot.DATA_ROOT_WSL
 LOCK_PATH = pilot.LOCK_PATH
 CONTRACT_PATH = pilot.CONTRACT_PATH
 NEW_ARMS = tuple(CONTRACT["registered_design_unchanged"]["new_training_arms"])

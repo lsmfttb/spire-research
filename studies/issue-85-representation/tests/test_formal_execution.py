@@ -14,6 +14,10 @@ import formal_execution
 import formal_runner
 
 
+def test_formal_runner_exports_the_locked_wsl_data_root() -> None:
+    assert formal_runner.DATA_ROOT_WSL == formal_runner.pilot.DATA_ROOT_WSL
+
+
 def _active_clock(*, elapsed: float, active_session: str | None, process_ids: list[int]) -> dict:
     return {
         "schema_id": "issue79-active-wall-clock-v1",
