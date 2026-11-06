@@ -1,5 +1,33 @@
 # Issue 85 actor input cache: offline performance and equivalence
 
+> **Current source-bound result (2026-11-06):** use the v10 addendum below for the valid uncached-baseline comparison. The earlier v6 comparison recorded a `baseline` label but did not disable the runtime input cache; its equivalence measurements remain historical evidence, but its performance ratios are not an uncached-versus-cached estimate. The v9 rerun had the same control-path defect and is also invalid for that estimate. Both raw packages are retained unchanged. No game, replay, pilot, formal training, evaluation, or TEST was run for this correction.
+
+## Source-bound uncached-versus-cached correction (v10)
+
+**Disposition:** all five arms (B–F) are bitwise equivalent at both sequential optimizer updates, and the corrected baseline/candidate costs are source-bound. This is an offline engineering measurement on the retained 16-owner B–F Pilot training traces, not policy-efficacy evidence or a formal-run authorization.
+
+- Candidate measurement source: `b5c8bc43e030449c10c30c088c4d6171dcce9033` (`codex/issue85-source-binding-20261106`).
+- Baseline runner source: `5cd70c00d03f1104728efdc4b66c764592e5acf8`; lock SHA-256 `a25c25cd4144cbe362c7c2414600e9d71f4554627c9bb129407ef69ec8366404a`.
+- Pinned Issue 84 source: `556128df66797bf979d36b56b6920ac88bab5b35`; lock SHA-256 `58ce736dbab1ac750e6e5771f644391610930ec4e9a87876f013bfd28838ef52`.
+- Durable v10 evidence: `D:\DeadlyCatCoding\stsrl-data\issue85\artifacts\performance\20261106-actor-cache-equivalence-v10-cache-control` (21 files; 1,242,280,010 bytes). The comparison JSON SHA-256 is `482e1d59f61f37286ce2f308a438ec6d189150fdb5a55f00194858105f911877`.
+- The source-binding validator independently verified both source locks, clean-commit/tree/blob identities, metric-to-snapshot digests and byte lengths, and the cache policy: baseline uncached for every arm; candidate cache absent for B and present for C–F.
+
+| Arm | Baseline two-step wall (s) | Candidate two-step wall (s) | Measured two-step ratio | Conditional 64-step block speedup | Candidate cache (MiB, 16 owners) |
+|---|---:|---:|---:|---:|---:|
+| B | 3.899 | 2.703 | 1.44× | 1.50× | 0 |
+| C | 408.046 | 202.715 | 2.01× | 53.60× | 23.51 |
+| D | 426.625 | 214.635 | 1.99× | 41.71× | 83.54 |
+| E | 7.638 | 5.347 | 1.43× | 5.36× | 23.00 |
+| F | 20.070 | 12.134 | 1.65× | 10.37× | 27.75 |
+
+The repeated cached step was 0.687 s for C, 1.864 s for D, 0.643 s for E, and 0.803 s for F; the first step includes cache construction (201.324, 211.035, 3.990, and 10.472 s, respectively). B bypasses the cache, so its measured change is a no-cache process/control observation and must not be attributed to caching. The two-step results cover only one short paired replay per arm.
+
+Across the five arms with equal weight, the measured 16-owner conditional 64-step block totals are 27,931.816 s uncached and 767.123 s cached (candidate/baseline ratio 0.02746). Applying that ratio only to the previous forecast's actor-update component gives 3.697 h rather than 134.603 h; adding the unchanged 16.297 h formal game-group projection yields a conditional 19.993 h formal core, or 29.061 h with the prior 9.068 h Pilot clock. This is a partial conditional projection: the 32-owner batch and 64-step behavior were not measured, and formal games, retry/restart variance, setup/queue time, bootstrap analysis, and human review remain outside the estimate. It is neither an all-in forecast nor a time cap.
+
+Comparison used exact equality (no tolerance) for inputs, encoded features, distributions, owner losses, total loss, gradients before/after clipping, gradient norm, model state, and optimizer state. Each arm had zero mismatches at both updates. The comparator was run with `--require-source-binding` and exited successfully. Targeted provenance tests passed (8 tests); Python compilation and `git diff --check` passed. No evidence was deleted or overwritten; no disk space was reclaimed.
+
+The sections below preserve the original v6 report and must be read as historical measurements, subject to the control-path correction above.
+
 **Candidate source commit:** `48d5d861cf944619e61be7bd54463045b707cb51` on `codex/issue85-actor-cache-optimization-20261106`.
 **Source baseline:** reviewed Issue 85 runner `5cd70c00d03f1104728efdc4b66c764592e5acf8`; `source-lock.json` SHA-256 `a25c25cd4144cbe362c7c241460e9d71f4554627c9bb129407ef69ec8366404a`.
 **Pinned Issue 84 gradient source:** `556128df66797bf979d36b56b6920ac88bab5b35`; lock SHA-256 `58ce736dbab1ac750e6e5771f644391610930ec4e9a87876f013bfd28838ef52`.
