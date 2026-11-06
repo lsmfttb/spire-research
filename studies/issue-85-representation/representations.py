@@ -320,25 +320,52 @@ class Issue85Arm(nn.Module):
             input_dimension = TOKEN_DIMENSION * 4
             self.residual = ZeroOutputResidual(input_dimension, seed)
 
-    def logits(self, legacy_features: torch.Tensor, payload: Mapping[str, Any]) -> torch.Tensor:
+    def logits(
+        self,
+        legacy_features: torch.Tensor,
+        payload: Mapping[str, Any] | None,
+        *,
+        encoded_features: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         expected_dim = WIDE_HASH_DIMENSION if self.widened else HASH_DIMENSION
         if legacy_features.ndim != 2 or legacy_features.shape[0] < 2 or legacy_features.shape[1] != expected_dim:
             raise ValueError("legacy backbone features do not match the arm's choice count/dimension")
         if not torch.isfinite(legacy_features).all():
             raise ValueError("legacy backbone features contain non-finite values")
         if self.arm == "B":
+            if encoded_features is not None:
+                raise ValueError("HASH arm does not accept a residual input tensor")
             return self.backbone.logits(legacy_features)
-        rows = _checked_payload(payload)
-        if legacy_features.shape[0] != len(rows):
-            raise ValueError("legacy and new-path candidate counts disagree")
         device = legacy_features.device
-        residual_features = self.encoder.encode(payload, device=device)
-        if residual_features.shape != (len(rows), self.residual.layers[0].in_features):
+        if encoded_features is None:
+            if payload is None:
+                raise ValueError("uncached residual scoring requires its checked semantic payload")
+            rows = _checked_payload(payload)
+            if legacy_features.shape[0] != len(rows):
+                raise ValueError("legacy and new-path candidate counts disagree")
+            residual_features = self.encoder.encode(payload, device=device)
+        else:
+            residual_features = encoded_features
+            if payload is not None:
+                rows = _checked_payload(payload)
+                if legacy_features.shape[0] != len(rows):
+                    raise ValueError("legacy and new-path candidate counts disagree")
+            if residual_features.device != device or residual_features.dtype != legacy_features.dtype:
+                raise ValueError("cached residual input has the wrong device or dtype")
+        if residual_features.shape != (legacy_features.shape[0], self.residual.layers[0].in_features):
             raise ValueError("new-path representation produced an unexpected shape")
+        if not torch.isfinite(residual_features).all():
+            raise ValueError("new-path representation contains a non-finite cached value")
         return self.backbone.logits(legacy_features) + self.residual(residual_features)
 
-    def distribution(self, legacy_features: torch.Tensor, payload: Mapping[str, Any]) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        logits = self.logits(legacy_features, payload)
+    def distribution(
+        self,
+        legacy_features: torch.Tensor,
+        payload: Mapping[str, Any] | None = None,
+        *,
+        encoded_features: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        logits = self.logits(legacy_features, payload, encoded_features=encoded_features)
         log_probabilities = torch.log_softmax(logits, dim=0)
         probabilities = torch.softmax(logits, dim=0)
         entropy = -(probabilities * log_probabilities).sum()

@@ -13,8 +13,10 @@ from contextvars import ContextVar
 from dataclasses import dataclass, replace
 import hashlib
 import json
+import time
+import weakref
 import zlib
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
 import numpy as np
 import torch
@@ -47,6 +49,213 @@ def _matrix_bytes(matrix: Any) -> tuple[np.ndarray, bytes]:
         raise ValueError("Issue 85 actor input must be a finite multi-candidate matrix")
     value = np.ascontiguousarray(value, dtype="<f4")
     return value, value.tobytes(order="C")
+
+
+@dataclass(frozen=True)
+class _CachedDecisionInput:
+    owner_seed: int
+    decision_index: int
+    source_decision: Any
+    source_fingerprint: tuple[Any, ...]
+    actor_features: torch.Tensor
+    residual_features: torch.Tensor | None
+
+
+def _decision_source_fingerprint(decision: Any, *, arm: str, widened: bool) -> tuple[Any, ...]:
+    legacy, legacy_raw = _matrix_bytes(decision.candidate_features)
+    legacy_sha = _sha256(legacy_raw)
+    recorded_legacy_sha = getattr(decision, "legacy_sha256", None)
+    if recorded_legacy_sha is not None and recorded_legacy_sha != legacy_sha:
+        raise ValueError("cached Issue 85 legacy input differs from its recorded source digest")
+    wide_sha = None
+    if widened:
+        wide, wide_raw = _matrix_bytes(getattr(decision, "wide_candidate_features", None))
+        if wide.shape != (legacy.shape[0], WIDE_HASH_DIMENSION):
+            raise ValueError("cached Issue 85 widened input has the wrong ordered-candidate shape")
+        wide_sha = _sha256(wide_raw)
+    payload_sha = None
+    if arm != "B":
+        payload = getattr(decision, "issue85_payload", None)
+        if not isinstance(payload, Mapping):
+            raise ValueError("cached Issue 85 residual input is missing its checked payload")
+        # Cache hits still fingerprint the original payload; any mutation, including
+        # adding a forbidden positional field, invalidates the prepared tensor.
+        payload_bytes = json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")
+        payload_sha = _sha256(payload_bytes)
+    identities = getattr(decision, "legal_identities", ())
+    identity_bytes = json.dumps([repr(value) for value in identities], separators=(",", ":")).encode("utf-8")
+    return (
+        legacy_sha,
+        wide_sha,
+        payload_sha,
+        int(decision.chosen_index),
+        len(legacy),
+        _sha256(identity_bytes),
+    )
+
+
+class Issue85BlockInputCache:
+    """Verified, parameter-independent decision tensors for one fixed owner block."""
+
+    def __init__(self, actor: Any, raw_block: Sequence[Any], converted_block: Sequence[Any], *, arm: str, feature_matrix):
+        from representations import _checked_payload, fold_widened_hash_features
+
+        started = time.perf_counter()
+        self.arm = str(arm).upper()
+        self.widened = bool(actor.widened)
+        self.owner_signature = tuple((int(row.owner_seed), id(row)) for row in raw_block)
+        if len(raw_block) != len(converted_block) or not raw_block:
+            raise ValueError("input cache requires the exact nonempty owner block")
+        self.device = next(actor.parameters()).device
+        self.dtype = next(actor.parameters()).dtype
+        if not self.dtype.is_floating_point:
+            raise ValueError("Issue 85 actor input cache requires a floating-point actor dtype")
+        self._inputs: dict[int, tuple[_CachedDecisionInput, ...]] = {}
+        self.tensor_bytes = 0
+        self.decision_count = 0
+        if self.arm not in ISSUE85_ARMS or str(actor.arm).upper() != self.arm:
+            raise ValueError("input cache arm does not match its registered Issue 85 actor")
+        if self.arm != "B" and actor.encoder is None:
+            raise ValueError("residual input cache requires the registered parameter-independent encoder")
+
+        gradients = __import__("gradients")
+        gradients._check_block(converted_block)
+        seen: set[int] = set()
+        with torch.no_grad():
+            for raw_owner, owner in zip(raw_block, converted_block, strict=True):
+                owner_seed = int(owner.owner_seed)
+                if int(raw_owner.owner_seed) != owner_seed or owner_seed in seen:
+                    raise ValueError("input cache owner order or identity differs from the validated block")
+                seen.add(owner_seed)
+                decisions = tuple(owner.decisions)
+                prepared: list[_CachedDecisionInput] = []
+                for decision_index, decision in enumerate(decisions):
+                    legacy_features = feature_matrix(decision)
+                    legacy, _legacy_raw = _matrix_bytes(decision.candidate_features)
+                    if legacy_features.shape != (len(decision.legal_identities), HASH_DIMENSION):
+                        raise ValueError("input cache legacy matrix lost ordered native candidate occurrences")
+                    actor_features = legacy_features
+                    if self.widened:
+                        if getattr(decision, "wide_candidate_features", None) is None:
+                            raise ValueError("widened Issue 85 cache input lacks its source-bound matrix")
+                        wide, _wide_raw = _matrix_bytes(decision.wide_candidate_features)
+                        if wide.shape != (len(decision.legal_identities), WIDE_HASH_DIMENSION):
+                            raise ValueError("widened Issue 85 cache input changed candidate order or dimension")
+                        wide_tensor = torch.as_tensor(wide, dtype=self.dtype, device=self.device)
+                        folded = fold_widened_hash_features(wide_tensor)
+                        if not torch.allclose(folded, legacy_features.to(self.device), rtol=1e-6, atol=1e-6):
+                            raise ValueError("cached widened features no longer fold to the locked legacy matrix")
+                        actor_features = wide_tensor
+                    actor_features = actor_features.detach().to(device=self.device, dtype=self.dtype).clone()
+
+                    payload = getattr(decision, "issue85_payload", None)
+                    residual_features = None
+                    if self.arm != "B":
+                        if not isinstance(payload, Mapping):
+                            raise ValueError("Issue 85 residual cache input lost its semantic payload")
+                        assert_index_free(payload)
+                        candidates = _checked_payload(payload)
+                        if len(candidates) != actor_features.shape[0]:
+                            raise ValueError("cached payload changed the ordered legal occurrence count")
+                        residual_features = actor.encoder.encode(payload, device=self.device).detach().clone()
+                        expected_shape = (actor_features.shape[0], actor.residual.layers[0].in_features)
+                        if tuple(residual_features.shape) != expected_shape or not torch.isfinite(residual_features).all():
+                            raise ValueError("cached residual tensor has an invalid shape or non-finite value")
+
+                    fingerprint = _decision_source_fingerprint(
+                        decision, arm=self.arm, widened=self.widened,
+                    )
+                    entry = _CachedDecisionInput(
+                        owner_seed=owner_seed,
+                        decision_index=decision_index,
+                        source_decision=decision,
+                        source_fingerprint=fingerprint,
+                        actor_features=actor_features,
+                        residual_features=residual_features,
+                    )
+                    prepared.append(entry)
+                    self.tensor_bytes += actor_features.numel() * actor_features.element_size()
+                    if residual_features is not None:
+                        self.tensor_bytes += residual_features.numel() * residual_features.element_size()
+                    self.decision_count += 1
+                self._inputs[owner_seed] = tuple(prepared)
+        self.preparation_wall_seconds = time.perf_counter() - started
+
+    def validate_block(self, raw_block: Sequence[Any]) -> None:
+        signature = tuple((int(row.owner_seed), id(row)) for row in raw_block)
+        if signature != self.owner_signature:
+            raise ValueError("input cache does not match this ordered owner block")
+
+    def owner_inputs(self, owner: Any) -> tuple[_CachedDecisionInput, ...]:
+        owner_seed = int(owner.owner_seed)
+        prepared = self._inputs.get(owner_seed)
+        decisions = tuple(owner.decisions)
+        if prepared is None or len(prepared) != len(decisions):
+            raise ValueError("input cache does not contain this exact owner's decision sequence")
+        for decision_index, (entry, decision) in enumerate(zip(prepared, decisions, strict=True)):
+            if (
+                entry.owner_seed != owner_seed
+                or entry.decision_index != decision_index
+                or entry.source_decision is not decision
+                or _decision_source_fingerprint(decision, arm=self.arm, widened=self.widened)
+                != entry.source_fingerprint
+            ):
+                raise ValueError("cached Issue 85 input no longer matches its source-bound occurrence")
+            if (
+                entry.actor_features.device != self.device
+                or entry.actor_features.dtype != self.dtype
+                or (
+                    entry.residual_features is not None
+                    and (entry.residual_features.device != self.device or entry.residual_features.dtype != self.dtype)
+                )
+            ):
+                raise ValueError("cached Issue 85 tensors no longer match actor device/dtype")
+        return prepared
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "arm": self.arm,
+            "owner_count": len(self._inputs),
+            "decision_count": self.decision_count,
+            "tensor_bytes": self.tensor_bytes,
+            "preparation_wall_seconds": self.preparation_wall_seconds,
+            "device": str(self.device),
+            "dtype": str(self.dtype),
+        }
+
+
+_BLOCK_INPUT_CACHES: weakref.WeakKeyDictionary[Any, Issue85BlockInputCache] = weakref.WeakKeyDictionary()
+
+
+def _cached_block_inputs(actor: Any, raw_block: Sequence[Any], converted_block: Sequence[Any], *, arm: str, feature_matrix):
+    # B has no residual encoder; its already-tensorized path is intentionally untouched.
+    if str(arm).upper() == "B":
+        return None
+    # Lightweight adapter fixtures exercise the uncached source path; only a
+    # fully constructed study actor can own the encoder/residual cache.
+    if not callable(getattr(getattr(actor, "encoder", None), "encode", None)):
+        return None
+    signature = tuple((int(row.owner_seed), id(row)) for row in raw_block)
+    cache = _BLOCK_INPUT_CACHES.get(actor)
+    actor_parameter = next(actor.parameters())
+    if (
+        cache is None
+        or cache.arm != str(arm).upper()
+        or cache.owner_signature != signature
+        or cache.device != actor_parameter.device
+        or cache.dtype != actor_parameter.dtype
+    ):
+        cache = Issue85BlockInputCache(actor, raw_block, converted_block, arm=arm, feature_matrix=feature_matrix)
+        _BLOCK_INPUT_CACHES[actor] = cache
+    cache.validate_block(raw_block)
+    return cache
+
+
+def issue85_input_cache_metrics(actor: Any) -> dict[str, Any] | None:
+    cache = _BLOCK_INPUT_CACHES.get(actor)
+    return None if cache is None else cache.summary()
 
 
 def _sha256(raw: bytes) -> str:
@@ -524,8 +733,9 @@ def install_issue85_runtime(
             raise ValueError("Issue 85 actor updates are limited to the registered B–F arms")
         if selected_arm != str(actor.arm).upper():
             raise ValueError("Issue 85 training arm does not match the actor's registered arm")
+        raw_block_examples = block_examples
         example = owner_training_outcome(example)
-        block_examples = [owner_training_outcome(row) for row in block_examples]
+        block_examples = [owner_training_outcome(row) for row in raw_block_examples]
         gradients._check_block(block_examples)
         matched = [i for i, row in enumerate(block_examples) if int(row.owner_seed) == int(example.owner_seed)]
         if not example.complete or len(matched) != 1 or float(block_examples[matched[0]].reward) != float(example.reward):
@@ -534,25 +744,49 @@ def install_issue85_runtime(
             zero = next(actor.parameters()).sum() * 0.0
             return zero, {"policy": 0.0, "entropy": 0.0, "kl": 0.0, "decision_count": 0.0}
 
+        input_cache = _cached_block_inputs(
+            actor,
+            raw_block_examples,
+            block_examples,
+            arm=selected_arm,
+            feature_matrix=gradients._feature_matrix,
+        )
+        cached_decisions = None
+        if input_cache is not None:
+            input_cache.validate_block(raw_block_examples)
+            cached_decisions = input_cache.owner_inputs(example)
+
         rewards = torch.tensor([float(row.reward) for row in block_examples], dtype=torch.float64)
         mean = float(rewards.mean().item())
         scale = max(float(rewards.std(unbiased=False).item()), 1.0)
         advantage = max(-3.0, min(3.0, (float(example.reward) - mean) / scale))
         logps = []
         entropies = []
-        for decision in example.decisions:
-            legacy = gradients._feature_matrix(decision)
-            if actor.widened:
-                if not isinstance(decision, Issue85Decision) or decision.wide_candidate_features is None:
-                    raise ValueError("widened Issue 85 training decision is missing its source-bound 8192 matrix")
-                features = torch.as_tensor(decision.wide_candidate_features, dtype=torch.float32)
-            else:
-                features = legacy
-            if not isinstance(decision, Issue85Decision):
-                raise ValueError("Issue 85 training decision lost its native semantic payload")
-            _logits, probabilities, entropy = actor.distribution(features, decision.issue85_payload or {})
-            logps.append(probabilities[int(decision.chosen_index)])
-            entropies.append(entropy)
+        if cached_decisions is None:
+            for decision in example.decisions:
+                legacy = gradients._feature_matrix(decision)
+                if actor.widened:
+                    if not isinstance(decision, Issue85Decision) or decision.wide_candidate_features is None:
+                        raise ValueError("widened Issue 85 training decision is missing its source-bound 8192 matrix")
+                    features = torch.as_tensor(decision.wide_candidate_features, dtype=torch.float32)
+                else:
+                    features = legacy
+                if not isinstance(decision, Issue85Decision):
+                    raise ValueError("Issue 85 training decision lost its native semantic payload")
+                _logits, probabilities, entropy = actor.distribution(features, decision.issue85_payload or {})
+                logps.append(probabilities[int(decision.chosen_index)])
+                entropies.append(entropy)
+        else:
+            for decision, prepared in zip(example.decisions, cached_decisions, strict=True):
+                if not isinstance(decision, Issue85Decision):
+                    raise ValueError("Issue 85 training decision lost its native semantic payload")
+                _logits, probabilities, entropy = actor.distribution(
+                    prepared.actor_features,
+                    None,
+                    encoded_features=prepared.residual_features,
+                )
+                logps.append(probabilities[int(decision.chosen_index)])
+                entropies.append(entropy)
         score_sum = torch.stack(logps).sum()
         policy_loss = -advantage * score_sum / float(gradients.T_REF)
         entropy_loss = -float(gradients.ENTROPY_COEFFICIENT) * torch.stack(entropies).mean()
@@ -565,6 +799,7 @@ def install_issue85_runtime(
         }
 
     gradients.owner_loss = owner_loss
+    gradients._issue85_input_cache_metrics = issue85_input_cache_metrics
     report = {
         "schema_id": "issue85-runtime-integration-v1",
         "pinned_upstream_source_modified": False,
