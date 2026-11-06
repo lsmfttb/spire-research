@@ -7,6 +7,7 @@ import json
 import math
 from pathlib import Path, PurePosixPath
 import random
+import re
 from typing import Any, Mapping, Sequence
 
 import formal_runner as formal
@@ -130,27 +131,27 @@ def _path_matches(saved: Any, expected: Path) -> bool:
 
 def _read_attempt(
     *, package_root: Path, policy: str, seed_row: Mapping[str, Any],
-    attempt_relative: str, package_commit: str, source_lock_sha256: str,
-    expected_model_digest: str,
+    attempt_relative: str, package_commit: str, source_lock_sha256: str, seed_table_sha256: str,
+    authorization_receipt_sha256: str, expected_model_digest: str, stage: str = "test",
 ) -> dict[str, Any]:
     attempt_dir = _safe_package_path(package_root, attempt_relative)
     relative = PurePosixPath(attempt_relative)
     if (
         len(relative.parts) != 5
-        or relative.parts[0:3] != ("test", policy, "units")
+        or relative.parts[0:3] != (stage, policy, "units")
         or not relative.parts[4].startswith("attempt-")
         or not relative.parts[4][8:].isdigit()
     ):
-        raise ValueError(f"TEST attempt path is outside its registered policy/unit tree: {attempt_relative}")
+        raise ValueError(f"{stage} attempt path is outside its registered policy/unit tree: {attempt_relative}")
     if not attempt_dir.is_dir():
-        raise ValueError(f"TEST attempt path is not a directory: {attempt_relative}")
+        raise ValueError(f"{stage} attempt path is not a directory: {attempt_relative}")
     unit_id = str(seed_row["unit_id"])
     result_path = attempt_dir / "result.json"
     job_path = attempt_dir / "worker-job.json"
     started_path = attempt_dir / "started.json"
     finished_path = attempt_dir / "finished.json"
     if not all(path.is_file() for path in (result_path, job_path, started_path, finished_path)):
-        raise ValueError(f"TEST success {unit_id} lacks its complete job/start/finish/result receipt chain")
+        raise ValueError(f"{stage} success {unit_id} lacks its complete job/start/finish/result receipt chain")
     attempts = [path for path in attempt_dir.parent.glob("attempt-*") if path.is_dir()]
     successes = []
     for candidate in attempts:
@@ -160,7 +161,7 @@ def _read_attempt(
             if record.get("status") == "SUCCEEDED":
                 successes.append(result_candidate)
     if len(successes) != 1 or successes[0].resolve() != result_path.resolve():
-        raise ValueError(f"TEST unit {unit_id} does not have exactly one successful attempt receipt")
+        raise ValueError(f"{stage} unit {unit_id} does not have exactly one successful attempt receipt")
 
     job = formal.read_json(job_path)
     started = formal.read_json(started_path)
@@ -173,19 +174,22 @@ def _read_attempt(
     if (
         job.get("schema_id") != "issue79-owner-worker-job-v1"
         or job.get("pilot") is not False
+        or job.get("formal") is not True
         or job.get("package_commit") != package_commit
         or job.get("runner_code_commit") != package_commit
         or job.get("source_lock_sha256") != source_lock_sha256
+        or job.get("seed_table_sha256") != seed_table_sha256
+        or job.get("authorization_receipt_sha256") != authorization_receipt_sha256
         or job.get("unit_id") != unit_id
         or job.get("row") != dict(seed_row)
         or job.get("phase") != "evaluation"
-        or not _path_matches(job.get("artifact_root"), package_root / "test" / policy)
+        or not _path_matches(job.get("artifact_root"), package_root / stage / policy)
         or not _path_matches(job.get("attempt_dir"), attempt_dir)
         or not _path_matches(job.get("result_path"), result_path)
         or not _path_matches(job.get("output_dir"), attempt_dir / "native")
         or job.get("run_id") != run_id
     ):
-        raise ValueError(f"TEST worker-job receipt is not bound to its frozen source/row: {unit_id}")
+        raise ValueError(f"{stage} worker-job receipt is not bound to its frozen source/row: {unit_id}")
     pid = started.get("pid")
     if (
         started.get("schema_id") != "issue79-owner-attempt-start-v1"
@@ -203,20 +207,20 @@ def _read_attempt(
         or finished.get("result_sha256") != result_sha
         or finished_mono < started_mono
     ):
-        raise ValueError(f"TEST start/finish receipt chain is inconsistent: {unit_id}")
+        raise ValueError(f"{stage} start/finish receipt chain is inconsistent: {unit_id}")
 
     resource = result.get("resource")
     if not isinstance(resource, Mapping):
-        raise ValueError(f"TEST result lacks resource accounting: {unit_id}")
+        raise ValueError(f"{stage} result lacks resource accounting: {unit_id}")
     worker_wall = _finite_number(resource.get("worker_wall_seconds"), label=f"{unit_id} worker wall", minimum=0.0)
     worker_cpu = _finite_number(resource.get("worker_process_cpu_seconds"), label=f"{unit_id} worker CPU", minimum=0.0)
     floor = result.get("terminal_floor")
     for flag in ("act2_plus", "act3_plus", "act4_reached"):
         if not isinstance(result.get(flag), bool):
-            raise ValueError(f"TEST result lacks a source-recorded Boolean {flag}: {unit_id}")
+            raise ValueError(f"{stage} result lacks a source-recorded Boolean {flag}: {unit_id}")
     heart = result.get("heart_victory")
     if not isinstance(heart, bool):
-        raise ValueError(f"TEST result has an invalid Heart-victory field: {unit_id}")
+        raise ValueError(f"{stage} result has an invalid Heart-victory field: {unit_id}")
     if (
         result.get("schema_id") != "issue75-stage1-unit-result-v1"
         or result.get("status") != "SUCCEEDED"
@@ -242,11 +246,12 @@ def _read_attempt(
         or (heart is True and not result["act4_reached"])
         or worker_wall < 0 or worker_cpu < 0
     ):
-        raise ValueError(f"TEST result is not a valid source-bound terminal for {unit_id}")
+        raise ValueError(f"{stage} result is not a valid source-bound terminal for {unit_id}")
     return {
         **result,
         "result_sha256": result_sha,
         "result_receipt_path": result_path.relative_to(package_root).as_posix(),
+        "attempt_count": len(attempts),
         "heart_win": heart is True,
         "worker_wall_seconds": worker_wall,
         "worker_process_cpu_seconds": worker_cpu,
@@ -320,17 +325,117 @@ def analyze_test_bundle(
     seed_table_sha256 = formal.file_sha256(seed_table_path)
     bundle = formal.read_json(test_bundle_path)
     expected_model_digests = {policy: str(policy_model_digests.get(policy, "")) for policy in POLICIES}
+    test_open_path = package_root / "test-open-receipt.json"
+    if not test_open_path.is_file():
+        raise ValueError("frozen TEST analysis requires a prior source/seed/validation/approval TEST-open receipt")
+    test_open = formal.read_json(test_open_path)
+    test_open_sha256 = formal.file_sha256(test_open_path)
+    validation_bindings = test_open.get("validation_group_receipts")
+    valid_issue_comment = re.compile(
+        r"https://github\.com/lsmfttb/spire-research/issues/85#issuecomment-[1-9][0-9]*"
+    )
     if (
-        bundle.get("schema_id") != "issue85-formal-test-receipts-v1"
+        test_open.get("schema_id") != "issue85-formal-test-open-v1"
+        or not str(test_open.get("status", "")).startswith("TEST_OPEN /")
+        or test_open.get("package_commit") != package_commit
+        or test_open.get("source_lock_sha256") != source_lock_sha256
+        or test_open.get("contract_sha256") != formal.file_sha256(formal.CONTRACT_PATH)
+        or test_open.get("seed_table_sha256") != seed_table_sha256
+        or test_open.get("analysis_source_sha256") != formal.file_sha256(Path(__file__).resolve())
+        or test_open.get("actor_update_schedule_sha256") != seed_table.get("actor_update_schedule_sha256")
+        or test_open.get("test_owner_range") != list(formal.CONTRACT["registered_design_unchanged"]["test"]["owners"])
+        or test_open.get("test_games_started_before_open_receipt") != 0
+        or test_open.get("validation_used_for_model_selection") is not False
+        or not isinstance(test_open.get("authorization_receipt_sha256"), str)
+        or not re.fullmatch(r"[0-9a-f]{64}", str(test_open.get("authorization_receipt_sha256", "")))
+        or not isinstance(test_open.get("owner_approval_comment_url"), str)
+        or valid_issue_comment.fullmatch(str(test_open.get("owner_approval_comment_url", ""))) is None
+        or not isinstance(test_open.get("reviewer_approval_comment_url"), str)
+        or valid_issue_comment.fullmatch(str(test_open.get("reviewer_approval_comment_url", ""))) is None
+        or not isinstance(validation_bindings, Mapping)
+        or set(validation_bindings) != set(POLICIES)
+        or any(
+            not isinstance(validation_bindings.get(policy), Mapping)
+            or validation_bindings[policy].get("completed") != 64
+            or not re.fullmatch(r"[0-9a-f]{64}", str(validation_bindings[policy].get("receipt_sha256", "")))
+            for policy in POLICIES
+        )
+        or test_open.get("test_policy_models") != expected_model_digests
+        or bundle.get("schema_id") != "issue85-formal-test-receipts-v1"
         or bundle.get("status") != "SUCCEEDED"
         or bundle.get("package_commit") != package_commit
         or bundle.get("source_lock_sha256") != source_lock_sha256
         or bundle.get("seed_table_sha256") != seed_table_sha256
+        or bundle.get("authorization_receipt_sha256") != test_open.get("authorization_receipt_sha256")
+        or bundle.get("test_open_receipt_sha256") != test_open_sha256
         or bundle.get("formal_games_started") != 2_240
         or set(bundle.get("groups", {})) != set(POLICIES)
         or any(not digest for digest in expected_model_digests.values())
     ):
         raise ValueError("formal TEST receipt bundle is not bound to the frozen seed/model/source package")
+    validation_config = formal.CONTRACT["registered_design_unchanged"]["validation"]
+    validation_owners = range(int(validation_config["owners"][0]), int(validation_config["owners"][1]) + 1)
+    validation_rows = {
+        policy: {
+            int(row["owner_seed"]): row
+            for row in seed_table["rows"]
+            if row.get("issue85_phase") == "validation" and row.get("arm") == policy
+        }
+        for policy in POLICIES
+    }
+    if any(set(validation_rows[policy]) != set(validation_owners) for policy in POLICIES):
+        raise ValueError("frozen formal validation seed table does not contain the exact disjoint 64-owner roster")
+    for policy in POLICIES:
+        binding = validation_bindings[policy]
+        validation_receipt_path = package_root / "validation" / policy / "group-receipt.json"
+        if not validation_receipt_path.is_file() or formal.file_sha256(validation_receipt_path) != binding["receipt_sha256"]:
+            raise ValueError(f"TEST-open receipt does not bind the immutable {policy} validation group receipt")
+        validation_receipt = formal.read_json(validation_receipt_path)
+        units = validation_receipt.get("units")
+        if (
+            validation_receipt.get("schema_id") != "issue85-formal-game-group-v1"
+            or validation_receipt.get("status") != "SUCCEEDED"
+            or validation_receipt.get("stage_id") != f"VALIDATION-{policy}"
+            or validation_receipt.get("package_commit") != package_commit
+            or validation_receipt.get("source_lock_sha256") != source_lock_sha256
+            or validation_receipt.get("seed_table_sha256") != seed_table_sha256
+            or validation_receipt.get("authorization_receipt_sha256") != test_open.get("authorization_receipt_sha256")
+            or validation_receipt.get("row_count") != len(validation_owners)
+            or validation_receipt.get("completed") != len(validation_owners)
+            or validation_receipt.get("model_selection_or_tuning") is not False
+            or binding.get("completed") != len(validation_owners)
+            or not isinstance(units, list) or len(units) != len(validation_owners)
+        ):
+            raise ValueError(f"formal {policy} validation receipt is incomplete, misbound, or selection-contaminated")
+        seen_validation_owners: set[int] = set()
+        for unit in units:
+            if not isinstance(unit, Mapping):
+                raise ValueError(f"formal {policy} validation receipt contains a malformed unit")
+            owner = int(unit.get("owner_seed", -1))
+            row = validation_rows[policy].get(owner)
+            if row is None or row["unit_id"] != unit.get("unit_id") or owner in seen_validation_owners:
+                raise ValueError(f"formal {policy} validation receipt has a duplicate or unregistered owner")
+            outcome = _read_attempt(
+                package_root=package_root,
+                policy=policy,
+                seed_row=row,
+                attempt_relative=str(unit.get("attempt_path", "")),
+                package_commit=package_commit,
+                source_lock_sha256=source_lock_sha256,
+                seed_table_sha256=seed_table_sha256,
+                authorization_receipt_sha256=str(test_open["authorization_receipt_sha256"]),
+                expected_model_digest=expected_model_digests[policy],
+                stage="validation",
+            )
+            if (
+                unit.get("result_sha256") != outcome["result_sha256"]
+                or unit.get("attempt_count") != outcome["attempt_count"]
+                or unit.get("model_digest") != expected_model_digests[policy]
+            ):
+                raise ValueError(f"formal {policy} validation group receipt differs from its attempt lineage for owner {owner}")
+            seen_validation_owners.add(owner)
+        if seen_validation_owners != set(validation_owners):
+            raise ValueError(f"formal {policy} validation receipt omits a registered owner")
     for policy, expected in (("PARENT", formal.LOCK["baseline_P"]["model_digest"]), ("A", formal.LOCK["baseline_A"]["model_digest"])):
         if expected_model_digests[policy] != expected:
             raise ValueError(f"TEST policy {policy} is not the exact source-locked baseline")
@@ -370,8 +475,15 @@ def analyze_test_bundle(
                 attempt_relative=str(entry.get("attempt_path", "")),
                 package_commit=package_commit,
                 source_lock_sha256=source_lock_sha256,
+                seed_table_sha256=seed_table_sha256,
+                authorization_receipt_sha256=str(test_open["authorization_receipt_sha256"]),
                 expected_model_digest=expected_model_digests[policy],
             )
+            if (
+                entry.get("result_sha256") != outcome["result_sha256"]
+                or entry.get("attempt_count") != outcome["attempt_count"]
+            ):
+                raise ValueError(f"TEST {policy} receipt manifest differs from its attempt lineage: {unit_id}")
             by_owner[owner] = outcome
         if set(by_owner) != set(owners):
             raise ValueError(f"TEST {policy} receipts omit a frozen owner")
@@ -455,6 +567,7 @@ def analyze_test_bundle(
         "source_lock_sha256": source_lock_sha256,
         "seed_table_sha256": seed_table_sha256,
         "test_receipt_bundle_sha256": formal.file_sha256(test_bundle_path),
+        "test_open_receipt_sha256": test_open_sha256,
         "analysis_code_sha256": formal.file_sha256(Path(__file__).resolve()),
         "analysis_seed": analysis_seed,
         "analysis_seed_rule": (

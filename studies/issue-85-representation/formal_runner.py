@@ -1,8 +1,8 @@
-"""Issue 85 formal cohort and source-readiness tooling.
+"""Issue 85 formal cohort, source-readiness and gated execution tooling.
 
-This entry point deliberately supports planning and preflight only. It freezes
-the registered seed table and verifies the exact source/baseline bindings, but
-contains no command that starts a formal game or actor update.
+Formal execution is available only with a source/seed-bound owner GO receipt,
+a whole-task active-wall cap, and an independent review of the exact commit.
+The registered design and the nonformal Pilot remain separate.
 """
 from __future__ import annotations
 
@@ -307,7 +307,8 @@ def formal_plan() -> dict[str, Any]:
         "schema_id": "issue85-formal-plan-v1",
         "scope": "REGISTERED_FORMAL_PLAN / NOT_STARTED",
         "execution_status": "NOT_STARTED",
-        "formal_execution_command_available": False,
+        "formal_execution_command_available": True,
+        "formal_execution_gate": "owner FORMAL_GO + numeric whole-task active-wall cap + Reviewer approval of exact commit",
         "formal_games_started": 0,
         "source_lock_sha256": file_sha256(LOCK_PATH),
         "contract_sha256": file_sha256(CONTRACT_PATH),
@@ -425,6 +426,23 @@ def build_formal_seed_table(backend: Any, identity: Mapping[str, str]) -> dict[s
         str(row["arm"]), str(row.get("issue85_arm", "")),
     ))
     plan = formal_plan()
+    actor_update_schedule = [
+        {
+            "arm": arm,
+            "block_index": block,
+            "seed": _derive_formal_seed("actor-update", arm, block),
+            "owners": [
+                train_owners.start + block * owners_per_block,
+                train_owners.start + (block + 1) * owners_per_block - 1,
+            ],
+            "owner_count": owners_per_block,
+            "updates": int(CONTRACT["training"]["updates_per_block"]),
+            "minibatch_owners": int(CONTRACT["training"]["minibatch_owners"]),
+            "sampling": "Python random.Random(seed); shuffle all 128 owners each epoch; four consecutive 32-owner minibatches per epoch",
+        }
+        for arm in NEW_ARMS
+        for block in range(len(train_owners) // owners_per_block)
+    ]
     expected_counts = {
         "training": plan["training_games"],
         "validation": plan["validation_games"],
@@ -449,6 +467,8 @@ def build_formal_seed_table(backend: Any, identity: Mapping[str, str]) -> dict[s
         "expected_games_by_phase": expected_counts,
         "row_count": len(rows),
         "rows_sha256": sha256_bytes(canonical(rows)),
+        "actor_update_schedule": actor_update_schedule,
+        "actor_update_schedule_sha256": sha256_bytes(canonical(actor_update_schedule)),
         "rows": rows,
     }
     validate_formal_seed_table(table, identity=identity)
@@ -474,6 +494,31 @@ def validate_formal_seed_table(
         raise ValueError("formal seed table rows must be a list")
     if table.get("rows_sha256") != sha256_bytes(canonical(rows)):
         raise ValueError("formal seed-table row digest differs")
+    updates = table.get("actor_update_schedule")
+    plan = formal_plan()
+    owners_per_block = int(CONTRACT["training"]["owners_per_block"])
+    expected_updates = [
+        {
+            "arm": arm,
+            "block_index": block,
+            "seed": _derive_formal_seed("actor-update", arm, block),
+            "owners": [
+                int(plan["owner_ranges"]["training"][0]) + block * owners_per_block,
+                int(plan["owner_ranges"]["training"][0]) + (block + 1) * owners_per_block - 1,
+            ],
+            "owner_count": owners_per_block,
+            "updates": int(CONTRACT["training"]["updates_per_block"]),
+            "minibatch_owners": int(CONTRACT["training"]["minibatch_owners"]),
+            "sampling": "Python random.Random(seed); shuffle all 128 owners each epoch; four consecutive 32-owner minibatches per epoch",
+        }
+        for arm in NEW_ARMS
+        for block in range(int(plan["training_blocks_per_arm"]))
+    ]
+    if (
+        updates != expected_updates
+        or table.get("actor_update_schedule_sha256") != sha256_bytes(canonical(expected_updates))
+    ):
+        raise ValueError("formal actor-update RNG schedule is not the exact registered 128/64/32 schedule")
     ranges = _registered_ranges()
     expected: dict[str, tuple[int, str, int | None]] = {}
     for arm in NEW_ARMS:
@@ -544,11 +589,7 @@ def validate_formal_seed_table(
 
 
 def _git_text(repo: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", "-C", str(repo), *args], check=True, text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-    )
-    return result.stdout.strip()
+    return baseline_preflight.git_bytes(repo, *args).decode("utf-8").strip()
 
 
 def _verify_locked_repository(root: Path, expected_commit: str, *, label: str) -> dict[str, str]:
@@ -658,8 +699,9 @@ def run_preflight(
         "formal_seed_table_sha256": table_sha,
         "formal_games_started": 0,
         "formal_cohorts_changed": False,
-        "execution_command_available": False,
-        "entrypoint_modes": ["--plan", "--preflight"],
+        "execution_command_available": True,
+        "execution_gate": "owner FORMAL_GO + numeric whole-task active-wall cap + Reviewer approval of exact commit",
+        "entrypoint_modes": ["--plan", "--preflight", "--verify-bundle", "--execute"],
     }
     report_path = readiness_root / "formal-readiness.json"
     if report_path.is_file():
@@ -674,18 +716,88 @@ def run_preflight(
     return {**report, "readiness_path": str(report_path)}
 
 
+def verify_dry_bundle(
+    *, issue84_source: Path, native_source: Path, stsr_source: Path,
+) -> dict[str, Any]:
+    """Recheck frozen source, seed and analysis receipts without creating evidence or starting work."""
+    identity = pilot.source_identity(require_clean=True)
+    issue84_root = _validate_issue84_source_for_runtime(issue84_source)
+    native_identity = _verify_native_source(native_source)
+    stsr_identity = _verify_stsr_source(stsr_source)
+    readiness_path = (
+        DATA_ROOT / "issue85" / "artifacts" / "formal-readiness"
+        / identity["package_commit"] / "formal-readiness.json"
+    )
+    package_root = DATA_ROOT / "issue85" / "artifacts" / "formal" / identity["package_commit"]
+    seed_path = package_root / "formal-seed-table.json"
+    preflight_path = package_root / "source-preflight.json"
+    if not readiness_path.is_file() or not seed_path.is_file() or not preflight_path.is_file():
+        raise RuntimeError("dry bundle check requires completed immutable source/seed preflight receipts")
+    readiness = read_json(readiness_path)
+    seed_table = read_json(seed_path)
+    preflight = read_json(preflight_path)
+    validate_formal_seed_table(seed_table, identity=identity)
+    if (
+        readiness.get("schema_id") != "issue85-formal-readiness-v1"
+        or readiness.get("package_commit") != identity["package_commit"]
+        or readiness.get("source_lock_sha256") != identity["source_lock_sha256"]
+        or readiness.get("contract_sha256") != file_sha256(CONTRACT_PATH)
+        or readiness.get("analysis_source_sha256") != file_sha256(STUDY / "formal_analysis.py")
+        or readiness.get("formal_seed_table_sha256") != file_sha256(seed_path)
+        or readiness.get("formal_games_started") != 0
+        or readiness.get("formal_cohorts_changed") is not False
+        or "NO_GO" not in str(readiness.get("whole_task_active_wall_estimate", {}).get("status", ""))
+        or preflight.get("verified") is not True
+        or readiness.get("baseline_preflight_path") != preflight_path.relative_to(DATA_ROOT).as_posix()
+        or readiness.get("baseline_preflight_sha256") != file_sha256(preflight_path)
+    ):
+        raise RuntimeError("dry bundle check found a changed source, seed, analysis, or readiness receipt")
+    cache_path = DATA_ROOT / CACHE_EQUIVALENCE_RELATIVE_PATH
+    cache = validate_cache_equivalence_report(
+        read_json(cache_path), report_sha256=file_sha256(cache_path),
+    )
+    if not cache.get("equivalence_scope", "").startswith("two sequential optimizer updates on retained 16-owner Pilot traces"):
+        raise RuntimeError("dry bundle check found a broadened cache-equivalence scope")
+    return {
+        "schema_id": "issue85-formal-dry-bundle-check-v1",
+        "status": "VERIFIED / NO GAMES OR UPDATES STARTED",
+        "package_commit": identity["package_commit"],
+        "source_lock_sha256": identity["source_lock_sha256"],
+        "contract_sha256": file_sha256(CONTRACT_PATH),
+        "readiness_sha256": file_sha256(readiness_path),
+        "seed_table_sha256": file_sha256(seed_path),
+        "actor_update_schedule_sha256": seed_table["actor_update_schedule_sha256"],
+        "analysis_source_sha256": file_sha256(STUDY / "formal_analysis.py"),
+        "issue84_source_commit": LOCK["baseline_A"]["issue84_final_accepted_source_commit"],
+        "issue84_source_root": str(issue84_root),
+        "native_source": native_identity,
+        "stsr_source": stsr_identity,
+        "cache_equivalence_evidence": cache,
+        "formal_games_started": 0,
+        "execution_authorized": False,
+        "writes_performed": False,
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--plan", action="store_true", help="print the registered formal cohorts without execution")
     modes.add_argument("--preflight", action="store_true", help="verify source bindings and freeze the formal seed table; never starts games")
+    modes.add_argument("--verify-bundle", action="store_true", help="dry-check source, seed, receipts and frozen analysis; never starts games")
+    modes.add_argument("--execute", action="store_true", help="run the registered formal study; requires exact owner GO/cap and Reviewer receipt")
+    modes.add_argument("--worker", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--issue84-source", type=Path, default=os.environ.get("ISSUE84_SOURCE_DIR"))
     parser.add_argument("--native-source", type=Path, default=os.environ.get("STS_LIGHTSPEED_SOURCE_DIR"))
     parser.add_argument("--stsr-source", type=Path, default=os.environ.get("STSRL_SOURCE_DIR"))
+    parser.add_argument("--authorization-receipt", type=Path, help="owner-supplied, source/seed-bound FORMAL_GO and numeric whole-task cap receipt")
     args = parser.parse_args(argv)
     if args.plan:
         print(json.dumps(formal_plan(), sort_keys=True))
         return 0
+    if args.worker is not None:
+        from formal_execution import worker_main
+        return worker_main(sys.modules[__name__], args.worker)
     missing = [
         name for name, value in (
             ("--issue84-source", args.issue84_source),
@@ -694,12 +806,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         ) if value is None
     ]
     if missing:
-        parser.error("--preflight requires " + ", ".join(missing) + "; no formal execution mode exists")
-    report = run_preflight(
-        issue84_source=Path(args.issue84_source),
-        native_source=Path(args.native_source),
-        stsr_source=Path(args.stsr_source),
-    )
+        parser.error("this mode requires " + ", ".join(missing))
+    if args.verify_bundle:
+        report = verify_dry_bundle(
+            issue84_source=Path(args.issue84_source),
+            native_source=Path(args.native_source),
+            stsr_source=Path(args.stsr_source),
+        )
+    elif args.preflight:
+        report = run_preflight(
+            issue84_source=Path(args.issue84_source),
+            native_source=Path(args.native_source),
+            stsr_source=Path(args.stsr_source),
+        )
+    else:
+        if args.authorization_receipt is None:
+            parser.error("--execute requires --authorization-receipt; no game or update was started")
+        from formal_execution import execute_formal
+        report = execute_formal(
+            sys.modules[__name__],
+            issue84_source=Path(args.issue84_source),
+            native_source=Path(args.native_source),
+            stsr_source=Path(args.stsr_source),
+            authorization_receipt=Path(args.authorization_receipt),
+        )
     print(json.dumps(report, sort_keys=True))
     return 0
 

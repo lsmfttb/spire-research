@@ -39,7 +39,8 @@ def test_formal_plan_uses_only_registered_disjoint_cohorts() -> None:
     assert plan["test_games"] == 2_240
     assert plan["training_blocks_per_arm"] == 8
     assert plan["formal_games_started"] == 0
-    assert plan["formal_execution_command_available"] is False
+    assert plan["formal_execution_command_available"] is True
+    assert "owner FORMAL_GO" in plan["formal_execution_gate"]
     assert len(plan["training_stage_schedule"]) == 80
     assert all(
         plan["training_stage_schedule"][index]["stage"] == "training_games"
@@ -48,6 +49,9 @@ def test_formal_plan_uses_only_registered_disjoint_cohorts() -> None:
         == plan["training_stage_schedule"][index]["stage_id"]
         for index in range(0, 80, 2)
     )
+    updates = [stage for stage in plan["training_stage_schedule"] if stage["stage"] == "actor_update"]
+    assert len(updates) == 40
+    assert all(stage["update_steps"] == 64 and stage["minibatch_owners"] == 32 for stage in updates)
     assert plan["owner_ranges"] == {
         "training": [8_400_001, 8_401_024],
         "validation": [8_510_001, 8_510_064],
@@ -223,6 +227,8 @@ def test_test_analysis_accepts_only_source_bound_success_receipt_chain(tmp_path:
     unit = "TEST:8520001:PARENT"
     commit = "c" * 40
     lock_sha = "s" * 64
+    seed_table_sha = "t" * 64
+    authorization_sha = "a" * 64
     model_digest = "m" * 64
     row = {
         "unit_id": unit,
@@ -270,9 +276,12 @@ def test_test_analysis_accepts_only_source_bound_success_receipt_chain(tmp_path:
     _write_receipt(attempt / "worker-job.json", {
         "schema_id": "issue79-owner-worker-job-v1",
         "pilot": False,
+        "formal": True,
         "package_commit": commit,
         "runner_code_commit": commit,
         "source_lock_sha256": lock_sha,
+        "seed_table_sha256": seed_table_sha,
+        "authorization_receipt_sha256": authorization_sha,
         "unit_id": unit,
         "row": row,
         "phase": "evaluation",
@@ -309,11 +318,32 @@ def test_test_analysis_accepts_only_source_bound_success_receipt_chain(tmp_path:
         attempt_relative="test/PARENT/units/unit-8520001/attempt-0001",
         package_commit=commit,
         source_lock_sha256=lock_sha,
+        seed_table_sha256=seed_table_sha,
+        authorization_receipt_sha256=authorization_sha,
         expected_model_digest=model_digest,
     )
     assert outcome["terminal_floor"] == 16
     assert outcome["heart_win"] is True
     assert outcome["worker_wall_seconds"] == 6.0
+
+    job_path = attempt / "worker-job.json"
+    job = formal_runner.read_json(job_path)
+    job["authorization_receipt_sha256"] = "b" * 64
+    _write_receipt(job_path, job)
+    with pytest.raises(ValueError, match="worker-job receipt"):
+        formal_analysis._read_attempt(
+            package_root=package,
+            policy="PARENT",
+            seed_row=row,
+            attempt_relative="test/PARENT/units/unit-8520001/attempt-0001",
+            package_commit=commit,
+            source_lock_sha256=lock_sha,
+            seed_table_sha256=seed_table_sha,
+            authorization_receipt_sha256=authorization_sha,
+            expected_model_digest=model_digest,
+        )
+    job["authorization_receipt_sha256"] = authorization_sha
+    _write_receipt(job_path, job)
 
     result.pop("heart_victory")
     _write_receipt(result_path, result)
@@ -328,5 +358,7 @@ def test_test_analysis_accepts_only_source_bound_success_receipt_chain(tmp_path:
             attempt_relative="test/PARENT/units/unit-8520001/attempt-0001",
             package_commit=commit,
             source_lock_sha256=lock_sha,
+            seed_table_sha256=seed_table_sha,
+            authorization_receipt_sha256=authorization_sha,
             expected_model_digest=model_digest,
         )

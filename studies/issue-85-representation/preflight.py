@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -69,17 +70,14 @@ def block_update_receipt_identity(
 
 
 def git_bytes(repo: Path, *args: str) -> bytes:
-    # The pinned Python runs under WSL, but these task/source repositories are
-    # Windows worktrees whose .git files contain Windows paths. Linux Git
-    # cannot resolve those pointers. When available, call Git for Windows and
-    # translate the WSL mount path before invoking it.
-    git_exe = shutil.which("git.exe")
+    # Under WSL, Linux Git must read object alternates in the same path namespace.
     repo_arg = str(repo)
-    if git_exe and repo_arg.startswith("/mnt/"):
-        repo_arg = subprocess.check_output(
-            ["wslpath", "-w", repo_arg], text=True
-        ).strip()
-    executable = git_exe or shutil.which("git")
+    if os.name == "nt":
+        executable = shutil.which("git.exe") or shutil.which("git")
+        if executable and repo_arg.startswith("/mnt/"):
+            repo_arg = subprocess.check_output(["wslpath", "-w", repo_arg], text=True).strip()
+    else:
+        executable = shutil.which("git")
     if not executable:
         raise RuntimeError("neither git.exe nor git is available for source verification")
     return subprocess.check_output([executable, "-C", repo_arg, *args])
