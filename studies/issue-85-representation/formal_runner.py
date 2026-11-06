@@ -195,19 +195,25 @@ def whole_task_active_wall_estimate(cache_report: Mapping[str, Any]) -> dict[str
     reserve_assumptions = {
         "frozen_analysis_and_machine_closeout": 1.0,
         "program_active_build_restore_and_queue": 1.0,
-        "unmeasured_32_owner_eight_worker_contention_retries_restarts_and_long_tails": 8.0,
+        "unmeasured_32_owner_eight_worker_contention_retries_restarts_and_long_tails": core * 0.5,
     }
     assumed_reserve = math.fsum(reserve_assumptions.values())
     cumulative_estimate = cumulative_with_pilot + assumed_reserve
     return {
         "schema_id": "issue85-whole-task-active-wall-estimate-v1",
         "status": "CONDITIONAL_PLANNING_ESTIMATE / NOT_MEASURED_ALL_IN / NO_GO",
-        "cumulative_active_wall_hours_approx": round(cumulative_estimate, -1),
+        "cumulative_active_wall_hours_approx": round(cumulative_estimate, 2),
         "unrounded_cumulative_active_wall_hours": cumulative_estimate,
         "cumulative_components_hours": {
             "pilot_already_spent_and_included_once": pilot_hours,
             "conditional_formal_core": core,
-            "explicit_assumed_program_active_reserve": assumed_reserve,
+            "assumed_retry_and_long_tail_reserve": reserve_assumptions[
+                "unmeasured_32_owner_eight_worker_contention_retries_restarts_and_long_tails"
+            ],
+            "assumed_analysis_build_restore_and_queue": math.fsum((
+                reserve_assumptions["frozen_analysis_and_machine_closeout"],
+                reserve_assumptions["program_active_build_restore_and_queue"],
+            )),
         },
         "formal_core_breakdown_hours": {
             "conditional_actor_update_component": actor_updates,
@@ -217,7 +223,7 @@ def whole_task_active_wall_estimate(cache_report: Mapping[str, Any]) -> dict[str
         "human_review_or_wait_hours": 0.0,
         "limitations": [
             "Pilot plus formal-core arithmetic is conditional; it is not measured full-study runtime.",
-            "The 10-hour operational reserve is an explicit planning assumption, not a measured upper bound or time cap.",
+            "The 50%-of-core retry/long-tail reserve and 2-hour program-active allowance are explicit planning assumptions, not a measured upper bound or time cap.",
             "The formal 32-owner/eight-worker path, retry and restart tails, restore/build/queue work and bootstrap runtime remain unmeasured.",
             "Pilot wall already includes its observed failed attempts; those are not added a second time.",
             "Human review and waiting are excluded under the active physical-wall policy.",

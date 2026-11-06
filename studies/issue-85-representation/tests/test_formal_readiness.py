@@ -207,10 +207,12 @@ def test_whole_task_estimate_separates_conditional_core_and_assumed_reserve() ->
         },
     })
 
-    assert estimate["cumulative_active_wall_hours_approx"] == 40
+    assert estimate["cumulative_active_wall_hours_approx"] == pytest.approx(41.06)
     assert estimate["cumulative_components_hours"]["pilot_already_spent_and_included_once"] == pytest.approx(9.067705735808613)
     assert estimate["formal_core_breakdown_hours"]["conditional_actor_update_component"] == pytest.approx(3.696762003157477)
-    assert estimate["cumulative_components_hours"]["explicit_assumed_program_active_reserve"] == 10
+    assert estimate["cumulative_components_hours"]["assumed_retry_and_long_tail_reserve"] == pytest.approx(9.996732673490958)
+    assert estimate["cumulative_components_hours"]["assumed_analysis_build_restore_and_queue"] == 2
+    assert estimate["unrounded_cumulative_active_wall_hours"] == pytest.approx(41.05790375628149)
     assert estimate["human_review_or_wait_hours"] == 0
     assert "not a measured upper bound or time cap" in estimate["limitations"][1]
 
