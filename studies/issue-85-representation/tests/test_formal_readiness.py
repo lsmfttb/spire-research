@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import formal_analysis
 import formal_runner
+import preflight
 
 
 class StubBackend:
@@ -156,6 +158,39 @@ def test_issue84_runtime_clean_attestation_follows_exact_source_validation(monke
     with pytest.raises(RuntimeError, match="source worktree is dirty"):
         formal_runner._validate_issue84_source_for_runtime(Path("input"))
     assert "ISSUE84_WORKTREE_CLEAN" not in formal_runner.os.environ
+
+
+def test_preflight_binds_update_receipt_to_exact_block_owner_range() -> None:
+    owners = list(range(8_400_001, 8_400_129))
+    expected_digest = hashlib.sha256(
+        ",".join(str(owner) for owner in owners).encode("ascii")
+    ).hexdigest()
+    assert expected_digest == "40d247ccf44feb5d0b05515d519674467a56303745879e2f91951ab5b92fa89e"
+    receipt = {
+        "block_index": 0,
+        "arm": "B",
+        "owner_seed_sha256": expected_digest,
+    }
+
+    identity = preflight.block_update_receipt_identity(
+        receipt, block_index=0, arm="B", owner_seeds=owners,
+    )
+    assert identity["block_index_matches"] is True
+    assert identity["arm_matches"] is True
+    assert identity["owner_seed_sha256_matches"] is True
+    assert identity["owner_seed_range"] == [8_400_001, 8_400_128]
+
+    mutated_digest = {**receipt, "owner_seed_sha256": "0" * 64}
+    rejected_digest = preflight.block_update_receipt_identity(
+        mutated_digest, block_index=0, arm="B", owner_seeds=owners,
+    )
+    assert rejected_digest["owner_seed_sha256_matches"] is False
+
+    mutated_block = {**receipt, "block_index": 1}
+    rejected_block = preflight.block_update_receipt_identity(
+        mutated_block, block_index=0, arm="B", owner_seeds=owners,
+    )
+    assert rejected_block["block_index_matches"] is False
 
 
 def test_whole_task_estimate_separates_conditional_core_and_assumed_reserve() -> None:

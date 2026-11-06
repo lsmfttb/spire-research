@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 
 HERE = Path(__file__).resolve().parent
@@ -31,6 +31,41 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def block_update_receipt_identity(
+    update: Mapping[str, Any], *, block_index: int, arm: str,
+    owner_seeds: Sequence[int],
+) -> dict[str, Any]:
+    """Validate the receipt's declared block against its exact owner cohort."""
+    owners = list(owner_seeds)
+    if (
+        not owners
+        or any(type(owner) is not int for owner in owners)
+        or owners != sorted(set(owners))
+    ):
+        raise ValueError("block owner seeds must be a nonempty, ascending unique integer sequence")
+    expected_owner_seed_sha256 = hashlib.sha256(
+        ",".join(str(owner) for owner in owners).encode("ascii")
+    ).hexdigest()
+    actual_block_index = update.get("block_index")
+    actual_arm = update.get("arm")
+    actual_owner_seed_sha256 = update.get("owner_seed_sha256")
+    return {
+        "expected_block_index": block_index,
+        "block_index": actual_block_index,
+        "block_index_matches": type(actual_block_index) is int and actual_block_index == block_index,
+        "expected_arm": arm,
+        "arm": actual_arm,
+        "arm_matches": isinstance(actual_arm, str) and actual_arm == arm,
+        "owner_seed_range": [owners[0], owners[-1]],
+        "expected_owner_seed_sha256": expected_owner_seed_sha256,
+        "owner_seed_sha256": actual_owner_seed_sha256,
+        "owner_seed_sha256_matches": (
+            isinstance(actual_owner_seed_sha256, str)
+            and actual_owner_seed_sha256 == expected_owner_seed_sha256
+        ),
+    }
 
 
 def git_bytes(repo: Path, *args: str) -> bytes:
@@ -252,13 +287,37 @@ def verify(data_root: Path, native_repo: Path, git_repo: Path) -> dict[str, Any]
     b_root = data_root / "issue84" / "artifacts" / "formal" / source_commit / "B"
     expected_source_digest = p_digest
     block_summaries: list[dict[str, Any]] = []
-    for block in range(8):
+    training_owner_start, training_owner_end = map(int, base["training_owners"])
+    training_owner_count = int(base["training_owner_count"])
+    block_count = int(base["block_count"])
+    require(
+        training_owner_count == training_owner_end - training_owner_start + 1,
+        "A_training_owner_range_count",
+        {"range": [training_owner_start, training_owner_end], "count": training_owner_count},
+    )
+    require(block_count > 0, "A_training_block_count", block_count)
+    owners_per_block = training_owner_count // block_count if block_count > 0 else 0
+    require(
+        block_count > 0 and training_owner_count % block_count == 0,
+        "A_training_owner_partition",
+        {"owner_count": training_owner_count, "block_count": block_count},
+    )
+    require(owners_per_block == 128, "A_training_owners_per_block", owners_per_block)
+    for block in range(max(0, block_count)):
+        block_owner_start = training_owner_start + block * owners_per_block
+        block_owner_seeds = list(range(block_owner_start, block_owner_start + owners_per_block))
         update_path = b_root / "models" / "blocks" / f"block-{block:02d}-update.json"
         if not update_path.is_file():
             errors.append(f"A_block_{block}: missing {update_path}")
             continue
         update = json.loads(update_path.read_text(encoding="utf-8"))
         require(update.get("status") == "SUCCEEDED", f"A_block_{block}_status", update.get("status"))
+        identity = block_update_receipt_identity(
+            update, block_index=block, arm="B", owner_seeds=block_owner_seeds,
+        )
+        require(identity["block_index_matches"], f"A_block_{block}_block_index", identity)
+        require(identity["arm_matches"], f"A_block_{block}_arm", identity)
+        require(identity["owner_seed_sha256_matches"], f"A_block_{block}_owner_seed_sha256", identity)
         require(update.get("owner_count") == 128, f"A_block_{block}_owner_count", update.get("owner_count"))
         require(update.get("completed_steps") == 64, f"A_block_{block}_completed_steps", update.get("completed_steps"))
         require(update.get("package_commit") == source_commit, f"A_block_{block}_package_commit", update.get("package_commit"))
@@ -281,6 +340,11 @@ def verify(data_root: Path, native_repo: Path, git_repo: Path) -> dict[str, Any]
         block_summaries.append(
             {
                 "block": block,
+                "block_index": identity["block_index"],
+                "arm": identity["arm"],
+                "owner_seed_range": identity["owner_seed_range"],
+                "owner_seed_sha256": identity["owner_seed_sha256"],
+                "expected_owner_seed_sha256": identity["expected_owner_seed_sha256"],
                 "status": update.get("status"),
                 "owners": update.get("owner_count"),
                 "updates": update.get("completed_steps"),
