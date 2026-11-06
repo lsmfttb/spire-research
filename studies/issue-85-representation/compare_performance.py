@@ -127,6 +127,9 @@ def main() -> None:
             ("baseline", bmetrics, bsnap_path),
             ("candidate", cmetrics, csnap_path),
         ):
+            expected_schema = f"issue85-offline-performance-{mode}-v3"
+            if report.get("schema_id") != expected_schema:
+                raise SystemExit(f"{mode} {arm} report has an unexpected measurement schema")
             if args.require_source_binding:
                 try:
                     verified = verify_committed_source(repo_root, report.get("measurement_source"), MEASUREMENT_SOURCE_FILES)
@@ -143,6 +146,19 @@ def main() -> None:
             expected_mode = "uncached_baseline" if mode == "baseline" else "candidate"
             if report.get("arm") != arm or report.get("mode") != expected_mode:
                 raise SystemExit(f"{mode} {arm} report has the wrong arm/mode identity")
+            expected_cache_policy = (
+                "disabled_for_uncached_control" if mode == "baseline"
+                else "not_applicable_arm_B" if arm == "B"
+                else "parameter_independent_per_block"
+            )
+            if report.get("cache_policy") != expected_cache_policy:
+                raise SystemExit(f"{mode} {arm} report does not prove the registered cache policy")
+            if mode == "baseline" and report.get("input_cache") is not None:
+                raise SystemExit(f"baseline {arm} unexpectedly constructed a reusable input cache")
+            if mode == "candidate" and arm != "B" and not isinstance(report.get("input_cache"), dict):
+                raise SystemExit(f"candidate {arm} did not produce input-cache metrics")
+            if mode == "candidate" and arm == "B" and report.get("input_cache") is not None:
+                raise SystemExit("candidate B unexpectedly constructed the residual-input cache")
             if report.get("snapshot_sha256") != sha256(snapshot_path) or report.get("snapshot_bytes") != snapshot_path.stat().st_size:
                 raise SystemExit(f"{mode} {arm} snapshot does not match its immutable report hash/size")
         paired_fields = (
@@ -168,11 +184,19 @@ def main() -> None:
         candidate = torch.load(csnap_path, map_location="cpu", weights_only=True)
         if baseline.get("arm") != arm or candidate.get("arm") != arm:
             raise SystemExit(f"snapshot arm identity mismatch for {arm}")
+        if (
+            baseline.get("schema_id") != "issue85-offline-performance-baseline-v3"
+            or candidate.get("schema_id") != "issue85-offline-performance-candidate-v3"
+        ):
+            raise SystemExit(f"{arm} snapshots have an unexpected source-bound measurement schema")
         if args.require_source_binding and (
             baseline.get("measurement_source") != measurement_source
             or candidate.get("measurement_source") != measurement_source
         ):
             raise SystemExit(f"{arm} snapshot source binding differs from its metrics")
+        expected_snapshot_modes = ("uncached_baseline", "candidate")
+        if (baseline.get("mode"), candidate.get("mode")) != expected_snapshot_modes:
+            raise SystemExit(f"{arm} snapshots do not bind to the requested baseline/candidate modes")
         bsteps = baseline["steps"]
         csteps = candidate["steps"]
         if len(bsteps) != 2 or len(csteps) != 2:
@@ -279,7 +303,7 @@ def main() -> None:
         result["measurement_source"] = measurement_source
         result["source_binding_validation"] = {
             "validator": "studies/issue-85-representation/compare_performance.py",
-            "rule": "paired baseline/candidate metrics and snapshots bind to the same clean-worktree commit, tree, Git blob IDs, SHA-256 digests and byte lengths; each source file was read from that immutable Git commit",
+            "rule": "paired baseline/candidate metrics and snapshots bind to the same clean-worktree commit, tree, Git blob IDs, SHA-256 digests and byte lengths; each source file was read from that immutable Git commit; baseline cache is disabled and candidate cache is verified",
             "metric_snapshot_hashes_validated": True,
             "baseline_source_lock_validated": RUNNER_LOCK_SHA256,
             "issue84_source_lock_validated": ISSUE84_LOCK_SHA256,

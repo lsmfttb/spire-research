@@ -9,6 +9,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from performance_provenance import (
     capture_worktree_source,
+    configure_measurement_cache,
     sha256_bytes,
     verify_committed_source,
     _windows_object_directory_from_wsl_alternate,
@@ -87,3 +88,30 @@ def test_windows_adapter_ignores_non_wsl_and_non_windows_paths(tmp_path: Path) -
 
     assert _windows_object_directory_from_wsl_alternate(repo, platform_name="nt") is None
     assert _windows_object_directory_from_wsl_alternate(repo, platform_name="posix") is None
+
+
+def _owner_loss_namespace():
+    namespace = {"_cached_block_inputs": lambda *_args, **_kwargs: "cached"}
+    exec("def owner_loss(*args, **kwargs): return _cached_block_inputs(*args, **kwargs)", namespace)
+    return namespace, namespace["owner_loss"]
+
+
+def test_uncached_measurement_control_disables_runtime_cache() -> None:
+    namespace, owner_loss = _owner_loss_namespace()
+
+    policy = configure_measurement_cache(owner_loss, "baseline", "C")
+
+    assert policy == "disabled_for_uncached_control"
+    assert owner_loss() is None
+    assert namespace["_cached_block_inputs"].__name__ == "issue85_uncached_measurement_control"
+
+
+def test_candidate_measurement_keeps_runtime_cache() -> None:
+    namespace, owner_loss = _owner_loss_namespace()
+    original = namespace["_cached_block_inputs"]
+
+    policy = configure_measurement_cache(owner_loss, "candidate", "C")
+
+    assert policy == "parameter_independent_per_block"
+    assert namespace["_cached_block_inputs"] is original
+    assert owner_loss() == "cached"

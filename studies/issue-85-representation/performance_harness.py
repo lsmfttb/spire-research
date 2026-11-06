@@ -24,6 +24,7 @@ repo=study.parents[1]
 sys.path.insert(0,str(study))
 from performance_provenance import (
     capture_worktree_source,
+    configure_measurement_cache,
     _git_environment,
     _windows_object_directory_from_wsl_alternate,
 )
@@ -130,6 +131,7 @@ actor.train()
 optimizer=learning._new_optimizer(actor)
 optimizer.load_state_dict(torch.load(optimizer_file,map_location='cpu',weights_only=True))
 gradients=importlib.import_module('gradients')
+cache_policy=configure_measurement_cache(gradients.owner_loss,a.mode,arm)
 
 # Record authentic decision cardinalities and typed-token/cross-product sizes outside timed updates.
 rep=importlib.import_module('representations')
@@ -276,14 +278,15 @@ def stat(values):
   def q(p): return s[min(n-1,round((n-1)*p))]
   return {'count':n,'min':s[0],'median':q(.5),'p90':q(.9),'max':s[-1]}
 candidate_counts=[x['candidate_count'] for x in card]
-report={'schema_id':'issue85-offline-performance-'+a.mode+'-v2','scope':'existing pilot data only; no games/replays/formal training',
+measurement_mode='uncached_baseline' if a.mode=='baseline' else 'candidate'
+report={'schema_id':'issue85-offline-performance-'+a.mode+'-v3','scope':'existing pilot data only; no games/replays/formal training',
  'runner_commit':expected_head,'runner_source_lock_sha256':lock_sha,'issue84_commit':head84,
  'issue84_source_lock_sha256':driver.file_sha256(issue84_root/'studies'/'issue-84-six-arm'/'source-lock.json'),
- 'pilot_package_commit':expected_head,'arm':arm,'mode':'uncached_baseline','python_version':sys.version.split()[0],
+ 'pilot_package_commit':expected_head,'arm':arm,'mode':measurement_mode,'cache_policy':cache_policy,'python_version':sys.version.split()[0],
  'torch_version':torch.__version__,'numpy_version':np.__version__,'torch_num_threads':torch.get_num_threads(),
  'platform':platform.platform(),'machine':platform.machine(),'processor':platform.processor(),
  'input_receipts':input_receipts,'actor_checkpoint_sha256':receipt['checkpoint_sha256'],'optimizer_checkpoint_sha256':receipt['optimizer_sha256'],
- 'actor_model_digest_start':receipt['model_digest'],'owner_count':len(examples),'decision_count':len(card),'mode':a.mode,
+ 'actor_model_digest_start':receipt['model_digest'],'owner_count':len(examples),'decision_count':len(card),
  'measurement_source':measurement_source,
  'candidate_count_distribution':stat(candidate_counts),'candidate_context_cardinality':{
    'context_token_count':stat([x['context_token_count'] for x in card if 'context_token_count'in x]),
@@ -301,7 +304,7 @@ try:
 except (OSError,ValueError,subprocess.CalledProcessError) as exc:
     raise SystemExit(f'measurement source changed during run: {exc}') from exc
 if final_measurement_source!=measurement_source: raise SystemExit('measurement source identity changed during run')
-tensors={'schema_id':report['schema_id'],'arm':arm,'steps':steps,'measurement_source':measurement_source}
+tensors={'schema_id':report['schema_id'],'arm':arm,'mode':measurement_mode,'steps':steps,'measurement_source':measurement_source}
 torch.save(tensors,arm_out/'snapshots.pt')
 report['snapshot_sha256']=hashlib.sha256((arm_out/'snapshots.pt').read_bytes()).hexdigest()
 report['snapshot_bytes']=(arm_out/'snapshots.pt').stat().st_size

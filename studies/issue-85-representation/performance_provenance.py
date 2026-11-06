@@ -76,6 +76,26 @@ def _windows_object_directory_from_wsl_alternate(
     return f"{match.group(1).upper()}:/{match.group(2)}"
 
 
+def configure_measurement_cache(owner_loss: Any, mode: str, arm: str) -> str:
+    """Select a real uncached control or the candidate block-cache path."""
+    if mode not in {"baseline", "candidate"}:
+        raise ValueError(f"unsupported offline measurement mode: {mode}")
+    if arm not in {"B", "C", "D", "E", "F"}:
+        raise ValueError(f"unsupported Issue 85 offline measurement arm: {arm}")
+    namespace = getattr(owner_loss, "__globals__", None)
+    if not isinstance(namespace, dict) or not callable(namespace.get("_cached_block_inputs")):
+        raise ValueError("Issue 85 owner_loss does not expose its registered block-cache hook")
+    if mode == "candidate":
+        return "not_applicable_arm_B" if arm == "B" else "parameter_independent_per_block"
+
+    def uncached_block_inputs(*_args: Any, **_kwargs: Any) -> None:
+        return None
+
+    uncached_block_inputs.__name__ = "issue85_uncached_measurement_control"
+    namespace["_cached_block_inputs"] = uncached_block_inputs
+    return "disabled_for_uncached_control"
+
+
 def _git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
     result = subprocess.run(
         ["git", "-C", str(repo_root), *args],
