@@ -138,6 +138,26 @@ def test_cache_evidence_requires_the_exact_reviewed_report_digest() -> None:
         formal_runner.validate_cache_equivalence_report({}, report_sha256="0" * 64)
 
 
+def test_issue84_runtime_clean_attestation_follows_exact_source_validation(monkeypatch) -> None:
+    accepted_root = Path("/accepted/issue84")
+    monkeypatch.setenv("ISSUE84_WORKTREE_CLEAN", "untrusted inherited value")
+    monkeypatch.setattr(
+        formal_runner.pilot, "validate_issue84_source", lambda path: accepted_root,
+    )
+
+    assert formal_runner._validate_issue84_source_for_runtime(Path("input")) == accepted_root
+    assert formal_runner.os.environ["ISSUE84_WORKTREE_CLEAN"] == "1"
+
+    def reject_dirty_source(path):
+        raise RuntimeError("source worktree is dirty")
+
+    monkeypatch.setenv("ISSUE84_WORKTREE_CLEAN", "untrusted inherited value")
+    monkeypatch.setattr(formal_runner.pilot, "validate_issue84_source", reject_dirty_source)
+    with pytest.raises(RuntimeError, match="source worktree is dirty"):
+        formal_runner._validate_issue84_source_for_runtime(Path("input"))
+    assert "ISSUE84_WORKTREE_CLEAN" not in formal_runner.os.environ
+
+
 def test_whole_task_estimate_separates_conditional_core_and_assumed_reserve() -> None:
     estimate = formal_runner.whole_task_active_wall_estimate({
         "conditional_cost_projection": {

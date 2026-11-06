@@ -590,11 +590,25 @@ def _host_path(wsl_path: str) -> Path:
     raise ValueError(f"unsupported WSL data path: {wsl_path}")
 
 
+def _validate_issue84_source_for_runtime(path: Path) -> Path:
+    """Pass the legacy driver's clean-tree guard only after our own check.
+
+    The accepted Issue 84 driver requires ISSUE84_WORKTREE_CLEAN as an
+    explicit caller attestation.  The Issue 85 validator below verifies the
+    exact accepted commit and a clean worktree, so set that attestation only
+    after validation succeeds and never trust an inherited value.
+    """
+    os.environ.pop("ISSUE84_WORKTREE_CLEAN", None)
+    root = pilot.validate_issue84_source(path)
+    os.environ["ISSUE84_WORKTREE_CLEAN"] = "1"
+    return root
+
+
 def run_preflight(
     *, issue84_source: Path, native_source: Path, stsr_source: Path,
 ) -> dict[str, Any]:
     identity = pilot.source_identity(require_clean=True)
-    issue84_root = pilot.validate_issue84_source(issue84_source)
+    issue84_root = _validate_issue84_source_for_runtime(issue84_source)
     native_identity = _verify_native_source(native_source)
     stsr_identity = _verify_stsr_source(stsr_source)
     cache_report_path = DATA_ROOT / CACHE_EQUIVALENCE_RELATIVE_PATH
