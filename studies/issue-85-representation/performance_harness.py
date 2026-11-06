@@ -1,6 +1,11 @@
 from __future__ import annotations
-import argparse, copy, hashlib, importlib, importlib.util, json, os, resource, subprocess, sys, time, types
+import argparse, copy, ctypes, hashlib, importlib, importlib.util, json, os, platform, subprocess, sys, time, types
 from pathlib import Path
+try:
+    import resource
+except ImportError:
+    resource=None
+sys.dont_write_bytecode=True
 
 ap=argparse.ArgumentParser()
 ap.add_argument('--arm',required=True,choices=list('BCDEF'))
@@ -15,22 +20,27 @@ pilot_root=a.pilot_root.resolve(strict=True)
 out_root=a.out_root.resolve()
 study=Path(__file__).resolve().parent
 repo=study.parents[1]
-# Worktrees were created by Windows Git; provide the same per-worktree Git metadata to the pinned WSL Python.
+# Worktrees were created by Windows Git; translate their .git pointers for the pinned WSL Python.
+sys.path.insert(0,str(study))
+from performance_provenance import capture_worktree_source, _git_environment
+
 _real_subprocess_run=subprocess.run
 def _git_aware_run(cmd,*args,**kwargs):
     if isinstance(cmd,(list,tuple)) and cmd and str(cmd[0]).endswith('git') and '-C' in cmd:
         try: target=Path(cmd[list(cmd).index('-C')+1]).resolve()
         except Exception: target=None
-        gitdir=None
-        if target==repo.resolve(): gitdir='/mnt/d/DeadlyCatCoding/spire-research/.git/worktrees/issue85-actor-cache-profiling-20261106'
-        elif target==issue84_root: gitdir='/mnt/d/DeadlyCatCoding/spire-research/.git/worktrees/issue85-i84-source-556128df-20261106b'
-        if gitdir:
-            env=dict(kwargs.get('env') or os.environ); env['GIT_DIR']=gitdir; env['GIT_WORK_TREE']=str(target); kwargs['env']=env
+        if target==repo.resolve() or target==issue84_root:
+            env=dict(os.environ); env.update(kwargs.get('env') or {}); env.update(_git_environment(target)); kwargs['env']=env
     return _real_subprocess_run(cmd,*args,**kwargs)
 subprocess.run=_git_aware_run
-source_head=subprocess.run(['git','-C',str(repo),'rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip()
 expected_head='5cd70c00d03f1104728efdc4b66c764592e5acf8'
-if source_head!=expected_head: raise SystemExit(f'wrong runner source: {source_head}')
+try:
+    measurement_source=capture_worktree_source(repo)
+except (OSError,ValueError,subprocess.CalledProcessError) as exc:
+    raise SystemExit(f'could not bind measurement code to a clean commit: {exc}') from exc
+runner_path='studies/issue-85-representation/pilot_runner.py'
+locked_runner=subprocess.run(['git','-C',str(repo),'show',f'{expected_head}:{runner_path}'],check=True,capture_output=True).stdout
+if (repo/runner_path).read_bytes().replace(b'\r\n',b'\n')!=locked_runner.replace(b'\r\n',b'\n'): raise SystemExit('pilot runner differs from the locked baseline commit')
 lock_path=study/'source-lock.json'
 lock_sha=hashlib.sha256(lock_path.read_bytes()).hexdigest()
 if lock_sha!='a25c25cd4144cbe362c7c241460e9d71f4554627c9bb129407ef69ec8366404a': raise SystemExit('source-lock SHA mismatch')
@@ -38,8 +48,6 @@ out_root.mkdir(parents=True,exist_ok=True)
 arm_out=out_root/a.mode/arm
 arm_out.mkdir(parents=True,exist_ok=False)
 
-sys.dont_write_bytecode=True
-sys.path.insert(0,str(study))
 spec=importlib.util.spec_from_file_location('issue85_perf_pilot_runner',study/'pilot_runner.py')
 runner=importlib.util.module_from_spec(spec); sys.modules[spec.name]=runner; spec.loader.exec_module(runner)
 os.environ['ISSUE84_WORKTREE_CLEAN']='1'
@@ -189,12 +197,29 @@ def cpu_tree(v):
   if isinstance(v,dict): return {k:cpu_tree(x) for k,x in v.items()}
   if isinstance(v,(list,tuple)): return type(v)(cpu_tree(x) for x in v)
   return copy.deepcopy(v)
-def rss_bytes():
+def process_memory():
+  if os.name=='nt':
+    class Counters(ctypes.Structure):
+      _fields_=[('cb',ctypes.c_ulong),('PageFaultCount',ctypes.c_ulong),
+        ('PeakWorkingSetSize',ctypes.c_size_t),('WorkingSetSize',ctypes.c_size_t),
+        ('QuotaPeakPagedPoolUsage',ctypes.c_size_t),('QuotaPagedPoolUsage',ctypes.c_size_t),
+        ('QuotaPeakNonPagedPoolUsage',ctypes.c_size_t),('QuotaNonPagedPoolUsage',ctypes.c_size_t),
+        ('PagefileUsage',ctypes.c_size_t),('PeakPagefileUsage',ctypes.c_size_t)]
+    counters=Counters(); counters.cb=ctypes.sizeof(counters)
+    kernel=ctypes.WinDLL('kernel32',use_last_error=True); psapi=ctypes.WinDLL('psapi',use_last_error=True)
+    get_current=kernel.GetCurrentProcess; get_current.restype=ctypes.c_void_p
+    get_info=psapi.GetProcessMemoryInfo; get_info.argtypes=[ctypes.c_void_p,ctypes.POINTER(Counters),ctypes.c_ulong]; get_info.restype=ctypes.c_int
+    if not get_info(get_current(),ctypes.byref(counters),counters.cb): return None,None
+    return int(counters.WorkingSetSize),int(counters.PeakWorkingSetSize//1024)
+  rss=None
   try:
     for line in Path('/proc/self/status').read_text().splitlines():
-      if line.startswith('VmRSS:'): return int(line.split()[1])*1024
+      if line.startswith('VmRSS:'): rss=int(line.split()[1])*1024; break
   except Exception: pass
-  return None
+  peak=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource is not None else None
+  return rss,peak
+def rss_bytes(): return process_memory()[0]
+def peak_rss_kib(): return process_memory()[1]
 
 steps=[]
 for step in range(1,3):
@@ -235,25 +260,32 @@ def stat(values):
   def q(p): return s[min(n-1,round((n-1)*p))]
   return {'count':n,'min':s[0],'median':q(.5),'p90':q(.9),'max':s[-1]}
 candidate_counts=[x['candidate_count'] for x in card]
-report={'schema_id':'issue85-offline-performance-'+a.mode+'-v1','scope':'existing pilot data only; no games/replays/formal training',
- 'runner_commit':source_head,'runner_source_lock_sha256':lock_sha,'issue84_commit':head84,
+report={'schema_id':'issue85-offline-performance-'+a.mode+'-v2','scope':'existing pilot data only; no games/replays/formal training',
+ 'runner_commit':expected_head,'runner_source_lock_sha256':lock_sha,'issue84_commit':head84,
  'issue84_source_lock_sha256':driver.file_sha256(issue84_root/'studies'/'issue-84-six-arm'/'source-lock.json'),
  'pilot_package_commit':expected_head,'arm':arm,'mode':'uncached_baseline','python_version':sys.version.split()[0],
  'torch_version':torch.__version__,'numpy_version':np.__version__,'torch_num_threads':torch.get_num_threads(),
+ 'platform':platform.platform(),'machine':platform.machine(),'processor':platform.processor(),
  'input_receipts':input_receipts,'actor_checkpoint_sha256':receipt['checkpoint_sha256'],'optimizer_checkpoint_sha256':receipt['optimizer_sha256'],
  'actor_model_digest_start':receipt['model_digest'],'owner_count':len(examples),'decision_count':len(card),'mode':a.mode,
+ 'measurement_source':measurement_source,
  'candidate_count_distribution':stat(candidate_counts),'candidate_context_cardinality':{
    'context_token_count':stat([x['context_token_count'] for x in card if 'context_token_count'in x]),
    'candidate_token_count':stat([x['candidate_token_count'] for x in card if 'candidate_token_count'in x]),
    'candidate_context_cross_products':stat([x['candidate_context_cross_products'] for x in card if 'candidate_context_cross_products'in x])},
- 'rss_bytes_before_updates':rss_bytes(),'ru_maxrss_before_updates_kib':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
- 'ru_maxrss_after_updates_kib':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+ 'rss_bytes_before_updates':rss_bytes(),'ru_maxrss_before_updates_kib':peak_rss_kib(),
+ 'ru_maxrss_after_updates_kib':peak_rss_kib(),
  'steps':[{'step':s['step'],'total_loss':float(s['total_loss'].item()),'grad_norm_before_clip':float(s['grad_norm_before_clip'].item()),
    'owner_count':len(s['owner_losses']),'decision_input_count':len(s['inputs']),'encoded_input_count':len(s['encoded_features']),
    'rss_bytes_after_step':s['rss_bytes_after_step'],'timings':s['timings'],'input_cache':s['input_cache'],'model_digest_after_step':s['model_digest_after_step']} for s in steps],
  'input_cache':next((s['input_cache'] for s in steps if s['input_cache'] is not None),None),
  'interpretation':'Step 1 is first measured update after source/model/data loading; step 2 is repeated update, not a long-run steady-state estimate.'}
-tensors={'schema_id':report['schema_id'],'arm':arm,'steps':steps}
+try:
+    final_measurement_source=capture_worktree_source(repo)
+except (OSError,ValueError,subprocess.CalledProcessError) as exc:
+    raise SystemExit(f'measurement source changed during run: {exc}') from exc
+if final_measurement_source!=measurement_source: raise SystemExit('measurement source identity changed during run')
+tensors={'schema_id':report['schema_id'],'arm':arm,'steps':steps,'measurement_source':measurement_source}
 torch.save(tensors,arm_out/'snapshots.pt')
 report['snapshot_sha256']=hashlib.sha256((arm_out/'snapshots.pt').read_bytes()).hexdigest()
 report['snapshot_bytes']=(arm_out/'snapshots.pt').stat().st_size

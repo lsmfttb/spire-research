@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import argparse
+import subprocess
 from pathlib import Path
 from typing import Any
 
 import torch
+from performance_provenance import MEASUREMENT_SOURCE_FILES, verify_committed_source
 
 
 DATA_ROOT = Path(
@@ -92,17 +95,29 @@ def snapshots_path(root: Path, arm: str) -> Path:
 
 
 def main() -> None:
-    if OUTPUT.exists():
-        raise SystemExit(f"refusing to overwrite comparison evidence: {OUTPUT}")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--baseline-root", type=Path, default=BASELINE_ROOT)
+    parser.add_argument("--candidate-root", type=Path, default=CANDIDATE_ROOT)
+    parser.add_argument("--output", type=Path, default=OUTPUT)
+    parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument("--require-source-binding", action="store_true")
+    args = parser.parse_args()
+    baseline_root = args.baseline_root.resolve(strict=True)
+    candidate_root = args.candidate_root.resolve(strict=True)
+    output = args.output.resolve()
+    repo_root = args.repo_root.resolve(strict=True)
+    if output.exists():
+        raise SystemExit(f"refusing to overwrite comparison evidence: {output}")
     comparisons: dict[str, Any] = {}
     baseline_projected_64 = 0.0
     candidate_projected_64 = 0.0
+    measurement_source: dict[str, Any] | None = None
 
     for arm in ARMS:
-        bmetrics_path = metrics_path(BASELINE_ROOT, arm)
-        cmetrics_path = metrics_path(CANDIDATE_ROOT, arm)
-        bsnap_path = snapshots_path(BASELINE_ROOT, arm)
-        csnap_path = snapshots_path(CANDIDATE_ROOT, arm)
+        bmetrics_path = metrics_path(baseline_root, arm)
+        cmetrics_path = metrics_path(candidate_root, arm)
+        bsnap_path = snapshots_path(baseline_root, arm)
+        csnap_path = snapshots_path(candidate_root, arm)
         for path in (bmetrics_path, cmetrics_path, bsnap_path, csnap_path):
             if not path.is_file():
                 raise SystemExit(f"missing required immutable measurement: {path}")
@@ -112,6 +127,15 @@ def main() -> None:
             ("baseline", bmetrics, bsnap_path),
             ("candidate", cmetrics, csnap_path),
         ):
+            if args.require_source_binding:
+                try:
+                    verified = verify_committed_source(repo_root, report.get("measurement_source"), MEASUREMENT_SOURCE_FILES)
+                except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+                    raise SystemExit(f"{mode} {arm} source binding failed: {exc}") from exc
+                if measurement_source is None:
+                    measurement_source = verified
+                elif verified != measurement_source:
+                    raise SystemExit(f"{mode} arm {arm} was measured from a different source commit")
             if report.get("runner_commit") != RUNNER_COMMIT or report.get("runner_source_lock_sha256") != RUNNER_LOCK_SHA256:
                 raise SystemExit(f"{mode} {arm} report is not bound to the locked Issue 85 runner/source lock")
             if report.get("issue84_commit") != ISSUE84_COMMIT or report.get("issue84_source_lock_sha256") != ISSUE84_LOCK_SHA256:
@@ -129,6 +153,13 @@ def main() -> None:
             "actor_model_digest_start",
             "owner_count",
             "decision_count",
+            "python_version",
+            "torch_version",
+            "numpy_version",
+            "torch_num_threads",
+            "platform",
+            "machine",
+            "processor",
         )
         provenance_mismatches = [field for field in paired_fields if bmetrics.get(field) != cmetrics.get(field)]
         if provenance_mismatches:
@@ -137,6 +168,11 @@ def main() -> None:
         candidate = torch.load(csnap_path, map_location="cpu", weights_only=True)
         if baseline.get("arm") != arm or candidate.get("arm") != arm:
             raise SystemExit(f"snapshot arm identity mismatch for {arm}")
+        if args.require_source_binding and (
+            baseline.get("measurement_source") != measurement_source
+            or candidate.get("measurement_source") != measurement_source
+        ):
+            raise SystemExit(f"{arm} snapshot source binding differs from its metrics")
         bsteps = baseline["steps"]
         csteps = candidate["steps"]
         if len(bsteps) != 2 or len(csteps) != 2:
@@ -230,7 +266,7 @@ def main() -> None:
         ],
     }
     result = {
-        "schema_id": "issue85-offline-cache-equivalence-comparison-v1",
+        "schema_id": "issue85-offline-cache-equivalence-comparison-v2" if args.require_source_binding else "issue85-offline-cache-equivalence-comparison-v1",
         "scope": "existing nonformal Pilot training traces only; no game/replay/formal run",
         "comparison": "uncached source path versus parameter-independent per-block input cache",
         "comparison_rule": "bitwise exact for every listed tensor and scalar; no tolerance applied",
@@ -239,10 +275,19 @@ def main() -> None:
         "all_arms_bitwise_equivalent": all(x["all_two_step_fields_bitwise_equal"] for x in comparisons.values()),
         "conditional_cost_projection": forecast,
     }
-    with OUTPUT.open("x", encoding="utf-8", newline="\n") as stream:
+    if args.require_source_binding:
+        result["measurement_source"] = measurement_source
+        result["source_binding_validation"] = {
+            "validator": "studies/issue-85-representation/compare_performance.py",
+            "rule": "paired baseline/candidate metrics and snapshots bind to the same clean-worktree commit, tree, Git blob IDs, SHA-256 digests and byte lengths; each source file was read from that immutable Git commit",
+            "metric_snapshot_hashes_validated": True,
+            "baseline_source_lock_validated": RUNNER_LOCK_SHA256,
+            "issue84_source_lock_validated": ISSUE84_LOCK_SHA256,
+        }
+    with output.open("x", encoding="utf-8", newline="\n") as stream:
         json.dump(result, stream, sort_keys=True, indent=2, allow_nan=False)
         stream.write("\n")
-    print(json.dumps({"output": str(OUTPUT), "all_arms_bitwise_equivalent": result["all_arms_bitwise_equivalent"], "conditional_actor_update_hours": forecast["conditional_actor_update_projection_hours"], "conditional_formal_core_hours": forecast["conditional_formal_core_projection_hours"]}, sort_keys=True))
+    print(json.dumps({"output": str(output), "all_arms_bitwise_equivalent": result["all_arms_bitwise_equivalent"], "candidate_source_commit": measurement_source["commit"] if measurement_source else None, "conditional_actor_update_hours": forecast["conditional_actor_update_projection_hours"], "conditional_formal_core_hours": forecast["conditional_formal_core_projection_hours"]}, sort_keys=True))
     if not result["all_arms_bitwise_equivalent"]:
         raise SystemExit(2)
 
