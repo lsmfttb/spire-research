@@ -1366,22 +1366,60 @@ def _test_open_receipt(
     validation_groups: Mapping[str, Mapping[str, Any]], model_digests: Mapping[str, str],
 ) -> tuple[Path, str]:
     expected_policies = set(formal.POLICIES)
-    if set(validation_groups) != expected_policies or any(
-        item.get("status") != "SUCCEEDED"
-        or item.get("completed") != len(formal._registered_ranges()["validation"])
-        or item.get("model_selection_or_tuning") is not False
-        or item.get("authorization_receipt_sha256") != authorization.get("sha256")
-        for item in validation_groups.values()
-    ):
-        raise RuntimeError("TEST remains closed until all seven exact validation groups have completed")
-    if set(model_digests) != expected_policies:
-        raise RuntimeError("TEST remains closed until all seven final policy model digests are frozen")
+    validation_count = len(formal._registered_ranges()["validation"])
+    if set(validation_groups) != expected_policies or set(model_digests) != expected_policies:
+        raise RuntimeError("TEST remains closed until all seven exact validation groups and final models are frozen")
     if any(
-        not isinstance(item.get("units"), list)
-        or any(unit.get("model_digest") != model_digests[policy] for unit in item["units"])
-        for policy, item in validation_groups.items()
+        not isinstance(validation_groups[policy], Mapping)
+        or validation_groups[policy].get("status") != "SUCCEEDED"
+        or type(validation_groups[policy].get("completed")) is not int
+        or validation_groups[policy].get("completed") != validation_count
+        or validation_groups[policy].get("row_count") != validation_count
+        or validation_groups[policy].get("stage_id") != f"VALIDATION-{policy}"
+        or validation_groups[policy].get("schema_id") != GROUP_SCHEMA
+        or validation_groups[policy].get("package_commit") != identity["package_commit"]
+        or validation_groups[policy].get("source_lock_sha256") != identity["source_lock_sha256"]
+        or validation_groups[policy].get("seed_table_sha256") != readiness.get("formal_seed_table_sha256")
+        or validation_groups[policy].get("authorization_receipt_sha256") != authorization.get("sha256")
+        or validation_groups[policy].get("model_selection_or_tuning") is not False
+        or not re.fullmatch(r"[0-9a-f]{64}", str(validation_groups[policy].get("receipt_sha256", "")))
+        or not isinstance(validation_groups[policy].get("units"), list)
+        or len(validation_groups[policy].get("units", [])) != validation_count
+        or any(
+            not isinstance(unit, Mapping)
+            or unit.get("model_digest") != model_digests.get(policy)
+            for unit in validation_groups[policy].get("units", [])
+        )
+        or not re.fullmatch(r"[0-9a-f]{64}", str(model_digests.get(policy, "")))
+        for policy in formal.POLICIES
     ):
-        raise RuntimeError("TEST remains closed until every validation unit is bound to its frozen policy model")
+        raise RuntimeError("TEST remains closed until all seven exact validation groups and final models are frozen")
+    validation_bindings = {
+        policy: {
+            "receipt_sha256": validation_groups[policy]["receipt_sha256"],
+            "completed": validation_groups[policy]["completed"],
+        }
+        for policy in sorted(formal.POLICIES)
+    }
+    for policy in formal.POLICIES:
+        item = validation_groups[policy]
+        group_root = package_root / "validation" / policy
+        receipt_path = group_root / "group-receipt.json"
+        if (
+            Path(str(item.get("group_root", ""))).resolve(strict=False) != group_root.resolve(strict=False)
+            or not receipt_path.is_file()
+            or formal.file_sha256(receipt_path) != item["receipt_sha256"]
+            or formal.read_json(receipt_path) != {
+                key: value for key, value in item.items() if key not in {"receipt_sha256", "group_root"}
+            }
+        ):
+            raise RuntimeError(f"TEST remains closed until the exact {policy} validation receipt is verified")
+    if (
+        not re.fullmatch(r"[0-9a-f]{64}", str(authorization.get("sha256", "")))
+        or not _issue_comment_url(authorization.get("owner_approval_comment_url"))
+        or not _issue_comment_url(authorization.get("reviewer_approval_comment_url"))
+    ):
+        raise RuntimeError("TEST remains closed until both source-bound approval comment receipts are valid")
     record = {
         "schema_id": TEST_OPEN_SCHEMA,
         "status": "TEST_OPEN / ALL SOURCES, SEEDS, ANALYSIS, VALIDATION, MODELS, OWNER GO AND REVIEW FROZEN",
@@ -1394,17 +1432,32 @@ def _test_open_receipt(
         "authorization_receipt_sha256": authorization["sha256"],
         "owner_approval_comment_url": authorization["owner_approval_comment_url"],
         "reviewer_approval_comment_url": authorization["reviewer_approval_comment_url"],
-        "validation_group_receipts": {
-            policy: {"receipt_sha256": item["receipt_sha256"], "completed": item["completed"]}
-            for policy, item in sorted(validation_groups.items())
-        },
+        "validation_group_receipts": validation_bindings,
         "validation_used_for_model_selection": False,
         "test_owner_range": list(formal.CONTRACT["registered_design_unchanged"]["test"]["owners"]),
         "test_policy_models": dict(sorted(model_digests.items())),
-        "opened_utc": _now(),
         "test_games_started_before_open_receipt": 0,
     }
     path = package_root / "test-open-receipt.json"
+    if path.is_file():
+        saved = formal.read_json(path)
+        opened_utc = saved.get("opened_utc")
+        try:
+            parsed_opened_utc = datetime.fromisoformat(opened_utc) if isinstance(opened_utc, str) else None
+        except ValueError:
+            parsed_opened_utc = None
+        if (
+            parsed_opened_utc is None
+            or parsed_opened_utc.tzinfo is None
+            or parsed_opened_utc.utcoffset() != timezone.utc.utcoffset(parsed_opened_utc)
+            or type(saved.get("test_games_started_before_open_receipt")) is not int
+            or saved.get("test_games_started_before_open_receipt") != 0
+            or saved.get("validation_used_for_model_selection") is not False
+            or saved != {**record, "opened_utc": opened_utc}
+        ):
+            raise RuntimeError("existing TEST-open receipt differs from the complete frozen validation/source package")
+        return path, formal.file_sha256(path)
+    record["opened_utc"] = _now()
     digest = formal.pilot._write_or_verify_once(path, record)
     if formal.read_json(path) != record:
         raise RuntimeError("immutable TEST-open receipt differs from the frozen validation/source package")
@@ -1579,26 +1632,11 @@ def execute_formal(
             },
         }
         test_open_path = package_root / "test-open-receipt.json"
-        if not test_open_path.is_file():
-            test_open_path, test_open_sha = _test_open_receipt(
-                formal, package_root=package_root, identity=identity, readiness=readiness,
-                seed=seed, authorization=authorization,
-                validation_groups=validation_groups, model_digests=model_digests,
-            )
-        else:
-            test_open_sha = formal.file_sha256(test_open_path)
-            saved = formal.read_json(test_open_path)
-            if (
-                saved.get("schema_id") != TEST_OPEN_SCHEMA
-                or saved.get("package_commit") != identity["package_commit"]
-                or saved.get("source_lock_sha256") != identity["source_lock_sha256"]
-                or saved.get("seed_table_sha256") != seed_table_sha256
-                or saved.get("analysis_source_sha256") != formal.file_sha256(formal.STUDY / "formal_analysis.py")
-                or saved.get("authorization_receipt_sha256") != authorization["sha256"]
-                or saved.get("validation_used_for_model_selection") is not False
-                or saved.get("test_policy_models") != model_digests
-            ):
-                raise RuntimeError("existing TEST-open receipt does not match frozen sources, models or approval")
+        test_open_path, test_open_sha = _test_open_receipt(
+            formal, package_root=package_root, identity=identity, readiness=readiness,
+            seed=seed, authorization=authorization,
+            validation_groups=validation_groups, model_digests=model_digests,
+        )
         progress["test_open_receipt_sha256"] = test_open_sha
         save_progress()
         test_groups: dict[str, dict[str, Any]] = {}

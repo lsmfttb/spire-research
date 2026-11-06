@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -226,3 +227,227 @@ def test_formal_attempt_rejects_job_from_another_frozen_receipt(tmp_path: Path, 
             lock_sha="l" * 64, seed_table_sha256=expected["seed_table_sha256"],
             authorization_receipt_sha256=expected["authorization_receipt_sha256"],
         )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "contract_sha256",
+        "actor_update_schedule_sha256",
+        "test_owner_range",
+        "validation_receipt_sha256",
+        "validation_completion_count",
+        "owner_approval_comment_url",
+        "reviewer_approval_comment_url",
+        "status",
+        "test_games_started_before_open_receipt",
+        "boolean_zero_start_marker",
+        "test_policy_models",
+        "missing_contract_digest",
+    ],
+)
+def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
+    monkeypatch, tmp_path: Path, field: str,
+) -> None:
+    policies = ("PARENT", "A", "B", "C", "D", "E", "F")
+    new_arms = ("B", "C", "D", "E", "F")
+    package_commit = "c" * 40
+    source_lock_sha = "d" * 64
+    authorization_sha = "e" * 64
+    analysis_sha = "f" * 64
+    schedule_sha = "1" * 64
+    seed_path = tmp_path / "package" / "formal-seed-table.json"
+    seed_path.parent.mkdir(parents=True)
+    seed_path.write_text("{}", encoding="utf-8")
+    package_root = seed_path.parent
+    seed_sha = hashlib.sha256(seed_path.read_bytes()).hexdigest()
+    contract_path = tmp_path / "contract.json"
+    contract_path.write_text("{}", encoding="utf-8")
+    study = tmp_path / "study"
+    study.mkdir()
+    analysis_path = study / "formal_analysis.py"
+    analysis_path.write_text("# frozen analysis fixture\n", encoding="utf-8")
+    issue84_source = tmp_path / "issue84"
+    issue84_source.mkdir()
+
+    model_digests = {
+        policy: hashlib.sha256(policy.encode("ascii")).hexdigest()
+        for policy in policies
+    }
+    authorization = {
+        "sha256": authorization_sha,
+        "owner_approval_comment_url": "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-100",
+        "reviewer_approval_comment_url": "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-101",
+        "whole_task_active_wall_cap_seconds": 1_000_000,
+        "path": str(tmp_path / "authorization.json"),
+    }
+    identity = {"package_commit": package_commit, "source_lock_sha256": source_lock_sha}
+    readiness = {"formal_seed_table_sha256": seed_sha}
+    seed = {"actor_update_schedule_sha256": schedule_sha}
+
+    def file_sha256(path: Path) -> str:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+    def read_json(path: Path) -> dict:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+
+    formal = SimpleNamespace(
+        pilot=SimpleNamespace(
+            source_identity=lambda *, require_clean: identity,
+            _write_or_verify_once=formal_runner._write_or_verify_once,
+        ),
+        __file__=str(tmp_path / "formal_runner.py"),
+        DATA_ROOT=tmp_path / "data",
+        LOCK={
+            "baseline_P": {"model_digest": model_digests["PARENT"]},
+            "baseline_A": {"model_digest": model_digests["A"]},
+            "native": {"commit": "native-commit"},
+            "stsr_source": {"commit": "stsr-commit"},
+        },
+        NEW_ARMS=new_arms,
+        POLICIES=policies,
+        CONTRACT={
+            "training": {"owners_per_block": 128},
+            "registered_design_unchanged": {
+                "test": {"owners": [8520001, 8520320]},
+            },
+        },
+        CONTRACT_PATH=contract_path,
+        STUDY=study,
+        _registered_ranges=lambda: {"validation": range(64), "test": range(320)},
+        formal_plan=lambda: {"training_blocks_per_arm": 1},
+        file_sha256=file_sha256,
+        read_json=read_json,
+        verify_dry_bundle=lambda **_kwargs: {
+            "status": "VERIFIED / NO GAMES OR UPDATES STARTED",
+        },
+        _verify_native_source=lambda _path: {"commit": "native-commit"},
+        _verify_stsr_source=lambda _path: {"commit": "stsr-commit"},
+    )
+    validation_groups = {}
+    for policy in policies:
+        group_root = package_root / "validation" / policy
+        group_root.mkdir(parents=True)
+        receipt = {
+            "schema_id": formal_execution.GROUP_SCHEMA,
+            "status": "SUCCEEDED",
+            "stage_id": f"VALIDATION-{policy}",
+            "package_commit": package_commit,
+            "source_lock_sha256": source_lock_sha,
+            "seed_table_sha256": seed_sha,
+            "authorization_receipt_sha256": authorization_sha,
+            "row_count": 64,
+            "completed": 64,
+            "units": [
+                {
+                    "unit_id": f"EVAL:{8510001 + index}:{policy}",
+                    "owner_seed": 8510001 + index,
+                    "attempt_path": f"validation/{policy}/attempt-{index:04d}",
+                    "result_sha256": "2" * 64,
+                    "model_digest": model_digests[policy],
+                    "attempt_count": 1,
+                }
+                for index in range(64)
+            ],
+            "model_selection_or_tuning": False,
+            "created_utc": "2026-11-06T00:00:00+00:00",
+        }
+        receipt_path = group_root / "group-receipt.json"
+        receipt_path.write_text(json.dumps(receipt, sort_keys=True), encoding="utf-8")
+        validation_groups[policy] = {
+            **receipt,
+            "receipt_sha256": file_sha256(receipt_path),
+            "group_root": str(group_root),
+        }
+
+    open_path, initial_open_sha = formal_execution._test_open_receipt(
+        formal, package_root=package_root, identity=identity, readiness=readiness,
+        seed=seed, authorization=authorization,
+        validation_groups=validation_groups, model_digests=model_digests,
+    )
+    resumed_path, resumed_open_sha = formal_execution._test_open_receipt(
+        formal, package_root=package_root, identity=identity, readiness=readiness,
+        seed=seed, authorization=authorization,
+        validation_groups=validation_groups, model_digests=model_digests,
+    )
+    assert resumed_path == open_path
+    assert resumed_open_sha == initial_open_sha
+    saved = read_json(open_path)
+    if field == "validation_receipt_sha256":
+        saved["validation_group_receipts"]["A"]["receipt_sha256"] = "0" * 64
+    elif field == "validation_completion_count":
+        saved["validation_group_receipts"]["A"]["completed"] = 63
+    elif field == "test_policy_models":
+        saved["test_policy_models"]["A"] = "0" * 64
+    elif field == "missing_contract_digest":
+        del saved["contract_sha256"]
+    elif field == "test_owner_range":
+        saved[field] = [8520002, 8520320]
+    elif field == "test_games_started_before_open_receipt":
+        saved[field] = 1
+    elif field == "boolean_zero_start_marker":
+        saved["test_games_started_before_open_receipt"] = False
+    elif field == "status":
+        saved[field] = "TEST_OPEN / stale"
+    elif field == "owner_approval_comment_url":
+        saved[field] = "https://example.invalid/owner"
+    elif field == "reviewer_approval_comment_url":
+        saved[field] = "https://example.invalid/reviewer"
+    else:
+        saved[field] = "0" * 64
+    open_path.write_text(json.dumps(saved, sort_keys=True), encoding="utf-8")
+
+    for arm in new_arms:
+        update_receipt = package_root / "training" / arm / "updates" / "block-00" / "success-receipt.json"
+        update_receipt.parent.mkdir(parents=True, exist_ok=True)
+        update_receipt.write_text("{}", encoding="utf-8")
+
+    class Clock:
+        elapsed_before = 0.0
+
+        def elapsed(self) -> float:
+            return 0.0
+
+        def expired(self) -> bool:
+            return False
+
+        def set_processes(self, _pids: set[int]) -> None:
+            pass
+
+        def close(self) -> float:
+            return 0.0
+
+    backend = SimpleNamespace(ActiveClock=lambda *_args: Clock())
+    monkeypatch.setattr(formal_execution, "os", SimpleNamespace(name="posix", getpid=lambda: 123))
+    monkeypatch.setattr(formal_execution, "_validate_readiness", lambda *_args: (package_root, readiness, seed))
+    monkeypatch.setattr(formal_execution, "validate_authorization", lambda *_args, **_kwargs: authorization)
+    monkeypatch.setattr(formal_execution, "_configure_formal_runtime", lambda *_args: (backend, object()))
+    monkeypatch.setattr(formal_execution, "_atomic_json", lambda *_args: None)
+    monkeypatch.setattr(
+        formal_execution, "_run_training_games",
+        lambda *_args, **_kwargs: {"status": "SUCCEEDED", "completed": 128},
+    )
+    monkeypatch.setattr(
+        formal_execution, "_read_update_receipt",
+        lambda _formal, _root, _identity, *, arm, block: {
+            "result_model_digest": model_digests[arm],
+        },
+    )
+    test_worker_calls = []
+
+    def run_stage(_formal, _backend, *, phase, group, **_kwargs):
+        if phase == "test":
+            test_worker_calls.append(group)
+            raise AssertionError("TEST worker was reached with a damaged TEST-open receipt")
+        return validation_groups[group]
+
+    monkeypatch.setattr(formal_execution, "_run_stage", run_stage)
+
+    with pytest.raises(RuntimeError, match="existing TEST-open receipt differs"):
+        formal_execution.execute_formal(
+            formal, issue84_source=issue84_source, native_source=issue84_source,
+            stsr_source=issue84_source, authorization_receipt=tmp_path / "authorization.json",
+        )
+
+    assert test_worker_calls == []
+    assert not (package_root / "test").exists()
