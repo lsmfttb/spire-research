@@ -22,15 +22,31 @@ study=Path(__file__).resolve().parent
 repo=study.parents[1]
 # Worktrees were created by Windows Git; translate their .git pointers for the pinned WSL Python.
 sys.path.insert(0,str(study))
-from performance_provenance import capture_worktree_source, _git_environment
+from performance_provenance import (
+    capture_worktree_source,
+    _git_environment,
+    _windows_object_directory_from_wsl_alternate,
+)
 
 _real_subprocess_run=subprocess.run
 def _git_aware_run(cmd,*args,**kwargs):
     if isinstance(cmd,(list,tuple)) and cmd and str(cmd[0]).endswith('git') and '-C' in cmd:
-        try: target=Path(cmd[list(cmd).index('-C')+1]).resolve()
+        try:
+            git_c_index=list(cmd).index('-C')
+            target=Path(cmd[git_c_index+1]).resolve()
         except Exception: target=None
         if target==repo.resolve() or target==issue84_root:
             env=dict(os.environ); env.update(kwargs.get('env') or {}); env.update(_git_environment(target)); kwargs['env']=env
+        elif target is not None and os.name=='nt':
+            alternate_objects=_windows_object_directory_from_wsl_alternate(target)
+            if alternate_objects:
+                verb=cmd[git_c_index+2] if len(cmd)>git_c_index+2 else ''
+                if verb not in {'rev-parse','status'}:
+                    raise RuntimeError(f'Windows WSL-alternate adapter only permits read-only Git identity checks, got {verb!r}')
+                env=dict(os.environ); env.update(kwargs.get('env') or {})
+                env['GIT_OBJECT_DIRECTORY']=alternate_objects
+                env['GIT_OPTIONAL_LOCKS']='0'
+                kwargs['env']=env
     return _real_subprocess_run(cmd,*args,**kwargs)
 subprocess.run=_git_aware_run
 expected_head='5cd70c00d03f1104728efdc4b66c764592e5acf8'

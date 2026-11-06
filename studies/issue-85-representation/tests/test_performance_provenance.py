@@ -7,7 +7,12 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from performance_provenance import capture_worktree_source, sha256_bytes, verify_committed_source
+from performance_provenance import (
+    capture_worktree_source,
+    sha256_bytes,
+    verify_committed_source,
+    _windows_object_directory_from_wsl_alternate,
+)
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -61,3 +66,24 @@ def test_verifier_rejects_unexpected_source_set(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="source file set/order"):
         verify_committed_source(repo, binding, ("other.py",))
+
+
+def test_windows_adapter_maps_wsl_alternate_to_drive_path(tmp_path: Path) -> None:
+    repo = tmp_path / "runtime"
+    alternates = repo / ".git" / "objects" / "info" / "alternates"
+    alternates.parent.mkdir(parents=True)
+    alternates.write_text("/mnt/d/DeadlyCatCoding/sts_lightspeed/.git/objects\n", encoding="utf-8")
+
+    result = _windows_object_directory_from_wsl_alternate(repo, platform_name="nt")
+
+    assert result == "D:/DeadlyCatCoding/sts_lightspeed/.git/objects"
+
+
+def test_windows_adapter_ignores_non_wsl_and_non_windows_paths(tmp_path: Path) -> None:
+    repo = tmp_path / "runtime"
+    alternates = repo / ".git" / "objects" / "info" / "alternates"
+    alternates.parent.mkdir(parents=True)
+    alternates.write_text("/home/research/objects\n", encoding="utf-8")
+
+    assert _windows_object_directory_from_wsl_alternate(repo, platform_name="nt") is None
+    assert _windows_object_directory_from_wsl_alternate(repo, platform_name="posix") is None

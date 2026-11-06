@@ -45,6 +45,37 @@ def _git_environment(repo_root: Path) -> dict[str, str]:
     return env
 
 
+def _windows_object_directory_from_wsl_alternate(
+    repo_root: Path,
+    *,
+    platform_name: str = os.name,
+) -> str | None:
+    """Map one WSL-mounted alternate object directory for Windows Git reads.
+
+    Some durable runtime snapshots were created by WSL Git and retain an
+    ``objects/info/alternates`` entry such as ``/mnt/d/...``. Windows Git
+    cannot resolve that entry, although the same object database is available
+    at ``D:/...``. The caller uses this only for read-only identity/status
+    checks, leaving the snapshot's refs, index, and worktree as the objects
+    being verified.
+    """
+    if platform_name != "nt":
+        return None
+    marker = repo_root / ".git"
+    if not marker.is_dir():
+        return None
+    alternates = marker / "objects" / "info" / "alternates"
+    if not alternates.is_file():
+        return None
+    entries = [line.strip() for line in alternates.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if len(entries) != 1:
+        return None
+    match = re.fullmatch(r"/mnt/([A-Za-z])/(.+)", entries[0])
+    if not match:
+        return None
+    return f"{match.group(1).upper()}:/{match.group(2)}"
+
+
 def _git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
     result = subprocess.run(
         ["git", "-C", str(repo_root), *args],
