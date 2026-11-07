@@ -1001,7 +1001,12 @@ def test_resumed_formal_continuation_shape_binds_actor_update_and_failed_attempt
         "b03_failed_attempt": {
             "unit_id": "TRAIN:8400417:B",
             "attempt": "attempt-0001",
-            "attempt_path": f"{formal_execution.RESUMED_B03_GROUP_ROOT}/units/TRAIN-8400417-B/attempt-0001",
+            "attempt_path": (
+                Path(formal_execution.RESUMED_B03_GROUP_ROOT)
+                .relative_to(Path(formal_execution.RESUMED_FORMAL_PACKAGE_ROOT))
+                .joinpath("units/TRAIN-8400417-B/attempt-0001")
+                .as_posix()
+            ),
             "status": "PRE_START_AUTHORIZATION_FAILURE",
             "failure_boundary": "before_started_receipt",
             "attempt_count": 1,

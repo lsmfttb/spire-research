@@ -316,6 +316,11 @@ def _validate_resumed_formal_continuation_shape(
         "TRAIN:8400418:B",
     ]
     failed = continuation.get("b03_failed_attempt")
+    expected_failed_attempt_path = (
+        Path(RESUMED_B03_GROUP_ROOT)
+        .relative_to(Path(RESUMED_FORMAL_PACKAGE_ROOT))
+        / "units/TRAIN-8400417-B/attempt-0001"
+    ).as_posix()
     b01_update = continuation.get("b01_actor_update")
     b02_update = continuation.get("b02_actor_update")
     snapshot = continuation.get("active_wall_clock_snapshot")
@@ -390,8 +395,7 @@ def _validate_resumed_formal_continuation_shape(
         and isinstance(failed, Mapping)
         and failed.get("unit_id") == "TRAIN:8400417:B"
         and failed.get("attempt") == "attempt-0001"
-        and failed.get("attempt_path")
-        == f"{RESUMED_B03_GROUP_ROOT}/units/TRAIN-8400417-B/attempt-0001"
+        and failed.get("attempt_path") == expected_failed_attempt_path
         and failed.get("status") == "PRE_START_AUTHORIZATION_FAILURE"
         and failed.get("failure_boundary") == "before_started_receipt"
         and type(failed.get("attempt_count")) is int
