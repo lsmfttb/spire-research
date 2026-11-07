@@ -79,6 +79,27 @@ RESUMED_B01_GROUP_CARRY = {
     "model_digest": RESUMED_B01_MODEL_DIGEST,
     "previous_update_receipt_sha256": RESUMED_B01_UPDATE_RECEIPT_SHA256,
 }
+RESUMED_FORMAL_PACKAGE_COMMIT = "b8b3fc043671498628f96d378d9cecd7ac54106f"
+RESUMED_FORMAL_PACKAGE_ROOT = (
+    "issue85/artifacts/formal/" + RESUMED_FORMAL_PACKAGE_COMMIT
+)
+RESUMED_FORMAL_SOURCE_LOCK_SHA256 = PREDECESSOR_SOURCE_LOCK_SHA256
+RESUMED_FORMAL_SEED_TABLE_SHA256 = "6fd3f9b022c93d91de0f4c36a9b26b3e651a8a6c57f9a90e26f11e2d6efffc46"
+RESUMED_FORMAL_PROGRESS_SHA256 = "d2d37be3f8421d4b10fbcb773f648b1ab6eb27425df505d4d11b360bcc3b0f14"
+RESUMED_FORMAL_AUTHORIZATION_SHA256 = "ab532c36b5d8dd00ca05cc3b338e16b026d204a36998a2ab9245886e6ffd44c1"
+RESUMED_FORMAL_CARRY_SHA256 = "83ff045730e9be827b9bb2762e16ddf75d0e304a59dee950486c83034ab0db43"
+RESUMED_B02_GROUP_ROOT = RESUMED_FORMAL_PACKAGE_ROOT + "/training/B/block-02/games"
+RESUMED_B02_GROUP_RECEIPT_SHA256 = "db787976261eb556b3e5ca0071a4b5e73ce85083a9545c8f6d9d79f2500786c2"
+RESUMED_B01_UPDATE_RECEIPT_FILE_SHA256 = "4d8bee2d845beedbd710d0a8badf01412a7e26bc91871f8ec7d028b34509d21a"
+RESUMED_B02_UPDATE_RECEIPT_FILE_SHA256 = "218d9e7ca5a38f97ea7fc2e661f87e1b4501f1900542fcf79ced27777bf5872e"
+RESUMED_B03_GROUP_ROOT = RESUMED_FORMAL_PACKAGE_ROOT + "/training/B/block-03/games"
+RESUMED_B03_LIVE_PROGRESS_PATH = RESUMED_FORMAL_PACKAGE_ROOT + "/live-training-B-03.json"
+RESUMED_B03_LIVE_PROGRESS_SHA256 = "ca0579f756c1ca3d136b5b0ae59b65471b18ae9b681ffd5ad52b9e17fec56ee5"
+RESUMED_FORMAL_CONTINUATION_SCHEMA = "issue85-formal-resumed-package-continuation-v1"
+RESUMED_B03_COMPLETED = 33
+RESUMED_B03_FAILED = 1
+RESUMED_B03_PENDING = 94
+RESUMED_B02_FAILED = 1
 FORMAL_GO_COMMENT_URL = "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-6686508621"
 FORMAL_ACTIVE_WALL_CAP_SECONDS = 295632
 PREDECESSOR_INITIAL_MODEL_DIGEST = "2891e60f6f9467c7f319a250e5789f4a0bfd89dcda17a60e8d416bcbdbd18908"
@@ -254,20 +275,134 @@ def _carried_active_wall_high_water(
         return None
     if len(carries) != 1 or not isinstance(carries[0], Mapping):
         raise RuntimeError("carried active-wall high-water record is malformed")
-    snapshot = carries[0].get("active_wall_clock_snapshot")
-    elapsed = snapshot.get("elapsed_seconds") if isinstance(snapshot, Mapping) else None
-    if (
-        isinstance(elapsed, bool) or not isinstance(elapsed, (int, float))
-        or not math.isfinite(float(elapsed))
-        or float(elapsed) < 0
-        or float(elapsed) > cap_seconds
-    ):
-        raise RuntimeError("immutable carried active-wall high-water is malformed or exceeds the approved cap")
-    return float(elapsed)
+    snapshots = [carries[0].get("active_wall_clock_snapshot")]
+    continuation = carry_manifest.get("resumed_formal_continuation")
+    if isinstance(continuation, Mapping):
+        snapshots.append(continuation.get("active_wall_clock_snapshot"))
+    elapsed_values = []
+    for snapshot in snapshots:
+        elapsed = snapshot.get("elapsed_seconds") if isinstance(snapshot, Mapping) else None
+        if (
+            isinstance(elapsed, bool) or not isinstance(elapsed, (int, float))
+            or not math.isfinite(float(elapsed))
+            or float(elapsed) < 0
+            or float(elapsed) > cap_seconds
+        ):
+            raise RuntimeError("immutable carried active-wall high-water is malformed or exceeds the approved cap")
+        elapsed_values.append(float(elapsed))
+    return max(elapsed_values)
 
 
 def _predecessor_carry_path(package_root: Path) -> Path:
     return Path(package_root) / "predecessor-carry-manifest.json"
+
+
+def _resumed_formal_continuation_required(package_commit: str) -> bool:
+    return package_commit not in {
+        OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT,
+        RESUMED_GAMES_PACKAGE_COMMIT,
+        RESUMED_FORMAL_PACKAGE_COMMIT,
+    }
+
+
+def _validate_resumed_formal_continuation_shape(
+    formal: Any, continuation: Any,
+) -> bool:
+    if not isinstance(continuation, Mapping):
+        return False
+    b03_units = continuation.get("b03_successful_units")
+    expected_successes = [
+        *(f"TRAIN:{owner}:B" for owner in range(8400385, 8400417)),
+        "TRAIN:8400418:B",
+    ]
+    failed = continuation.get("b03_failed_attempt")
+    b01_update = continuation.get("b01_actor_update")
+    b02_update = continuation.get("b02_actor_update")
+    snapshot = continuation.get("active_wall_clock_snapshot")
+    elapsed = snapshot.get("elapsed_seconds") if isinstance(snapshot, Mapping) else None
+
+    def valid_update_reference(
+        value: Any, *, block: int, receipt_file_sha256: str,
+        training_group_receipt_sha256: str, training_data_package_commit: str,
+    ) -> bool:
+        return bool(
+            isinstance(value, Mapping)
+            and value.get("arm") == "B"
+            and value.get("block_index") == block
+            and value.get("source_package_commit") == RESUMED_FORMAL_PACKAGE_COMMIT
+            and value.get("source_package_root") == RESUMED_FORMAL_PACKAGE_ROOT
+            and value.get("source_lock_sha256") == RESUMED_FORMAL_SOURCE_LOCK_SHA256
+            and value.get("source_update_receipt_file_sha256") == receipt_file_sha256
+            and value.get("training_group_receipt_sha256") == training_group_receipt_sha256
+            and value.get("training_data_package_commit") == training_data_package_commit
+            and isinstance(value.get("source_update_receipt_path"), str)
+            and isinstance(value.get("receipt_sha256"), str)
+            and re.fullmatch(r"[0-9a-f]{64}", value["receipt_sha256"]) is not None
+            and isinstance(value.get("actor_checkpoint_path"), str)
+            and isinstance(value.get("actor_checkpoint_sha256"), str)
+            and re.fullmatch(r"[0-9a-f]{64}", value["actor_checkpoint_sha256"]) is not None
+            and isinstance(value.get("optimizer_checkpoint_path"), str)
+            and isinstance(value.get("optimizer_checkpoint_sha256"), str)
+            and re.fullmatch(r"[0-9a-f]{64}", value["optimizer_checkpoint_sha256"]) is not None
+            and isinstance(value.get("result_model_digest"), str)
+            and re.fullmatch(r"[0-9a-f]{64}", value["result_model_digest"]) is not None
+        )
+
+    return bool(
+        continuation.get("schema_id") == RESUMED_FORMAL_CONTINUATION_SCHEMA
+        and continuation.get("source_package_commit") == RESUMED_FORMAL_PACKAGE_COMMIT
+        and continuation.get("source_package_root") == RESUMED_FORMAL_PACKAGE_ROOT
+        and continuation.get("source_lock_sha256") == RESUMED_FORMAL_SOURCE_LOCK_SHA256
+        and continuation.get("formal_seed_table_sha256") == RESUMED_FORMAL_SEED_TABLE_SHA256
+        and continuation.get("formal_progress_sha256") == RESUMED_FORMAL_PROGRESS_SHA256
+        and continuation.get("authorization_receipt_sha256") == RESUMED_FORMAL_AUTHORIZATION_SHA256
+        and continuation.get("predecessor_carry_manifest_sha256") == RESUMED_FORMAL_CARRY_SHA256
+        and continuation.get("b02_group_root") == RESUMED_B02_GROUP_ROOT
+        and continuation.get("b02_group_receipt_sha256") == RESUMED_B02_GROUP_RECEIPT_SHA256
+        and continuation.get("b01_update_receipt_file_sha256") == RESUMED_B01_UPDATE_RECEIPT_FILE_SHA256
+        and continuation.get("b02_update_receipt_file_sha256") == RESUMED_B02_UPDATE_RECEIPT_FILE_SHA256
+        and continuation.get("b03_live_progress_path") == RESUMED_B03_LIVE_PROGRESS_PATH
+        and continuation.get("b03_live_progress_sha256") == RESUMED_B03_LIVE_PROGRESS_SHA256
+        and continuation.get("b02_expected") == 128
+        and continuation.get("b02_completed") == 128
+        and continuation.get("b02_failed_attempt_count") == RESUMED_B02_FAILED
+        and continuation.get("b03_expected") == 128
+        and continuation.get("b03_completed") == RESUMED_B03_COMPLETED
+        and continuation.get("b03_failed_attempt_count") == RESUMED_B03_FAILED
+        and continuation.get("b03_pending") == RESUMED_B03_PENDING
+        and isinstance(b03_units, list)
+        and len(b03_units) == RESUMED_B03_COMPLETED
+        and [item.get("unit_id") for item in b03_units if isinstance(item, Mapping)] == expected_successes
+        and continuation.get("b03_units_sha256") == _hash_json(formal, b03_units)
+        and valid_update_reference(
+            b01_update, block=1,
+            receipt_file_sha256=RESUMED_B01_UPDATE_RECEIPT_FILE_SHA256,
+            training_group_receipt_sha256=RESUMED_B01_GROUP_RECEIPT_SHA256,
+            training_data_package_commit=RESUMED_GAMES_PACKAGE_COMMIT,
+        )
+        and valid_update_reference(
+            b02_update, block=2,
+            receipt_file_sha256=RESUMED_B02_UPDATE_RECEIPT_FILE_SHA256,
+            training_group_receipt_sha256=RESUMED_B02_GROUP_RECEIPT_SHA256,
+            training_data_package_commit=RESUMED_FORMAL_PACKAGE_COMMIT,
+        )
+        and continuation.get("b02_update_receipt_sha256") == b02_update.get("receipt_sha256")
+        and isinstance(failed, Mapping)
+        and failed.get("unit_id") == "TRAIN:8400417:B"
+        and failed.get("attempt") == "attempt-0001"
+        and failed.get("attempt_path")
+        == f"{RESUMED_B03_GROUP_ROOT}/units/TRAIN-8400417-B/attempt-0001"
+        and isinstance(failed.get("worker_job_sha256"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", failed["worker_job_sha256"]) is not None
+        and isinstance(failed.get("started_receipt_sha256"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", failed["started_receipt_sha256"]) is not None
+        and isinstance(elapsed, (int, float)) and not isinstance(elapsed, bool)
+        and math.isfinite(float(elapsed)) and 0 <= float(elapsed) <= FORMAL_ACTIVE_WALL_CAP_SECONDS
+        and snapshot.get("active_session") is None
+        and snapshot.get("process_ids") == []
+        and isinstance(snapshot.get("source_active_wall_file_sha256"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", snapshot["source_active_wall_file_sha256"]) is not None
+    )
 
 
 def _validate_carry_manifest(
@@ -292,6 +427,11 @@ def _validate_carry_manifest(
         [] if successor.get("package_commit") == OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT
         else [RESUMED_B01_GROUP_CARRY]
     ) if isinstance(successor, Mapping) else None
+    needs_formal_continuation = (
+        _resumed_formal_continuation_required(str(successor.get("package_commit", "")))
+        if isinstance(successor, Mapping) else False
+    )
+    resumed_formal_continuation = manifest.get("resumed_formal_continuation")
     if (
         manifest.get("schema_id") != PREDECESSOR_CARRY_SCHEMA
         or manifest.get("status") != "VERIFIED_READ_ONLY_CONTINUATION"
@@ -324,6 +464,16 @@ def _validate_carry_manifest(
         or resumed_game_carries != expected_resumed_game_carries
         or manifest.get("resumed_training_games_carried", 0) != (
             0 if expected_resumed_game_carries == [] else 128
+        )
+        or (resumed_formal_continuation is not None) != needs_formal_continuation
+        or (needs_formal_continuation and not _validate_resumed_formal_continuation_shape(
+            formal, resumed_formal_continuation,
+        ))
+        or manifest.get("resumed_formal_games_carried", 0) != (
+            0 if not needs_formal_continuation else 128 + RESUMED_B03_COMPLETED
+        )
+        or manifest.get("resumed_formal_actor_updates_carried", 0) != (
+            0 if not needs_formal_continuation else 2
         )
     ):
         raise RuntimeError("predecessor carry manifest is malformed or bound to another source/evidence")
@@ -1135,6 +1285,21 @@ def verify_predecessor_carry(
             formal, backend, issue84_driver, seed=seed,
             active_wall_clock_snapshot=actor_update_carries[0].get("active_wall_clock_snapshot"),
         )]
+    resumed_formal_continuation = None
+    if _resumed_formal_continuation_required(str(identity["package_commit"])):
+        stored_continuation = None
+        if manifest_path.is_file():
+            old_manifest = formal.read_json(manifest_path)
+            stored_continuation = old_manifest.get("resumed_formal_continuation")
+        snapshot = (
+            stored_continuation.get("active_wall_clock_snapshot")
+            if isinstance(stored_continuation, Mapping) else None
+        )
+        resumed_formal_continuation = _build_resumed_formal_continuation(
+            formal, issue84_source=issue84_source, seed=seed,
+            backend=backend, issue84_driver=issue84_driver,
+            active_wall_clock_snapshot=snapshot,
+        )
     manifest: dict[str, Any] = {
         "schema_id": PREDECESSOR_CARRY_SCHEMA,
         "status": "VERIFIED_READ_ONLY_CONTINUATION",
@@ -1189,6 +1354,10 @@ def verify_predecessor_carry(
     if resumed_training_group_carries:
         manifest["resumed_training_group_carries"] = resumed_training_group_carries
         manifest["resumed_training_games_carried"] = 128
+    if resumed_formal_continuation is not None:
+        manifest["resumed_formal_continuation"] = resumed_formal_continuation
+        manifest["resumed_formal_games_carried"] = 128 + RESUMED_B03_COMPLETED
+        manifest["resumed_formal_actor_updates_carried"] = 2
     manifest["manifest_sha256"] = _hash_json(formal, manifest)
     created_manifest = False
     if manifest_path.exists():
@@ -1219,12 +1388,647 @@ def verify_predecessor_carry(
         "formal_games_carried": len(unit_manifest),
         "actor_updates_carried": len(actor_update_carries),
         "resumed_training_games_carried": 128 * len(resumed_training_group_carries),
-        "total_formal_games_carried": len(unit_manifest) + 128 * len(resumed_training_group_carries),
-        "features_loaded_by_pinned_issue84_parser": len(examples),
+        "total_formal_games_carried": (
+            len(unit_manifest) + 128 * len(resumed_training_group_carries)
+            + (0 if resumed_formal_continuation is None else 128 + RESUMED_B03_COMPLETED)
+        ),
+        "resumed_formal_games_carried": (
+            0 if resumed_formal_continuation is None else 128 + RESUMED_B03_COMPLETED
+        ),
+        "resumed_formal_actor_updates_carried": (
+            0 if resumed_formal_continuation is None else 2
+        ),
+        "features_loaded_by_pinned_issue84_parser": len(examples) + (
+            0 if resumed_formal_continuation is None else RESUMED_B03_COMPLETED
+        ),
         "manifest_path": str(manifest_path),
         "manifest_sha256": manifest_sha,
         "manifest": manifest,
         "writes_performed": created_manifest,
+    }
+
+
+def _resumed_formal_continuation_files(formal: Any) -> tuple[Path, dict[str, Path]]:
+    data_root = Path(formal.DATA_ROOT).resolve(strict=True)
+    source_root = _inside(data_root, RESUMED_FORMAL_PACKAGE_ROOT)
+    files = {
+        "seed": source_root / "formal-seed-table.json",
+        "progress": source_root / "formal-progress.json",
+        "authorization": source_root / "formal-execution-authorization.json",
+        "carry": source_root / "predecessor-carry-manifest.json",
+        "b02_group": source_root / "training/B/block-02/games/group-receipt.json",
+        "b01_update": source_root / "training/B/updates/block-01/success-receipt.json",
+        "b02_update": source_root / "training/B/updates/block-02/success-receipt.json",
+        "b03_live": source_root / "live-training-B-03.json",
+    }
+    expected = {
+        "seed": RESUMED_FORMAL_SEED_TABLE_SHA256,
+        "progress": RESUMED_FORMAL_PROGRESS_SHA256,
+        "authorization": RESUMED_FORMAL_AUTHORIZATION_SHA256,
+        "carry": RESUMED_FORMAL_CARRY_SHA256,
+        "b02_group": RESUMED_B02_GROUP_RECEIPT_SHA256,
+        "b01_update": RESUMED_B01_UPDATE_RECEIPT_FILE_SHA256,
+        "b02_update": RESUMED_B02_UPDATE_RECEIPT_FILE_SHA256,
+        "b03_live": RESUMED_B03_LIVE_PROGRESS_SHA256,
+    }
+    for key, path in files.items():
+        if not path.is_file() or formal.file_sha256(path) != expected[key]:
+            raise RuntimeError(f"retained b8 continuation input is missing or changed: {key}")
+    return source_root, files
+
+
+def _b8_update_carry_reference(
+    formal: Any, source_root: Path, receipt: Mapping[str, Any], *, arm: str, block: int,
+) -> dict[str, Any]:
+    receipt_path = source_root / "training" / arm / "updates" / f"block-{block:02d}" / "success-receipt.json"
+    return {
+        "arm": arm,
+        "block_index": block,
+        "source_package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_package_root": RESUMED_FORMAL_PACKAGE_ROOT,
+        "source_lock_sha256": RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+        "source_update_receipt_path": receipt_path.relative_to(source_root).as_posix(),
+        "source_update_receipt_file_sha256": formal.file_sha256(receipt_path),
+        "receipt_sha256": receipt.get("receipt_sha256"),
+        "training_group_receipt_sha256": receipt.get("training_group_receipt_sha256"),
+        "training_data_package_commit": receipt.get("training_data_package_commit"),
+        "source_predecessor_carry_manifest_sha256": receipt.get("predecessor_carry_manifest_sha256"),
+        "actor_checkpoint_path": receipt.get("actor_checkpoint_path"),
+        "actor_checkpoint_sha256": receipt.get("actor_checkpoint_sha256"),
+        "optimizer_checkpoint_path": receipt.get("optimizer_checkpoint_path"),
+        "optimizer_checkpoint_sha256": receipt.get("optimizer_checkpoint_sha256"),
+        "result_model_digest": receipt.get("result_model_digest"),
+        "completed_steps": receipt.get("completed_steps"),
+        "actor_update_seed": receipt.get("actor_update_seed"),
+        "actor_update_schedule_sha256": receipt.get("actor_update_schedule_sha256"),
+        "owner_seed_sha256": receipt.get("owner_seed_sha256"),
+    }
+
+
+def _receipt_attempt_path(package_root: Path, unit: Mapping[str, Any]) -> Path:
+    relative = unit.get("attempt_path")
+    if not isinstance(relative, str) or not relative:
+        raise RuntimeError("group unit receipt has no package-relative attempt path")
+    return _inside(package_root, relative)
+
+
+def _build_resumed_formal_continuation(
+    formal: Any, *, issue84_source: Path, seed: Mapping[str, Any],
+    backend: Any, issue84_driver: Any, active_wall_clock_snapshot: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    source_root, files = _resumed_formal_continuation_files(formal)
+    source_seed = formal.read_json(files["seed"])
+    current_clock_path = Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "active-wall-issue85-task.json"
+    if not current_clock_path.is_file():
+        raise RuntimeError("the authoritative Issue 85 active-wall clock is missing")
+    current_clock = formal.read_json(current_clock_path)
+    elapsed = _validate_active_wall_clock(
+        current_clock, FORMAL_ACTIVE_WALL_CAP_SECONDS, require_idle=True,
+    )
+    if active_wall_clock_snapshot is None:
+        clock_snapshot = {
+            "elapsed_seconds": float(elapsed),
+            "active_session": None,
+            "process_ids": [],
+            "source_active_wall_file_sha256": formal.file_sha256(current_clock_path),
+        }
+    else:
+        clock_snapshot = dict(active_wall_clock_snapshot)
+        prior_elapsed = clock_snapshot.get("elapsed_seconds")
+        if (
+            isinstance(prior_elapsed, bool) or not isinstance(prior_elapsed, (int, float))
+            or float(elapsed) < float(prior_elapsed)
+        ):
+            raise RuntimeError("the cumulative Issue 85 clock fell below the carried b8 high-water")
+    if (
+        source_seed.get("schema_id") != "issue85-formal-seed-table-v1"
+        or source_seed.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
+        or source_seed.get("source_lock_sha256") != RESUMED_FORMAL_SOURCE_LOCK_SHA256
+        or source_seed.get("contract_sha256") != formal.file_sha256(formal.CONTRACT_PATH)
+        or source_seed.get("row_count") != 7808
+        or source_seed.get("rows_sha256") != _hash_json(formal, source_seed.get("rows"))
+        or source_seed.get("rows") != seed.get("rows")
+        or source_seed.get("actor_update_schedule") != seed.get("actor_update_schedule")
+        or source_seed.get("actor_update_schedule_sha256") != seed.get("actor_update_schedule_sha256")
+    ):
+        raise RuntimeError("b8 and successor seed tables do not bind the exact same registered rows and update schedule")
+    old_progress = formal.read_json(files["progress"])
+    old_auth = formal.read_json(files["authorization"])
+    reviewer = old_auth.get("reviewer_approval")
+    owner = old_auth.get("owner_approval")
+    old_b02_group = formal.read_json(files["b02_group"])
+    old_b03_live = formal.read_json(files["b03_live"])
+    source_identity = {
+        "package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_lock_sha256": RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+    }
+    if (
+        old_auth.get("schema_id") != AUTH_SCHEMA
+        or old_auth.get("issue") != 85 or old_auth.get("formal_go") is not True
+        or old_auth.get("status") != "APPROVED"
+        or old_auth.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
+        or old_auth.get("source_lock_sha256") != RESUMED_FORMAL_SOURCE_LOCK_SHA256
+        or old_auth.get("seed_table_sha256") != RESUMED_FORMAL_SEED_TABLE_SHA256
+        or old_auth.get("whole_task_active_wall_cap_seconds") != FORMAL_ACTIVE_WALL_CAP_SECONDS
+        or not isinstance(owner, Mapping) or owner.get("decision") != "FORMAL_GO"
+        or owner.get("comment_url") != FORMAL_GO_COMMENT_URL
+        or not isinstance(reviewer, Mapping) or reviewer.get("decision") != "PASS"
+        or reviewer.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
+        or reviewer.get("source_lock_sha256") != RESUMED_FORMAL_SOURCE_LOCK_SHA256
+        or old_progress.get("schema_id") != PROGRESS_SCHEMA
+        or old_progress.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
+        or old_progress.get("source_lock_sha256") != RESUMED_FORMAL_SOURCE_LOCK_SHA256
+        or old_progress.get("seed_table_sha256") != RESUMED_FORMAL_SEED_TABLE_SHA256
+        or old_progress.get("authorization_receipt_sha256") != RESUMED_FORMAL_AUTHORIZATION_SHA256
+        or old_progress.get("actor_updates", {}).get("B:1", {}).get("status") != "SUCCEEDED"
+        or old_progress.get("actor_updates", {}).get("B:2", {}).get("status") != "SUCCEEDED"
+    ):
+        raise RuntimeError("b8 formal authorization/progress does not preserve the approved same-study continuation")
+    b02_rows = _training_rows(seed, "B", 2)
+    b03_rows = _training_rows(seed, "B", 3)
+    if (
+        len(b02_rows) != 128 or [int(row["owner_seed"]) for row in b02_rows] != list(range(8400257, 8400385))
+        or len(b03_rows) != 128 or [int(row["owner_seed"]) for row in b03_rows] != list(range(8400385, 8400513))
+    ):
+        raise RuntimeError("registered B/02 or B/03 owners differ from the frozen formal seed table")
+    group_root = _inside(Path(formal.DATA_ROOT), RESUMED_B02_GROUP_ROOT)
+    expected_b02_ids = [str(row["unit_id"]) for row in b02_rows]
+    progress_b02 = old_progress.get("game_groups", {}).get("TRAIN-B-BLOCK-02")
+    update_b01 = _read_update_receipt(
+        formal, source_root, source_identity, arm="B", block=1,
+    )
+    update_b02 = _read_update_receipt(
+        formal, source_root, source_identity, arm="B", block=2,
+    )
+    if (
+        old_b02_group.get("schema_id") != GROUP_SCHEMA
+        or old_b02_group.get("status") != "SUCCEEDED"
+        or old_b02_group.get("stage_id") != "TRAIN-B-BLOCK-02-GAMES"
+        or old_b02_group.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
+        or old_b02_group.get("source_lock_sha256") != RESUMED_FORMAL_SOURCE_LOCK_SHA256
+        or old_b02_group.get("seed_table_sha256") != RESUMED_FORMAL_SEED_TABLE_SHA256
+        or old_b02_group.get("authorization_receipt_sha256") != RESUMED_FORMAL_AUTHORIZATION_SHA256
+        or old_b02_group.get("expected") != 128 or old_b02_group.get("row_count") != 128
+        or old_b02_group.get("completed") != 128
+        or old_b02_group.get("failed_attempt_count") != RESUMED_B02_FAILED
+        or [item.get("unit_id") for item in old_b02_group.get("units", [])] != expected_b02_ids
+        or not isinstance(progress_b02, Mapping) or progress_b02.get("status") != "SUCCEEDED"
+        or progress_b02.get("receipt_sha256") != RESUMED_B02_GROUP_RECEIPT_SHA256
+        or update_b01.get("receipt_file_sha256") != RESUMED_B01_UPDATE_RECEIPT_FILE_SHA256
+        or update_b02.get("receipt_file_sha256") != RESUMED_B02_UPDATE_RECEIPT_FILE_SHA256
+        or update_b02.get("training_group_receipt_sha256") != RESUMED_B02_GROUP_RECEIPT_SHA256
+        or update_b02.get("result_model_digest") != "10a3749c923d8ab7d9fdac6283bc5ddb8ae17ab793633cb78aca374e81cc4c75"
+    ):
+        raise RuntimeError("b8 B/02 group or B/01-B/02 actor-update lineage differs from retained receipts")
+    b02_history: dict[str, list[dict[str, Any]]] = {}
+    for row, unit in zip(b02_rows, old_b02_group["units"], strict=True):
+        unit_id = str(row["unit_id"])
+        result, history = _unit_attempts(
+            formal, backend, root=group_root, row=row,
+            package_commit=RESUMED_FORMAL_PACKAGE_COMMIT,
+            lock_sha=RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+            seed_table_sha256=RESUMED_FORMAL_SEED_TABLE_SHA256,
+            authorization_receipt_sha256=RESUMED_FORMAL_AUTHORIZATION_SHA256,
+            check_live_workers=False,
+        )
+        unit_dir = group_root / "units" / backend.unit_key(unit_id)
+        attempt_count = len(list(unit_dir.glob("attempt-*"))) if unit_dir.is_dir() else 0
+        success_record = backend.existing_success_record(
+            group_root, row, RESUMED_FORMAL_PACKAGE_COMMIT,
+        )
+        if result is None or success_record is None:
+            raise RuntimeError(f"retained B/02 successful owner receipt is unavailable: {unit_id}")
+        _success_result, result_path = success_record
+        expected_attempt_path = result_path.parent.relative_to(source_root).as_posix()
+        if (
+            _receipt_attempt_path(source_root, unit) != result_path.parent
+            or unit.get("owner_seed") != int(row["owner_seed"])
+            or unit.get("attempt_count") != attempt_count
+            or unit.get("attempt_path") != expected_attempt_path
+            or unit.get("result_sha256") != formal.file_sha256(result_path)
+            or unit.get("model_digest") != result.get("model_digest")
+            or result.get("model_digest") != update_b01.get("result_model_digest")
+        ):
+            raise RuntimeError(f"retained B/02 successful owner receipt differs: {unit_id}")
+        b02_history[unit_id] = history
+    if b02_history != old_b02_group.get("historical_attempts"):
+        raise RuntimeError("retained B/02 failed-attempt history differs from its immutable group receipt")
+    b03_root = _inside(Path(formal.DATA_ROOT), RESUMED_B03_GROUP_ROOT)
+    expected_success_ids = [
+        *(f"TRAIN:{owner}:B" for owner in range(8400385, 8400417)),
+        "TRAIN:8400418:B",
+    ]
+    expected_pending_ids = [f"TRAIN:{owner}:B" for owner in range(8400419, 8400513)]
+    failure_id = "TRAIN:8400417:B"
+    attempt_counts = old_b03_live.get("attempt_counts")
+    historical_attempts = old_b03_live.get("historical_attempts")
+    all_b03_ids = [str(row["unit_id"]) for row in b03_rows]
+    pending_with_attempts = [
+        unit_id for unit_id in expected_pending_ids
+        if (
+            (b03_root / "units" / backend.unit_key(unit_id)).is_dir()
+            and any((b03_root / "units" / backend.unit_key(unit_id)).iterdir())
+        )
+    ]
+    if pending_with_attempts:
+        raise RuntimeError(
+            "retained B/03 pending owner has unrecorded attempts; refusing to repeat or overwrite evidence: "
+            + ", ".join(pending_with_attempts[:5])
+        )
+    if (
+        old_b03_live.get("schema_id") != "issue85-formal-live-stage-v1"
+        or old_b03_live.get("status") != "RUNNING"
+        or old_b03_live.get("stage_id") != "TRAIN-B-BLOCK-03-GAMES"
+        or old_b03_live.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
+        or old_b03_live.get("source_lock_sha256") != RESUMED_FORMAL_SOURCE_LOCK_SHA256
+        or old_b03_live.get("seed_table_sha256") != RESUMED_FORMAL_SEED_TABLE_SHA256
+        or old_b03_live.get("authorization_receipt_sha256") != RESUMED_FORMAL_AUTHORIZATION_SHA256
+        or old_b03_live.get("expected") != 128
+        or old_b03_live.get("successful_completions") != RESUMED_B03_COMPLETED
+        or old_b03_live.get("successful_unit_ids") != expected_success_ids
+        or old_b03_live.get("pending_unit_ids") != expected_pending_ids
+        or old_b03_live.get("active_unit_ids") != []
+        or old_b03_live.get("recent_failures") != [{
+            "unit_id": failure_id, "attempt": "attempt-0001", "exit_code": 1,
+            "failure_detail": "worker failed without a result",
+        }]
+        or old_b03_live.get("historical_attempts", {}).get(failure_id) != [{
+            "attempt": "attempt-0001", "status": "STARTED_WITHOUT_TERMINAL",
+        }]
+        or not isinstance(attempt_counts, Mapping)
+        or set(attempt_counts) != set(all_b03_ids)
+        or any(attempt_counts.get(unit_id) != 1 for unit_id in expected_success_ids)
+        or any(attempt_counts.get(unit_id) != 0 for unit_id in expected_pending_ids)
+        or attempt_counts.get(failure_id) != 1
+        or historical_attempts != {
+            failure_id: [{"attempt": "attempt-0001", "status": "STARTED_WITHOUT_TERMINAL"}],
+        }
+    ):
+        raise RuntimeError("b8 B/03 partial progress is inconsistent or contains active/changed attempts")
+    successful_units = []
+    decoded = []
+    old_auth_sha = RESUMED_FORMAL_AUTHORIZATION_SHA256
+    for row in b03_rows:
+        unit_id = str(row["unit_id"])
+        if unit_id not in expected_success_ids:
+            continue
+        result, history = _unit_attempts(
+            formal, backend, root=b03_root, row=row,
+            package_commit=RESUMED_FORMAL_PACKAGE_COMMIT,
+            lock_sha=RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+            seed_table_sha256=RESUMED_FORMAL_SEED_TABLE_SHA256,
+            authorization_receipt_sha256=old_auth_sha,
+            check_live_workers=False,
+        )
+        if result is None or history:
+            raise RuntimeError(f"retained B/03 success is not one terminal source-bound result: {unit_id}")
+        unit_dir = b03_root / "units" / backend.unit_key(unit_id)
+        attempt_dirs = sorted(path for path in unit_dir.glob("attempt-*") if path.is_dir())
+        if len(attempt_dirs) != 1 or attempt_dirs[0].name != "attempt-0001":
+            raise RuntimeError(f"retained B/03 success attempt history is not unique: {unit_id}")
+        attempt = attempt_dirs[0]
+        result_path = attempt / "result.json"
+        finish_path = attempt / "finished.json"
+        pointer = result.get("training_features")
+        model_source = result.get("policy_source")
+        if (
+            not isinstance(pointer, Mapping)
+            or pointer.get("compression") != "zlib"
+            or result.get("model_digest") != update_b02.get("result_model_digest")
+            or not isinstance(model_source, Mapping)
+            or model_source.get("previous_update_receipt_sha256") != update_b02.get("receipt_sha256")
+            or result.get("expert_decisions") != 0
+        ):
+            raise RuntimeError(f"retained B/03 result is not bound to the carried B/02 actor: {unit_id}")
+        feature_relative = Path(str(pointer.get("path", "")))
+        expected_feature = Path("training-features.json.zlib")
+        if feature_relative.is_absolute() or ".." in feature_relative.parts or feature_relative != expected_feature:
+            raise RuntimeError(f"retained B/03 feature path escapes its attempt: {unit_id}")
+        feature_path = _inside(attempt, feature_relative.as_posix())
+        compressed = feature_path.read_bytes()
+        raw = zlib.decompress(compressed)
+        if (
+            formal.sha256_bytes(compressed) != pointer.get("sha256")
+            or len(compressed) != pointer.get("stored_bytes")
+            or formal.sha256_bytes(raw) != pointer.get("uncompressed_sha256")
+            or len(raw) != pointer.get("uncompressed_bytes")
+        ):
+            raise RuntimeError(f"retained B/03 feature bytes/hash/length differ: {unit_id}")
+        payload = json.loads(raw.decode("utf-8"))
+        base = payload.get("base") if isinstance(payload, Mapping) else None
+        if (
+            not isinstance(payload, Mapping) or payload.get("unit_id") != unit_id
+            or payload.get("owner_seed") != int(row["owner_seed"])
+            or payload.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
+            or payload.get("source_lock_sha256") != RESUMED_FORMAL_SOURCE_LOCK_SHA256
+            or not isinstance(base, Mapping) or base.get("complete") is not True
+            or base.get("terminal_floor") != result.get("terminal_floor")
+            or base.get("heart_win") is not result.get("heart_victory")
+        ):
+            raise RuntimeError(f"retained B/03 feature terminal/owner binding differs: {unit_id}")
+        successful_units.append({
+            "unit_id": unit_id,
+            "owner_seed": int(row["owner_seed"]),
+            "attempt_path": attempt.relative_to(source_root).as_posix(),
+            "attempt_count": 1,
+            "result_sha256": formal.file_sha256(result_path),
+            "finished_receipt_sha256": formal.file_sha256(finish_path),
+            "training_features_path": feature_relative.as_posix(),
+            "training_features_sha256": str(pointer["sha256"]),
+            "training_features_uncompressed_sha256": str(pointer["uncompressed_sha256"]),
+            "model_digest": str(result["model_digest"]),
+        })
+        decoded.append({
+            "unit_id": unit_id, "owner_seed": int(row["owner_seed"]),
+            "terminal_floor": float(result["terminal_floor"]),
+            "heart_victory": bool(result["heart_victory"]),
+        })
+    if len(successful_units) != RESUMED_B03_COMPLETED:
+        raise RuntimeError("retained B/03 success count differs from the immutable live-stage receipt")
+    failed_row = next(row for row in b03_rows if str(row["unit_id"]) == failure_id)
+    failed_root = b03_root / "units" / backend.unit_key(failure_id)
+    failed_attempt = failed_root / "attempt-0001"
+    failed_attempt_dirs = sorted(path for path in failed_root.glob("attempt-*") if path.is_dir())
+    if failed_attempt_dirs != [failed_attempt]:
+        raise RuntimeError("retained B/03 startup-failure attempt inventory differs from the pinned progress")
+    failed_result = failed_attempt / "result.json"
+    failed_finish = failed_attempt / "finished.json"
+    failed_job = failed_attempt / "worker-job.json"
+    failed_started = failed_attempt / "started.json"
+    failed_result_from_scan, failed_history = _unit_attempts(
+        formal, backend, root=b03_root, row=failed_row,
+        package_commit=RESUMED_FORMAL_PACKAGE_COMMIT,
+        lock_sha=RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+        seed_table_sha256=RESUMED_FORMAL_SEED_TABLE_SHA256,
+        authorization_receipt_sha256=old_auth_sha,
+        check_live_workers=False,
+    )
+    job = formal.read_json(failed_job) if failed_job.is_file() else {}
+    started = formal.read_json(failed_started) if failed_started.is_file() else {}
+    expected_failed_attempt = {
+        "schema_id": "issue79-owner-worker-job-v1",
+        "run_id": f"{failure_id}-attempt-0001",
+        "unit_id": failure_id,
+        "phase": failed_row.get("phase"),
+        "row": dict(failed_row),
+        "package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_lock_sha256": RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": RESUMED_FORMAL_SEED_TABLE_SHA256,
+        "authorization_receipt_sha256": old_auth_sha,
+    }
+    if (
+        failed_result_from_scan is not None or failed_history != [{
+            "attempt": "attempt-0001", "status": "STARTED_WITHOUT_TERMINAL",
+        }]
+        or failed_result.exists() or failed_finish.exists()
+        or any(job.get(key) != value for key, value in expected_failed_attempt.items())
+        or started.get("unit_id") != failure_id
+        or started.get("run_id") != f"{failure_id}-attempt-0001"
+        or started.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
+        or not isinstance(started.get("pid"), int)
+        or isinstance(started.get("pid"), bool)
+    ):
+        raise RuntimeError("retained B/03 startup failure differs; refusing to erase or relabel it")
+    with tempfile.TemporaryDirectory(prefix="issue85-resumed-b03-carry-") as temporary_root:
+        loaded = backend.load_modules(Path(temporary_root), pilot=True)
+        examples, outcomes = issue84_driver.load_training_outcomes(
+            [dict(row) for row in b03_rows if str(row["unit_id"]) in expected_success_ids],
+            root=b03_root, executor=loaded[-1], package=RESUMED_FORMAL_PACKAGE_COMMIT,
+        )
+    if len(examples) != RESUMED_B03_COMPLETED or len(outcomes) != RESUMED_B03_COMPLETED:
+        raise RuntimeError("pinned #84 loader did not recover all 33 retained B/03 outcomes")
+    for expected, example, outcome in zip(decoded, examples, outcomes, strict=True):
+        base = getattr(example, "base", None)
+        if (
+            int(getattr(example, "owner_seed", -1)) != expected["owner_seed"]
+            or not bool(getattr(base, "complete", False))
+            or float(getattr(base, "terminal_floor", math.nan)) != expected["terminal_floor"]
+            or bool(getattr(base, "heart_win", False)) != expected["heart_victory"]
+            or int(getattr(outcome, "owner_seed", -1)) != expected["owner_seed"]
+            or not bool(getattr(outcome, "complete", False))
+            or float(getattr(outcome, "terminal_floor", math.nan)) != expected["terminal_floor"]
+            or bool(getattr(outcome, "heart_win", False)) != expected["heart_victory"]
+        ):
+            raise RuntimeError(f"pinned #84 loader changed retained B/03 outcome: {expected['unit_id']}")
+    failure_reference = {
+        "unit_id": failure_id,
+        "attempt": "attempt-0001",
+        "attempt_path": failed_attempt.relative_to(source_root).as_posix(),
+        "worker_job_sha256": formal.file_sha256(failed_job),
+        "started_receipt_sha256": formal.file_sha256(failed_started),
+    }
+    return {
+        "schema_id": RESUMED_FORMAL_CONTINUATION_SCHEMA,
+        "source_package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_package_root": RESUMED_FORMAL_PACKAGE_ROOT,
+        "source_lock_sha256": RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+        "formal_seed_table_sha256": RESUMED_FORMAL_SEED_TABLE_SHA256,
+        "formal_progress_sha256": RESUMED_FORMAL_PROGRESS_SHA256,
+        "authorization_receipt_sha256": RESUMED_FORMAL_AUTHORIZATION_SHA256,
+        "predecessor_carry_manifest_sha256": RESUMED_FORMAL_CARRY_SHA256,
+        "b02_group_root": RESUMED_B02_GROUP_ROOT,
+        "b02_group_receipt_sha256": RESUMED_B02_GROUP_RECEIPT_SHA256,
+        "b01_update_receipt_file_sha256": update_b01["receipt_file_sha256"],
+        "b02_update_receipt_file_sha256": update_b02["receipt_file_sha256"],
+        "b02_update_receipt_sha256": update_b02["receipt_sha256"],
+        "b02_expected": 128,
+        "b02_completed": 128,
+        "b02_failed_attempt_count": RESUMED_B02_FAILED,
+        "b03_live_progress_path": RESUMED_B03_LIVE_PROGRESS_PATH,
+        "b03_live_progress_sha256": RESUMED_B03_LIVE_PROGRESS_SHA256,
+        "b03_expected": 128,
+        "b03_completed": len(successful_units),
+        "b03_failed_attempt_count": RESUMED_B03_FAILED,
+        "b03_pending": RESUMED_B03_PENDING,
+        "b01_actor_update": _b8_update_carry_reference(
+            formal, source_root, update_b01, arm="B", block=1,
+        ),
+        "b02_actor_update": _b8_update_carry_reference(
+            formal, source_root, update_b02, arm="B", block=2,
+        ),
+        "b03_successful_units": successful_units,
+        "b03_units_sha256": _hash_json(formal, successful_units),
+        "b03_failed_attempt": failure_reference,
+        "active_wall_clock_snapshot": clock_snapshot,
+    }
+
+
+def _validate_resumed_formal_continuation(
+    formal: Any, package_root: Path, identity: Mapping[str, str], backend: Any,
+) -> dict[str, Any] | None:
+    if not _resumed_formal_continuation_required(str(identity.get("package_commit", ""))):
+        return None
+    manifest, carry_sha256 = _validate_carry_manifest(formal, package_root, identity)
+    continuation = manifest.get("resumed_formal_continuation")
+    if not _validate_resumed_formal_continuation_shape(formal, continuation):
+        raise RuntimeError("b8 formal continuation reference is malformed")
+    source_root, files = _resumed_formal_continuation_files(formal)
+    if (
+        formal.file_sha256(files["seed"]) != continuation["formal_seed_table_sha256"]
+        or formal.file_sha256(files["progress"]) != continuation["formal_progress_sha256"]
+        or formal.file_sha256(files["authorization"]) != continuation["authorization_receipt_sha256"]
+        or formal.file_sha256(files["carry"]) != continuation["predecessor_carry_manifest_sha256"]
+        or formal.file_sha256(files["b02_group"]) != continuation["b02_group_receipt_sha256"]
+        or formal.file_sha256(files["b03_live"]) != continuation["b03_live_progress_sha256"]
+    ):
+        raise RuntimeError("retained b8 package source receipts changed after continuation review")
+    source_identity = {
+        "package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_lock_sha256": RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+    }
+    b01_update = _read_update_receipt(formal, source_root, source_identity, arm="B", block=1)
+    b02_update = _read_update_receipt(formal, source_root, source_identity, arm="B", block=2)
+    references = {
+        "B:1": (continuation["b01_actor_update"], b01_update),
+        "B:2": (continuation["b02_actor_update"], b02_update),
+    }
+    for label, (reference, receipt) in references.items():
+        if (
+            reference.get("source_update_receipt_file_sha256") != receipt.get("receipt_file_sha256")
+            or reference.get("receipt_sha256") != receipt.get("receipt_sha256")
+            or reference.get("actor_checkpoint_sha256") != receipt.get("actor_checkpoint_sha256")
+            or reference.get("optimizer_checkpoint_sha256") != receipt.get("optimizer_checkpoint_sha256")
+            or reference.get("result_model_digest") != receipt.get("result_model_digest")
+        ):
+            raise RuntimeError(f"retained b8 carried actor update differs for {label}")
+    b03_root = _inside(Path(formal.DATA_ROOT), RESUMED_B03_GROUP_ROOT)
+    source_seed = formal.read_json(files["seed"])
+    b03_rows = _training_rows(source_seed, "B", 3)
+    rows_by_id = {str(row["unit_id"]): row for row in b03_rows}
+    carried_units: dict[str, dict[str, Any]] = {}
+    for reference in continuation["b03_successful_units"]:
+        unit_id = str(reference["unit_id"])
+        row = rows_by_id.get(unit_id)
+        if (
+            row is None
+            or reference.get("owner_seed") != int(row["owner_seed"])
+            or reference.get("attempt_count") != 1
+        ):
+            raise RuntimeError(f"retained b8 B/03 owner reference differs from the seed table: {unit_id}")
+        expected_attempt = b03_root / "units" / backend.unit_key(unit_id) / "attempt-0001"
+        attempt = _inside(source_root, str(reference["attempt_path"]))
+        if attempt != expected_attempt:
+            raise RuntimeError(f"retained b8 B/03 attempt path differs from its owner: {unit_id}")
+        result_path = attempt / "result.json"
+        finish_path = attempt / "finished.json"
+        feature_path = _inside(attempt, str(reference["training_features_path"]))
+        if (
+            formal.file_sha256(result_path) != reference["result_sha256"]
+            or formal.file_sha256(finish_path) != reference["finished_receipt_sha256"]
+            or formal.file_sha256(feature_path) != reference["training_features_sha256"]
+        ):
+            raise RuntimeError(f"retained b8 B/03 success changed after continuation review: {unit_id}")
+        result = formal.read_json(result_path)
+        pointer = result.get("training_features")
+        model_source = result.get("policy_source")
+        if (
+            result.get("status") != "SUCCEEDED"
+            or result.get("unit_id") != unit_id
+            or result.get("owner_seed") != int(row["owner_seed"])
+            or result.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
+            or result.get("source_lock_sha256") != RESUMED_FORMAL_SOURCE_LOCK_SHA256
+            or result.get("model_digest") != continuation["b02_actor_update"]["result_model_digest"]
+            or not isinstance(pointer, Mapping)
+            or pointer.get("path") != reference.get("training_features_path")
+            or pointer.get("sha256") != reference.get("training_features_sha256")
+            or pointer.get("uncompressed_sha256") != reference.get("training_features_uncompressed_sha256")
+            or not isinstance(model_source, Mapping)
+            or model_source.get("previous_update_receipt_sha256") != continuation["b02_actor_update"].get("receipt_sha256")
+            or result.get("expert_decisions") != 0
+        ):
+            raise RuntimeError(f"retained b8 B/03 terminal result is not bound to the reviewed B/02 model: {unit_id}")
+        carried_units[unit_id] = {
+            "result": result,
+            "history": [],
+            "attempt_count": int(reference["attempt_count"]),
+            "reference": dict(reference),
+            "group_root": str(b03_root),
+            "package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+        }
+    failed = continuation["b03_failed_attempt"]
+    failed_attempt = _inside(source_root, str(failed["attempt_path"]))
+    expected_failed_attempt = b03_root / "units" / backend.unit_key(failed["unit_id"]) / "attempt-0001"
+    if failed_attempt != expected_failed_attempt:
+        raise RuntimeError("retained b8 B/03 failure path differs from its registered owner")
+    failed_job = failed_attempt / "worker-job.json"
+    failed_started = failed_attempt / "started.json"
+    if (
+        formal.file_sha256(failed_job) != failed["worker_job_sha256"]
+        or formal.file_sha256(failed_started) != failed["started_receipt_sha256"]
+        or (failed_attempt / "result.json").exists()
+        or (failed_attempt / "finished.json").exists()
+    ):
+        raise RuntimeError("retained b8 B/03 failed attempt changed after continuation review")
+    carried_units[str(failed["unit_id"])] = {
+        "result": None,
+        "history": [{
+            "attempt": str(failed["attempt"]),
+            "status": "STARTED_WITHOUT_TERMINAL",
+            "source_package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+        }],
+        "attempt_count": 1,
+        "reference": dict(failed),
+        "group_root": str(b03_root),
+        "package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+    }
+    pending_ids = [
+        str(row["unit_id"]) for row in b03_rows
+        if str(row["unit_id"]) not in carried_units
+    ]
+    pending_with_attempts = [
+        unit_id for unit_id in pending_ids
+        if (
+            (b03_root / "units" / backend.unit_key(unit_id)).is_dir()
+            and any((b03_root / "units" / backend.unit_key(unit_id)).iterdir())
+        )
+    ]
+    if pending_with_attempts:
+        raise RuntimeError(
+            "retained b8 B/03 pending owner now has unrecorded attempts; refusing to repeat evidence: "
+            + ", ".join(pending_with_attempts[:5])
+        )
+    return {
+        "manifest_sha256": carry_sha256,
+        "source_package_root": str(source_root),
+        "b02_group_receipt": formal.read_json(files["b02_group"]),
+        "b02_group_root": str(_inside(Path(formal.DATA_ROOT), RESUMED_B02_GROUP_ROOT)),
+        "b01_actor_update": b01_update,
+        "b02_actor_update": b02_update,
+        "b03_carried_units": carried_units,
+        "b03_failed_attempt": dict(failed),
+    }
+
+
+def _resumed_b02_training_group(
+    formal: Any, package_root: Path, identity: Mapping[str, str],
+    continuation: Mapping[str, Any],
+) -> dict[str, Any]:
+    _manifest, carry_sha256 = _validate_carry_manifest(formal, package_root, identity)
+    receipt = continuation.get("b02_group_receipt")
+    if (
+        not isinstance(receipt, Mapping)
+        or formal.file_sha256(_inside(Path(formal.DATA_ROOT), RESUMED_B02_GROUP_ROOT) / "group-receipt.json")
+        != RESUMED_B02_GROUP_RECEIPT_SHA256
+    ):
+        raise RuntimeError("verified read-only B/02 group receipt is unavailable")
+    return {
+        "schema_id": CARRIED_GROUP_REFERENCE_SCHEMA,
+        "artifact_kind": "read-only b8 B/02 receipt reference; no successor game receipt",
+        "status": "SUCCEEDED",
+        "stage_id": "TRAIN-B-BLOCK-02-GAMES",
+        "package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+        "training_data_package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_lock_sha256": RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": RESUMED_FORMAL_SEED_TABLE_SHA256,
+        "authorization_receipt_sha256": RESUMED_FORMAL_AUTHORIZATION_SHA256,
+        "expected": 128,
+        "completed": 128,
+        "failed_attempt_count": RESUMED_B02_FAILED,
+        "receipt_path": (Path(RESUMED_B02_GROUP_ROOT) / "group-receipt.json").as_posix(),
+        "receipt_sha256": RESUMED_B02_GROUP_RECEIPT_SHA256,
+        "group_root": str(continuation["b02_group_root"]),
+        "predecessor_carry_manifest_sha256": carry_sha256,
+        "carried_actor_update": "B/02 is also referenced from the reviewed b8 package",
     }
 
 
@@ -1776,6 +2580,8 @@ def _run_formal_units(
     stage_id: str, package_commit: str, source_lock_sha256: str,
     seed_table_sha256: str, authorization: Mapping[str, Any],
     issue84_source: Path, clock: Any, progress_path: Path,
+    carried_unit_results: Mapping[str, Mapping[str, Any]] | None = None,
+    predecessor_carry_manifest_sha256: str | None = None,
 ) -> dict[str, Any]:
     if not rows or len({str(row["unit_id"]) for row in rows}) != len(rows):
         raise ValueError(f"{stage_id} must contain unique registered rows")
@@ -1785,20 +2591,56 @@ def _run_formal_units(
     complete: dict[str, dict[str, Any]] = {}
     attempts_by_unit: dict[str, int] = {}
     histories: dict[str, list[dict[str, Any]]] = {}
+    carried_histories: dict[str, list[dict[str, Any]]] = {}
+    carried_results = {str(key): dict(value) for key, value in (carried_unit_results or {}).items()}
     pending: list[dict[str, Any]] = []
+    row_ids = {str(row["unit_id"]) for row in rows}
+    if not set(carried_results).issubset(row_ids):
+        raise RuntimeError(f"{stage_id} continuation contains an unregistered carried owner")
     for row in rows:
-        result, history = _unit_attempts(
+        unit_id = str(row["unit_id"])
+        carried = carried_results.get(unit_id)
+        unit_dir = root / "units" / backend.unit_key(unit_id)
+        local_attempts = sorted(path for path in unit_dir.glob("attempt-*") if path.is_dir()) if unit_dir.is_dir() else []
+        local_result, local_history = _unit_attempts(
             formal, backend, root=root, row=row, package_commit=package_commit,
             lock_sha=source_lock_sha256, seed_table_sha256=seed_table_sha256,
             authorization_receipt_sha256=str(authorization["sha256"]),
         )
-        histories[str(row["unit_id"])] = history
-        unit_dir = root / "units" / backend.unit_key(str(row["unit_id"]))
-        attempts_by_unit[str(row["unit_id"])] = len(list(unit_dir.glob("attempt-*"))) if unit_dir.is_dir() else 0
-        if result is None:
+        if carried is not None:
+            if (
+                int(carried.get("attempt_count", -1)) < 0
+                or str(carried.get("package_commit", "")) != RESUMED_FORMAL_PACKAGE_COMMIT
+                or not isinstance(carried.get("history"), list)
+                or (carried.get("result") is not None and local_attempts)
+                or (carried.get("result") is not None and local_result is not None)
+            ):
+                raise RuntimeError(f"{stage_id} carried and successor attempts overlap or are malformed: {unit_id}")
+            if carried.get("result") is None and any(
+                int(path.name.removeprefix("attempt-")) <= int(carried["attempt_count"])
+                for path in local_attempts
+            ):
+                raise RuntimeError(f"{stage_id} successor attempt numbers overlap the carried history: {unit_id}")
+            carried_histories[unit_id] = [dict(item) for item in carried["history"]]
+            attempts_by_unit[unit_id] = int(carried["attempt_count"]) + len(local_attempts)
+            histories[unit_id] = carried_histories[unit_id] + local_history
+            if carried.get("result") is not None:
+                result = carried["result"]
+                if (
+                    result.get("unit_id") != unit_id
+                    or result.get("owner_seed") != int(row["owner_seed"])
+                    or result.get("status") != "SUCCEEDED"
+                ):
+                    raise RuntimeError(f"{stage_id} carried result differs from its registered row: {unit_id}")
+                complete[unit_id] = result
+                continue
+        else:
+            attempts_by_unit[unit_id] = len(local_attempts)
+            histories[unit_id] = local_history
+        if local_result is None:
             pending.append(row)
         else:
-            complete[str(row["unit_id"])] = result
+            complete[unit_id] = local_result
     group: dict[str, Any] = {
         "schema_id": "issue85-formal-live-stage-v1",
         "stage_id": stage_id,
@@ -1931,7 +2773,7 @@ def _run_formal_units(
                 authorization_receipt_sha256=str(authorization["sha256"]),
             )
             del active[run_id]
-            histories[unit_id] = history
+            histories[unit_id] = carried_histories.get(unit_id, []) + history
             if code == 0 and result is not None:
                 complete[unit_id] = result
             else:
@@ -1950,49 +2792,84 @@ def _run_formal_units(
             if time.monotonic() - last_heartbeat >= 5.0:
                 publish()
                 last_heartbeat = time.monotonic()
-    complete_rows = []
     for row in rows:
-        result, history = _unit_attempts(
+        unit_id = str(row["unit_id"])
+        _result, history = _unit_attempts(
             formal, backend, root=root, row=row, package_commit=package_commit,
             lock_sha=source_lock_sha256, seed_table_sha256=seed_table_sha256,
             authorization_receipt_sha256=str(authorization["sha256"]),
         )
-        if result is not None:
-            record = backend.existing_success_record(root, row, package_commit)
-            if record is None:
-                raise RuntimeError(f"formal success cannot be recovered from the exact executor receipts: {row['unit_id']}")
-            result_value, result_path = record
-            complete_rows.append({
-                "unit_id": str(row["unit_id"]),
-                "owner_seed": int(row["owner_seed"]),
-                "attempt_path": result_path.parent.relative_to(Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal" / package_commit).as_posix(),
-                "result_sha256": formal.file_sha256(result_path),
-                "model_digest": str(result["model_digest"]),
-                "attempt_count": len(list((root / "units" / backend.unit_key(str(row["unit_id"]))).glob("attempt-*"))),
+        if complete.get(unit_id) is None:
+            histories[unit_id] = carried_histories.get(unit_id, []) + history
+    final_units = []
+    carried_sources = {}
+    for row in rows:
+        unit_id = str(row["unit_id"])
+        carried = carried_results.get(unit_id)
+        if carried is not None and carried.get("result") is not None:
+            reference = dict(carried["reference"])
+            source_commit = str(carried["package_commit"])
+            reference.update({
+                "source_package_commit": source_commit,
+                "source_group_root": RESUMED_B03_GROUP_ROOT,
             })
-        else:
-            histories[str(row["unit_id"])] = history
+            final_units.append(reference)
+            carried_sources[unit_id] = {
+                "package_commit": source_commit,
+                "group_root": RESUMED_B03_GROUP_ROOT,
+            }
+            continue
+        result, result_path = backend.existing_success_record(root, row, package_commit) if complete.get(unit_id) is not None else (None, None)
+        if result is None or result_path is None:
+            continue
+        final_units.append({
+            "unit_id": unit_id,
+            "owner_seed": int(row["owner_seed"]),
+            "attempt_path": result_path.parent.relative_to(Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal" / package_commit).as_posix(),
+            "result_sha256": formal.file_sha256(result_path),
+            "model_digest": str(result["model_digest"]),
+            "attempt_count": attempts_by_unit[unit_id],
+        })
     final = {
         "schema_id": GROUP_SCHEMA,
         "stage_id": stage_id,
-        "status": "SUCCEEDED" if len(complete_rows) == len(rows) else str(group.get("stop_reason", "PAUSED_AFTER_FAILED_ATTEMPT")),
+        "status": "SUCCEEDED" if len(final_units) == len(rows) else str(group.get("stop_reason", "PAUSED_AFTER_FAILED_ATTEMPT")),
         "package_commit": package_commit,
         "source_lock_sha256": source_lock_sha256,
         "seed_table_sha256": seed_table_sha256,
         "authorization_receipt_sha256": authorization["sha256"],
         "expected": len(rows),
-        "completed": len(complete_rows),
-        "successful_unit_ids": [row["unit_id"] for row in complete_rows],
-        "units": complete_rows,
+        "completed": len(final_units),
+        "successful_unit_ids": [row["unit_id"] for row in final_units],
+        "units": final_units,
         "historical_attempts": histories,
         "failed_attempt_count": sum(1 for entries in histories.values() for item in entries if item.get("status") != "SUCCEEDED"),
         "active_wall_seconds_at_stage_close": clock.elapsed(),
     }
+    if carried_sources:
+        final["carried_unit_sources"] = carried_sources
+        final["training_data_package_commit"] = package_commit
+        final["predecessor_carry_manifest_sha256"] = predecessor_carry_manifest_sha256
     if rows[0].get("issue85_phase") == "validation":
         final["model_selection_or_tuning"] = False
     group_receipt = root / "group-receipt.json"
     if final["status"] == "SUCCEEDED":
-        digest = formal.pilot._write_or_verify_once(group_receipt, final)
+        if group_receipt.is_file():
+            existing = formal.read_json(group_receipt)
+            comparable_existing = {
+                key: value for key, value in existing.items()
+                if key != "active_wall_seconds_at_stage_close"
+            }
+            comparable_final = {
+                key: value for key, value in final.items()
+                if key != "active_wall_seconds_at_stage_close"
+            }
+            if comparable_existing != comparable_final:
+                raise RuntimeError("immutable formal training group receipt differs on resumed reconstruction")
+            final = existing
+            digest = formal.file_sha256(group_receipt)
+        else:
+            digest = formal.pilot._write_or_verify_once(group_receipt, final)
         final["receipt_path"] = str(group_receipt)
         final["receipt_sha256"] = digest
     _snapshot_stage(formal, progress_path=progress_path, group={**final, "updated_utc": _now()})
@@ -2022,6 +2899,53 @@ def _read_update_receipt(
     formal: Any, package_root: Path, identity: Mapping[str, str], *, arm: str, block: int,
 ) -> dict[str, Any]:
     path = package_root / "training" / arm / "updates" / f"block-{block:02d}" / "success-receipt.json"
+    if arm == "B" and block in (1, 2) and _resumed_formal_continuation_required(str(identity.get("package_commit", ""))):
+        carry_manifest, carry_manifest_sha256 = _validate_carry_manifest(formal, package_root, identity)
+        continuation = carry_manifest.get("resumed_formal_continuation")
+        carry_key = "b01_actor_update" if block == 1 else "b02_actor_update"
+        carry = continuation.get(carry_key) if isinstance(continuation, Mapping) else None
+        if not isinstance(carry, Mapping):
+            raise RuntimeError(f"B/{block:02d} update has no reviewed b8 source receipt")
+        if path.parent.exists() and any(path.parent.iterdir()):
+            raise RuntimeError(f"B/{block:02d} update is both carried by reference and has local attempts")
+        if (
+            carry.get("arm") != "B" or carry.get("block_index") != block
+            or carry.get("source_package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
+            or carry.get("source_package_root") != RESUMED_FORMAL_PACKAGE_ROOT
+            or carry.get("source_lock_sha256") != RESUMED_FORMAL_SOURCE_LOCK_SHA256
+        ):
+            raise RuntimeError(f"B/{block:02d} actor-update carry is bound to another source")
+        source_root = _inside(Path(formal.DATA_ROOT), RESUMED_FORMAL_PACKAGE_ROOT)
+        source_receipt = _read_update_receipt(
+            formal, source_root,
+            {"package_commit": RESUMED_FORMAL_PACKAGE_COMMIT, "source_lock_sha256": RESUMED_FORMAL_SOURCE_LOCK_SHA256},
+            arm="B", block=block,
+        )
+        bindings = {
+            "source_update_receipt_path": "receipt_path",
+            "source_update_receipt_file_sha256": "receipt_file_sha256",
+            "receipt_sha256": "receipt_sha256",
+            "training_group_receipt_sha256": "training_group_receipt_sha256",
+            "training_data_package_commit": "training_data_package_commit",
+            "source_predecessor_carry_manifest_sha256": "predecessor_carry_manifest_sha256",
+            "actor_checkpoint_path": "actor_checkpoint_path",
+            "actor_checkpoint_sha256": "actor_checkpoint_sha256",
+            "optimizer_checkpoint_path": "optimizer_checkpoint_path",
+            "optimizer_checkpoint_sha256": "optimizer_checkpoint_sha256",
+            "result_model_digest": "result_model_digest",
+            "completed_steps": "completed_steps",
+            "actor_update_seed": "actor_update_seed",
+            "actor_update_schedule_sha256": "actor_update_schedule_sha256",
+            "owner_seed_sha256": "owner_seed_sha256",
+        }
+        if any(carry.get(carry_key) != source_receipt.get(receipt_key) for carry_key, receipt_key in bindings.items()):
+            raise RuntimeError(f"B/{block:02d} carried actor update differs from its immutable b8 source receipt")
+        return {
+            **source_receipt,
+            "producer_package_root": str(source_root),
+            "carried_from_package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+            "carried_by_manifest_sha256": carry_manifest_sha256,
+        }
     if arm == "B" and block == 0:
         carry_manifest, carry_manifest_sha256 = _validate_carry_manifest(formal, package_root, identity)
         carries = carry_manifest.get("actor_update_carries", [])
@@ -2086,11 +3010,23 @@ def _read_update_receipt(
         if _manifest.get("resumed_training_group_carries") != [RESUMED_B01_GROUP_CARRY]:
             raise RuntimeError("B/01 actor update receipt has no verified carried games reference")
         training_data_package = RESUMED_GAMES_PACKAGE_COMMIT
+    elif arm == "B" and block == 3:
+        _manifest, carry_manifest_sha256 = _validate_carry_manifest(formal, package_root, identity)
+        if not isinstance(_manifest.get("resumed_formal_continuation"), Mapping):
+            raise RuntimeError("B/03 actor update has no verified partial-group continuation")
+        training_data_package = identity["package_commit"]
+        group_receipt_path = package_root / "training/B/block-03/games/group-receipt.json"
+        if (
+            not group_receipt_path.is_file()
+            or formal.file_sha256(group_receipt_path) != receipt.get("training_group_receipt_sha256")
+        ):
+            raise RuntimeError("B/03 actor update is not bound to its immutable mixed-source game group")
     if (
         receipt.get("training_data_package_commit") != training_data_package
         or receipt.get("predecessor_carry_manifest_sha256") != carry_manifest_sha256
         or (arm == "B" and block == 0 and receipt.get("training_group_receipt_sha256") != PREDECESSOR_GROUP_RECEIPT_SHA256)
         or (arm == "B" and block == 1 and receipt.get("training_group_receipt_sha256") != RESUMED_B01_GROUP_RECEIPT_SHA256)
+        or (arm == "B" and block == 3 and receipt.get("predecessor_carry_manifest_sha256") != carry_manifest_sha256)
         or receipt.get("schema_id") != UPDATE_SCHEMA or receipt.get("status") != "SUCCEEDED"
         or receipt.get("arm") != arm or receipt.get("block_index") != block
         or receipt.get("package_commit") != identity["package_commit"]
@@ -2100,6 +3036,7 @@ def _read_update_receipt(
         or receipt.get("minibatch_owners") != int(formal.CONTRACT["training"]["minibatch_owners"])
         or receipt.get("receipt_sha256") != _hash_json(formal, {key: value for key, value in receipt.items() if key != "receipt_sha256"})
         or formal.file_sha256(_inside(package_root, str(receipt.get("actor_checkpoint_path", "")))) != receipt.get("actor_checkpoint_sha256")
+        or formal.file_sha256(_inside(package_root, str(receipt.get("optimizer_checkpoint_path", "")))) != receipt.get("optimizer_checkpoint_sha256")
     ):
         raise RuntimeError(f"formal actor update receipt/checkpoint differs for {arm} block {block}")
     return {
@@ -2244,6 +3181,23 @@ def _train_actor_block(
             or _manifest.get("resumed_training_group_carries") != [RESUMED_B01_GROUP_CARRY]
         ):
             raise RuntimeError("B/block-01 actor update is not bound to the verified resumed game group")
+    elif arm == "B" and block == 3:
+        manifest, expected_carry_sha256 = _validate_carry_manifest(
+            formal, package_root, identity,
+            expected_sha256=str(carry_manifest_sha256) if carry_manifest_sha256 is not None else None,
+        )
+        carried_sources = training_group.get("carried_unit_sources")
+        group_receipt_path = package_root / "training/B/block-03/games/group-receipt.json"
+        if (
+            training_data_package != identity["package_commit"]
+            or carry_manifest_sha256 != expected_carry_sha256
+            or not isinstance(manifest.get("resumed_formal_continuation"), Mapping)
+            or not isinstance(carried_sources, Mapping)
+            or len(carried_sources) != RESUMED_B03_COMPLETED
+            or not group_receipt_path.is_file()
+            or formal.file_sha256(group_receipt_path) != group_sha
+        ):
+            raise RuntimeError("B/block-03 actor update is not bound to the reviewed mixed-source game group")
     elif training_data_package != identity["package_commit"] or carry_manifest_sha256 is not None:
         raise RuntimeError("non-predecessor actor update has an unexpected training-data package")
     update_root = package_root / "training" / arm / "updates" / f"block-{block:02d}"
@@ -2263,10 +3217,27 @@ def _train_actor_block(
     finally:
         formal.pilot._CURRENT_ROW.reset(row_token)
     actor.train()
-    examples, _outcomes = issue84_driver.load_training_outcomes(
-        rows, root=Path(training_group["group_root"]), executor=executor,
-        package=training_data_package,
-    )
+    carried_sources = training_group.get("carried_unit_sources", {})
+    receipt_roots_by_owner = {}
+    if carried_sources:
+        for unit_id, source in carried_sources.items():
+            if not isinstance(source, Mapping) or source.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT:
+                raise RuntimeError(f"mixed-source training group has a malformed carried receipt binding: {unit_id}")
+            receipt_roots_by_owner[str(unit_id)] = (
+                _inside(Path(formal.DATA_ROOT), str(source.get("group_root", ""))),
+                str(source["package_commit"]),
+            )
+        examples = formal.pilot._load_pilot_training_examples(
+            issue84_driver, rows, root=Path(training_group["group_root"]),
+            executor=executor, package_commit=training_data_package,
+            receipt_roots_by_owner=receipt_roots_by_owner,
+        )
+        _outcomes = None
+    else:
+        examples, _outcomes = issue84_driver.load_training_outcomes(
+            rows, root=Path(training_group["group_root"]), executor=executor,
+            package=training_data_package,
+        )
     if len(examples) != expected_owners or [int(item.owner_seed) for item in examples] != [int(row["owner_seed"]) for row in rows]:
         raise RuntimeError(f"formal learner {arm}/{block} loaded an incorrect owner set or order")
     if any(not getattr(getattr(item, "base", None), "complete", False) for item in examples):
@@ -2634,6 +3605,7 @@ def _run_training_games(
     arm: str, block: int, clock: Any, identity: Mapping[str, str],
     seed_table_sha256: str, authorization: Mapping[str, Any], issue84_source: Path,
     progress_path: Path,
+    resumed_formal_continuation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     rows = _training_rows(seed, arm, block)
     expected = int(formal.CONTRACT["training"]["owners_per_block"])
@@ -2679,6 +3651,15 @@ def _run_training_games(
         else:
             formal.pilot._write_or_verify_once(receipt_path, receipt)
         return {**receipt, "receipt_sha256": formal.file_sha256(receipt_path), "group_root": str(root)}
+    carried_unit_results = None
+    carry_manifest_sha256 = None
+    if arm == "B" and block == 3:
+        if not isinstance(resumed_formal_continuation, Mapping):
+            raise RuntimeError("B/03 continuation requires the reviewed read-only b8 package references")
+        carried_unit_results = resumed_formal_continuation.get("b03_carried_units")
+        carry_manifest_sha256 = resumed_formal_continuation.get("manifest_sha256")
+        if not isinstance(carried_unit_results, Mapping) or len(carried_unit_results) != RESUMED_B03_COMPLETED + RESUMED_B03_FAILED:
+            raise RuntimeError("B/03 continuation reference count differs from retained progress")
     return _run_formal_units(
         formal, backend, rows=rows, root=root,
         stage_id=f"TRAIN-{arm}-BLOCK-{block:02d}-GAMES",
@@ -2686,6 +3667,8 @@ def _run_training_games(
         seed_table_sha256=seed_table_sha256, authorization=authorization,
         issue84_source=issue84_source, clock=clock,
         progress_path=progress_path.with_name(f"live-training-{arm}-{block:02d}.json"),
+        carried_unit_results=carried_unit_results,
+        predecessor_carry_manifest_sha256=carry_manifest_sha256,
     ) | {"group_root": str(root)}
 
 
@@ -2884,13 +3867,15 @@ def execute_formal(
     ):
         raise RuntimeError("formal progress is bound to a different source, seed, carry manifest or owner authorization")
     backend, issue84_driver = _configure_formal_runtime(formal, issue84_source, identity, package_root)
-    carry_report = verify_predecessor_carry(
-        formal, issue84_source=issue84_source, identity=identity,
-        readiness=readiness, seed=seed, package_root=package_root,
-        write_manifest=False, backend=backend, issue84_driver=issue84_driver,
+    carry_manifest, carry_manifest_sha256 = _validate_carry_manifest(
+        formal, package_root, identity,
+        expected_sha256=authorization["predecessor_carry_manifest_sha256"],
     )
-    if carry_report["manifest_sha256"] != authorization["predecessor_carry_manifest_sha256"]:
+    if carry_manifest_sha256 != authorization["predecessor_carry_manifest_sha256"]:
         raise RuntimeError("source-bound authorization references a different predecessor carry manifest")
+    resumed_formal_continuation = _validate_resumed_formal_continuation(
+        formal, package_root, identity, backend,
+    )
     carried_training_groups = {
         ("B", 0): _predecessor_training_group(
             formal, package_root, identity,
@@ -2901,6 +3886,10 @@ def execute_formal(
             expected_carry_sha256=authorization["predecessor_carry_manifest_sha256"],
         ),
     }
+    if resumed_formal_continuation is not None:
+        carried_training_groups[("B", 2)] = _resumed_b02_training_group(
+            formal, package_root, identity, resumed_formal_continuation,
+        )
     clock = backend.ActiveClock("issue85-task", float(authorization["whole_task_active_wall_cap_seconds"]))
     progress = prior_progress or {
         "schema_id": PROGRESS_SCHEMA,
@@ -2946,14 +3935,17 @@ def execute_formal(
                         arm=arm, block=block, clock=clock, identity=identity,
                         seed_table_sha256=seed_table_sha256, authorization=authorization,
                         issue84_source=Path(issue84_source).resolve(strict=True), progress_path=progress_path,
+                        resumed_formal_continuation=resumed_formal_continuation,
                     )
                 progress["game_groups"][f"TRAIN-{arm}-BLOCK-{block:02d}"] = game_group
                 save_progress()
                 if game_group.get("status") != "SUCCEEDED" or game_group.get("completed") != int(formal.CONTRACT["training"]["owners_per_block"]):
                     raise RuntimeError(f"formal training games paused at {arm}/{block}; attempts are retained")
                 update_path = package_root / "training" / arm / "updates" / f"block-{block:02d}" / "success-receipt.json"
-                if not update_path.is_file() and arm == "B" and block == 0:
-                    progress["active_stage"] = "TRAIN-B-BLOCK-00-ACTOR-UPDATE-CARRY-READ"
+                if not update_path.is_file() and arm == "B" and block in (0, 1, 2) and (
+                    block == 0 or resumed_formal_continuation is not None
+                ):
+                    progress["active_stage"] = f"TRAIN-B-BLOCK-{block:02d}-ACTOR-UPDATE-CARRY-READ"
                     save_progress()
                     progress["actor_updates"][block_key] = _read_update_receipt(
                         formal, package_root, identity, arm=arm, block=block,

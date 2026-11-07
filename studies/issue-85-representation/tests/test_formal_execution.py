@@ -561,7 +561,7 @@ def test_predecessor_group_reference_uses_original_receipt_without_forging_one(t
 
 
 def test_new_successor_carry_requires_an_actor_update_reference(tmp_path: Path, monkeypatch) -> None:
-    package_commit = "b" * 40
+    package_commit = formal_execution.RESUMED_GAMES_PACKAGE_COMMIT
     source_lock_sha = formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256
     package_root = tmp_path / "issue85" / "artifacts" / "formal" / package_commit
     package_root.mkdir(parents=True)
@@ -636,6 +636,117 @@ def test_new_successor_carry_requires_an_actor_update_reference(tmp_path: Path, 
         formal_execution._validate_carry_manifest(
             formal, package_root, {"package_commit": package_commit, "source_lock_sha256": source_lock_sha},
         )
+
+
+
+
+def test_group_receipt_attempt_paths_resolve_from_package_root(tmp_path: Path) -> None:
+    package_root = tmp_path / "b8-package"
+    group_root = package_root / "training/B/block-02/games"
+    attempt = group_root / "units/TRAIN-8400257-B/attempt-0001"
+    attempt.mkdir(parents=True)
+    receipt_unit = {"attempt_path": attempt.relative_to(package_root).as_posix()}
+
+    assert formal_execution._receipt_attempt_path(package_root, receipt_unit) == attempt
+    with pytest.raises(FileNotFoundError):
+        formal_execution._receipt_attempt_path(group_root, receipt_unit)
+
+
+def test_resumed_formal_continuation_shape_binds_actor_update_and_failed_attempt() -> None:
+    formal = SimpleNamespace(
+        canonical=formal_runner.canonical,
+        sha256_bytes=formal_runner.sha256_bytes,
+    )
+    successful_units = [
+        {"unit_id": f"TRAIN:{owner}:B"}
+        for owner in [*range(8400385, 8400417), 8400418]
+    ]
+
+    def update_reference(
+        *, block: int, receipt_sha: str, group_sha: str, data_package: str,
+    ) -> dict:
+        return {
+            "arm": "B",
+            "block_index": block,
+            "source_package_commit": formal_execution.RESUMED_FORMAL_PACKAGE_COMMIT,
+            "source_package_root": formal_execution.RESUMED_FORMAL_PACKAGE_ROOT,
+            "source_lock_sha256": formal_execution.RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+            "source_update_receipt_path": f"training/B/updates/block-{block:02d}/success-receipt.json",
+            "source_update_receipt_file_sha256": receipt_sha,
+            "receipt_sha256": "1" * 64,
+            "training_group_receipt_sha256": group_sha,
+            "training_data_package_commit": data_package,
+            "actor_checkpoint_path": "actor.pt",
+            "actor_checkpoint_sha256": "2" * 64,
+            "optimizer_checkpoint_path": "optimizer.pt",
+            "optimizer_checkpoint_sha256": "3" * 64,
+            "result_model_digest": "4" * 64,
+        }
+
+    b02_update = update_reference(
+        block=2,
+        receipt_sha=formal_execution.RESUMED_B02_UPDATE_RECEIPT_FILE_SHA256,
+        group_sha=formal_execution.RESUMED_B02_GROUP_RECEIPT_SHA256,
+        data_package=formal_execution.RESUMED_FORMAL_PACKAGE_COMMIT,
+    )
+    continuation = {
+        "schema_id": formal_execution.RESUMED_FORMAL_CONTINUATION_SCHEMA,
+        "source_package_commit": formal_execution.RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_package_root": formal_execution.RESUMED_FORMAL_PACKAGE_ROOT,
+        "source_lock_sha256": formal_execution.RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+        "formal_seed_table_sha256": formal_execution.RESUMED_FORMAL_SEED_TABLE_SHA256,
+        "formal_progress_sha256": formal_execution.RESUMED_FORMAL_PROGRESS_SHA256,
+        "authorization_receipt_sha256": formal_execution.RESUMED_FORMAL_AUTHORIZATION_SHA256,
+        "predecessor_carry_manifest_sha256": formal_execution.RESUMED_FORMAL_CARRY_SHA256,
+        "b02_group_root": formal_execution.RESUMED_B02_GROUP_ROOT,
+        "b02_group_receipt_sha256": formal_execution.RESUMED_B02_GROUP_RECEIPT_SHA256,
+        "b01_update_receipt_file_sha256": formal_execution.RESUMED_B01_UPDATE_RECEIPT_FILE_SHA256,
+        "b02_update_receipt_file_sha256": formal_execution.RESUMED_B02_UPDATE_RECEIPT_FILE_SHA256,
+        "b02_update_receipt_sha256": b02_update["receipt_sha256"],
+        "b02_expected": 128,
+        "b02_completed": 128,
+        "b02_failed_attempt_count": formal_execution.RESUMED_B02_FAILED,
+        "b03_live_progress_path": formal_execution.RESUMED_B03_LIVE_PROGRESS_PATH,
+        "b03_live_progress_sha256": formal_execution.RESUMED_B03_LIVE_PROGRESS_SHA256,
+        "b03_expected": 128,
+        "b03_completed": formal_execution.RESUMED_B03_COMPLETED,
+        "b03_failed_attempt_count": formal_execution.RESUMED_B03_FAILED,
+        "b03_pending": formal_execution.RESUMED_B03_PENDING,
+        "b01_actor_update": update_reference(
+            block=1,
+            receipt_sha=formal_execution.RESUMED_B01_UPDATE_RECEIPT_FILE_SHA256,
+            group_sha=formal_execution.RESUMED_B01_GROUP_RECEIPT_SHA256,
+            data_package=formal_execution.RESUMED_GAMES_PACKAGE_COMMIT,
+        ),
+        "b02_actor_update": b02_update,
+        "b03_successful_units": successful_units,
+        "b03_units_sha256": formal_execution._hash_json(formal, successful_units),
+        "b03_failed_attempt": {
+            "unit_id": "TRAIN:8400417:B",
+            "attempt": "attempt-0001",
+            "attempt_path": f"{formal_execution.RESUMED_B03_GROUP_ROOT}/units/TRAIN-8400417-B/attempt-0001",
+            "worker_job_sha256": "5" * 64,
+            "started_receipt_sha256": "6" * 64,
+        },
+        "active_wall_clock_snapshot": {
+            "elapsed_seconds": 39261.797795255006,
+            "active_session": None,
+            "process_ids": [],
+            "source_active_wall_file_sha256": "7" * 64,
+        },
+    }
+
+    assert formal_execution._validate_resumed_formal_continuation_shape(formal, continuation)
+
+    wrong_b01 = dict(continuation)
+    wrong_b01["b01_actor_update"] = dict(continuation["b01_actor_update"], block_index=2)
+    assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_b01)
+
+    wrong_failed_path = dict(continuation)
+    wrong_failed_path["b03_failed_attempt"] = dict(
+        continuation["b03_failed_attempt"], attempt_path="outside/attempt-0001",
+    )
+    assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_failed_path)
 
 
 def test_b00_update_receipt_is_read_from_its_verified_source_package(tmp_path: Path, monkeypatch) -> None:
@@ -1075,8 +1186,15 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
     monkeypatch.setattr(formal_execution, "validate_authorization", lambda *_args, **_kwargs: authorization)
     monkeypatch.setattr(formal_execution, "_configure_formal_runtime", lambda *_args: (backend, object()))
     monkeypatch.setattr(
-        formal_execution, "verify_predecessor_carry",
-        lambda *_args, **_kwargs: {"manifest_sha256": authorization["predecessor_carry_manifest_sha256"]},
+        formal_execution, "_validate_carry_manifest",
+        lambda *_args, **_kwargs: (
+            {"actor_update_carries": []},
+            authorization["predecessor_carry_manifest_sha256"],
+        ),
+    )
+    monkeypatch.setattr(
+        formal_execution, "_validate_resumed_formal_continuation",
+        lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
         formal_execution, "_predecessor_training_group",
