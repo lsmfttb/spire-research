@@ -114,6 +114,10 @@ def test_formal_runtime_dispatches_locked_a_without_using_issue84_final_pi20(mon
         derive_seed=lambda *args: 1,
     )
     lock = {
+        "model_runtime": {
+            "python_data_path": "runtime/python3.13",
+            "python_sha256": hashlib.sha256(b"source-locked-python").hexdigest(),
+        },
         "baseline_P": {"model_digest": "parent-digest", "checkpoint_sha256": "parent-checkpoint-sha"},
         "baseline_A": {
             "model_digest": "baseline-digest",
@@ -125,8 +129,10 @@ def test_formal_runtime_dispatches_locked_a_without_using_issue84_final_pi20(mon
     formal = SimpleNamespace(
         pilot=pilot_module,
         __file__=str(tmp_path / "formal_runner.py"),
+        DATA_ROOT=tmp_path,
         DATA_ROOT_WSL="/mnt/d/DeadlyCatCoding/stsrl-data",
         LOCK=lock,
+        file_sha256=formal_runner.file_sha256,
         NEW_ARMS=("B", "C", "D", "E", "F"),
         POLICIES=("PARENT", "A", "B", "C", "D", "E", "F"),
     )
@@ -134,9 +140,13 @@ def test_formal_runtime_dispatches_locked_a_without_using_issue84_final_pi20(mon
     representations.Issue85Arm = type("Issue85Arm", (), {})
     monkeypatch.setitem(sys.modules, "representations", representations)
 
+    pinned_python = tmp_path / "runtime/python3.13"
+    pinned_python.parent.mkdir(parents=True)
+    pinned_python.write_bytes(b"source-locked-python")
     configured, _ = formal_execution._configure_formal_runtime(
         formal, tmp_path / "issue84", {"package_commit": "c" * 40}, tmp_path / "package",
     )
+    assert configured.PINNED_PYTHON == pinned_python
     _algorithm, _runtime, _model, _learning, configured_executor = configured.load_modules(tmp_path, pilot=False)
 
     a_token = current_row.set({
@@ -186,7 +196,7 @@ def test_predecessor_group_reference_uses_original_receipt_without_forging_one(t
     receipt_sha = formal_runner.file_sha256(original_receipt)
     monkeypatch.setattr(formal_execution, "PREDECESSOR_GROUP_RECEIPT_SHA256", receipt_sha)
 
-    package_commit = "c" * 40
+    package_commit = formal_execution.OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT
     source_lock_sha = formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256
     package_root = data_root / "issue85" / "artifacts" / "formal" / package_commit
     package_root.mkdir(parents=True)
@@ -238,6 +248,181 @@ def test_predecessor_group_reference_uses_original_receipt_without_forging_one(t
     assert group["schema_id"] == formal_execution.CARRIED_GROUP_REFERENCE_SCHEMA
     assert "no successor game receipt" in group["artifact_kind"]
     assert not (package_root / "training/B/block-00/games/group-receipt.json").exists()
+
+
+def test_new_successor_carry_requires_an_actor_update_reference(tmp_path: Path, monkeypatch) -> None:
+    package_commit = "b" * 40
+    source_lock_sha = formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256
+    package_root = tmp_path / "issue85" / "artifacts" / "formal" / package_commit
+    package_root.mkdir(parents=True)
+    checked: list[dict] = []
+    monkeypatch.setattr(
+        formal_execution, "_validate_operational_actor_update_carry",
+        lambda _formal, carry: checked.append(dict(carry)) or dict(carry),
+    )
+    formal = SimpleNamespace(
+        read_json=formal_runner.read_json,
+        file_sha256=formal_runner.file_sha256,
+        canonical=formal_runner.canonical,
+        sha256_bytes=formal_runner.sha256_bytes,
+    )
+    manifest = {
+        "schema_id": formal_execution.PREDECESSOR_CARRY_SCHEMA,
+        "status": "VERIFIED_READ_ONLY_CONTINUATION",
+        "successor": {"package_commit": package_commit, "source_lock_sha256": source_lock_sha},
+        "predecessor": {
+            "package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+            "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+            "formal_seed_table_sha256": formal_execution.PREDECESSOR_SEED_TABLE_SHA256,
+            "group_receipt_sha256": formal_execution.PREDECESSOR_GROUP_RECEIPT_SHA256,
+            "formal_progress_sha256": formal_execution.PREDECESSOR_PROGRESS_SHA256,
+            "authorization_receipt_sha256": formal_execution.PREDECESSOR_AUTHORIZATION_SHA256,
+            "group_root": formal_execution.PREDECESSOR_GROUP_ROOT,
+            "failed_update": {
+                "failure_type": "AttributeError",
+                "failure_detail": formal_execution.PREDECESSOR_UPDATE_FAILURE_DETAIL,
+                "log_path": formal_execution.PREDECESSOR_UPDATE_FAILURE_LOG,
+                "log_sha256": formal_execution.PREDECESSOR_UPDATE_FAILURE_LOG_SHA256,
+                "formal_progress_sha256": formal_execution.PREDECESSOR_PROGRESS_SHA256,
+            },
+        },
+        "owner_go_comment_url": formal_execution.FORMAL_GO_COMMENT_URL,
+        "validated_units": 128,
+        "formal_games_carried": 128,
+        "actor_updates_carried": 1,
+        "actor_update_carries": [{"arm": "B", "block_index": 0}],
+    }
+    manifest["manifest_sha256"] = formal_runner.sha256_bytes(formal_runner.canonical(manifest))
+    formal_execution._predecessor_carry_path(package_root).write_text(json.dumps(manifest), encoding="utf-8")
+
+    loaded, _digest = formal_execution._validate_carry_manifest(
+        formal, package_root, {"package_commit": package_commit, "source_lock_sha256": source_lock_sha},
+    )
+    assert loaded["actor_updates_carried"] == 1
+    assert checked == [{"arm": "B", "block_index": 0}]
+
+    manifest["actor_updates_carried"] = 0
+    manifest["actor_update_carries"] = []
+    manifest["manifest_sha256"] = formal_runner.sha256_bytes(formal_runner.canonical(
+        {key: value for key, value in manifest.items() if key != "manifest_sha256"}
+    ))
+    formal_execution._predecessor_carry_path(package_root).write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="malformed or bound"):
+        formal_execution._validate_carry_manifest(
+            formal, package_root, {"package_commit": package_commit, "source_lock_sha256": source_lock_sha},
+        )
+
+
+def test_b00_update_receipt_is_read_from_its_verified_source_package(tmp_path: Path, monkeypatch) -> None:
+    data_root = tmp_path / "data"
+    source_root = data_root / formal_execution.OPERATIONAL_PREDECESSOR_ROOT
+    package_root = data_root / "issue85/artifacts/formal" / ("b" * 40)
+    source_root.mkdir(parents=True)
+    package_root.mkdir(parents=True)
+    source_lock_sha = formal_execution.OPERATIONAL_PREDECESSOR_LOCK_SHA256
+    fde_carry_sha = "f" * 64
+    current_carry_sha = "e" * 64
+    actor_path = source_root / "training/B/updates/block-00/attempt-0001/actor-state.pt"
+    optimizer_path = source_root / "training/B/updates/block-00/attempt-0001/optimizer-state.pt"
+    actor_path.parent.mkdir(parents=True)
+    actor_path.write_bytes(b"carried actor")
+    optimizer_path.write_bytes(b"carried optimizer")
+    receipt_path = source_root / "training/B/updates/block-00/success-receipt.json"
+    receipt = {
+        "schema_id": formal_execution.UPDATE_SCHEMA,
+        "status": "SUCCEEDED",
+        "arm": "B",
+        "block_index": 0,
+        "package_commit": formal_execution.OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT,
+        "source_lock_sha256": source_lock_sha,
+        "training_data_package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+        "predecessor_carry_manifest_sha256": fde_carry_sha,
+        "training_group_receipt_sha256": formal_execution.PREDECESSOR_GROUP_RECEIPT_SHA256,
+        "owner_count": 128,
+        "completed_steps": 64,
+        "minibatch_owners": 32,
+        "seed_table_sha256": "a" * 64,
+        "actor_update_seed": 96940393,
+        "actor_update_schedule_sha256": "1" * 64,
+        "owner_seed_sha256": "2" * 64,
+        "result_model_digest": "model-digest",
+        "actor_checkpoint_path": actor_path.relative_to(source_root).as_posix(),
+        "actor_checkpoint_sha256": formal_runner.file_sha256(actor_path),
+        "optimizer_checkpoint_path": optimizer_path.relative_to(source_root).as_posix(),
+        "optimizer_checkpoint_sha256": formal_runner.file_sha256(optimizer_path),
+        "receipt_sha256": "",
+    }
+    receipt["receipt_sha256"] = formal_runner.sha256_bytes(formal_runner.canonical(
+        {key: value for key, value in receipt.items() if key != "receipt_sha256"}
+    ))
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    receipt_file_sha = formal_runner.file_sha256(receipt_path)
+    carry = {
+        "arm": "B",
+        "block_index": 0,
+        "source_package_commit": formal_execution.OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT,
+        "source_package_root": formal_execution.OPERATIONAL_PREDECESSOR_ROOT,
+        "source_lock_sha256": source_lock_sha,
+        "source_seed_table_sha256": receipt["seed_table_sha256"],
+        "source_formal_progress_path": "formal-progress.json",
+        "source_formal_progress_sha256": "b" * 64,
+        "source_authorization_path": "formal-execution-authorization.json",
+        "source_authorization_sha256": "c" * 64,
+        "source_predecessor_carry_manifest_sha256": fde_carry_sha,
+        "source_update_receipt_path": receipt_path.relative_to(source_root).as_posix(),
+        "source_update_receipt_file_sha256": receipt_file_sha,
+        "source_update_attempt_progress_path": "training/B/updates/block-00/attempt-0001/progress.json",
+        "source_update_attempt_progress_sha256": "d" * 64,
+        "actor_checkpoint_path": receipt["actor_checkpoint_path"],
+        "actor_checkpoint_sha256": receipt["actor_checkpoint_sha256"],
+        "optimizer_checkpoint_path": receipt["optimizer_checkpoint_path"],
+        "optimizer_checkpoint_sha256": receipt["optimizer_checkpoint_sha256"],
+        "receipt_sha256": receipt["receipt_sha256"],
+        "actor_update_seed": 96940393,
+        "actor_update_schedule_sha256": "1" * 64,
+        "owner_seed_sha256": "2" * 64,
+        "completed_steps": 64,
+        "result_model_digest": "model-digest",
+        "active_wall_clock_snapshot": {"snapshot_sha256": "3" * 64},
+    }
+    manifest = {"actor_update_carries": [carry]}
+
+    def validate_carry(_formal, _root, identity):
+        if identity["package_commit"] == formal_execution.OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT:
+            return {"actor_update_carries": []}, fde_carry_sha
+        return manifest, current_carry_sha
+
+    monkeypatch.setattr(formal_execution, "_validate_carry_manifest", validate_carry)
+    formal = SimpleNamespace(
+        DATA_ROOT=data_root,
+        CONTRACT={"training": {"owners_per_block": 128, "updates_per_block": 64, "minibatch_owners": 32}},
+        read_json=formal_runner.read_json,
+        file_sha256=formal_runner.file_sha256,
+        canonical=formal_runner.canonical,
+        sha256_bytes=formal_runner.sha256_bytes,
+    )
+
+    loaded = formal_execution._read_update_receipt(
+        formal, package_root,
+        {"package_commit": "b" * 40, "source_lock_sha256": source_lock_sha},
+        arm="B", block=0,
+    )
+
+    assert loaded["package_commit"] == formal_execution.OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT
+    assert loaded["producer_package_root"] == str(source_root)
+    assert loaded["carried_from_package_commit"] == formal_execution.OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT
+    assert loaded["carried_by_manifest_sha256"] == current_carry_sha
+    assert not (package_root / "training/B/updates/block-00/success-receipt.json").exists()
+
+    local_attempt = package_root / "training/B/updates/block-00/attempt-0001"
+    local_attempt.mkdir(parents=True)
+    (local_attempt / "progress.json").write_text('{"status":"FAILED"}', encoding="utf-8")
+    with pytest.raises(RuntimeError, match="local update attempts"):
+        formal_execution._read_update_receipt(
+            formal, package_root,
+            {"package_commit": "b" * 40, "source_lock_sha256": source_lock_sha},
+            arm="B", block=0,
+        )
 
 
 def test_verify_predecessor_carry_cli_never_dispatches_formal_execution(monkeypatch, tmp_path: Path, capsys) -> None:

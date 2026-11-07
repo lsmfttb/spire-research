@@ -49,6 +49,25 @@ FORMAL_ACTIVE_WALL_CAP_SECONDS = 295632
 PREDECESSOR_INITIAL_MODEL_DIGEST = "2891e60f6f9467c7f319a250e5789f4a0bfd89dcda17a60e8d416bcbdbd18908"
 ACCEPTED_PILOT_PACKAGE_COMMIT = "5cd70c00d03f1104728efdc4b66c764592e5acf8"
 ACCEPTED_PILOT_REPORT_SHA256 = "ea0c1025b6a4d87df66c7c55e629a8f2008b0d09f68b455b5e2017a376f6a606"
+OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT = "fde456f52aaa388b7abc92a2b148ba91d3720e1e"
+OPERATIONAL_PREDECESSOR_ROOT = (
+    "issue85/artifacts/formal/fde456f52aaa388b7abc92a2b148ba91d3720e1e"
+)
+OPERATIONAL_PREDECESSOR_LOCK_SHA256 = PREDECESSOR_SOURCE_LOCK_SHA256
+OPERATIONAL_PREDECESSOR_SEED_TABLE_SHA256 = "3784c3503a16ecc24da905f543486890c7d9afb8dc006dda8c2cb1320a5e6592"
+OPERATIONAL_PREDECESSOR_PROGRESS_SHA256 = "d8827751b8bcbbe2c47ecc6bd4788691be8e303936e3679cdf1a58753e4eeab4"
+OPERATIONAL_PREDECESSOR_AUTHORIZATION_SHA256 = "74cc91c8aee173af1554a3f5a4ec7df5e92d082474c6e072996b22152edd64e8"
+OPERATIONAL_PREDECESSOR_CARRY_SHA256 = "0b418eb8f83396aa64cff43c1e36efc9c96725170ada9d61ba84c1d361eb9a70"
+OPERATIONAL_PREDECESSOR_UPDATE_RECEIPT_FILE_SHA256 = "341f7937eb41ddcc999003493f1b47d84336257d18663c1271c35c70a86a46ae"
+OPERATIONAL_PREDECESSOR_UPDATE_RECEIPT_SHA256 = "301a74e4cca79e813eebdaa843c948acbdd864a24cab81c647a75d4dc6c32358"
+OPERATIONAL_PREDECESSOR_UPDATE_PROGRESS_SHA256 = "399a286cd1499cf0b8a3a3afd98d61de5f691436b16f3e920aed55b9d61fd8f4"
+OPERATIONAL_PREDECESSOR_LIVE_B1_SHA256 = "49ca20d48e09b8012d56e58095d946a6b478e2dd41a3795c5ea0d169df8254e9"
+OPERATIONAL_PREDECESSOR_UPDATE_FAILURE_DETAIL = (
+    "formal execution must be launched inside the source-locked pinned WSL Python runtime"
+)
+OPERATIONAL_PREDECESSOR_UPDATE_SEED = 96940393
+OPERATIONAL_PREDECESSOR_UPDATE_STEPS = 64
+OPERATIONAL_PREDECESSOR_UPDATE_SCHEDULE_SHA256 = "22679fe29f5b7c518c5c5b7e7c22a99bd30c1dd5064540b4cc91162677492774"
 
 
 def _now() -> str:
@@ -135,6 +154,10 @@ def _validate_carry_manifest(
     predecessor = manifest.get("predecessor")
     successor = manifest.get("successor")
     failed_update = predecessor.get("failed_update") if isinstance(predecessor, Mapping) else None
+    actor_update_carries = manifest.get("actor_update_carries", [])
+    expected_actor_updates_carried = (
+        0 if successor.get("package_commit") == OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT else 1
+    ) if isinstance(successor, Mapping) else -1
     if (
         manifest.get("schema_id") != PREDECESSOR_CARRY_SCHEMA
         or manifest.get("status") != "VERIFIED_READ_ONLY_CONTINUATION"
@@ -160,9 +183,14 @@ def _validate_carry_manifest(
         or manifest.get("owner_go_comment_url") != FORMAL_GO_COMMENT_URL
         or manifest.get("formal_games_carried") != int(manifest.get("validated_units", 0))
         or manifest.get("validated_units") != 128
-        or manifest.get("actor_updates_carried") != 0
+        or expected_actor_updates_carried not in (0, 1)
+        or manifest.get("actor_updates_carried") != expected_actor_updates_carried
+        or not isinstance(actor_update_carries, list)
+        or len(actor_update_carries) != expected_actor_updates_carried
     ):
         raise RuntimeError("predecessor carry manifest is malformed or bound to another source/evidence")
+    if actor_update_carries:
+        _validate_operational_actor_update_carry(formal, actor_update_carries[0])
     return manifest, digest
 
 
@@ -199,13 +227,178 @@ def _predecessor_training_group(
     }
 
 
+def _operational_predecessor_actor_update(
+    formal: Any, *, active_wall_clock_snapshot: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Verify the successful B/00 update in fde before carrying it to a source successor."""
+    data_root = Path(formal.DATA_ROOT).resolve(strict=True)
+    source_root = _inside(data_root, OPERATIONAL_PREDECESSOR_ROOT)
+    progress_path = source_root / "formal-progress.json"
+    authorization_path = source_root / "formal-execution-authorization.json"
+    seed_path = source_root / "formal-seed-table.json"
+    carry_path = _predecessor_carry_path(source_root)
+    receipt_path = source_root / "training/B/updates/block-00/success-receipt.json"
+    attempt_progress_path = source_root / "training/B/updates/block-00/attempt-0001/progress.json"
+    live_b1_path = source_root / "live-training-B-01.json"
+    pinned_hashes = (
+        (progress_path, OPERATIONAL_PREDECESSOR_PROGRESS_SHA256, "formal progress"),
+        (authorization_path, OPERATIONAL_PREDECESSOR_AUTHORIZATION_SHA256, "authorization"),
+        (seed_path, OPERATIONAL_PREDECESSOR_SEED_TABLE_SHA256, "seed table"),
+        (carry_path, OPERATIONAL_PREDECESSOR_CARRY_SHA256, "predecessor carry manifest"),
+        (receipt_path, OPERATIONAL_PREDECESSOR_UPDATE_RECEIPT_FILE_SHA256, "B/00 update receipt"),
+        (attempt_progress_path, OPERATIONAL_PREDECESSOR_UPDATE_PROGRESS_SHA256, "B/00 attempt progress"),
+        (live_b1_path, OPERATIONAL_PREDECESSOR_LIVE_B1_SHA256, "B/01 live-game progress"),
+    )
+    for path, expected, label in pinned_hashes:
+        if not path.is_file() or formal.file_sha256(path) != expected:
+            raise RuntimeError(f"verified operational predecessor {label} changed: {path}")
+
+    progress = formal.read_json(progress_path)
+    live_b1 = formal.read_json(live_b1_path)
+    if (
+        progress.get("schema_id") != PROGRESS_SCHEMA
+        or progress.get("status") != "FAILED_OR_PAUSED"
+        or progress.get("package_commit") != OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT
+        or progress.get("source_lock_sha256") != OPERATIONAL_PREDECESSOR_LOCK_SHA256
+        or progress.get("seed_table_sha256") != OPERATIONAL_PREDECESSOR_SEED_TABLE_SHA256
+        or progress.get("authorization_receipt_sha256") != OPERATIONAL_PREDECESSOR_AUTHORIZATION_SHA256
+        or progress.get("active_stage") != "TRAIN-B-BLOCK-01-GAMES"
+        or progress.get("failure", {}).get("type") != "RuntimeError"
+        or progress.get("failure", {}).get("detail") != OPERATIONAL_PREDECESSOR_UPDATE_FAILURE_DETAIL
+        or set(progress.get("game_groups", {})) != {"TRAIN-B-BLOCK-00"}
+        or set(progress.get("actor_updates", {})) != {"B:0"}
+        or progress["game_groups"]["TRAIN-B-BLOCK-00"].get("status") != "SUCCEEDED"
+        or progress["game_groups"]["TRAIN-B-BLOCK-00"].get("completed") != 128
+        or live_b1.get("status") != "RUNNING"
+        or live_b1.get("expected") != 128
+        or live_b1.get("successful_completions") != 0
+        or live_b1.get("active_unit_ids") != []
+        or len(live_b1.get("pending_unit_ids", [])) != 128
+        or live_b1.get("recent_failures") != []
+        or not isinstance(live_b1.get("attempt_counts"), Mapping)
+        or len(live_b1["attempt_counts"]) != 128
+        or any(value != 0 for value in live_b1["attempt_counts"].values())
+    ):
+        raise RuntimeError("operational predecessor is not paused immediately before B/01 games")
+
+    b1_root = source_root / "training/B/block-01/games"
+    if b1_root.exists() and any(b1_root.iterdir()):
+        raise RuntimeError("operational predecessor has B/01 game attempts; refusing a duplicate continuation")
+
+    source_identity = {
+        "package_commit": OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT,
+        "source_lock_sha256": OPERATIONAL_PREDECESSOR_LOCK_SHA256,
+    }
+    receipt = _read_update_receipt(formal, source_root, source_identity, arm="B", block=0)
+    attempt_progress = formal.read_json(attempt_progress_path)
+    optimizer_path = _inside(source_root, str(receipt.get("optimizer_checkpoint_path", "")))
+    seed_table = formal.read_json(seed_path)
+    training_rows = [
+        row for row in seed_table.get("rows", [])
+        if row.get("issue85_phase") == "training"
+        and row.get("issue85_arm") == "B"
+        and row.get("block_index") == 0
+    ]
+    prior_update = progress["actor_updates"]["B:0"]
+    if (
+        receipt.get("receipt_sha256") != OPERATIONAL_PREDECESSOR_UPDATE_RECEIPT_SHA256
+        or receipt.get("status") != "SUCCEEDED"
+        or receipt.get("completed_steps") != OPERATIONAL_PREDECESSOR_UPDATE_STEPS
+        or receipt.get("actor_update_seed") != OPERATIONAL_PREDECESSOR_UPDATE_SEED
+        or receipt.get("actor_update_schedule_sha256") != OPERATIONAL_PREDECESSOR_UPDATE_SCHEDULE_SHA256
+        or receipt.get("seed_table_sha256") != OPERATIONAL_PREDECESSOR_SEED_TABLE_SHA256
+        or receipt.get("source_lock_sha256") != OPERATIONAL_PREDECESSOR_LOCK_SHA256
+        or receipt.get("training_data_package_commit") != PREDECESSOR_PACKAGE_COMMIT
+        or receipt.get("predecessor_carry_manifest_sha256") != OPERATIONAL_PREDECESSOR_CARRY_SHA256
+        or len(training_rows) != 128
+        or _owner_hash(training_rows) != receipt.get("owner_seed_sha256")
+        or formal.file_sha256(optimizer_path) != receipt.get("optimizer_checkpoint_sha256")
+        or attempt_progress.get("status") != "SUCCEEDED"
+        or attempt_progress.get("completed_steps") != OPERATIONAL_PREDECESSOR_UPDATE_STEPS
+        or attempt_progress.get("actor_update_seed") != OPERATIONAL_PREDECESSOR_UPDATE_SEED
+        or prior_update.get("status") != "SUCCEEDED"
+        or prior_update.get("completed_steps") != OPERATIONAL_PREDECESSOR_UPDATE_STEPS
+        or prior_update.get("receipt_sha256") != receipt.get("receipt_sha256")
+        or prior_update.get("receipt_file_sha256") != receipt.get("receipt_file_sha256")
+        or prior_update.get("actor_checkpoint_sha256") != receipt.get("actor_checkpoint_sha256")
+        or prior_update.get("optimizer_checkpoint_sha256") != receipt.get("optimizer_checkpoint_sha256")
+    ):
+        raise RuntimeError("operational predecessor B/00 actor update receipt or checkpoint chain differs")
+
+    if active_wall_clock_snapshot is None:
+        clock_path = data_root / "issue85/artifacts/active-wall-issue85-task.json"
+        clock = formal.read_json(clock_path)
+        elapsed = _validate_active_wall_clock(
+            clock, FORMAL_ACTIVE_WALL_CAP_SECONDS, require_idle=True,
+        )
+        snapshot_body = {
+            "elapsed_seconds": elapsed,
+            "active_session": clock.get("active_session"),
+            "process_ids": clock.get("process_ids"),
+            "receipt_file_sha256": formal.file_sha256(clock_path),
+        }
+        active_wall_clock_snapshot = {
+            **snapshot_body,
+            "snapshot_sha256": _hash_json(formal, snapshot_body),
+        }
+    else:
+        snapshot = dict(active_wall_clock_snapshot)
+        snapshot_hash = snapshot.pop("snapshot_sha256", None)
+        if (
+            snapshot_hash != _hash_json(formal, snapshot)
+            or snapshot.get("active_session") is not None
+            or snapshot.get("process_ids") != []
+            or not isinstance(snapshot.get("elapsed_seconds"), (int, float))
+            or snapshot.get("elapsed_seconds") > FORMAL_ACTIVE_WALL_CAP_SECONDS
+        ):
+            raise RuntimeError("carried active-wall pause snapshot is malformed or exceeds the approved cap")
+
+    return {
+        "arm": "B",
+        "block_index": 0,
+        "source_package_commit": OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT,
+        "source_package_root": OPERATIONAL_PREDECESSOR_ROOT,
+        "source_lock_sha256": OPERATIONAL_PREDECESSOR_LOCK_SHA256,
+        "source_seed_table_sha256": OPERATIONAL_PREDECESSOR_SEED_TABLE_SHA256,
+        "source_formal_progress_path": "formal-progress.json",
+        "source_formal_progress_sha256": OPERATIONAL_PREDECESSOR_PROGRESS_SHA256,
+        "source_authorization_path": "formal-execution-authorization.json",
+        "source_authorization_sha256": OPERATIONAL_PREDECESSOR_AUTHORIZATION_SHA256,
+        "source_predecessor_carry_manifest_sha256": OPERATIONAL_PREDECESSOR_CARRY_SHA256,
+        "source_update_receipt_path": "training/B/updates/block-00/success-receipt.json",
+        "source_update_receipt_file_sha256": OPERATIONAL_PREDECESSOR_UPDATE_RECEIPT_FILE_SHA256,
+        "source_update_attempt_progress_path": "training/B/updates/block-00/attempt-0001/progress.json",
+        "source_update_attempt_progress_sha256": OPERATIONAL_PREDECESSOR_UPDATE_PROGRESS_SHA256,
+        "actor_checkpoint_path": receipt["actor_checkpoint_path"],
+        "actor_checkpoint_sha256": receipt["actor_checkpoint_sha256"],
+        "optimizer_checkpoint_path": receipt["optimizer_checkpoint_path"],
+        "optimizer_checkpoint_sha256": receipt["optimizer_checkpoint_sha256"],
+        "receipt_sha256": receipt["receipt_sha256"],
+        "actor_update_seed": receipt["actor_update_seed"],
+        "actor_update_schedule_sha256": receipt["actor_update_schedule_sha256"],
+        "owner_seed_sha256": receipt["owner_seed_sha256"],
+        "completed_steps": receipt["completed_steps"],
+        "result_model_digest": receipt["result_model_digest"],
+        "active_wall_clock_snapshot": dict(active_wall_clock_snapshot),
+    }
+
+
+def _validate_operational_actor_update_carry(formal: Any, carry: Mapping[str, Any]) -> dict[str, Any]:
+    expected = _operational_predecessor_actor_update(
+        formal, active_wall_clock_snapshot=carry.get("active_wall_clock_snapshot"),
+    )
+    if dict(carry) != expected:
+        raise RuntimeError("carried B/00 actor update differs from its immutable operational predecessor")
+    return expected
+
+
 def verify_predecessor_carry(
     formal: Any, *, issue84_source: Path, identity: Mapping[str, str],
     readiness: Mapping[str, Any], seed: Mapping[str, Any], package_root: Path,
     write_manifest: bool, backend: Any | None = None,
     issue84_driver: Any | None = None,
 ) -> dict[str, Any]:
-    """Hash-verify immutable e549 B/block-00 evidence and its exact pinned feature loader."""
+    """Hash-verify carried e549 games, the fde B/00 update, and the pinned feature loader."""
     if (
         identity.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
         or formal.file_sha256(formal.LOCK_PATH) != PREDECESSOR_SOURCE_LOCK_SHA256
@@ -488,6 +681,19 @@ def verify_predecessor_carry(
         ):
             raise RuntimeError(f"pinned #84 loader changed predecessor training outcomes: {expected['unit_id']}")
 
+    manifest_path = _predecessor_carry_path(current_root)
+    stored_actor_update_snapshot = None
+    if manifest_path.is_file():
+        stored_manifest = formal.read_json(manifest_path)
+        stored_carries = stored_manifest.get("actor_update_carries", [])
+        if isinstance(stored_carries, list) and len(stored_carries) == 1 and isinstance(stored_carries[0], Mapping):
+            stored_actor_update_snapshot = stored_carries[0].get("active_wall_clock_snapshot")
+    actor_update_carries = (
+        [] if identity["package_commit"] == OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT
+        else [_operational_predecessor_actor_update(
+            formal, active_wall_clock_snapshot=stored_actor_update_snapshot,
+        )]
+    )
     manifest: dict[str, Any] = {
         "schema_id": PREDECESSOR_CARRY_SCHEMA,
         "status": "VERIFIED_READ_ONLY_CONTINUATION",
@@ -527,15 +733,19 @@ def verify_predecessor_carry(
         "stsr_source_commit": formal.LOCK["stsr_source"]["commit"],
         "validated_units": len(unit_manifest),
         "formal_games_carried": len(unit_manifest),
-        "actor_updates_carried": 0,
+        "actor_updates_carried": len(actor_update_carries),
         "features_loaded_by_pinned_issue84_parser": len(examples),
         "units_sha256": _hash_json(formal, unit_manifest),
         "units": unit_manifest,
         "outcome_manifest_sha256": _hash_json(formal, decoded_features),
-        "no_successor_game_or_update_receipts_created": True,
     }
+    if actor_update_carries:
+        manifest["actor_update_carries"] = actor_update_carries
+        manifest["no_new_successor_game_or_actor_update_receipts_created"] = True
+    else:
+        # Preserve the exact immutable fde package manifest schema and bytes.
+        manifest["no_successor_game_or_update_receipts_created"] = True
     manifest["manifest_sha256"] = _hash_json(formal, manifest)
-    manifest_path = _predecessor_carry_path(current_root)
     created_manifest = False
     if manifest_path.exists():
         if formal.read_json(manifest_path) != manifest:
@@ -553,13 +763,17 @@ def verify_predecessor_carry(
     manifest_sha = formal.file_sha256(manifest_path)
     return {
         "schema_id": "issue85-formal-predecessor-carry-verification-report-v1",
-        "status": "VERIFIED / 128 PREDECESSOR TERMINALS AND FEATURES / NO NEW GAMES OR UPDATES",
+        "status": (
+            "VERIFIED / 128 PREDECESSOR TERMINALS AND FEATURES / B/00 UPDATE CARRIED BY REFERENCE"
+            if actor_update_carries else
+            "VERIFIED / 128 PREDECESSOR TERMINALS AND FEATURES / NO NEW GAMES OR UPDATES"
+        ),
         "package_commit": identity["package_commit"],
         "source_lock_sha256": identity["source_lock_sha256"],
         "predecessor_package_commit": PREDECESSOR_PACKAGE_COMMIT,
         "predecessor_group_receipt_sha256": PREDECESSOR_GROUP_RECEIPT_SHA256,
         "formal_games_carried": len(unit_manifest),
-        "actor_updates_carried": 0,
+        "actor_updates_carried": len(actor_update_carries),
         "features_loaded_by_pinned_issue84_parser": len(examples),
         "manifest_path": str(manifest_path),
         "manifest_sha256": manifest_sha,
@@ -719,6 +933,7 @@ def _configure_formal_runtime(
 ) -> tuple[Any, Any]:
     pilot_module = formal.pilot
     backend, issue84_driver = pilot_module._configure_runtime(issue84_source, package_root, identity)
+    backend.PINNED_PYTHON = _source_locked_formal_python(formal)
     pilot_root_loader = backend.load_modules
     backend.__file__ = str(Path(formal.__file__).resolve())
 
@@ -758,7 +973,8 @@ def _configure_formal_runtime(
             if block == 0:
                 return actor, model.model_digest(actor), source
             previous = _read_update_receipt(formal, package_root, identity, arm=arm, block=block - 1)
-            checkpoint = _inside(package_root, str(previous["actor_checkpoint_path"]))
+            previous_root = Path(str(previous.get("producer_package_root", package_root)))
+            checkpoint = _inside(previous_root, str(previous["actor_checkpoint_path"]))
             if formal.file_sha256(checkpoint) != previous.get("actor_checkpoint_sha256"):
                 raise RuntimeError("previous formal actor checkpoint hash differs")
             import torch
@@ -841,6 +1057,14 @@ def _configure_formal_runtime(
 
     backend.load_modules = load_modules
     return backend, issue84_driver
+
+
+def _source_locked_formal_python(formal: Any) -> Path:
+    runtime = formal.LOCK["model_runtime"]
+    path = Path(formal.DATA_ROOT) / str(runtime["python_data_path"])
+    if not path.is_file() or formal.file_sha256(path) != runtime["python_sha256"]:
+        raise RuntimeError("formal runtime Python differs from the source-locked Issue 85 binary")
+    return path
 
 
 def _inside(root: Path, relative: str) -> Path:
@@ -1322,6 +1546,56 @@ def _read_update_receipt(
     formal: Any, package_root: Path, identity: Mapping[str, str], *, arm: str, block: int,
 ) -> dict[str, Any]:
     path = package_root / "training" / arm / "updates" / f"block-{block:02d}" / "success-receipt.json"
+    if arm == "B" and block == 0:
+        carry_manifest, carry_manifest_sha256 = _validate_carry_manifest(formal, package_root, identity)
+        carries = carry_manifest.get("actor_update_carries", [])
+        if carries:
+            if path.parent.exists() and any(path.parent.iterdir()):
+                raise RuntimeError("B/00 update is both carried by reference and has local update attempts")
+            if len(carries) != 1 or not isinstance(carries[0], Mapping):
+                raise RuntimeError("formal predecessor carry has an invalid B/00 actor-update reference")
+            carry = carries[0]
+            if (
+                carry.get("arm") != "B"
+                or carry.get("block_index") != 0
+                or carry.get("source_package_commit") != OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT
+                or carry.get("source_package_root") != OPERATIONAL_PREDECESSOR_ROOT
+                or carry.get("source_lock_sha256") != OPERATIONAL_PREDECESSOR_LOCK_SHA256
+            ):
+                raise RuntimeError("formal predecessor B/00 update reference is bound to another source")
+            source_root = _inside(Path(formal.DATA_ROOT), str(carry["source_package_root"]))
+            source_identity = {
+                "package_commit": OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT,
+                "source_lock_sha256": OPERATIONAL_PREDECESSOR_LOCK_SHA256,
+            }
+            source_receipt = _read_update_receipt(
+                formal, source_root, source_identity, arm="B", block=0,
+            )
+            bindings = {
+                "source_seed_table_sha256": "seed_table_sha256",
+                "source_predecessor_carry_manifest_sha256": "predecessor_carry_manifest_sha256",
+                "source_update_receipt_file_sha256": "receipt_file_sha256",
+                "actor_checkpoint_path": "actor_checkpoint_path",
+                "actor_checkpoint_sha256": "actor_checkpoint_sha256",
+                "optimizer_checkpoint_path": "optimizer_checkpoint_path",
+                "optimizer_checkpoint_sha256": "optimizer_checkpoint_sha256",
+                "receipt_sha256": "receipt_sha256",
+                "actor_update_seed": "actor_update_seed",
+                "actor_update_schedule_sha256": "actor_update_schedule_sha256",
+                "owner_seed_sha256": "owner_seed_sha256",
+                "completed_steps": "completed_steps",
+                "result_model_digest": "result_model_digest",
+            }
+            if any(carry.get(carry_key) != source_receipt.get(receipt_key) for carry_key, receipt_key in bindings.items()):
+                raise RuntimeError("carried B/00 update reference differs from its source receipt")
+            if carry.get("source_update_receipt_path") != source_receipt.get("receipt_path"):
+                raise RuntimeError("carried B/00 update receipt path differs from its source record")
+            return {
+                **source_receipt,
+                "producer_package_root": str(source_root),
+                "carried_from_package_commit": OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT,
+                "carried_by_manifest_sha256": carry_manifest_sha256,
+            }
     if not path.is_file():
         raise RuntimeError(f"formal actor update receipt is missing for {arm} block {block}")
     receipt = formal.read_json(path)
@@ -1345,7 +1619,12 @@ def _read_update_receipt(
         or formal.file_sha256(_inside(package_root, str(receipt.get("actor_checkpoint_path", "")))) != receipt.get("actor_checkpoint_sha256")
     ):
         raise RuntimeError(f"formal actor update receipt/checkpoint differs for {arm} block {block}")
-    return {**receipt, "receipt_file_sha256": digest, "receipt_path": path.relative_to(package_root).as_posix()}
+    return {
+        **receipt,
+        "receipt_file_sha256": digest,
+        "receipt_path": path.relative_to(package_root).as_posix(),
+        "producer_package_root": str(package_root),
+    }
 
 
 def _next_attempt(update_root: Path) -> int:
@@ -1476,6 +1755,10 @@ def _train_actor_block(
     success_path = update_root / "success-receipt.json"
     if success_path.is_file():
         return _read_update_receipt(formal, package_root, identity, arm=arm, block=block)
+    if arm == "B" and block == 0:
+        carry_manifest, _carry_sha256 = _validate_carry_manifest(formal, package_root, identity)
+        if carry_manifest.get("actor_update_carries"):
+            return _read_update_receipt(formal, package_root, identity, arm=arm, block=block)
     update_root.mkdir(parents=True, exist_ok=True)
     loaded = backend.load_modules(update_root, pilot=True)
     _algorithm, _runtime, model, learning, executor = loaded
@@ -2167,7 +2450,13 @@ def execute_formal(
                 if game_group.get("status") != "SUCCEEDED" or game_group.get("completed") != int(formal.CONTRACT["training"]["owners_per_block"]):
                     raise RuntimeError(f"formal training games paused at {arm}/{block}; attempts are retained")
                 update_path = package_root / "training" / arm / "updates" / f"block-{block:02d}" / "success-receipt.json"
-                if not update_path.is_file():
+                if not update_path.is_file() and arm == "B" and block == 0:
+                    progress["active_stage"] = "TRAIN-B-BLOCK-00-ACTOR-UPDATE-CARRY-READ"
+                    save_progress()
+                    progress["actor_updates"][block_key] = _read_update_receipt(
+                        formal, package_root, identity, arm=arm, block=block,
+                    )
+                elif not update_path.is_file():
                     progress["active_stage"] = f"TRAIN-{arm}-BLOCK-{block:02d}-ACTOR-UPDATE"
                     save_progress()
                     progress["actor_updates"][block_key] = _train_actor_block(
