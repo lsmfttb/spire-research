@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
+import zlib
 
 import pytest
 
@@ -713,6 +714,179 @@ def test_predecessor_units_reuse_authenticated_manifest_with_owner_and_hash_chec
         formal_execution._predecessor_units_from_carry_manifest(
             formal, malformed, rows, backend,
         )
+
+
+@pytest.mark.parametrize("tamper", ["none", "result-and-feature", "feature-only"])
+def test_b00_consumption_reads_only_bytes_bound_by_pinned_carry_hashes(tmp_path: Path, tamper: str) -> None:
+    data_root = tmp_path / "data"
+    group_root = data_root / formal_execution.PREDECESSOR_GROUP_ROOT
+    group_root.mkdir(parents=True)
+    formal = SimpleNamespace(
+        DATA_ROOT=data_root,
+        canonical=formal_runner.canonical,
+        sha256_bytes=formal_runner.sha256_bytes,
+    )
+    carry_sha256 = "d" * 64
+    identity = {
+        "package_commit": formal_execution.RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+    }
+    rows = []
+    units = []
+    first_result = first_feature = None
+
+    for owner_seed in range(8400001, 8400129):
+        unit_id = f"TRAIN:{owner_seed}:B"
+        unit_key = unit_id.replace(":", "-")
+        relative_attempt = Path("units") / unit_key / "attempt-0001"
+        feature_path = relative_attempt / "training-features.json.zlib"
+        feature_target = group_root / feature_path
+        feature_target.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps({
+            "schema_id": "issue75-stage1-training-features-v1",
+            "unit_id": unit_id,
+            "owner_seed": owner_seed,
+            "base": {"complete": True, "terminal_floor": 16.0, "heart_win": False},
+        }, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        compressed = zlib.compress(payload)
+        compressed_sha = hashlib.sha256(compressed).hexdigest()
+        payload_sha = hashlib.sha256(payload).hexdigest()
+        result = {
+            "status": "SUCCEEDED",
+            "unit_id": unit_id,
+            "owner_seed": owner_seed,
+            "package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+            "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+            "phase": "training",
+            "arm": "TRAIN",
+            "formal": True,
+            "model_digest": formal_execution.PREDECESSOR_INITIAL_MODEL_DIGEST,
+            "expert_decisions": 0,
+            "terminal_floor": 16.0,
+            "heart_victory": False,
+            "training_features": {
+                "path": feature_path.as_posix(),
+                "compression": "zlib",
+                "sha256": compressed_sha,
+                "uncompressed_sha256": payload_sha,
+            },
+        }
+        result_bytes = json.dumps(result, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        feature_target.write_bytes(compressed)
+        result_target = group_root / relative_attempt / "result.json"
+        result_target.write_bytes(result_bytes)
+        row = {
+            "unit_id": unit_id,
+            "owner_seed": owner_seed,
+            "phase": "training",
+            "arm": "TRAIN",
+            "formal": True,
+        }
+        rows.append(row)
+        units.append({
+            "unit_id": unit_id,
+            "owner_seed": owner_seed,
+            "attempt_path": f"training/B/block-00/games/units/{unit_key}/attempt-0001",
+            "result_sha256": hashlib.sha256(result_bytes).hexdigest(),
+            "model_digest": formal_execution.PREDECESSOR_INITIAL_MODEL_DIGEST,
+            "training_features_path": feature_path.as_posix(),
+            "training_features_sha256": compressed_sha,
+            "training_features_uncompressed_sha256": payload_sha,
+            "terminal_floor": 16.0,
+            "heart_victory": False,
+            "complete": True,
+            "expert_decisions": 0,
+        })
+        if first_result is None:
+            first_result, first_feature = result_target, feature_target
+
+    manifest = {
+        "schema_id": formal_execution.PREDECESSOR_CARRY_SCHEMA,
+        "status": "VERIFIED_READ_ONLY_CONTINUATION",
+        "successor": identity,
+        "validated_units": 128,
+        "formal_games_carried": 128,
+        "features_loaded_by_pinned_issue84_parser": 128,
+        "initial_model_digest": formal_execution.PREDECESSOR_INITIAL_MODEL_DIGEST,
+        "units": units,
+        "units_sha256": formal_execution._hash_json(formal, units),
+        "outcome_manifest_sha256": formal_execution._hash_json(formal, [
+            {
+                "unit_id": unit["unit_id"], "owner_seed": unit["owner_seed"],
+                "terminal_floor": unit["terminal_floor"], "heart_victory": unit["heart_victory"],
+            }
+            for unit in units
+        ]),
+    }
+    manifest["manifest_sha256"] = formal_execution._hash_json(formal, manifest)
+    pinned_manifest_sha = manifest["manifest_sha256"]
+    training_group = {
+        "schema_id": formal_execution.CARRIED_GROUP_REFERENCE_SCHEMA,
+        "status": "SUCCEEDED",
+        "training_data_package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+        "receipt_sha256": formal_execution.PREDECESSOR_GROUP_RECEIPT_SHA256,
+        "receipt_path": (Path(formal_execution.PREDECESSOR_GROUP_ROOT) / "group-receipt.json").as_posix(),
+        "group_root": str(group_root),
+        "predecessor_carry_manifest_sha256": carry_sha256,
+        "units_manifest_sha256": manifest["units_sha256"],
+    }
+
+    if tamper == "result-and-feature":
+        result = json.loads(first_result.read_text(encoding="utf-8"))
+        replacement = b'{"replacement":true}'
+        replacement_compressed = zlib.compress(replacement)
+        replacement_path = first_feature.parent / "replacement-training-features.json.zlib"
+        replacement_path.write_bytes(replacement_compressed)
+        result["training_features"].update({
+            "path": replacement_path.relative_to(group_root).as_posix(),
+            "sha256": hashlib.sha256(replacement_compressed).hexdigest(),
+            "uncompressed_sha256": hashlib.sha256(replacement).hexdigest(),
+        })
+        first_result.write_text(json.dumps(result, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+    elif tamper == "feature-only":
+        first_feature.write_bytes(zlib.compress(b'{"replacement":true}'))
+
+    def issue84_loader(rows, *, root, executor, package):
+        assert package == formal_execution.PREDECESSOR_PACKAGE_COMMIT
+        examples = []
+        for row in rows:
+            unit_key = row["unit_id"].replace(":", "-")
+            result_paths = sorted((root / "units" / unit_key).glob("attempt-*/result.json"))
+            assert len(result_paths) == 1
+            result_path = result_paths[0]
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            pointer = result["training_features"]
+            compressed = (root / pointer["path"]).read_bytes()
+            raw = zlib.decompress(compressed)
+            assert hashlib.sha256(compressed).hexdigest() == pointer["sha256"]
+            assert hashlib.sha256(raw).hexdigest() == pointer["uncompressed_sha256"]
+            examples.append(SimpleNamespace(
+                owner_seed=row["owner_seed"],
+                base=SimpleNamespace(complete=True),
+            ))
+        return examples, []
+
+    driver = SimpleNamespace(load_training_outcomes=issue84_loader)
+    backend = SimpleNamespace(unit_key=lambda unit_id: unit_id.replace(":", "-"))
+    if tamper == "none":
+        examples, outcomes = formal_execution._load_pinned_predecessor_training_outcomes(
+            formal, backend, driver, rows, training_group=training_group,
+            carry_manifest=manifest, carry_manifest_sha256=carry_sha256,
+            executor=object(), package=formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+        )
+        assert len(examples) == 128
+        assert outcomes == []
+    else:
+        with pytest.raises(RuntimeError, match="pinned predecessor B/00 (result|feature) bytes differ"):
+            formal_execution._load_pinned_predecessor_training_outcomes(
+                formal, backend, driver, rows, training_group=training_group,
+                carry_manifest=manifest, carry_manifest_sha256=carry_sha256,
+                executor=object(), package=formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+            )
+    assert manifest["manifest_sha256"] == pinned_manifest_sha
+    assert formal_execution._hash_json(
+        formal, {key: value for key, value in manifest.items() if key != "manifest_sha256"},
+    ) == pinned_manifest_sha
 
 
 def test_resumed_b02_group_receipt_uses_actual_count_schema() -> None:

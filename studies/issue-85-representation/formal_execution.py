@@ -573,6 +573,138 @@ def _predecessor_training_group(
     }
 
 
+def _load_pinned_predecessor_training_outcomes(
+    formal: Any, backend: Any, issue84_driver: Any, rows: Sequence[Mapping[str, Any]], *,
+    training_group: Mapping[str, Any], carry_manifest: Mapping[str, Any],
+    carry_manifest_sha256: str, executor: Any, package: str,
+) -> tuple[list[Any], list[Any]]:
+    """Bind the pinned B8 unit hashes to the exact bytes read by the #84 loader."""
+    group_root = _inside(Path(formal.DATA_ROOT), PREDECESSOR_GROUP_ROOT)
+    try:
+        recorded_group_root = Path(str(training_group.get("group_root", ""))).resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise RuntimeError("B/block-00 predecessor training root is missing or malformed") from exc
+    if (
+        training_group.get("schema_id") != CARRIED_GROUP_REFERENCE_SCHEMA
+        or training_group.get("status") != "SUCCEEDED"
+        or training_group.get("training_data_package_commit") != PREDECESSOR_PACKAGE_COMMIT
+        or training_group.get("receipt_sha256") != PREDECESSOR_GROUP_RECEIPT_SHA256
+        or training_group.get("receipt_path") != (
+            Path(PREDECESSOR_GROUP_ROOT) / "group-receipt.json"
+        ).as_posix()
+        or training_group.get("predecessor_carry_manifest_sha256") != carry_manifest_sha256
+        or training_group.get("units_manifest_sha256") != carry_manifest.get("units_sha256")
+        or recorded_group_root != group_root
+        or package != PREDECESSOR_PACKAGE_COMMIT
+    ):
+        raise RuntimeError("B/block-00 training inputs differ from the pinned predecessor carry")
+
+    units, _outcomes = _predecessor_units_from_carry_manifest(formal, carry_manifest, rows, backend)
+    result_bindings: dict[str, Mapping[str, Any]] = {}
+    feature_bindings: dict[str, tuple[str, str]] = {}
+
+    def absolute_key(path: Path) -> str:
+        return os.path.normcase(os.path.abspath(os.fspath(path)))
+
+    for unit in units:
+        unit_id = unit.get("unit_id")
+        feature_path = Path(str(unit.get("training_features_path", "")))
+        result_path = group_root / feature_path.parent / "result.json"
+        feature_file = group_root / feature_path
+        result_key = absolute_key(result_path)
+        feature_key = absolute_key(feature_file)
+        if result_key in result_bindings or feature_key in feature_bindings:
+            raise RuntimeError(f"pinned predecessor B/00 unit paths are duplicated: {unit_id}")
+        result_bindings[result_key] = unit
+        feature_bindings[feature_key] = (unit_id, str(unit["training_features_sha256"]))
+
+    group_root_resolved = group_root.resolve(strict=True)
+    group_root_absolute = Path(os.path.abspath(os.fspath(group_root)))
+
+    def is_unit_artifact(path: Path) -> bool:
+        try:
+            relative = Path(os.path.abspath(os.fspath(path))).relative_to(group_root_absolute)
+        except ValueError:
+            return False
+        return (
+            len(relative.parts) == 4
+            and relative.parts[0] == "units"
+            and relative.parts[-2].startswith("attempt-")
+            and relative.name in {"result.json", "training-features.json.zlib"}
+        )
+
+    class PinnedPredecessorPath(type(group_root)):
+        __slots__ = ()
+
+        def _assert_inside_group(self) -> None:
+            try:
+                Path(self).resolve(strict=True).relative_to(group_root_resolved)
+            except (OSError, RuntimeError, ValueError) as exc:
+                raise RuntimeError("B/block-00 training artifact escaped the pinned predecessor group") from exc
+
+        def _verify_result(self, content: bytes, unit: Mapping[str, Any]) -> None:
+            unit_id = str(unit["unit_id"])
+            if formal.sha256_bytes(content) != unit["result_sha256"]:
+                raise RuntimeError(f"pinned predecessor B/00 result bytes differ: {unit_id}")
+            try:
+                result = json.loads(content.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise RuntimeError(f"pinned predecessor B/00 result is malformed: {unit_id}") from exc
+            pointer = result.get("training_features") if isinstance(result, Mapping) else None
+            if (
+                not isinstance(pointer, Mapping)
+                or result.get("unit_id") != unit_id
+                or result.get("owner_seed") != unit["owner_seed"]
+                or result.get("status") != "SUCCEEDED"
+                or result.get("package_commit") != PREDECESSOR_PACKAGE_COMMIT
+                or result.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+                or result.get("phase") != "training" or result.get("arm") != "TRAIN"
+                or result.get("formal") is not True
+                or pointer.get("compression") != "zlib"
+                or pointer.get("path") != unit.get("training_features_path")
+                or pointer.get("sha256") != unit.get("training_features_sha256")
+                or pointer.get("uncompressed_sha256") != unit.get("training_features_uncompressed_sha256")
+            ):
+                raise RuntimeError(f"pinned predecessor B/00 result pointer differs: {unit_id}")
+
+        def read_text(self, encoding: str | None = None, errors: str | None = None) -> str:
+            key = absolute_key(self)
+            unit = result_bindings.get(key)
+            if unit is None:
+                if is_unit_artifact(self) and self.name == "result.json":
+                    raise RuntimeError("unexpected B/00 result file outside the pinned predecessor carry")
+                return super().read_text(encoding=encoding, errors=errors)
+            self._assert_inside_group()
+            content = super().read_bytes()
+            self._verify_result(content, unit)
+            try:
+                text = content.decode(encoding or "utf-8", errors or "strict")
+                return text.replace("\r\n", "\n").replace("\r", "\n")
+            except (LookupError, UnicodeDecodeError) as exc:
+                raise RuntimeError(f"pinned predecessor B/00 result cannot be decoded: {unit['unit_id']}") from exc
+
+        def read_bytes(self) -> bytes:
+            self._assert_inside_group()
+            content = super().read_bytes()
+            key = absolute_key(self)
+            unit = result_bindings.get(key)
+            if unit is not None:
+                self._verify_result(content, unit)
+                return content
+            feature = feature_bindings.get(key)
+            if feature is not None:
+                if formal.sha256_bytes(content) != feature[1]:
+                    raise RuntimeError(f"pinned predecessor B/00 feature bytes differ: {feature[0]}")
+                return content
+            if is_unit_artifact(self) and self.name == "training-features.json.zlib":
+                raise RuntimeError(f"unexpected B/00 training feature outside the pinned predecessor carry: {self}")
+            return content
+
+    return issue84_driver.load_training_outcomes(
+        rows, root=PinnedPredecessorPath(group_root), executor=executor, package=package,
+    )
+
+
 def _resumed_b01_training_group(
     formal: Any, package_root: Path, identity: Mapping[str, str], *,
     expected_carry_sha256: str | None = None,
@@ -3146,15 +3278,17 @@ def _train_actor_block(
     group_sha = str(training_group["receipt_sha256"])
     training_data_package = str(training_group.get("training_data_package_commit", identity["package_commit"]))
     carry_manifest_sha256 = training_group.get("predecessor_carry_manifest_sha256")
+    predecessor_carry_manifest = None
+    predecessor_carry_sha256 = None
     if arm == "B" and block == 0:
-        _manifest, expected_carry_sha256 = _validate_carry_manifest(
+        predecessor_carry_manifest, predecessor_carry_sha256 = _validate_carry_manifest(
             formal, package_root, identity,
             expected_sha256=str(carry_manifest_sha256) if carry_manifest_sha256 is not None else None,
         )
         if (
             training_data_package != PREDECESSOR_PACKAGE_COMMIT
             or group_sha != PREDECESSOR_GROUP_RECEIPT_SHA256
-            or carry_manifest_sha256 != expected_carry_sha256
+            or carry_manifest_sha256 != predecessor_carry_sha256
         ):
             raise RuntimeError("B/block-00 actor update is not bound to the verified predecessor group")
     elif arm == "B" and block == 1:
@@ -3193,8 +3327,9 @@ def _train_actor_block(
     if success_path.is_file():
         return _read_update_receipt(formal, package_root, identity, arm=arm, block=block)
     if arm == "B" and block == 0:
-        carry_manifest, _carry_sha256 = _validate_carry_manifest(formal, package_root, identity)
-        if carry_manifest.get("actor_update_carries"):
+        if predecessor_carry_manifest is None:
+            raise RuntimeError("B/block-00 update lost its validated predecessor carry")
+        if predecessor_carry_manifest.get("actor_update_carries"):
             return _read_update_receipt(formal, package_root, identity, arm=arm, block=block)
     update_root.mkdir(parents=True, exist_ok=True)
     loaded = backend.load_modules(update_root, pilot=True)
@@ -3221,6 +3356,16 @@ def _train_actor_block(
             receipt_roots_by_owner=receipt_roots_by_owner,
         )
         _outcomes = None
+    elif arm == "B" and block == 0:
+        if predecessor_carry_manifest is None or predecessor_carry_sha256 is None:
+            raise RuntimeError("B/block-00 training lacks its validated predecessor content hashes")
+        examples, _outcomes = _load_pinned_predecessor_training_outcomes(
+            formal, backend, issue84_driver, rows,
+            training_group=training_group,
+            carry_manifest=predecessor_carry_manifest,
+            carry_manifest_sha256=predecessor_carry_sha256,
+            executor=executor, package=training_data_package,
+        )
     else:
         examples, _outcomes = issue84_driver.load_training_outcomes(
             rows, root=Path(training_group["group_root"]), executor=executor,
