@@ -137,6 +137,29 @@ def _validate_active_wall_clock(
     return float(elapsed)
 
 
+def _carried_active_wall_high_water(
+    carry_manifest: Mapping[str, Any], cap_seconds: int,
+) -> float | None:
+    """Return the immutable predecessor clock floor for a carried Actor update."""
+    carries = carry_manifest.get("actor_update_carries", [])
+    if not isinstance(carries, list):
+        raise RuntimeError("carried active-wall high-water record is malformed")
+    if not carries:
+        return None
+    if len(carries) != 1 or not isinstance(carries[0], Mapping):
+        raise RuntimeError("carried active-wall high-water record is malformed")
+    snapshot = carries[0].get("active_wall_clock_snapshot")
+    elapsed = snapshot.get("elapsed_seconds") if isinstance(snapshot, Mapping) else None
+    if (
+        isinstance(elapsed, bool) or not isinstance(elapsed, (int, float))
+        or not math.isfinite(float(elapsed))
+        or float(elapsed) < 0
+        or float(elapsed) > cap_seconds
+    ):
+        raise RuntimeError("immutable carried active-wall high-water is malformed or exceeds the approved cap")
+    return float(elapsed)
+
+
 def _predecessor_carry_path(package_root: Path) -> Path:
     return Path(package_root) / "predecessor-carry-manifest.json"
 
@@ -831,8 +854,11 @@ def validate_authorization(
     cap = receipt.get("whole_task_active_wall_cap_seconds")
     package_root, _readiness_path, _seed_path = _formal_paths(formal, identity)
     carry_sha256 = receipt.get("predecessor_carry_manifest_sha256")
+    carry_manifest = None
     if isinstance(carry_sha256, str):
-        _validate_carry_manifest(formal, package_root, identity, expected_sha256=carry_sha256)
+        carry_manifest, _validated_carry_sha256 = _validate_carry_manifest(
+            formal, package_root, identity, expected_sha256=carry_sha256,
+        )
     if (
         receipt.get("schema_id") != AUTH_SCHEMA
         or receipt.get("issue") != 85
@@ -869,6 +895,13 @@ def validate_authorization(
         raise RuntimeError("the cumulative Issue 85 active-wall clock is missing; refusing to reset study time")
     prior_clock = formal.read_json(active_wall)
     elapsed = _validate_active_wall_clock(prior_clock, cap, require_idle=require_idle_clock)
+    if carry_manifest is not None:
+        high_water = _carried_active_wall_high_water(carry_manifest, cap)
+        if high_water is not None and elapsed < high_water:
+            raise RuntimeError(
+                "the cumulative Issue 85 active-wall clock is below the immutable carried active-wall high-water "
+                f"({elapsed} < {high_water}); refusing to reset study time"
+            )
     pilot_report_path = (
         Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "pilot"
         / ACCEPTED_PILOT_PACKAGE_COMMIT / "pilot-report.json"

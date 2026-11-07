@@ -73,6 +73,131 @@ def test_stale_active_wall_session_is_resumable_without_resetting_elapsed(monkey
         )
 
 
+@pytest.mark.parametrize(
+    ("current_elapsed", "must_reject"),
+    [
+        (33_893.47028780101 - 0.25, True),
+        (33_893.47028780101, False),
+        (33_893.47028780101 + 10.0, False),
+    ],
+)
+def test_validate_authorization_enforces_carried_active_wall_high_water(
+    monkeypatch, tmp_path: Path, current_elapsed: float, must_reject: bool,
+) -> None:
+    package_root = tmp_path / "formal-package"
+    package_root.mkdir()
+    data_root = tmp_path / "data"
+    contract_path = tmp_path / "contract.json"
+    contract_path.write_text("{}", encoding="utf-8")
+    study = tmp_path / "study"
+    study.mkdir()
+    analysis_path = study / "formal_analysis.py"
+    analysis_path.write_text("# frozen test analysis\n", encoding="utf-8")
+
+    identity = {"package_commit": "a" * 40, "source_lock_sha256": "b" * 64}
+    seed_sha = "c" * 64
+    schedule_sha = "d" * 64
+    carry_sha = "e" * 64
+    readiness = {"formal_seed_table_sha256": seed_sha}
+    seed = {"actor_update_schedule_sha256": schedule_sha}
+    carried_elapsed = 33_893.47028780101
+    snapshot_body = {
+        "elapsed_seconds": carried_elapsed,
+        "active_session": None,
+        "process_ids": [],
+        "receipt_file_sha256": "f" * 64,
+    }
+    snapshot = {
+        **snapshot_body,
+        "snapshot_sha256": formal_runner.sha256_bytes(formal_runner.canonical(snapshot_body)),
+    }
+    carry_manifest = {"actor_update_carries": [{"active_wall_clock_snapshot": snapshot}]}
+    monkeypatch.setattr(
+        formal_execution, "_formal_paths",
+        lambda *_args: (package_root, tmp_path / "readiness.json", tmp_path / "seed.json"),
+    )
+    monkeypatch.setattr(
+        formal_execution, "_validate_carry_manifest",
+        lambda *_args, **_kwargs: (carry_manifest, carry_sha),
+    )
+
+    formal = SimpleNamespace(
+        DATA_ROOT=data_root,
+        CONTRACT_PATH=contract_path,
+        STUDY=study,
+        read_json=formal_runner.read_json,
+        file_sha256=formal_runner.file_sha256,
+    )
+    pilot_report_path = (
+        data_root / "issue85" / "artifacts" / "pilot"
+        / formal_execution.ACCEPTED_PILOT_PACKAGE_COMMIT / "pilot-report.json"
+    )
+    pilot_report_path.parent.mkdir(parents=True)
+    pilot_report_path.write_text(json.dumps({
+        "schema_id": "issue85-pilot-report-v1",
+        "status": "SUCCEEDED",
+        "package_commit": formal_execution.ACCEPTED_PILOT_PACKAGE_COMMIT,
+        "source_lock_sha256": identity["source_lock_sha256"],
+        "formal_games_started": 0,
+        "formal_cohorts_changed": False,
+    }), encoding="utf-8")
+    monkeypatch.setattr(
+        formal_execution, "ACCEPTED_PILOT_REPORT_SHA256",
+        formal_runner.file_sha256(pilot_report_path),
+    )
+
+    active_wall = data_root / "issue85" / "artifacts" / "active-wall-issue85-task.json"
+    active_wall.parent.mkdir(parents=True, exist_ok=True)
+    active_wall.write_text(json.dumps(_active_clock(
+        elapsed=current_elapsed, active_session=None, process_ids=[],
+    )), encoding="utf-8")
+    assert formal_runner.file_sha256(active_wall) != snapshot_body["receipt_file_sha256"]
+
+    authorization = {
+        "schema_id": formal_execution.AUTH_SCHEMA,
+        "issue": 85,
+        "formal_go": True,
+        "status": "APPROVED",
+        "package_commit": identity["package_commit"],
+        "source_lock_sha256": identity["source_lock_sha256"],
+        "contract_sha256": formal_runner.file_sha256(contract_path),
+        "seed_table_sha256": seed_sha,
+        "actor_update_schedule_sha256": schedule_sha,
+        "analysis_source_sha256": formal_runner.file_sha256(analysis_path),
+        "whole_task_active_wall_cap_seconds": formal_execution.FORMAL_ACTIVE_WALL_CAP_SECONDS,
+        "predecessor_carry_manifest_sha256": carry_sha,
+        "pilot_report_sha256": formal_runner.file_sha256(pilot_report_path),
+        "owner_approval": {
+            "status": "APPROVED",
+            "decision": "FORMAL_GO",
+            "comment_url": formal_execution.FORMAL_GO_COMMENT_URL,
+        },
+        "reviewer_approval": {
+            "status": "APPROVED",
+            "package_commit": identity["package_commit"],
+            "source_lock_sha256": identity["source_lock_sha256"],
+            "seed_table_sha256": seed_sha,
+            "actor_update_schedule_sha256": schedule_sha,
+            "analysis_source_sha256": formal_runner.file_sha256(analysis_path),
+            "decision": "PASS",
+            "comment_url": "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-123",
+        },
+    }
+    authorization_path = tmp_path / "authorization.json"
+    authorization_path.write_text(json.dumps(authorization), encoding="utf-8")
+
+    if must_reject:
+        with pytest.raises(RuntimeError, match="below the immutable carried active-wall high-water"):
+            formal_execution.validate_authorization(
+                formal, authorization_path, identity=identity, readiness=readiness, seed=seed,
+            )
+    else:
+        result = formal_execution.validate_authorization(
+            formal, authorization_path, identity=identity, readiness=readiness, seed=seed,
+        )
+        assert result["prior_active_wall_seconds"] == pytest.approx(current_elapsed)
+
+
 def test_formal_runtime_dispatches_locked_a_without_using_issue84_final_pi20(monkeypatch, tmp_path: Path) -> None:
     current_row = ContextVar("test_formal_current_row", default=None)
     parent_actor = object()
