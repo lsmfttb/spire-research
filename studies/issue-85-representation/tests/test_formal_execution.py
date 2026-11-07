@@ -27,18 +27,19 @@ def test_training_worker_accepts_issue84_block_dispatch_for_locked_pi12_lineage(
     }
 
     assert formal_execution._formal_training_dispatch(
-        formal_runner, row, f"pi{block}",
+        formal_runner, row, f"pi{12 + block}",
     ) == ("B", block)
 
 
 @pytest.mark.parametrize(
     ("row", "loader_label"),
     [
+        ({"issue85_arm": "B", "block_index": 1, "issue84_policy_label": "pi12"}, "pi1"),
         ({"issue85_arm": "B", "block_index": 1, "issue84_policy_label": "pi12"}, "pi12"),
-        ({"issue85_arm": "B", "block_index": 1, "issue84_policy_label": "pi20"}, "pi1"),
-        ({"issue85_arm": "A", "block_index": 1, "issue84_policy_label": "pi12"}, "pi1"),
-        ({"issue85_arm": "B", "block_index": True, "issue84_policy_label": "pi12"}, "pi1"),
-        ({"issue85_arm": "B", "block_index": 8, "issue84_policy_label": "pi12"}, "pi8"),
+        ({"issue85_arm": "B", "block_index": 1, "issue84_policy_label": "pi20"}, "pi13"),
+        ({"issue85_arm": "A", "block_index": 1, "issue84_policy_label": "pi12"}, "pi13"),
+        ({"issue85_arm": "B", "block_index": True, "issue84_policy_label": "pi12"}, "pi13"),
+        ({"issue85_arm": "B", "block_index": 8, "issue84_policy_label": "pi12"}, "pi20"),
     ],
 )
 def test_training_worker_rejects_unregistered_block_dispatch(row: dict, loader_label: str) -> None:

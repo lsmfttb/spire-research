@@ -966,8 +966,8 @@ def _formal_training_dispatch(
 ) -> tuple[str, int]:
     """Validate #84's block dispatch token, then select the formal actor lineage.
 
-    The pinned #84 driver calls `_arm_policy` with the zero-based training block
-    and therefore asks its loader for `pi{block}`. For Issue 85, that label is
+    The pinned #84 driver calls `arm_policy` with the zero-based training block
+    and therefore asks its loader for `pi{12 + block}`. For Issue 85, that label is
     only a dispatch token: the source-bound row still records pi12 as the locked
     initialization, while `load_training_arm` selects either that initialization
     or the preceding Issue 85 block checkpoint.
@@ -980,7 +980,7 @@ def _formal_training_dispatch(
         or isinstance(block, bool)
         or not isinstance(block, int)
         or not 0 <= block < 8
-        or loader_label != f"pi{block}"
+        or loader_label != f"pi{12 + block}"
     ):
         raise RuntimeError("formal training worker has an invalid arm/block/model label")
     return arm, block
