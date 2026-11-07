@@ -18,6 +18,34 @@ def test_formal_runner_exports_the_locked_wsl_data_root() -> None:
     assert formal_runner.DATA_ROOT_WSL == formal_runner.pilot.DATA_ROOT_WSL
 
 
+@pytest.mark.parametrize("block", range(8))
+def test_training_worker_accepts_issue84_block_dispatch_for_locked_pi12_lineage(block: int) -> None:
+    row = {
+        "issue85_arm": "B",
+        "block_index": block,
+        "issue84_policy_label": "pi12",
+    }
+
+    assert formal_execution._formal_training_dispatch(
+        formal_runner, row, f"pi{block}",
+    ) == ("B", block)
+
+
+@pytest.mark.parametrize(
+    ("row", "loader_label"),
+    [
+        ({"issue85_arm": "B", "block_index": 1, "issue84_policy_label": "pi12"}, "pi12"),
+        ({"issue85_arm": "B", "block_index": 1, "issue84_policy_label": "pi20"}, "pi1"),
+        ({"issue85_arm": "A", "block_index": 1, "issue84_policy_label": "pi12"}, "pi1"),
+        ({"issue85_arm": "B", "block_index": True, "issue84_policy_label": "pi12"}, "pi1"),
+        ({"issue85_arm": "B", "block_index": 8, "issue84_policy_label": "pi12"}, "pi8"),
+    ],
+)
+def test_training_worker_rejects_unregistered_block_dispatch(row: dict, loader_label: str) -> None:
+    with pytest.raises(RuntimeError, match="invalid arm/block/model label"):
+        formal_execution._formal_training_dispatch(formal_runner, row, loader_label)
+
+
 @pytest.mark.parametrize(
     ("steps", "parameter_count", "allowed", "valid"),
     [

@@ -961,6 +961,31 @@ def _validate_worker_authorization(
     return receipt
 
 
+def _formal_training_dispatch(
+    formal: Any, row: Mapping[str, Any], loader_label: str,
+) -> tuple[str, int]:
+    """Validate #84's block dispatch token, then select the formal actor lineage.
+
+    The pinned #84 driver calls `_arm_policy` with the zero-based training block
+    and therefore asks its loader for `pi{block}`. For Issue 85, that label is
+    only a dispatch token: the source-bound row still records pi12 as the locked
+    initialization, while `load_training_arm` selects either that initialization
+    or the preceding Issue 85 block checkpoint.
+    """
+    arm = str(row.get("issue85_arm", ""))
+    block = row.get("block_index")
+    if (
+        arm not in formal.NEW_ARMS
+        or row.get("issue84_policy_label") != "pi12"
+        or isinstance(block, bool)
+        or not isinstance(block, int)
+        or not 0 <= block < 8
+        or loader_label != f"pi{block}"
+    ):
+        raise RuntimeError("formal training worker has an invalid arm/block/model label")
+    return arm, block
+
+
 def _configure_formal_runtime(
     formal: Any, issue84_source: Path, identity: Mapping[str, str], package_root: Path,
 ) -> tuple[Any, Any]:
@@ -1064,13 +1089,7 @@ def _configure_formal_runtime(
                 raise RuntimeError("Issue 85 formal worker did not receive its frozen seed-table row")
             phase = str(row.get("phase", ""))
             if phase == "training":
-                arm = str(row.get("issue85_arm", ""))
-                block = row.get("block_index")
-                if (
-                    arm not in formal.NEW_ARMS or label != "pi12"
-                    or isinstance(block, bool) or not isinstance(block, int) or not 0 <= block < 8
-                ):
-                    raise RuntimeError("formal training worker has an invalid arm/block/model label")
+                arm, block = _formal_training_dispatch(formal, row, label)
                 return load_training_arm(row, arm, block)
             if phase == "evaluation":
                 policy = str(row.get("arm", ""))
