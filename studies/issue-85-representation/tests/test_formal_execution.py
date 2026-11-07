@@ -47,6 +47,56 @@ def test_training_worker_rejects_unregistered_block_dispatch(row: dict, loader_l
         formal_execution._formal_training_dispatch(formal_runner, row, loader_label)
 
 
+def test_b01_actor_update_uses_pinned_issue84_dispatch_token(tmp_path: Path, monkeypatch) -> None:
+    package_commit = "b" * 40
+    carry_sha = "e" * 64
+    identity = {
+        "package_commit": package_commit,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+    }
+    manifest = {"resumed_training_group_carries": [dict(formal_execution.RESUMED_B01_GROUP_CARRY)]}
+    monkeypatch.setattr(
+        formal_execution, "_validate_carry_manifest",
+        lambda *_args, **_kwargs: (manifest, carry_sha),
+    )
+    loader_labels: list[str] = []
+
+    class StopAfterModelLoad(Exception):
+        pass
+
+    class Executor:
+        def _load_model(self, label: str, *, proxy: bool):
+            assert proxy is False
+            loader_labels.append(label)
+            raise StopAfterModelLoad
+
+    executor = Executor()
+    backend = SimpleNamespace(load_modules=lambda *_args, **_kwargs: (None, None, None, None, executor))
+    formal = SimpleNamespace(
+        CONTRACT={"training": {"owners_per_block": 128, "updates_per_block": 64, "minibatch_owners": 32}},
+        pilot=SimpleNamespace(_CURRENT_ROW=ContextVar("issue85-current-row", default=None)),
+    )
+    rows = [{"owner_seed": owner} for owner in range(8400129, 8400257)]
+    seed_table = {
+        "actor_update_schedule": [{"arm": "B", "block_index": 1, "seed": 12345}],
+        "actor_update_schedule_sha256": "a" * 64,
+    }
+    training_group = {
+        "receipt_sha256": formal_execution.RESUMED_B01_GROUP_RECEIPT_SHA256,
+        "training_data_package_commit": formal_execution.RESUMED_GAMES_PACKAGE_COMMIT,
+        "predecessor_carry_manifest_sha256": carry_sha,
+    }
+    with pytest.raises(StopAfterModelLoad):
+        formal_execution._train_actor_block(
+            formal, backend, object(), arm="B", block=1, rows=rows,
+            package_root=tmp_path / package_commit, identity=identity,
+            seed_table=seed_table, seed_table_sha256="d" * 64,
+            training_group=training_group, clock=object(),
+        )
+    assert loader_labels == ["pi13"]
+    assert formal.pilot._CURRENT_ROW.get() is None
+
+
 @pytest.mark.parametrize(
     ("steps", "parameter_count", "allowed", "valid"),
     [
@@ -445,6 +495,8 @@ def test_new_successor_carry_requires_an_actor_update_reference(tmp_path: Path, 
         "formal_games_carried": 128,
         "actor_updates_carried": 1,
         "actor_update_carries": [{"arm": "B", "block_index": 0}],
+        "resumed_training_group_carries": [dict(formal_execution.RESUMED_B01_GROUP_CARRY)],
+        "resumed_training_games_carried": 128,
     }
     manifest["manifest_sha256"] = formal_runner.sha256_bytes(formal_runner.canonical(manifest))
     formal_execution._predecessor_carry_path(package_root).write_text(json.dumps(manifest), encoding="utf-8")
@@ -453,8 +505,21 @@ def test_new_successor_carry_requires_an_actor_update_reference(tmp_path: Path, 
         formal, package_root, {"package_commit": package_commit, "source_lock_sha256": source_lock_sha},
     )
     assert loaded["actor_updates_carried"] == 1
+    assert loaded["resumed_training_games_carried"] == 128
+    assert loaded["resumed_training_group_carries"] == [formal_execution.RESUMED_B01_GROUP_CARRY]
     assert checked == [{"arm": "B", "block_index": 0}]
 
+    manifest["resumed_training_group_carries"][0]["group_receipt_sha256"] = "0" * 64
+    manifest["manifest_sha256"] = formal_runner.sha256_bytes(formal_runner.canonical(
+        {key: value for key, value in manifest.items() if key != "manifest_sha256"}
+    ))
+    formal_execution._predecessor_carry_path(package_root).write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="malformed or bound"):
+        formal_execution._validate_carry_manifest(
+            formal, package_root, {"package_commit": package_commit, "source_lock_sha256": source_lock_sha},
+        )
+
+    manifest["resumed_training_group_carries"] = [dict(formal_execution.RESUMED_B01_GROUP_CARRY)]
     manifest["actor_updates_carried"] = 0
     manifest["actor_update_carries"] = []
     manifest["manifest_sha256"] = formal_runner.sha256_bytes(formal_runner.canonical(
@@ -795,7 +860,7 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
         CONTRACT_PATH=contract_path,
         STUDY=study,
         _registered_ranges=lambda: {"validation": range(64), "test": range(320)},
-        formal_plan=lambda: {"training_blocks_per_arm": 1},
+        formal_plan=lambda: {"training_blocks_per_arm": 2},
         file_sha256=file_sha256,
         read_json=read_json,
         verify_dry_bundle=lambda **_kwargs: {
@@ -878,9 +943,10 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
     open_path.write_text(json.dumps(saved, sort_keys=True), encoding="utf-8")
 
     for arm in new_arms:
-        update_receipt = package_root / "training" / arm / "updates" / "block-00" / "success-receipt.json"
-        update_receipt.parent.mkdir(parents=True, exist_ok=True)
-        update_receipt.write_text("{}", encoding="utf-8")
+        for block in range(2):
+            update_receipt = package_root / "training" / arm / "updates" / f"block-{block:02d}" / "success-receipt.json"
+            update_receipt.parent.mkdir(parents=True, exist_ok=True)
+            update_receipt.write_text("{}", encoding="utf-8")
 
     class Clock:
         elapsed_before = 0.0
@@ -915,10 +981,31 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
             "predecessor_carry_manifest_sha256": authorization["predecessor_carry_manifest_sha256"],
         },
     )
-    monkeypatch.setattr(formal_execution, "_atomic_json", lambda *_args: None)
     monkeypatch.setattr(
-        formal_execution, "_run_training_games",
-        lambda *_args, **_kwargs: {"status": "SUCCEEDED", "completed": 128},
+        formal_execution, "_resumed_b01_training_group",
+        lambda *_args, **_kwargs: {
+            "status": "SUCCEEDED", "completed": 128,
+            "receipt_sha256": formal_execution.RESUMED_B01_GROUP_RECEIPT_SHA256,
+            "training_data_package_commit": formal_execution.RESUMED_GAMES_PACKAGE_COMMIT,
+            "predecessor_carry_manifest_sha256": authorization["predecessor_carry_manifest_sha256"],
+        },
+    )
+    monkeypatch.setattr(
+        formal_execution, "_training_rows",
+        lambda _seed, arm, block: [
+            {"owner_seed": 8400001 + block * 128 + index, "unit_id": f"TRAIN:{8400001 + block * 128 + index}:{arm}"}
+            for index in range(128)
+        ],
+    )
+    monkeypatch.setattr(formal_execution, "_atomic_json", lambda *_args: None)
+    training_game_calls: list[tuple[str, int]] = []
+
+    def run_training_games(_formal, _backend, *, arm, block, **_kwargs):
+        training_game_calls.append((arm, block))
+        return {"status": "SUCCEEDED", "completed": 128}
+
+    monkeypatch.setattr(
+        formal_execution, "_run_training_games", run_training_games,
     )
     monkeypatch.setattr(
         formal_execution, "_read_update_receipt",
@@ -943,4 +1030,6 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
         )
 
     assert test_worker_calls == []
+    assert ("B", 0) not in training_game_calls
+    assert ("B", 1) not in training_game_calls
     assert not (package_root / "test").exists()

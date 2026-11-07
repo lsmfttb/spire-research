@@ -44,6 +44,38 @@ PREDECESSOR_GROUP_ROOT = (
     "issue85/artifacts/formal/e549105ead79c9524bee706fc600164f8c7f9f1a/"
     "training/B/block-00/games"
 )
+RESUMED_GAMES_PACKAGE_COMMIT = "318bdc800c5f986d67b445c38caeb13cebb154fb"
+RESUMED_GAMES_SOURCE_LOCK_SHA256 = PREDECESSOR_SOURCE_LOCK_SHA256
+RESUMED_GAMES_SEED_TABLE_SHA256 = "eabbfa135330e2729d1c4e854c387afed1f61ad1f5b24b9f5c1d90a061e9c957"
+RESUMED_GAMES_PROGRESS_SHA256 = "8ac79ed8bc8509c296f2a07ab08b52c4e0a1a2e9e6c6ed5333d0bf86b8c92d5e"
+RESUMED_GAMES_AUTHORIZATION_SHA256 = "a739437e17e81f92318fc1a6bcf1218f064b0d6916e60e304f43358b5fa7507e"
+RESUMED_GAMES_CARRY_SHA256 = "6c83e39421014ca2193668253ef3b204eb1f1551c120c6920da592c0f036d0ef"
+RESUMED_B01_GROUP_RECEIPT_SHA256 = "480078361cd6bec04eabf07a7a875dbc08810dcf7999b3876d0fcfb4d069856c"
+RESUMED_B01_GROUP_ROOT = (
+    "issue85/artifacts/formal/318bdc800c5f986d67b445c38caeb13cebb154fb/"
+    "training/B/block-01/games"
+)
+RESUMED_B01_UPDATE_RECEIPT_SHA256 = "301a74e4cca79e813eebdaa843c948acbdd864a24cab81c647a75d4dc6c32358"
+RESUMED_B01_MODEL_DIGEST = "a272f206458ac60644805a9773a5eac66f7c7b2bcbf7be502bdc03a5939d6165"
+RESUMED_B01_FORMAL_FAILURE = "formal training worker has an invalid arm/block/model label"
+RESUMED_B01_GROUP_CARRY = {
+    "arm": "B",
+    "block_index": 1,
+    "stage_id": "TRAIN-B-BLOCK-01-GAMES",
+    "package_commit": RESUMED_GAMES_PACKAGE_COMMIT,
+    "source_lock_sha256": RESUMED_GAMES_SOURCE_LOCK_SHA256,
+    "seed_table_sha256": RESUMED_GAMES_SEED_TABLE_SHA256,
+    "formal_progress_sha256": RESUMED_GAMES_PROGRESS_SHA256,
+    "authorization_receipt_sha256": RESUMED_GAMES_AUTHORIZATION_SHA256,
+    "predecessor_carry_manifest_sha256": RESUMED_GAMES_CARRY_SHA256,
+    "group_receipt_sha256": RESUMED_B01_GROUP_RECEIPT_SHA256,
+    "group_root": RESUMED_B01_GROUP_ROOT,
+    "expected": 128,
+    "completed": 128,
+    "failed_attempt_count": 0,
+    "model_digest": RESUMED_B01_MODEL_DIGEST,
+    "previous_update_receipt_sha256": RESUMED_B01_UPDATE_RECEIPT_SHA256,
+}
 FORMAL_GO_COMMENT_URL = "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-6686508621"
 FORMAL_ACTIVE_WALL_CAP_SECONDS = 295632
 PREDECESSOR_INITIAL_MODEL_DIGEST = "2891e60f6f9467c7f319a250e5789f4a0bfd89dcda17a60e8d416bcbdbd18908"
@@ -178,9 +210,14 @@ def _validate_carry_manifest(
     successor = manifest.get("successor")
     failed_update = predecessor.get("failed_update") if isinstance(predecessor, Mapping) else None
     actor_update_carries = manifest.get("actor_update_carries", [])
+    resumed_game_carries = manifest.get("resumed_training_group_carries", [])
     expected_actor_updates_carried = (
         0 if successor.get("package_commit") == OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT else 1
     ) if isinstance(successor, Mapping) else -1
+    expected_resumed_game_carries = (
+        [] if successor.get("package_commit") == OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT
+        else [RESUMED_B01_GROUP_CARRY]
+    ) if isinstance(successor, Mapping) else None
     if (
         manifest.get("schema_id") != PREDECESSOR_CARRY_SCHEMA
         or manifest.get("status") != "VERIFIED_READ_ONLY_CONTINUATION"
@@ -210,6 +247,10 @@ def _validate_carry_manifest(
         or manifest.get("actor_updates_carried") != expected_actor_updates_carried
         or not isinstance(actor_update_carries, list)
         or len(actor_update_carries) != expected_actor_updates_carried
+        or resumed_game_carries != expected_resumed_game_carries
+        or manifest.get("resumed_training_games_carried", 0) != (
+            0 if expected_resumed_game_carries == [] else 128
+        )
     ):
         raise RuntimeError("predecessor carry manifest is malformed or bound to another source/evidence")
     if actor_update_carries:
@@ -247,6 +288,57 @@ def _predecessor_training_group(
         "predecessor_carry_manifest_path": _predecessor_carry_path(package_root).relative_to(package_root).as_posix(),
         "predecessor_carry_manifest_sha256": carry_sha256,
         "units_manifest_sha256": manifest["units_sha256"],
+    }
+
+
+def _resumed_b01_training_group(
+    formal: Any, package_root: Path, identity: Mapping[str, str], *,
+    expected_carry_sha256: str | None = None,
+) -> dict[str, Any]:
+    manifest, carry_sha256 = _validate_carry_manifest(
+        formal, package_root, identity, expected_sha256=expected_carry_sha256,
+    )
+    carries = manifest.get("resumed_training_group_carries", [])
+    if carries != [RESUMED_B01_GROUP_CARRY]:
+        raise RuntimeError("B/block-01 games are not bound to the verified read-only continuation")
+    old_root = _inside(Path(formal.DATA_ROOT), RESUMED_B01_GROUP_ROOT)
+    receipt_path = old_root / "group-receipt.json"
+    if formal.file_sha256(receipt_path) != RESUMED_B01_GROUP_RECEIPT_SHA256:
+        raise RuntimeError("immutable resumed B/block-01 group receipt changed after carry verification")
+    receipt = formal.read_json(receipt_path)
+    if (
+        receipt.get("schema_id") != GROUP_SCHEMA
+        or receipt.get("status") != "SUCCEEDED"
+        or receipt.get("stage_id") != "TRAIN-B-BLOCK-01-GAMES"
+        or receipt.get("package_commit") != RESUMED_GAMES_PACKAGE_COMMIT
+        or receipt.get("source_lock_sha256") != RESUMED_GAMES_SOURCE_LOCK_SHA256
+        or receipt.get("seed_table_sha256") != RESUMED_GAMES_SEED_TABLE_SHA256
+        or receipt.get("authorization_receipt_sha256") != RESUMED_GAMES_AUTHORIZATION_SHA256
+        or receipt.get("expected") != 128
+        or receipt.get("completed") != 128
+        or receipt.get("failed_attempt_count") != 0
+        or len(receipt.get("units", [])) != 128
+    ):
+        raise RuntimeError("resumed B/block-01 group receipt is incomplete or bound to other evidence")
+    return {
+        "schema_id": CARRIED_GROUP_REFERENCE_SCHEMA,
+        "artifact_kind": "read-only resumed group reference; no successor game receipt",
+        "status": "SUCCEEDED",
+        "stage_id": "TRAIN-B-BLOCK-01-GAMES",
+        "package_commit": RESUMED_GAMES_PACKAGE_COMMIT,
+        "training_data_package_commit": RESUMED_GAMES_PACKAGE_COMMIT,
+        "source_lock_sha256": RESUMED_GAMES_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": RESUMED_GAMES_SEED_TABLE_SHA256,
+        "authorization_receipt_sha256": RESUMED_GAMES_AUTHORIZATION_SHA256,
+        "expected": 128,
+        "completed": 128,
+        "failed_attempt_count": 0,
+        "receipt_path": (Path(RESUMED_B01_GROUP_ROOT) / "group-receipt.json").as_posix(),
+        "receipt_sha256": RESUMED_B01_GROUP_RECEIPT_SHA256,
+        "group_root": str(old_root),
+        "predecessor_carry_manifest_path": _predecessor_carry_path(package_root).relative_to(package_root).as_posix(),
+        "predecessor_carry_manifest_sha256": carry_sha256,
+        "units_manifest_sha256": _hash_json(formal, receipt["units"]),
     }
 
 
@@ -413,6 +505,221 @@ def _validate_operational_actor_update_carry(formal: Any, carry: Mapping[str, An
     if dict(carry) != expected:
         raise RuntimeError("carried B/00 actor update differs from its immutable operational predecessor")
     return expected
+
+
+def _verify_resumed_b01_training_group(
+    formal: Any, backend: Any, issue84_driver: Any, *, seed: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate the successful 318bdc B/01 games for read-only source continuation."""
+    data_root = Path(formal.DATA_ROOT).resolve(strict=True)
+    source_root = _inside(data_root, f"issue85/artifacts/formal/{RESUMED_GAMES_PACKAGE_COMMIT}")
+    progress_path = source_root / "formal-progress.json"
+    authorization_path = source_root / "formal-execution-authorization.json"
+    seed_path = source_root / "formal-seed-table.json"
+    carry_path = _predecessor_carry_path(source_root)
+    group_root = _inside(data_root, RESUMED_B01_GROUP_ROOT)
+    group_path = group_root / "group-receipt.json"
+    for path, expected, label in (
+        (progress_path, RESUMED_GAMES_PROGRESS_SHA256, "formal progress"),
+        (authorization_path, RESUMED_GAMES_AUTHORIZATION_SHA256, "authorization"),
+        (seed_path, RESUMED_GAMES_SEED_TABLE_SHA256, "seed table"),
+        (carry_path, RESUMED_GAMES_CARRY_SHA256, "predecessor carry"),
+        (group_path, RESUMED_B01_GROUP_RECEIPT_SHA256, "B/01 group receipt"),
+    ):
+        if not path.is_file() or formal.file_sha256(path) != expected:
+            raise RuntimeError(f"read-only B/01 continuation {label} is missing or changed: {path}")
+
+    old_seed = formal.read_json(seed_path)
+    old_progress = formal.read_json(progress_path)
+    authorization = formal.read_json(authorization_path)
+    owner = authorization.get("owner_approval")
+    reviewer = authorization.get("reviewer_approval")
+    if (
+        old_seed.get("schema_id") != "issue85-formal-seed-table-v1"
+        or old_seed.get("package_commit") != RESUMED_GAMES_PACKAGE_COMMIT
+        or old_seed.get("source_lock_sha256") != RESUMED_GAMES_SOURCE_LOCK_SHA256
+        or old_seed.get("row_count") != 7808
+        or old_seed.get("rows") != seed.get("rows")
+        or old_seed.get("rows_sha256") != _hash_json(formal, old_seed.get("rows"))
+        or old_seed.get("actor_update_schedule") != seed.get("actor_update_schedule")
+        or old_seed.get("actor_update_schedule_sha256") != seed.get("actor_update_schedule_sha256")
+        or old_progress.get("schema_id") != PROGRESS_SCHEMA
+        or old_progress.get("status") != "FAILED_OR_PAUSED"
+        or old_progress.get("package_commit") != RESUMED_GAMES_PACKAGE_COMMIT
+        or old_progress.get("source_lock_sha256") != RESUMED_GAMES_SOURCE_LOCK_SHA256
+        or old_progress.get("seed_table_sha256") != RESUMED_GAMES_SEED_TABLE_SHA256
+        or old_progress.get("authorization_receipt_sha256") != RESUMED_GAMES_AUTHORIZATION_SHA256
+        or old_progress.get("active_stage") != "TRAIN-B-BLOCK-01-ACTOR-UPDATE"
+        or old_progress.get("failure") != {"type": "RuntimeError", "detail": RESUMED_B01_FORMAL_FAILURE}
+        or authorization.get("schema_id") != AUTH_SCHEMA
+        or authorization.get("status") != "APPROVED"
+        or authorization.get("issue") != 85
+        or authorization.get("formal_go") is not True
+        or authorization.get("package_commit") != RESUMED_GAMES_PACKAGE_COMMIT
+        or authorization.get("source_lock_sha256") != RESUMED_GAMES_SOURCE_LOCK_SHA256
+        or authorization.get("seed_table_sha256") != RESUMED_GAMES_SEED_TABLE_SHA256
+        or authorization.get("predecessor_carry_manifest_sha256") != RESUMED_GAMES_CARRY_SHA256
+        or authorization.get("whole_task_active_wall_cap_seconds") != FORMAL_ACTIVE_WALL_CAP_SECONDS
+        or not isinstance(owner, Mapping)
+        or owner.get("status") != "APPROVED"
+        or owner.get("decision") != "FORMAL_GO"
+        or owner.get("comment_url") != FORMAL_GO_COMMENT_URL
+        or not isinstance(reviewer, Mapping)
+        or reviewer.get("status") != "APPROVED"
+        or reviewer.get("decision") != "PASS"
+        or reviewer.get("package_commit") != RESUMED_GAMES_PACKAGE_COMMIT
+        or reviewer.get("source_lock_sha256") != RESUMED_GAMES_SOURCE_LOCK_SHA256
+        or reviewer.get("seed_table_sha256") != RESUMED_GAMES_SEED_TABLE_SHA256
+    ):
+        raise RuntimeError("read-only B/01 continuation changed its authorized source, cohort, or stop boundary")
+
+    rows = _training_rows(seed, "B", 1)
+    owners = list(range(8400129, 8400257))
+    unit_ids = [f"TRAIN:{owner}:B" for owner in owners]
+    prior_group = old_progress.get("game_groups", {}).get("TRAIN-B-BLOCK-01")
+    prior_update = old_progress.get("actor_updates", {}).get("B:0")
+    receipt = formal.read_json(group_path)
+    if (
+        len(rows) != 128
+        or [int(row["owner_seed"]) for row in rows] != owners
+        or [str(row["unit_id"]) for row in rows] != unit_ids
+        or old_progress.get("actor_updates", {}).keys() != {"B:0"}
+        or not isinstance(prior_update, Mapping)
+        or prior_update.get("status") != "SUCCEEDED"
+        or prior_update.get("completed_steps") != 64
+        or prior_update.get("result_model_digest") != RESUMED_B01_MODEL_DIGEST
+        or prior_update.get("receipt_sha256") != RESUMED_B01_UPDATE_RECEIPT_SHA256
+        or not isinstance(prior_group, Mapping)
+        or prior_group.get("status") != "SUCCEEDED"
+        or prior_group.get("stage_id") != "TRAIN-B-BLOCK-01-GAMES"
+        or prior_group.get("package_commit") != RESUMED_GAMES_PACKAGE_COMMIT
+        or prior_group.get("source_lock_sha256") != RESUMED_GAMES_SOURCE_LOCK_SHA256
+        or prior_group.get("seed_table_sha256") != RESUMED_GAMES_SEED_TABLE_SHA256
+        or prior_group.get("authorization_receipt_sha256") != RESUMED_GAMES_AUTHORIZATION_SHA256
+        or prior_group.get("expected") != 128 or prior_group.get("completed") != 128
+        or prior_group.get("failed_attempt_count") != 0
+        or prior_group.get("receipt_sha256") != RESUMED_B01_GROUP_RECEIPT_SHA256
+        or prior_group.get("successful_unit_ids") != unit_ids
+        or not isinstance(receipt.get("units"), list) or len(receipt["units"]) != 128
+        or receipt.get("schema_id") != GROUP_SCHEMA
+        or receipt.get("status") != "SUCCEEDED"
+        or receipt.get("stage_id") != "TRAIN-B-BLOCK-01-GAMES"
+        or receipt.get("package_commit") != RESUMED_GAMES_PACKAGE_COMMIT
+        or receipt.get("source_lock_sha256") != RESUMED_GAMES_SOURCE_LOCK_SHA256
+        or receipt.get("seed_table_sha256") != RESUMED_GAMES_SEED_TABLE_SHA256
+        or receipt.get("authorization_receipt_sha256") != RESUMED_GAMES_AUTHORIZATION_SHA256
+        or receipt.get("expected") != 128 or receipt.get("completed") != 128
+        or receipt.get("failed_attempt_count") != 0
+        or receipt.get("successful_unit_ids") != unit_ids
+    ):
+        raise RuntimeError("read-only B/01 progress and complete-game receipt are inconsistent")
+    update_root = source_root / "training" / "B" / "updates" / "block-01"
+    if update_root.exists() and any(update_root.iterdir()):
+        raise RuntimeError("B/01 actor-update artifacts exist; refusing to skip or relabel the update")
+    if {path.name for path in (group_root / "units").iterdir() if path.is_dir()} != {
+        backend.unit_key(unit_id) for unit_id in unit_ids
+    }:
+        raise RuntimeError("resumed B/01 unit directories differ from its exact 128 registered owners")
+
+    decoded: list[dict[str, Any]] = []
+    for row, unit_receipt in zip(rows, receipt["units"], strict=True):
+        unit_id = str(row["unit_id"])
+        expected_attempt = Path("training/B/block-01/games/units") / backend.unit_key(unit_id) / "attempt-0001"
+        if (
+            unit_receipt.get("unit_id") != unit_id
+            or unit_receipt.get("owner_seed") != int(row["owner_seed"])
+            or unit_receipt.get("attempt_count") != 1
+            or Path(str(unit_receipt.get("attempt_path", ""))) != expected_attempt
+        ):
+            raise RuntimeError(f"resumed B/01 unit identity/attempt count differs: {unit_id}")
+        result, history = _unit_attempts(
+            formal, backend, root=group_root, row=row,
+            package_commit=RESUMED_GAMES_PACKAGE_COMMIT,
+            lock_sha=RESUMED_GAMES_SOURCE_LOCK_SHA256,
+            seed_table_sha256=RESUMED_GAMES_SEED_TABLE_SHA256,
+            authorization_receipt_sha256=RESUMED_GAMES_AUTHORIZATION_SHA256,
+            check_live_workers=False,
+        )
+        if result is None or history:
+            raise RuntimeError(f"resumed B/01 owner is not a single complete success: {unit_id}")
+        result_path = _inside(group_root, str(unit_receipt["attempt_path"]).removeprefix("training/B/block-01/games/")) / "result.json"
+        policy_source = result.get("policy_source")
+        pointer = result.get("training_features")
+        if (
+            formal.file_sha256(result_path) != unit_receipt.get("result_sha256")
+            or unit_receipt.get("model_digest") != RESUMED_B01_MODEL_DIGEST
+            or result.get("model_digest") != RESUMED_B01_MODEL_DIGEST
+            or not isinstance(policy_source, Mapping)
+            or policy_source.get("source") != "previous-registered-formal-block"
+            or policy_source.get("previous_block") != 0
+            or policy_source.get("parent_model_digest") != formal.LOCK["baseline_P"]["model_digest"]
+            or policy_source.get("previous_update_receipt_sha256") != RESUMED_B01_UPDATE_RECEIPT_SHA256
+            or result.get("expert_decisions") != 0
+            or result.get("terminal_outcome") is None
+            or isinstance(result.get("terminal_floor"), bool)
+            or not isinstance(result.get("terminal_floor"), (int, float))
+            or not math.isfinite(float(result["terminal_floor"]))
+            or not isinstance(result.get("heart_victory"), bool)
+            or result.get("native_source_commit") != formal.LOCK["native"]["commit"]
+            or result.get("stsr_source_commit") != formal.LOCK["stsr_source"]["commit"]
+            or result.get("native_module_sha256") != formal.LOCK["native"]["compiled_module_sha256"]
+            or not isinstance(pointer, Mapping) or pointer.get("compression") != "zlib"
+        ):
+            raise RuntimeError(f"resumed B/01 terminal/model/source lineage differs: {unit_id}")
+        relative_feature = Path(str(pointer.get("path", "")))
+        expected_feature = expected_attempt.relative_to(Path("training/B/block-01/games")) / "training-features.json.zlib"
+        if relative_feature.is_absolute() or ".." in relative_feature.parts or relative_feature != expected_feature:
+            raise RuntimeError(f"resumed B/01 feature path differs from its attempt: {unit_id}")
+        compressed = _inside(group_root, relative_feature.as_posix()).read_bytes()
+        raw = zlib.decompress(compressed)
+        if (
+            formal.sha256_bytes(compressed) != pointer.get("sha256")
+            or len(compressed) != pointer.get("stored_bytes")
+            or formal.sha256_bytes(raw) != pointer.get("uncompressed_sha256")
+            or len(raw) != pointer.get("uncompressed_bytes")
+        ):
+            raise RuntimeError(f"resumed B/01 feature bytes/hash/length differ: {unit_id}")
+        payload = json.loads(raw.decode("utf-8"))
+        base = payload.get("base") if isinstance(payload, Mapping) else None
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("schema_id") != "issue75-stage1-training-features-v1"
+            or payload.get("unit_id") != unit_id
+            or payload.get("owner_seed") != int(row["owner_seed"])
+            or payload.get("package_commit") != RESUMED_GAMES_PACKAGE_COMMIT
+            or payload.get("source_lock_sha256") != RESUMED_GAMES_SOURCE_LOCK_SHA256
+            or not isinstance(base, Mapping) or base.get("complete") is not True
+            or base.get("terminal_floor") != result.get("terminal_floor")
+            or base.get("heart_win") is not result.get("heart_victory")
+        ):
+            raise RuntimeError(f"resumed B/01 training-feature lineage differs: {unit_id}")
+        decoded.append({
+            "unit_id": unit_id, "owner_seed": int(row["owner_seed"]),
+            "terminal_floor": float(result["terminal_floor"]),
+            "heart_victory": bool(result["heart_victory"]),
+        })
+
+    with tempfile.TemporaryDirectory(prefix="issue85-resumed-b01-carry-") as temporary_root:
+        loaded = backend.load_modules(Path(temporary_root), pilot=True)
+        examples, outcomes = issue84_driver.load_training_outcomes(
+            rows, root=group_root, executor=loaded[-1], package=RESUMED_GAMES_PACKAGE_COMMIT,
+        )
+    if len(examples) != 128 or len(outcomes) != 128:
+        raise RuntimeError("pinned #84 loader did not read all 128 resumed B/01 feature records")
+    for expected, example, outcome in zip(decoded, examples, outcomes, strict=True):
+        base = getattr(example, "base", None)
+        if (
+            int(getattr(example, "owner_seed", -1)) != expected["owner_seed"]
+            or not bool(getattr(base, "complete", False))
+            or float(getattr(base, "terminal_floor", math.nan)) != expected["terminal_floor"]
+            or bool(getattr(base, "heart_win", False)) != expected["heart_victory"]
+            or int(getattr(outcome, "owner_seed", -1)) != expected["owner_seed"]
+            or not bool(getattr(outcome, "complete", False))
+            or float(getattr(outcome, "terminal_floor", math.nan)) != expected["terminal_floor"]
+            or bool(getattr(outcome, "heart_win", False)) != expected["heart_victory"]
+        ):
+            raise RuntimeError(f"pinned #84 loader changed resumed B/01 outcome: {expected['unit_id']}")
+    return dict(RESUMED_B01_GROUP_CARRY)
 
 
 def verify_predecessor_carry(
@@ -717,6 +1024,12 @@ def verify_predecessor_carry(
             formal, active_wall_clock_snapshot=stored_actor_update_snapshot,
         )]
     )
+    resumed_training_group_carries = (
+        [] if identity["package_commit"] == OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT
+        else [_verify_resumed_b01_training_group(
+            formal, backend, issue84_driver, seed=seed,
+        )]
+    )
     manifest: dict[str, Any] = {
         "schema_id": PREDECESSOR_CARRY_SCHEMA,
         "status": "VERIFIED_READ_ONLY_CONTINUATION",
@@ -768,6 +1081,9 @@ def verify_predecessor_carry(
     else:
         # Preserve the exact immutable fde package manifest schema and bytes.
         manifest["no_successor_game_or_update_receipts_created"] = True
+    if resumed_training_group_carries:
+        manifest["resumed_training_group_carries"] = resumed_training_group_carries
+        manifest["resumed_training_games_carried"] = 128
     manifest["manifest_sha256"] = _hash_json(formal, manifest)
     created_manifest = False
     if manifest_path.exists():
@@ -787,7 +1103,7 @@ def verify_predecessor_carry(
     return {
         "schema_id": "issue85-formal-predecessor-carry-verification-report-v1",
         "status": (
-            "VERIFIED / 128 PREDECESSOR TERMINALS AND FEATURES / B/00 UPDATE CARRIED BY REFERENCE"
+            "VERIFIED / 128 PREDECESSOR + 128 RESUMED B/01 TERMINALS AND FEATURES / B/00 UPDATE CARRIED BY REFERENCE"
             if actor_update_carries else
             "VERIFIED / 128 PREDECESSOR TERMINALS AND FEATURES / NO NEW GAMES OR UPDATES"
         ),
@@ -797,6 +1113,8 @@ def verify_predecessor_carry(
         "predecessor_group_receipt_sha256": PREDECESSOR_GROUP_RECEIPT_SHA256,
         "formal_games_carried": len(unit_manifest),
         "actor_updates_carried": len(actor_update_carries),
+        "resumed_training_games_carried": 128 * len(resumed_training_group_carries),
+        "total_formal_games_carried": len(unit_manifest) + 128 * len(resumed_training_group_carries),
         "features_loaded_by_pinned_issue84_parser": len(examples),
         "manifest_path": str(manifest_path),
         "manifest_sha256": manifest_sha,
@@ -1652,14 +1970,21 @@ def _read_update_receipt(
         raise RuntimeError(f"formal actor update receipt is missing for {arm} block {block}")
     receipt = formal.read_json(path)
     digest = formal.file_sha256(path)
-    training_data_package = PREDECESSOR_PACKAGE_COMMIT if arm == "B" and block == 0 else identity["package_commit"]
+    training_data_package = identity["package_commit"]
     carry_manifest_sha256 = None
     if arm == "B" and block == 0:
+        training_data_package = PREDECESSOR_PACKAGE_COMMIT
         _carry, carry_manifest_sha256 = _validate_carry_manifest(formal, package_root, identity)
+    elif arm == "B" and block == 1:
+        _manifest, carry_manifest_sha256 = _validate_carry_manifest(formal, package_root, identity)
+        if _manifest.get("resumed_training_group_carries") != [RESUMED_B01_GROUP_CARRY]:
+            raise RuntimeError("B/01 actor update receipt has no verified carried games reference")
+        training_data_package = RESUMED_GAMES_PACKAGE_COMMIT
     if (
         receipt.get("training_data_package_commit") != training_data_package
         or receipt.get("predecessor_carry_manifest_sha256") != carry_manifest_sha256
         or (arm == "B" and block == 0 and receipt.get("training_group_receipt_sha256") != PREDECESSOR_GROUP_RECEIPT_SHA256)
+        or (arm == "B" and block == 1 and receipt.get("training_group_receipt_sha256") != RESUMED_B01_GROUP_RECEIPT_SHA256)
         or receipt.get("schema_id") != UPDATE_SCHEMA or receipt.get("status") != "SUCCEEDED"
         or receipt.get("arm") != arm or receipt.get("block_index") != block
         or receipt.get("package_commit") != identity["package_commit"]
@@ -1801,6 +2126,18 @@ def _train_actor_block(
             or carry_manifest_sha256 != expected_carry_sha256
         ):
             raise RuntimeError("B/block-00 actor update is not bound to the verified predecessor group")
+    elif arm == "B" and block == 1:
+        _manifest, expected_carry_sha256 = _validate_carry_manifest(
+            formal, package_root, identity,
+            expected_sha256=str(carry_manifest_sha256) if carry_manifest_sha256 is not None else None,
+        )
+        if (
+            training_data_package != RESUMED_GAMES_PACKAGE_COMMIT
+            or group_sha != RESUMED_B01_GROUP_RECEIPT_SHA256
+            or carry_manifest_sha256 != expected_carry_sha256
+            or _manifest.get("resumed_training_group_carries") != [RESUMED_B01_GROUP_CARRY]
+        ):
+            raise RuntimeError("B/block-01 actor update is not bound to the verified resumed game group")
     elif training_data_package != identity["package_commit"] or carry_manifest_sha256 is not None:
         raise RuntimeError("non-predecessor actor update has an unexpected training-data package")
     update_root = package_root / "training" / arm / "updates" / f"block-{block:02d}"
@@ -1816,7 +2153,7 @@ def _train_actor_block(
     _algorithm, _runtime, model, learning, executor = loaded
     row_token = formal.pilot._CURRENT_ROW.set(rows[0])
     try:
-        actor, source_model_digest, source_record = executor._load_model("pi12", proxy=False)
+        actor, source_model_digest, source_record = executor._load_model(f"pi{12 + block}", proxy=False)
     finally:
         formal.pilot._CURRENT_ROW.reset(row_token)
     actor.train()
@@ -2448,10 +2785,16 @@ def execute_formal(
     )
     if carry_report["manifest_sha256"] != authorization["predecessor_carry_manifest_sha256"]:
         raise RuntimeError("source-bound authorization references a different predecessor carry manifest")
-    carried_training_group = _predecessor_training_group(
-        formal, package_root, identity,
-        expected_carry_sha256=authorization["predecessor_carry_manifest_sha256"],
-    )
+    carried_training_groups = {
+        ("B", 0): _predecessor_training_group(
+            formal, package_root, identity,
+            expected_carry_sha256=authorization["predecessor_carry_manifest_sha256"],
+        ),
+        ("B", 1): _resumed_b01_training_group(
+            formal, package_root, identity,
+            expected_carry_sha256=authorization["predecessor_carry_manifest_sha256"],
+        ),
+    }
     clock = backend.ActiveClock("issue85-task", float(authorization["whole_task_active_wall_cap_seconds"]))
     progress = prior_progress or {
         "schema_id": PROGRESS_SCHEMA,
@@ -2482,14 +2825,15 @@ def execute_formal(
                 if clock.expired():
                     raise TimeoutError("whole-task active-wall cap reached before the next registered training block")
                 block_key = f"{arm}:{block}"
-                is_predecessor_carry = arm == "B" and block == 0
+                is_carried_game_group = (arm, block) in carried_training_groups
                 progress["active_stage"] = (
-                    "TRAIN-B-BLOCK-00-GAMES-CARRY-READ" if is_predecessor_carry
-                    else f"TRAIN-{arm}-BLOCK-{block:02d}-GAMES"
+                    f"TRAIN-{arm}-BLOCK-{block:02d}-GAMES-CARRY-READ"
+                    if is_carried_game_group else
+                    f"TRAIN-{arm}-BLOCK-{block:02d}-GAMES"
                 )
                 save_progress()
-                if is_predecessor_carry:
-                    game_group = dict(carried_training_group)
+                if is_carried_game_group:
+                    game_group = dict(carried_training_groups[(arm, block)])
                 else:
                     game_group = _run_training_games(
                         formal, backend, package_root=package_root, seed=seed,
