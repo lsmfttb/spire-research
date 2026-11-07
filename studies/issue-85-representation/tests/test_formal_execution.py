@@ -725,8 +725,15 @@ def test_resumed_formal_continuation_shape_binds_actor_update_and_failed_attempt
             "unit_id": "TRAIN:8400417:B",
             "attempt": "attempt-0001",
             "attempt_path": f"{formal_execution.RESUMED_B03_GROUP_ROOT}/units/TRAIN-8400417-B/attempt-0001",
+            "status": "PRE_START_AUTHORIZATION_FAILURE",
+            "failure_boundary": "before_started_receipt",
+            "attempt_count": 1,
+            "next_attempt": "attempt-0002",
             "worker_job_sha256": "5" * 64,
-            "started_receipt_sha256": "6" * 64,
+            "worker_log_sha256": "6" * 64,
+            "started_receipt_absent": True,
+            "result_receipt_absent": True,
+            "finished_receipt_absent": True,
         },
         "active_wall_clock_snapshot": {
             "elapsed_seconds": 39261.797795255006,
@@ -747,6 +754,93 @@ def test_resumed_formal_continuation_shape_binds_actor_update_and_failed_attempt
         continuation["b03_failed_attempt"], attempt_path="outside/attempt-0001",
     )
     assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_failed_path)
+
+    wrong_next_attempt = dict(continuation)
+    wrong_next_attempt["b03_failed_attempt"] = dict(
+        continuation["b03_failed_attempt"], next_attempt="attempt-0003",
+    )
+    assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_next_attempt)
+
+
+def test_b03_prestart_failure_without_receipts_binds_job_log_and_next_attempt(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    source_root = data_root / formal_execution.RESUMED_FORMAL_PACKAGE_ROOT
+    b03_root = data_root / formal_execution.RESUMED_B03_GROUP_ROOT
+    unit_id = "TRAIN:8400417:B"
+    row = {
+        "arm": "TRAIN", "block_index": 3, "formal": True,
+        "game_seed": 8400417, "issue84_arm": "B", "issue84_policy_label": "pi12",
+        "issue85_arm": "B", "issue85_phase": "training", "owner_seed": 8400417,
+        "paired_owner_key": "issue85-formal-train-8400417", "phase": "training",
+        "policy_rng_seed": 1760549921,
+        "search_invocation_seeds": [1995937057, 235366109, 1504309875, 1772922856],
+        "unit_id": unit_id,
+    }
+    attempt = b03_root / "units" / "TRAIN-8400417-B" / "attempt-0001"
+    attempt.mkdir(parents=True)
+    job = {
+        "schema_id": "issue79-owner-worker-job-v1",
+        "artifact_root": str(b03_root),
+        "attempt_dir": str(attempt),
+        "result_path": str(attempt / "result.json"),
+        "output_dir": str(attempt / "native"),
+        "run_id": f"{unit_id}-attempt-0001",
+        "unit_id": unit_id,
+        "phase": "training",
+        "row": row,
+        "pilot": False,
+        "formal": True,
+        "package_commit": formal_execution.RESUMED_FORMAL_PACKAGE_COMMIT,
+        "runner_code_commit": formal_execution.RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": formal_execution.RESUMED_FORMAL_SEED_TABLE_SHA256,
+        "authorization_receipt_sha256": formal_execution.RESUMED_FORMAL_AUTHORIZATION_SHA256,
+    }
+    job_path = attempt / "worker-job.json"
+    log_path = attempt / "worker.log"
+    job_path.write_text(json.dumps(job), encoding="utf-8")
+    log_path.write_text(
+        "_validate_worker_authorization\nFileNotFoundError: "
+        "/mnt/d/DeadlyCatCoding/stsrl-data/issue85/artifacts/active-wall-issue85-task.json\n",
+        encoding="utf-8",
+    )
+    formal = SimpleNamespace(
+        DATA_ROOT=str(data_root),
+        read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        file_sha256=lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+    )
+    backend = SimpleNamespace(unit_key=lambda _unit_id: "TRAIN-8400417-B")
+
+    reference = formal_execution._verify_b03_prestart_failure_reference(
+        formal, backend, source_root=source_root, b03_root=b03_root, row=row,
+        authorization_receipt_sha256=formal_execution.RESUMED_FORMAL_AUTHORIZATION_SHA256,
+    )
+    assert reference["worker_job_sha256"] == formal.file_sha256(job_path)
+    assert reference["worker_log_sha256"] == formal.file_sha256(log_path)
+    assert reference["status"] == "PRE_START_AUTHORIZATION_FAILURE"
+    assert reference["attempt_count"] == 1
+    assert reference["next_attempt"] == "attempt-0002"
+    assert reference["started_receipt_absent"] is True
+    assert reference["result_receipt_absent"] is True
+    assert reference["finished_receipt_absent"] is True
+
+    carried = {
+        "reference": reference,
+        "attempt_count": reference["attempt_count"],
+        "next_attempt": reference["next_attempt"],
+    }
+    formal_execution._validate_prestart_carried_attempt(carried)
+    with pytest.raises(RuntimeError, match="exactly its next attempt number"):
+        formal_execution._validate_prestart_carried_attempt({
+            **carried, "next_attempt": "attempt-0003",
+        })
+
+    (attempt.parent / "attempt-0002").mkdir()
+    with pytest.raises(RuntimeError, match="attempt inventory changed"):
+        formal_execution._verify_b03_prestart_failure_reference(
+            formal, backend, source_root=source_root, b03_root=b03_root, row=row,
+            authorization_receipt_sha256=formal_execution.RESUMED_FORMAL_AUTHORIZATION_SHA256,
+        )
 
 
 def test_b00_update_receipt_is_read_from_its_verified_source_package(tmp_path: Path, monkeypatch) -> None:

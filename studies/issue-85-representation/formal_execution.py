@@ -95,7 +95,7 @@ RESUMED_B02_UPDATE_RECEIPT_FILE_SHA256 = "218d9e7ca5a38f97ea7fc2e661f87e1b4501f1
 RESUMED_B03_GROUP_ROOT = RESUMED_FORMAL_PACKAGE_ROOT + "/training/B/block-03/games"
 RESUMED_B03_LIVE_PROGRESS_PATH = RESUMED_FORMAL_PACKAGE_ROOT + "/live-training-B-03.json"
 RESUMED_B03_LIVE_PROGRESS_SHA256 = "ca0579f756c1ca3d136b5b0ae59b65471b18ae9b681ffd5ad52b9e17fec56ee5"
-RESUMED_FORMAL_CONTINUATION_SCHEMA = "issue85-formal-resumed-package-continuation-v1"
+RESUMED_FORMAL_CONTINUATION_SCHEMA = "issue85-formal-resumed-package-continuation-v2"
 RESUMED_B03_COMPLETED = 33
 RESUMED_B03_FAILED = 1
 RESUMED_B03_PENDING = 94
@@ -392,10 +392,18 @@ def _validate_resumed_formal_continuation_shape(
         and failed.get("attempt") == "attempt-0001"
         and failed.get("attempt_path")
         == f"{RESUMED_B03_GROUP_ROOT}/units/TRAIN-8400417-B/attempt-0001"
+        and failed.get("status") == "PRE_START_AUTHORIZATION_FAILURE"
+        and failed.get("failure_boundary") == "before_started_receipt"
+        and type(failed.get("attempt_count")) is int
+        and failed.get("attempt_count") == 1
+        and failed.get("next_attempt") == "attempt-0002"
         and isinstance(failed.get("worker_job_sha256"), str)
         and re.fullmatch(r"[0-9a-f]{64}", failed["worker_job_sha256"]) is not None
-        and isinstance(failed.get("started_receipt_sha256"), str)
-        and re.fullmatch(r"[0-9a-f]{64}", failed["started_receipt_sha256"]) is not None
+        and isinstance(failed.get("worker_log_sha256"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", failed["worker_log_sha256"]) is not None
+        and failed.get("started_receipt_absent") is True
+        and failed.get("result_receipt_absent") is True
+        and failed.get("finished_receipt_absent") is True
         and isinstance(elapsed, (int, float)) and not isinstance(elapsed, bool)
         and math.isfinite(float(elapsed)) and 0 <= float(elapsed) <= FORMAL_ACTIVE_WALL_CAP_SECONDS
         and snapshot.get("active_session") is None
@@ -1472,6 +1480,85 @@ def _receipt_attempt_path(package_root: Path, unit: Mapping[str, Any]) -> Path:
     return _inside(package_root, relative)
 
 
+def _verify_b03_prestart_failure_reference(
+    formal: Any, backend: Any, *, source_root: Path, b03_root: Path,
+    row: Mapping[str, Any], authorization_receipt_sha256: str,
+    reference: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Bind the retained B/03 attempt that failed before its start receipt."""
+    failure_id = "TRAIN:8400417:B"
+    attempt_name = "attempt-0001"
+    if str(row.get("unit_id")) != failure_id:
+        raise RuntimeError("retained B/03 pre-start failure row differs from its registered owner")
+    unit_root = b03_root / "units" / backend.unit_key(failure_id)
+    failed_attempt = unit_root / attempt_name
+    attempt_dirs = sorted(path for path in unit_root.glob("attempt-*") if path.is_dir())
+    if attempt_dirs != [failed_attempt]:
+        raise RuntimeError("retained B/03 pre-start failure attempt inventory changed")
+
+    job_path = failed_attempt / "worker-job.json"
+    log_path = failed_attempt / "worker.log"
+    started_path = failed_attempt / "started.json"
+    result_path = failed_attempt / "result.json"
+    finished_path = failed_attempt / "finished.json"
+    if (
+        not job_path.is_file() or not log_path.is_file()
+        or started_path.exists() or result_path.exists() or finished_path.exists()
+    ):
+        raise RuntimeError("retained B/03 pre-start failure receipts or files differ")
+
+    result, history = _unit_attempts(
+        formal, backend, root=b03_root, row=row,
+        package_commit=RESUMED_FORMAL_PACKAGE_COMMIT,
+        lock_sha=RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+        seed_table_sha256=RESUMED_FORMAL_SEED_TABLE_SHA256,
+        authorization_receipt_sha256=authorization_receipt_sha256,
+        check_live_workers=False,
+    )
+    if result is not None or history != [{
+        "attempt": attempt_name, "status": "STARTED_WITHOUT_TERMINAL",
+    }]:
+        raise RuntimeError("retained B/03 pre-start failure is not one unfinished attempt")
+
+    log_text = log_path.read_text(encoding="utf-8")
+    if not all(marker in log_text for marker in (
+        "_validate_worker_authorization", "FileNotFoundError",
+        "active-wall-issue85-task.json",
+    )):
+        raise RuntimeError("retained B/03 worker log does not show the reviewed pre-start authorization failure")
+    observed = {
+        "unit_id": failure_id,
+        "attempt": attempt_name,
+        "attempt_path": failed_attempt.relative_to(source_root).as_posix(),
+        "status": "PRE_START_AUTHORIZATION_FAILURE",
+        "failure_boundary": "before_started_receipt",
+        "attempt_count": 1,
+        "next_attempt": "attempt-0002",
+        "worker_job_sha256": formal.file_sha256(job_path),
+        "worker_log_sha256": formal.file_sha256(log_path),
+        "started_receipt_absent": True,
+        "result_receipt_absent": True,
+        "finished_receipt_absent": True,
+    }
+    if reference is not None and dict(reference) != observed:
+        raise RuntimeError("retained B/03 pre-start failure reference or evidence hash changed")
+    return observed
+
+
+def _validate_prestart_carried_attempt(carried: Mapping[str, Any]) -> None:
+    reference = carried.get("reference")
+    if not isinstance(reference, Mapping) or reference.get("status") != "PRE_START_AUTHORIZATION_FAILURE":
+        return
+    attempt_count = carried.get("attempt_count")
+    if (
+        type(attempt_count) is not int
+        or attempt_count != reference.get("attempt_count")
+        or carried.get("next_attempt") != f"attempt-{attempt_count + 1:04d}"
+        or reference.get("next_attempt") != carried.get("next_attempt")
+    ):
+        raise RuntimeError("B/03 pre-start failure must resume at exactly its next attempt number")
+
+
 def _build_resumed_formal_continuation(
     formal: Any, *, issue84_source: Path, seed: Mapping[str, Any],
     backend: Any, issue84_driver: Any, active_wall_clock_snapshot: Mapping[str, Any] | None = None,
@@ -1746,49 +1833,10 @@ def _build_resumed_formal_continuation(
     if len(successful_units) != RESUMED_B03_COMPLETED:
         raise RuntimeError("retained B/03 success count differs from the immutable live-stage receipt")
     failed_row = next(row for row in b03_rows if str(row["unit_id"]) == failure_id)
-    failed_root = b03_root / "units" / backend.unit_key(failure_id)
-    failed_attempt = failed_root / "attempt-0001"
-    failed_attempt_dirs = sorted(path for path in failed_root.glob("attempt-*") if path.is_dir())
-    if failed_attempt_dirs != [failed_attempt]:
-        raise RuntimeError("retained B/03 startup-failure attempt inventory differs from the pinned progress")
-    failed_result = failed_attempt / "result.json"
-    failed_finish = failed_attempt / "finished.json"
-    failed_job = failed_attempt / "worker-job.json"
-    failed_started = failed_attempt / "started.json"
-    failed_result_from_scan, failed_history = _unit_attempts(
-        formal, backend, root=b03_root, row=failed_row,
-        package_commit=RESUMED_FORMAL_PACKAGE_COMMIT,
-        lock_sha=RESUMED_FORMAL_SOURCE_LOCK_SHA256,
-        seed_table_sha256=RESUMED_FORMAL_SEED_TABLE_SHA256,
-        authorization_receipt_sha256=old_auth_sha,
-        check_live_workers=False,
+    failure_reference = _verify_b03_prestart_failure_reference(
+        formal, backend, source_root=source_root, b03_root=b03_root,
+        row=failed_row, authorization_receipt_sha256=old_auth_sha,
     )
-    job = formal.read_json(failed_job) if failed_job.is_file() else {}
-    started = formal.read_json(failed_started) if failed_started.is_file() else {}
-    expected_failed_attempt = {
-        "schema_id": "issue79-owner-worker-job-v1",
-        "run_id": f"{failure_id}-attempt-0001",
-        "unit_id": failure_id,
-        "phase": failed_row.get("phase"),
-        "row": dict(failed_row),
-        "package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
-        "source_lock_sha256": RESUMED_FORMAL_SOURCE_LOCK_SHA256,
-        "seed_table_sha256": RESUMED_FORMAL_SEED_TABLE_SHA256,
-        "authorization_receipt_sha256": old_auth_sha,
-    }
-    if (
-        failed_result_from_scan is not None or failed_history != [{
-            "attempt": "attempt-0001", "status": "STARTED_WITHOUT_TERMINAL",
-        }]
-        or failed_result.exists() or failed_finish.exists()
-        or any(job.get(key) != value for key, value in expected_failed_attempt.items())
-        or started.get("unit_id") != failure_id
-        or started.get("run_id") != f"{failure_id}-attempt-0001"
-        or started.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT
-        or not isinstance(started.get("pid"), int)
-        or isinstance(started.get("pid"), bool)
-    ):
-        raise RuntimeError("retained B/03 startup failure differs; refusing to erase or relabel it")
     with tempfile.TemporaryDirectory(prefix="issue85-resumed-b03-carry-") as temporary_root:
         loaded = backend.load_modules(Path(temporary_root), pilot=True)
         examples, outcomes = issue84_driver.load_training_outcomes(
@@ -1810,13 +1858,6 @@ def _build_resumed_formal_continuation(
             or bool(getattr(outcome, "heart_win", False)) != expected["heart_victory"]
         ):
             raise RuntimeError(f"pinned #84 loader changed retained B/03 outcome: {expected['unit_id']}")
-    failure_reference = {
-        "unit_id": failure_id,
-        "attempt": "attempt-0001",
-        "attempt_path": failed_attempt.relative_to(source_root).as_posix(),
-        "worker_job_sha256": formal.file_sha256(failed_job),
-        "started_receipt_sha256": formal.file_sha256(failed_started),
-    }
     return {
         "schema_id": RESUMED_FORMAL_CONTINUATION_SCHEMA,
         "source_package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
@@ -1946,28 +1987,32 @@ def _validate_resumed_formal_continuation(
             "package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
         }
     failed = continuation["b03_failed_attempt"]
-    failed_attempt = _inside(source_root, str(failed["attempt_path"]))
-    expected_failed_attempt = b03_root / "units" / backend.unit_key(failed["unit_id"]) / "attempt-0001"
-    if failed_attempt != expected_failed_attempt:
-        raise RuntimeError("retained b8 B/03 failure path differs from its registered owner")
-    failed_job = failed_attempt / "worker-job.json"
-    failed_started = failed_attempt / "started.json"
-    if (
-        formal.file_sha256(failed_job) != failed["worker_job_sha256"]
-        or formal.file_sha256(failed_started) != failed["started_receipt_sha256"]
-        or (failed_attempt / "result.json").exists()
-        or (failed_attempt / "finished.json").exists()
-    ):
-        raise RuntimeError("retained b8 B/03 failed attempt changed after continuation review")
+    failed_row = rows_by_id.get(str(failed["unit_id"]))
+    if failed_row is None:
+        raise RuntimeError("retained b8 B/03 failed owner is absent from the frozen seed table")
+    _verify_b03_prestart_failure_reference(
+        formal, backend, source_root=source_root, b03_root=b03_root,
+        row=failed_row,
+        authorization_receipt_sha256=RESUMED_FORMAL_AUTHORIZATION_SHA256,
+        reference=failed,
+    )
     carried_units[str(failed["unit_id"])] = {
         "result": None,
         "history": [{
             "attempt": str(failed["attempt"]),
-            "status": "STARTED_WITHOUT_TERMINAL",
+            "status": str(failed["status"]),
+            "failure_boundary": str(failed["failure_boundary"]),
+            "worker_job_sha256": str(failed["worker_job_sha256"]),
+            "worker_log_sha256": str(failed["worker_log_sha256"]),
+            "started_receipt_absent": True,
+            "result_receipt_absent": True,
+            "finished_receipt_absent": True,
             "source_package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
+            "next_attempt": str(failed["next_attempt"]),
         }],
-        "attempt_count": 1,
+        "attempt_count": int(failed["attempt_count"]),
         "reference": dict(failed),
+        "next_attempt": str(failed["next_attempt"]),
         "group_root": str(b03_root),
         "package_commit": RESUMED_FORMAL_PACKAGE_COMMIT,
     }
@@ -2608,6 +2653,7 @@ def _run_formal_units(
             authorization_receipt_sha256=str(authorization["sha256"]),
         )
         if carried is not None:
+            _validate_prestart_carried_attempt(carried)
             if (
                 int(carried.get("attempt_count", -1)) < 0
                 or str(carried.get("package_commit", "")) != RESUMED_FORMAL_PACKAGE_COMMIT
