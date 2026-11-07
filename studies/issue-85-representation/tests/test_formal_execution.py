@@ -1139,3 +1139,126 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
     assert ("B", 0) not in training_game_calls
     assert ("B", 1) not in training_game_calls
     assert not (package_root / "test").exists()
+
+def _formal_attempt_fixture(tmp_path: Path, *, terminal: bool = True):
+    root = tmp_path / "validation" / "A"
+    row = {
+        "unit_id": "VALIDATION:8510001:A",
+        "phase": "evaluation",
+        "owner_seed": 8510001,
+        "arm": "A",
+        "game_seed": 9510001,
+        "paired_owner_key": "owner-8510001",
+    }
+    package_commit = "c" * 40
+    lock_sha = "l" * 64
+    seed_sha = "s" * 64
+    authorization_sha = "a" * 64
+    attempt = root / "units" / "unit-8510001" / "attempt-0001"
+    attempt.mkdir(parents=True)
+    run_id = f"{row['unit_id']}-attempt-0001"
+    result_path = attempt / "result.json"
+    job = {
+        "schema_id": "issue79-owner-worker-job-v1",
+        "pilot": False,
+        "formal": True,
+        "unit_id": row["unit_id"],
+        "run_id": run_id,
+        "row": row,
+        "phase": row["phase"],
+        "package_commit": package_commit,
+        "runner_code_commit": package_commit,
+        "source_lock_sha256": lock_sha,
+        "seed_table_sha256": seed_sha,
+        "authorization_receipt_sha256": authorization_sha,
+        "artifact_root": str(root),
+        "attempt_dir": str(attempt),
+        "result_path": str(result_path),
+        "output_dir": str(attempt / "native"),
+    }
+    (attempt / "worker-job.json").write_text(json.dumps(job), encoding="utf-8")
+    row_sha = "r" * 64
+    started = {
+        "schema_id": "issue79-owner-attempt-start-v1",
+        "unit_id": row["unit_id"],
+        "run_id": run_id,
+        "owner_seed": row["owner_seed"],
+        "arm": row["arm"],
+        "package_commit": package_commit,
+        "seed_row_sha256": row_sha,
+        "pid": 639,
+    }
+    (attempt / "started.json").write_text(json.dumps(started), encoding="utf-8")
+    result = {
+        "schema_id": "issue75-stage1-unit-result-v1",
+        "status": "SUCCEEDED",
+        "formal": True,
+        "unit_id": row["unit_id"],
+        "phase": row["phase"],
+        "arm": row["arm"],
+        "owner_seed": row["owner_seed"],
+        "game_seed": row["game_seed"],
+        "paired_owner_key": row["paired_owner_key"],
+        "package_commit": package_commit,
+        "runner_code_commit": package_commit,
+        "source_lock_sha256": lock_sha,
+        "native_source_commit": formal_runner.LOCK["native"]["commit"],
+        "stsr_source_commit": formal_runner.LOCK["stsr_source"]["commit"],
+        "native_module_sha256": formal_runner.LOCK["native"]["compiled_module_sha256"],
+        "resource": {"ledger_run_id": run_id},
+    }
+    if terminal:
+        result_path.write_text(json.dumps(result), encoding="utf-8")
+        finished = {
+            "schema_id": "issue79-owner-attempt-finish-v1",
+            "unit_id": row["unit_id"],
+            "run_id": run_id,
+            "result_sha256": hashlib.sha256(result_path.read_bytes()).hexdigest(),
+            "status": "SUCCEEDED",
+        }
+        (attempt / "finished.json").write_text(json.dumps(finished), encoding="utf-8")
+    formal = SimpleNamespace(
+        read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        file_sha256=lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+        LOCK=formal_runner.LOCK,
+    )
+    backend = SimpleNamespace(unit_key=lambda _unit_id: "unit-8510001")
+    return formal, backend, root, row, package_commit, lock_sha, seed_sha, authorization_sha, result, row_sha
+
+
+def test_formal_attempt_does_not_probe_reused_pid_after_terminal_success(tmp_path: Path, monkeypatch) -> None:
+    fixture = _formal_attempt_fixture(tmp_path)
+    formal, backend, root, row, package, lock, seed, authorization, result, row_sha = fixture
+    monkeypatch.setattr(formal_execution, "_hash_json", lambda _formal, _row: row_sha)
+
+    def reused_pid_is_not_owned(_pid: int, _signal: int) -> None:
+        raise PermissionError("PID has been reused by another process")
+
+    monkeypatch.setattr(formal_execution.os, "kill", reused_pid_is_not_owned)
+    success, historical = formal_execution._unit_attempts(
+        formal, backend, root=root, row=row, package_commit=package, lock_sha=lock,
+        seed_table_sha256=seed, authorization_receipt_sha256=authorization,
+    )
+
+    assert success == result
+    assert historical == []
+
+
+def test_formal_attempt_still_refuses_a_started_worker_without_terminal_receipt(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    fixture = _formal_attempt_fixture(tmp_path, terminal=False)
+    formal, backend, root, row, package, lock, seed, authorization, _result, row_sha = fixture
+    monkeypatch.setattr(formal_execution, "_hash_json", lambda _formal, _row: row_sha)
+    live_pids: list[tuple[int, int]] = []
+
+    def worker_is_live(pid: int, signal: int) -> None:
+        live_pids.append((pid, signal))
+
+    monkeypatch.setattr(formal_execution.os, "kill", worker_is_live)
+    with pytest.raises(RuntimeError, match="formal worker 639 is still alive"):
+        formal_execution._unit_attempts(
+            formal, backend, root=root, row=row, package_commit=package, lock_sha=lock,
+            seed_table_sha256=seed, authorization_receipt_sha256=authorization,
+        )
+    assert live_pids == [(639, 0)]

@@ -1710,7 +1710,8 @@ def _unit_attempts(
                 or isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0
             ):
                 raise RuntimeError(f"formal attempt start receipt differs: {started_path}")
-            if check_live_workers:
+            # Terminal attempts can outlive their PID; it may have been reused.
+            if check_live_workers and finished is None:
                 try:
                     os.kill(pid, 0)
                 except ProcessLookupError:
