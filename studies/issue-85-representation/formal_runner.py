@@ -708,7 +708,7 @@ def run_preflight(
         "formal_cohorts_changed": False,
         "execution_command_available": True,
         "execution_gate": "owner FORMAL_GO + numeric whole-task active-wall cap + Reviewer approval of exact commit",
-        "entrypoint_modes": ["--plan", "--preflight", "--verify-bundle", "--execute"],
+        "entrypoint_modes": ["--plan", "--preflight", "--verify-bundle", "--verify-predecessor-carry", "--execute"],
     }
     report_path = readiness_root / "formal-readiness.json"
     if report_path.is_file():
@@ -792,6 +792,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     modes.add_argument("--plan", action="store_true", help="print the registered formal cohorts without execution")
     modes.add_argument("--preflight", action="store_true", help="verify source bindings and freeze the formal seed table; never starts games")
     modes.add_argument("--verify-bundle", action="store_true", help="dry-check source, seed, receipts and frozen analysis; never starts games")
+    modes.add_argument("--verify-predecessor-carry", action="store_true", help="verify immutable e549 B/block-00 evidence and write one lineage manifest; no games or updates")
     modes.add_argument("--execute", action="store_true", help="run the registered formal study; requires exact owner GO/cap and Reviewer receipt")
     modes.add_argument("--worker", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--issue84-source", type=Path, default=os.environ.get("ISSUE84_SOURCE_DIR"))
@@ -814,7 +815,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     ]
     if missing:
         parser.error("this mode requires " + ", ".join(missing))
-    if args.verify_bundle:
+    if args.verify_predecessor_carry:
+        dry = verify_dry_bundle(
+            issue84_source=Path(args.issue84_source),
+            native_source=Path(args.native_source),
+            stsr_source=Path(args.stsr_source),
+        )
+        if dry.get("status") != "VERIFIED / NO GAMES OR UPDATES STARTED":
+            raise RuntimeError("predecessor carry requires the exact-source no-work dry bundle check")
+        identity = pilot.source_identity(require_clean=True)
+        from formal_execution import _validate_readiness, verify_predecessor_carry
+        package_root, readiness, seed = _validate_readiness(sys.modules[__name__], identity)
+        report = verify_predecessor_carry(
+            sys.modules[__name__],
+            issue84_source=Path(dry["issue84_source_root"]),
+            identity=identity, readiness=readiness, seed=seed,
+            package_root=package_root, write_manifest=True,
+        )
+        report = {key: value for key, value in report.items() if key != "manifest"}
+    elif args.verify_bundle:
         report = verify_dry_bundle(
             issue84_source=Path(args.issue84_source),
             native_source=Path(args.native_source),

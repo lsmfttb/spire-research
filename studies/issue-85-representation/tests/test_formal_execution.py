@@ -150,6 +150,115 @@ def test_formal_runtime_dispatches_locked_a_without_using_issue84_final_pi20(mon
     assert original_calls == ["pi12"]
 
 
+def test_predecessor_group_reference_uses_original_receipt_without_forging_one(tmp_path: Path, monkeypatch) -> None:
+    data_root = tmp_path / "data"
+    group_root = data_root / formal_execution.PREDECESSOR_GROUP_ROOT
+    group_root.mkdir(parents=True)
+    original_receipt = group_root / "group-receipt.json"
+    original_receipt.write_bytes(b'{"retained":"original"}\\n')
+    receipt_sha = formal_runner.file_sha256(original_receipt)
+    monkeypatch.setattr(formal_execution, "PREDECESSOR_GROUP_RECEIPT_SHA256", receipt_sha)
+
+    package_commit = "c" * 40
+    source_lock_sha = formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256
+    package_root = data_root / "issue85" / "artifacts" / "formal" / package_commit
+    package_root.mkdir(parents=True)
+    manifest = {
+        "schema_id": formal_execution.PREDECESSOR_CARRY_SCHEMA,
+        "status": "VERIFIED_READ_ONLY_CONTINUATION",
+        "successor": {"package_commit": package_commit, "source_lock_sha256": source_lock_sha},
+        "predecessor": {
+            "package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+            "source_lock_sha256": source_lock_sha,
+            "formal_seed_table_sha256": formal_execution.PREDECESSOR_SEED_TABLE_SHA256,
+            "group_receipt_sha256": receipt_sha,
+            "formal_progress_sha256": formal_execution.PREDECESSOR_PROGRESS_SHA256,
+            "authorization_receipt_sha256": formal_execution.PREDECESSOR_AUTHORIZATION_SHA256,
+            "group_root": formal_execution.PREDECESSOR_GROUP_ROOT,
+            "failed_update": {
+                "failure_type": "AttributeError",
+                "failure_detail": formal_execution.PREDECESSOR_UPDATE_FAILURE_DETAIL,
+                "log_path": formal_execution.PREDECESSOR_UPDATE_FAILURE_LOG,
+                "log_sha256": formal_execution.PREDECESSOR_UPDATE_FAILURE_LOG_SHA256,
+                "formal_progress_sha256": formal_execution.PREDECESSOR_PROGRESS_SHA256,
+            },
+        },
+        "owner_go_comment_url": formal_execution.FORMAL_GO_COMMENT_URL,
+        "validated_units": 128,
+        "formal_games_carried": 128,
+        "actor_updates_carried": 0,
+        "units_sha256": "a" * 64,
+    }
+    manifest["manifest_sha256"] = formal_runner.sha256_bytes(formal_runner.canonical(manifest))
+    carry_path = formal_execution._predecessor_carry_path(package_root)
+    carry_path.write_text(json.dumps(manifest), encoding="utf-8")
+    formal = SimpleNamespace(
+        DATA_ROOT=data_root,
+        read_json=formal_runner.read_json,
+        file_sha256=formal_runner.file_sha256,
+        canonical=formal_runner.canonical,
+        sha256_bytes=formal_runner.sha256_bytes,
+    )
+
+    group = formal_execution._predecessor_training_group(
+        formal, package_root, {"package_commit": package_commit, "source_lock_sha256": source_lock_sha},
+    )
+
+    assert group["package_commit"] == formal_execution.PREDECESSOR_PACKAGE_COMMIT
+    assert group["training_data_package_commit"] == formal_execution.PREDECESSOR_PACKAGE_COMMIT
+    assert group["receipt_sha256"] == receipt_sha
+    assert group["group_root"] == str(group_root)
+    assert group["schema_id"] == formal_execution.CARRIED_GROUP_REFERENCE_SCHEMA
+    assert "no successor game receipt" in group["artifact_kind"]
+    assert not (package_root / "training/B/block-00/games/group-receipt.json").exists()
+
+
+def test_verify_predecessor_carry_cli_never_dispatches_formal_execution(monkeypatch, tmp_path: Path, capsys) -> None:
+    import formal_execution as execution
+
+    package_commit = "d" * 40
+    identity = {"package_commit": package_commit, "source_lock_sha256": "e" * 64}
+    package_root = tmp_path / "formal-package"
+    readiness = {"package_commit": package_commit, "source_lock_sha256": "e" * 64}
+    seed = {"package_commit": package_commit, "source_lock_sha256": "e" * 64}
+    monkeypatch.setattr(
+        formal_runner, "verify_dry_bundle",
+        lambda **_kwargs: {
+            "status": "VERIFIED / NO GAMES OR UPDATES STARTED",
+            "issue84_source_root": str(tmp_path / "issue84"),
+        },
+    )
+    monkeypatch.setattr(formal_runner.pilot, "source_identity", lambda **_kwargs: identity)
+    monkeypatch.setattr(execution, "_validate_readiness", lambda *_args: (package_root, readiness, seed))
+
+    def verify(*_args, **_kwargs):
+        return {
+            "status": "VERIFIED / 128 PREDECESSOR TERMINALS AND FEATURES / NO NEW GAMES OR UPDATES",
+            "formal_games_carried": 128,
+            "actor_updates_carried": 0,
+            "writes_performed": True,
+            "manifest": {"units": ["details omitted from console output"]},
+        }
+
+    monkeypatch.setattr(execution, "verify_predecessor_carry", verify)
+    monkeypatch.setattr(
+        execution, "execute_formal",
+        lambda *_args, **_kwargs: pytest.fail("carry-verification mode dispatched formal execution"),
+    )
+
+    assert formal_runner.main([
+        "--verify-predecessor-carry",
+        "--issue84-source", str(tmp_path / "issue84"),
+        "--native-source", str(tmp_path / "native"),
+        "--stsr-source", str(tmp_path / "stsr"),
+    ]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["formal_games_carried"] == 128
+    assert report["actor_updates_carried"] == 0
+    assert report["writes_performed"] is True
+    assert "manifest" not in report
+
+
 def test_execute_cli_requires_authorization_before_calling_executor(monkeypatch) -> None:
     monkeypatch.setattr(
         formal_execution,
@@ -280,6 +389,7 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
     }
     authorization = {
         "sha256": authorization_sha,
+        "predecessor_carry_manifest_sha256": "9" * 64,
         "owner_approval_comment_url": "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-100",
         "reviewer_approval_comment_url": "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-101",
         "whole_task_active_wall_cap_seconds": 1_000_000,
@@ -426,6 +536,19 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
     monkeypatch.setattr(formal_execution, "_validate_readiness", lambda *_args: (package_root, readiness, seed))
     monkeypatch.setattr(formal_execution, "validate_authorization", lambda *_args, **_kwargs: authorization)
     monkeypatch.setattr(formal_execution, "_configure_formal_runtime", lambda *_args: (backend, object()))
+    monkeypatch.setattr(
+        formal_execution, "verify_predecessor_carry",
+        lambda *_args, **_kwargs: {"manifest_sha256": authorization["predecessor_carry_manifest_sha256"]},
+    )
+    monkeypatch.setattr(
+        formal_execution, "_predecessor_training_group",
+        lambda *_args, **_kwargs: {
+            "status": "SUCCEEDED", "completed": 128,
+            "receipt_sha256": formal_execution.PREDECESSOR_GROUP_RECEIPT_SHA256,
+            "training_data_package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+            "predecessor_carry_manifest_sha256": authorization["predecessor_carry_manifest_sha256"],
+        },
+    )
     monkeypatch.setattr(formal_execution, "_atomic_json", lambda *_args: None)
     monkeypatch.setattr(
         formal_execution, "_run_training_games",

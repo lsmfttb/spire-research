@@ -18,7 +18,9 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
+import zlib
 from typing import Any, Mapping, Sequence
 
 
@@ -27,6 +29,24 @@ GROUP_SCHEMA = "issue85-formal-game-group-v1"
 UPDATE_SCHEMA = "issue85-formal-actor-update-v1"
 TEST_OPEN_SCHEMA = "issue85-formal-test-open-v1"
 PROGRESS_SCHEMA = "issue85-formal-progress-v1"
+PREDECESSOR_CARRY_SCHEMA = "issue85-formal-predecessor-carry-v1"
+CARRIED_GROUP_REFERENCE_SCHEMA = "issue85-formal-carried-training-group-reference-v1"
+PREDECESSOR_PACKAGE_COMMIT = "e549105ead79c9524bee706fc600164f8c7f9f1a"
+PREDECESSOR_SOURCE_LOCK_SHA256 = "a25c25cd4144cbe362c7c241460e9d71f4554627c9bb129407ef69ec8366404a"
+PREDECESSOR_SEED_TABLE_SHA256 = "6e304435485663e5fc8e95fadeeb771eea78cd01e5e1ff63caa2aba43c10a2de"
+PREDECESSOR_GROUP_RECEIPT_SHA256 = "55a5466091c38b197fbe15c274d88dcf7a665390c70d155e02594ac8d448ae4a"
+PREDECESSOR_PROGRESS_SHA256 = "499055e2a1382efc010653d88b8b4e2eed23388f9fdbda3467110055bf57262d"
+PREDECESSOR_AUTHORIZATION_SHA256 = "96b202b8d5c86aa4fc81cc1077cf4e5d1f867ca28b05743fba716c3337ed89e0"
+PREDECESSOR_UPDATE_FAILURE_LOG = "logs/formal-execution-20261106-resume01.log"
+PREDECESSOR_UPDATE_FAILURE_LOG_SHA256 = "62c6b3554c536518f724a737749ec7c4af41ab6474fa88f9e6727d6922cb26c0"
+PREDECESSOR_UPDATE_FAILURE_DETAIL = "module '__main__' has no attribute 'DATA_ROOT_WSL'"
+PREDECESSOR_GROUP_ROOT = (
+    "issue85/artifacts/formal/e549105ead79c9524bee706fc600164f8c7f9f1a/"
+    "training/B/block-00/games"
+)
+FORMAL_GO_COMMENT_URL = "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-6686508621"
+FORMAL_ACTIVE_WALL_CAP_SECONDS = 295632
+PREDECESSOR_INITIAL_MODEL_DIGEST = "2891e60f6f9467c7f319a250e5789f4a0bfd89dcda17a60e8d416bcbdbd18908"
 ACCEPTED_PILOT_PACKAGE_COMMIT = "5cd70c00d03f1104728efdc4b66c764592e5acf8"
 ACCEPTED_PILOT_REPORT_SHA256 = "ea0c1025b6a4d87df66c7c55e629a8f2008b0d09f68b455b5e2017a376f6a606"
 
@@ -52,6 +72,15 @@ def _issue_comment_url(value: Any) -> bool:
         r"https://github\.com/lsmfttb/spire-research/issues/85#issuecomment-[1-9][0-9]*",
         value,
     ) is not None
+
+
+def _resolves_to(value: Any, expected: Path) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        return Path(value).resolve(strict=True) == Path(expected).resolve(strict=True)
+    except (OSError, RuntimeError, ValueError):
+        return False
 
 
 def _validate_active_wall_clock(
@@ -87,6 +116,456 @@ def _validate_active_wall_clock(
     if require_idle and prior_clock.get("active_session") is None and process_ids:
         raise RuntimeError("the closed Issue 85 active-wall receipt still lists processes")
     return float(elapsed)
+
+
+def _predecessor_carry_path(package_root: Path) -> Path:
+    return Path(package_root) / "predecessor-carry-manifest.json"
+
+
+def _validate_carry_manifest(
+    formal: Any, package_root: Path, identity: Mapping[str, str], *,
+    expected_sha256: str | None = None,
+) -> tuple[dict[str, Any], str]:
+    path = _predecessor_carry_path(package_root)
+    if not path.is_file():
+        raise RuntimeError("verified predecessor carry manifest is missing; no formal work may start")
+    manifest = formal.read_json(path)
+    digest = formal.file_sha256(path)
+    unsigned = {key: value for key, value in manifest.items() if key != "manifest_sha256"}
+    predecessor = manifest.get("predecessor")
+    successor = manifest.get("successor")
+    failed_update = predecessor.get("failed_update") if isinstance(predecessor, Mapping) else None
+    if (
+        manifest.get("schema_id") != PREDECESSOR_CARRY_SCHEMA
+        or manifest.get("status") != "VERIFIED_READ_ONLY_CONTINUATION"
+        or manifest.get("manifest_sha256") != _hash_json(formal, unsigned)
+        or (expected_sha256 is not None and digest != expected_sha256)
+        or not isinstance(predecessor, Mapping)
+        or not isinstance(successor, Mapping)
+        or successor.get("package_commit") != identity.get("package_commit")
+        or successor.get("source_lock_sha256") != identity.get("source_lock_sha256")
+        or predecessor.get("package_commit") != PREDECESSOR_PACKAGE_COMMIT
+        or predecessor.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or predecessor.get("formal_seed_table_sha256") != PREDECESSOR_SEED_TABLE_SHA256
+        or predecessor.get("group_receipt_sha256") != PREDECESSOR_GROUP_RECEIPT_SHA256
+        or predecessor.get("formal_progress_sha256") != PREDECESSOR_PROGRESS_SHA256
+        or predecessor.get("authorization_receipt_sha256") != PREDECESSOR_AUTHORIZATION_SHA256
+        or predecessor.get("group_root") != PREDECESSOR_GROUP_ROOT
+        or not isinstance(failed_update, Mapping)
+        or failed_update.get("failure_type") != "AttributeError"
+        or failed_update.get("failure_detail") != PREDECESSOR_UPDATE_FAILURE_DETAIL
+        or failed_update.get("log_path") != PREDECESSOR_UPDATE_FAILURE_LOG
+        or failed_update.get("log_sha256") != PREDECESSOR_UPDATE_FAILURE_LOG_SHA256
+        or failed_update.get("formal_progress_sha256") != PREDECESSOR_PROGRESS_SHA256
+        or manifest.get("owner_go_comment_url") != FORMAL_GO_COMMENT_URL
+        or manifest.get("formal_games_carried") != int(manifest.get("validated_units", 0))
+        or manifest.get("validated_units") != 128
+        or manifest.get("actor_updates_carried") != 0
+    ):
+        raise RuntimeError("predecessor carry manifest is malformed or bound to another source/evidence")
+    return manifest, digest
+
+
+def _predecessor_training_group(
+    formal: Any, package_root: Path, identity: Mapping[str, str], *,
+    expected_carry_sha256: str | None = None,
+) -> dict[str, Any]:
+    manifest, carry_sha256 = _validate_carry_manifest(
+        formal, package_root, identity, expected_sha256=expected_carry_sha256,
+    )
+    old_root = _inside(Path(formal.DATA_ROOT), PREDECESSOR_GROUP_ROOT)
+    receipt_path = old_root / "group-receipt.json"
+    if formal.file_sha256(receipt_path) != PREDECESSOR_GROUP_RECEIPT_SHA256:
+        raise RuntimeError("immutable predecessor group receipt changed after carry verification")
+    return {
+        "schema_id": CARRIED_GROUP_REFERENCE_SCHEMA,
+        "artifact_kind": "read-only predecessor receipt reference; no successor game receipt",
+        "status": "SUCCEEDED",
+        "stage_id": "TRAIN-B-BLOCK-00-GAMES",
+        "package_commit": PREDECESSOR_PACKAGE_COMMIT,
+        "training_data_package_commit": PREDECESSOR_PACKAGE_COMMIT,
+        "source_lock_sha256": PREDECESSOR_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": PREDECESSOR_SEED_TABLE_SHA256,
+        "authorization_receipt_sha256": PREDECESSOR_AUTHORIZATION_SHA256,
+        "expected": 128,
+        "completed": 128,
+        "failed_attempt_count": 0,
+        "receipt_path": (Path(PREDECESSOR_GROUP_ROOT) / "group-receipt.json").as_posix(),
+        "receipt_sha256": PREDECESSOR_GROUP_RECEIPT_SHA256,
+        "group_root": str(old_root),
+        "predecessor_carry_manifest_path": _predecessor_carry_path(package_root).relative_to(package_root).as_posix(),
+        "predecessor_carry_manifest_sha256": carry_sha256,
+        "units_manifest_sha256": manifest["units_sha256"],
+    }
+
+
+def verify_predecessor_carry(
+    formal: Any, *, issue84_source: Path, identity: Mapping[str, str],
+    readiness: Mapping[str, Any], seed: Mapping[str, Any], package_root: Path,
+    write_manifest: bool, backend: Any | None = None,
+    issue84_driver: Any | None = None,
+) -> dict[str, Any]:
+    """Hash-verify immutable e549 B/block-00 evidence and its exact pinned feature loader."""
+    if (
+        identity.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or formal.file_sha256(formal.LOCK_PATH) != PREDECESSOR_SOURCE_LOCK_SHA256
+        or readiness.get("package_commit") != identity.get("package_commit")
+        or readiness.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or seed.get("package_commit") != identity.get("package_commit")
+        or seed.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or seed.get("actor_update_schedule_sha256") != "22679fe29f5b7c518c5c5b7e7c22a99bd30c1dd5064540b4cc91162677492774"
+    ):
+        raise RuntimeError("successor source/readiness/seed does not preserve the reviewed Issue 85 contract")
+    new_rows = seed.get("rows")
+    if not isinstance(new_rows, list) or len(new_rows) != 7808:
+        raise RuntimeError("successor seed table has an unexpected registered row count")
+
+    data_root = Path(formal.DATA_ROOT).resolve(strict=True)
+    old_package_root = _inside(data_root, f"issue85/artifacts/formal/{PREDECESSOR_PACKAGE_COMMIT}")
+    old_seed_path = old_package_root / "formal-seed-table.json"
+    old_progress_path = old_package_root / "formal-progress.json"
+    old_auth_path = old_package_root / "formal-execution-authorization-corrected.json"
+    old_failure_log_path = old_package_root / PREDECESSOR_UPDATE_FAILURE_LOG
+    old_group_root = _inside(data_root, PREDECESSOR_GROUP_ROOT)
+    old_group_path = old_group_root / "group-receipt.json"
+    expected_files = (
+        (old_seed_path, PREDECESSOR_SEED_TABLE_SHA256, "predecessor seed table"),
+        (old_progress_path, PREDECESSOR_PROGRESS_SHA256, "predecessor formal progress"),
+        (old_auth_path, PREDECESSOR_AUTHORIZATION_SHA256, "predecessor source-bound authorization"),
+        (old_failure_log_path, PREDECESSOR_UPDATE_FAILURE_LOG_SHA256, "predecessor failed-update log"),
+        (old_group_path, PREDECESSOR_GROUP_RECEIPT_SHA256, "predecessor game group receipt"),
+    )
+    for path, digest, label in expected_files:
+        if not path.is_file() or formal.file_sha256(path) != digest:
+            raise RuntimeError(f"{label} is missing or changed; refusing to rerun predecessor owners")
+
+    old_seed = formal.read_json(old_seed_path)
+    if (
+        old_seed.get("schema_id") != "issue85-formal-seed-table-v1"
+        or old_seed.get("package_commit") != PREDECESSOR_PACKAGE_COMMIT
+        or old_seed.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or old_seed.get("contract_sha256") != formal.file_sha256(formal.CONTRACT_PATH)
+        or old_seed.get("row_count") != 7808
+        or old_seed.get("rows") != new_rows
+        or old_seed.get("rows_sha256") != _hash_json(formal, old_seed.get("rows"))
+        or old_seed.get("actor_update_schedule") != seed.get("actor_update_schedule")
+        or old_seed.get("actor_update_schedule_sha256") != seed.get("actor_update_schedule_sha256")
+    ):
+        raise RuntimeError("predecessor and successor seed rows/schedule differ")
+    rows = _training_rows(seed, "B", 0)
+    owners = [int(row["owner_seed"]) for row in rows]
+    unit_ids = [str(row["unit_id"]) for row in rows]
+    if (
+        len(rows) != 128 or owners != list(range(8400001, 8400129))
+        or len(set(owners)) != 128 or len(set(unit_ids)) != 128
+        or any(
+            row.get("formal") is not True or row.get("phase") != "training"
+            or row.get("issue85_phase") != "training" or row.get("issue85_arm") != "B"
+            or row.get("issue84_arm") != "B" or row.get("issue84_policy_label") != "pi12"
+            or row.get("unit_id") != f"TRAIN:{row.get('owner_seed')}:B"
+            for row in rows
+        )
+    ):
+        raise RuntimeError("registered successor B/block-00 owner/unit identities are not exact and unique")
+
+    old_auth = formal.read_json(old_auth_path)
+    old_owner = old_auth.get("owner_approval")
+    old_reviewer = old_auth.get("reviewer_approval")
+    if (
+        old_auth.get("schema_id") != AUTH_SCHEMA or old_auth.get("issue") != 85
+        or old_auth.get("formal_go") is not True or old_auth.get("status") != "APPROVED"
+        or old_auth.get("package_commit") != PREDECESSOR_PACKAGE_COMMIT
+        or old_auth.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or old_auth.get("seed_table_sha256") != PREDECESSOR_SEED_TABLE_SHA256
+        or old_auth.get("actor_update_schedule_sha256") != seed.get("actor_update_schedule_sha256")
+        or old_auth.get("whole_task_active_wall_cap_seconds") != FORMAL_ACTIVE_WALL_CAP_SECONDS
+        or not isinstance(old_owner, Mapping) or old_owner.get("status") != "APPROVED"
+        or old_owner.get("decision") != "FORMAL_GO"
+        or old_owner.get("comment_url") != FORMAL_GO_COMMENT_URL
+        or not isinstance(old_reviewer, Mapping) or old_reviewer.get("status") != "APPROVED"
+        or old_reviewer.get("decision") != "PASS"
+        or old_reviewer.get("package_commit") != PREDECESSOR_PACKAGE_COMMIT
+        or old_reviewer.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+    ):
+        raise RuntimeError("predecessor authorization does not trace to the same owner FORMAL_GO and approved source")
+    active_wall_path = data_root / "issue85" / "artifacts" / "active-wall-issue85-task.json"
+    if not active_wall_path.is_file():
+        raise RuntimeError("the authoritative Issue 85 clock is missing; predecessor carry cannot be verified")
+    _validate_active_wall_clock(
+        formal.read_json(active_wall_path), FORMAL_ACTIVE_WALL_CAP_SECONDS, require_idle=True,
+    )
+    prior_progress = formal.read_json(old_progress_path)
+    prior_group = prior_progress.get("game_groups", {}).get("TRAIN-B-BLOCK-00")
+    group_receipt = formal.read_json(old_group_path)
+    if (
+        prior_progress.get("schema_id") != PROGRESS_SCHEMA
+        or prior_progress.get("status") != "FAILED_OR_PAUSED"
+        or prior_progress.get("package_commit") != PREDECESSOR_PACKAGE_COMMIT
+        or prior_progress.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or prior_progress.get("seed_table_sha256") != PREDECESSOR_SEED_TABLE_SHA256
+        or prior_progress.get("authorization_receipt_sha256") != PREDECESSOR_AUTHORIZATION_SHA256
+        or prior_progress.get("active_stage") != "TRAIN-B-BLOCK-00-ACTOR-UPDATE"
+        or prior_progress.get("failure", {}).get("type") != "AttributeError"
+        or prior_progress.get("failure", {}).get("detail") != PREDECESSOR_UPDATE_FAILURE_DETAIL
+        or PREDECESSOR_UPDATE_FAILURE_DETAIL not in old_failure_log_path.read_text(encoding="utf-8", errors="replace")
+        or prior_progress.get("actor_updates") != {}
+        or not isinstance(prior_group, Mapping)
+        or prior_group.get("schema_id") != GROUP_SCHEMA or prior_group.get("status") != "SUCCEEDED"
+        or prior_group.get("stage_id") != "TRAIN-B-BLOCK-00-GAMES"
+        or prior_group.get("package_commit") != PREDECESSOR_PACKAGE_COMMIT
+        or prior_group.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or prior_group.get("seed_table_sha256") != PREDECESSOR_SEED_TABLE_SHA256
+        or prior_group.get("authorization_receipt_sha256") != PREDECESSOR_AUTHORIZATION_SHA256
+        or prior_group.get("expected") != 128 or prior_group.get("completed") != 128
+        or prior_group.get("failed_attempt_count") != 0
+        or prior_group.get("group_root") != str(old_group_root)
+        or prior_group.get("receipt_sha256") != PREDECESSOR_GROUP_RECEIPT_SHA256
+        or not isinstance(group_receipt.get("units"), list)
+        or len(group_receipt["units"]) != 128
+        or group_receipt.get("schema_id") != GROUP_SCHEMA
+        or group_receipt.get("status") != "SUCCEEDED"
+        or group_receipt.get("stage_id") != "TRAIN-B-BLOCK-00-GAMES"
+        or group_receipt.get("package_commit") != PREDECESSOR_PACKAGE_COMMIT
+        or group_receipt.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or group_receipt.get("seed_table_sha256") != PREDECESSOR_SEED_TABLE_SHA256
+        or group_receipt.get("authorization_receipt_sha256") != PREDECESSOR_AUTHORIZATION_SHA256
+        or group_receipt.get("completed") != 128
+        or prior_group.get("successful_unit_ids") != unit_ids
+        or not _resolves_to(prior_group.get("receipt_path"), old_group_path)
+        or prior_group.get("receipt_sha256") != formal.file_sha256(old_group_path)
+    ):
+        raise RuntimeError("predecessor progress/group receipt is incomplete, inconsistent, or already updated")
+    update_root = old_package_root / "training" / "B" / "updates" / "block-00"
+    if update_root.exists() and any(update_root.iterdir()):
+        raise RuntimeError("predecessor Actor-update artifacts exist; carry would skip or relabel a real update")
+    current_root = Path(package_root).resolve(strict=True)
+    current_progress = current_root / "formal-progress.json"
+    if not _predecessor_carry_path(current_root).is_file() and current_progress.exists():
+        raise RuntimeError("successor execution began before the predecessor carry manifest was fixed")
+    successor_games_root = current_root / "training" / "B" / "block-00" / "games"
+    if successor_games_root.exists() and any(successor_games_root.iterdir()):
+        raise RuntimeError("successor B/block-00 game attempts already exist; refusing duplicate registered owners")
+
+    if backend is None or issue84_driver is None:
+        backend, issue84_driver = _configure_formal_runtime(
+            formal, Path(issue84_source).resolve(strict=True), identity, current_root,
+        )
+    unit_dirs = old_group_root / "units"
+    expected_unit_dirs = {backend.unit_key(unit_id) for unit_id in unit_ids}
+    actual_unit_dirs = {path.name for path in unit_dirs.iterdir() if path.is_dir()} if unit_dirs.is_dir() else set()
+    if actual_unit_dirs != expected_unit_dirs:
+        raise RuntimeError("predecessor unit directory set differs from the exact 128 registered owners")
+
+    unit_manifest: list[dict[str, Any]] = []
+    decoded_features: list[dict[str, Any]] = []
+    model_digests: set[str] = set()
+    for row, unit_receipt in zip(rows, group_receipt["units"], strict=True):
+        unit_id = str(row["unit_id"])
+        if (
+            unit_receipt.get("unit_id") != unit_id
+            or unit_receipt.get("owner_seed") != int(row["owner_seed"])
+            or unit_receipt.get("attempt_count") != 1
+        ):
+            raise RuntimeError(f"predecessor group unit identity/attempt count differs: {unit_id}")
+        expected_attempt_relative = (
+            Path("training/B/block-00/games/units")
+            / backend.unit_key(unit_id) / "attempt-0001"
+        )
+        if Path(str(unit_receipt.get("attempt_path", ""))) != expected_attempt_relative:
+            raise RuntimeError(f"predecessor group attempt path differs for {unit_id}")
+        result, history = _unit_attempts(
+            formal, backend, root=old_group_root, row=row,
+            package_commit=PREDECESSOR_PACKAGE_COMMIT,
+            lock_sha=PREDECESSOR_SOURCE_LOCK_SHA256,
+            seed_table_sha256=PREDECESSOR_SEED_TABLE_SHA256,
+            authorization_receipt_sha256=PREDECESSOR_AUTHORIZATION_SHA256,
+            check_live_workers=False,
+        )
+        if result is None or history:
+            raise RuntimeError(f"predecessor unit is not a single complete, source-bound success: {unit_id}")
+        attempt = _inside(old_group_root, str(unit_receipt["attempt_path"]).removeprefix("training/B/block-00/games/"))
+        result_path = attempt / "result.json"
+        result_sha = formal.file_sha256(result_path)
+        model_digest = str(result.get("model_digest", ""))
+        policy_source = result.get("policy_source")
+        if (
+            result_sha != unit_receipt.get("result_sha256")
+            or unit_receipt.get("model_digest") != model_digest
+            or model_digest != PREDECESSOR_INITIAL_MODEL_DIGEST
+            or not isinstance(policy_source, Mapping)
+            or policy_source.get("source") != "locked-issue82-pi12-plus-registered-issue85-initialization"
+            or policy_source.get("parent_model_digest") != formal.LOCK["baseline_P"]["model_digest"]
+            or policy_source.get("parent_checkpoint_sha256") != formal.LOCK["baseline_P"]["checkpoint_sha256"]
+            or result.get("expert_decisions") != 0
+            or result.get("terminal_outcome") is None
+            or isinstance(result.get("terminal_floor"), bool)
+            or not isinstance(result.get("terminal_floor"), (int, float))
+            or not math.isfinite(float(result["terminal_floor"]))
+            or not isinstance(result.get("heart_victory"), bool)
+            or result.get("native_source_commit") != formal.LOCK["native"]["commit"]
+            or result.get("stsr_source_commit") != formal.LOCK["stsr_source"]["commit"]
+            or result.get("native_module_sha256") != formal.LOCK["native"]["compiled_module_sha256"]
+        ):
+            raise RuntimeError(f"predecessor terminal/model/source lineage differs for {unit_id}")
+        pointer = result.get("training_features")
+        if not isinstance(pointer, Mapping) or pointer.get("compression") != "zlib":
+            raise RuntimeError(f"predecessor training-feature receipt is missing for {unit_id}")
+        relative_feature = Path(str(pointer.get("path", "")))
+        expected_feature = (
+            expected_attempt_relative.relative_to(Path("training/B/block-00/games"))
+            / "training-features.json.zlib"
+        )
+        if relative_feature.is_absolute() or ".." in relative_feature.parts or relative_feature != expected_feature:
+            raise RuntimeError(f"predecessor feature path escapes or differs from its attempt for {unit_id}")
+        feature_path = _inside(old_group_root, relative_feature.as_posix())
+        compressed = feature_path.read_bytes()
+        raw = zlib.decompress(compressed)
+        if (
+            formal.sha256_bytes(compressed) != pointer.get("sha256")
+            or len(compressed) != pointer.get("stored_bytes")
+            or formal.sha256_bytes(raw) != pointer.get("uncompressed_sha256")
+            or len(raw) != pointer.get("uncompressed_bytes")
+        ):
+            raise RuntimeError(f"predecessor feature bytes/hash/length differ for {unit_id}")
+        payload = json.loads(raw.decode("utf-8"))
+        base = payload.get("base") if isinstance(payload, Mapping) else None
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("schema_id") != "issue75-stage1-training-features-v1"
+            or payload.get("unit_id") != unit_id
+            or payload.get("owner_seed") != int(row["owner_seed"])
+            or payload.get("package_commit") != PREDECESSOR_PACKAGE_COMMIT
+            or payload.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+            or not isinstance(base, Mapping)
+            or base.get("complete") is not True
+            or base.get("terminal_floor") != result.get("terminal_floor")
+            or base.get("heart_win") is not result.get("heart_victory")
+        ):
+            raise RuntimeError(f"predecessor feature terminal/owner lineage differs for {unit_id}")
+        model_digests.add(model_digest)
+        unit_manifest.append({
+            "unit_id": unit_id,
+            "owner_seed": int(row["owner_seed"]),
+            "attempt_path": str(unit_receipt["attempt_path"]),
+            "result_sha256": result_sha,
+            "model_digest": model_digest,
+            "training_features_path": relative_feature.as_posix(),
+            "training_features_sha256": str(pointer["sha256"]),
+            "training_features_uncompressed_sha256": str(pointer["uncompressed_sha256"]),
+            "terminal_floor": float(result["terminal_floor"]),
+            "heart_victory": bool(result["heart_victory"]),
+            "complete": True,
+            "expert_decisions": 0,
+        })
+        decoded_features.append({
+            "unit_id": unit_id,
+            "owner_seed": int(row["owner_seed"]),
+            "terminal_floor": float(result["terminal_floor"]),
+            "heart_victory": bool(result["heart_victory"]),
+        })
+    if model_digests != {PREDECESSOR_INITIAL_MODEL_DIGEST}:
+        raise RuntimeError("predecessor B/block-00 did not use one common initialized actor model")
+
+    with tempfile.TemporaryDirectory(prefix="issue85-predecessor-carry-") as temporary_root:
+        loaded = backend.load_modules(Path(temporary_root), pilot=True)
+        examples, outcomes = issue84_driver.load_training_outcomes(
+            rows, root=old_group_root, executor=loaded[-1],
+            package=PREDECESSOR_PACKAGE_COMMIT,
+        )
+    if len(examples) != 128 or len(outcomes) != 128:
+        raise RuntimeError("pinned #84 loader did not read all 128 predecessor feature records")
+    for expected, example, outcome in zip(decoded_features, examples, outcomes, strict=True):
+        base = getattr(example, "base", None)
+        if (
+            int(getattr(example, "owner_seed", -1)) != expected["owner_seed"]
+            or not bool(getattr(base, "complete", False))
+            or float(getattr(base, "terminal_floor", math.nan)) != expected["terminal_floor"]
+            or bool(getattr(base, "heart_win", False)) != expected["heart_victory"]
+            or int(getattr(outcome, "owner_seed", -1)) != expected["owner_seed"]
+            or not bool(getattr(outcome, "complete", False))
+            or float(getattr(outcome, "terminal_floor", math.nan)) != expected["terminal_floor"]
+            or bool(getattr(outcome, "heart_win", False)) != expected["heart_victory"]
+        ):
+            raise RuntimeError(f"pinned #84 loader changed predecessor training outcomes: {expected['unit_id']}")
+
+    manifest: dict[str, Any] = {
+        "schema_id": PREDECESSOR_CARRY_SCHEMA,
+        "status": "VERIFIED_READ_ONLY_CONTINUATION",
+        "successor": {
+            "package_commit": identity["package_commit"],
+            "source_lock_sha256": identity["source_lock_sha256"],
+            "formal_seed_table_sha256": formal.file_sha256(package_root / "formal-seed-table.json"),
+            "actor_update_schedule_sha256": seed["actor_update_schedule_sha256"],
+        },
+        "predecessor": {
+            "package_commit": PREDECESSOR_PACKAGE_COMMIT,
+            "source_lock_sha256": PREDECESSOR_SOURCE_LOCK_SHA256,
+            "formal_seed_table_sha256": PREDECESSOR_SEED_TABLE_SHA256,
+            "formal_progress_sha256": PREDECESSOR_PROGRESS_SHA256,
+            "authorization_receipt_sha256": PREDECESSOR_AUTHORIZATION_SHA256,
+            "group_receipt_sha256": PREDECESSOR_GROUP_RECEIPT_SHA256,
+            "group_root": PREDECESSOR_GROUP_ROOT,
+            "failed_update": {
+                "failure_type": "AttributeError",
+                "failure_detail": PREDECESSOR_UPDATE_FAILURE_DETAIL,
+                "log_path": PREDECESSOR_UPDATE_FAILURE_LOG,
+                "log_sha256": PREDECESSOR_UPDATE_FAILURE_LOG_SHA256,
+                "formal_progress_sha256": PREDECESSOR_PROGRESS_SHA256,
+            },
+            "stage_id": "TRAIN-B-BLOCK-00-GAMES",
+            "expected": 128,
+            "completed": 128,
+            "failed_attempt_count": 0,
+            "actor_update_count": 0,
+        },
+        "owner_go_comment_url": FORMAL_GO_COMMENT_URL,
+        "pinned_issue84_source_commit": formal.LOCK["baseline_A"]["issue84_final_accepted_source_commit"],
+        "initial_model_digest": PREDECESSOR_INITIAL_MODEL_DIGEST,
+        "parent_model_digest": formal.LOCK["baseline_P"]["model_digest"],
+        "parent_checkpoint_sha256": formal.LOCK["baseline_P"]["checkpoint_sha256"],
+        "native_source_commit": formal.LOCK["native"]["commit"],
+        "stsr_source_commit": formal.LOCK["stsr_source"]["commit"],
+        "validated_units": len(unit_manifest),
+        "formal_games_carried": len(unit_manifest),
+        "actor_updates_carried": 0,
+        "features_loaded_by_pinned_issue84_parser": len(examples),
+        "units_sha256": _hash_json(formal, unit_manifest),
+        "units": unit_manifest,
+        "outcome_manifest_sha256": _hash_json(formal, decoded_features),
+        "no_successor_game_or_update_receipts_created": True,
+    }
+    manifest["manifest_sha256"] = _hash_json(formal, manifest)
+    manifest_path = _predecessor_carry_path(current_root)
+    created_manifest = False
+    if manifest_path.exists():
+        if formal.read_json(manifest_path) != manifest:
+            raise RuntimeError("immutable successor predecessor-carry manifest differs from verified evidence")
+    elif write_manifest:
+        if (current_root / "formal-progress.json").exists():
+            raise RuntimeError("successor formal progress exists before the immutable carry manifest")
+        update_root = current_root / "training" / "B" / "updates" / "block-00"
+        if update_root.exists() and any(update_root.iterdir()):
+            raise RuntimeError("successor Actor-update attempts exist before predecessor carry verification")
+        formal.pilot._write_or_verify_once(manifest_path, manifest)
+        created_manifest = True
+    else:
+        raise RuntimeError("successor predecessor-carry manifest has not been established")
+    manifest_sha = formal.file_sha256(manifest_path)
+    return {
+        "schema_id": "issue85-formal-predecessor-carry-verification-report-v1",
+        "status": "VERIFIED / 128 PREDECESSOR TERMINALS AND FEATURES / NO NEW GAMES OR UPDATES",
+        "package_commit": identity["package_commit"],
+        "source_lock_sha256": identity["source_lock_sha256"],
+        "predecessor_package_commit": PREDECESSOR_PACKAGE_COMMIT,
+        "predecessor_group_receipt_sha256": PREDECESSOR_GROUP_RECEIPT_SHA256,
+        "formal_games_carried": len(unit_manifest),
+        "actor_updates_carried": 0,
+        "features_loaded_by_pinned_issue84_parser": len(examples),
+        "manifest_path": str(manifest_path),
+        "manifest_sha256": manifest_sha,
+        "manifest": manifest,
+        "writes_performed": created_manifest,
+    }
 
 
 def _formal_paths(formal: Any, identity: Mapping[str, str]) -> tuple[Path, Path, Path]:
@@ -136,6 +615,10 @@ def validate_authorization(
     owner = receipt.get("owner_approval")
     reviewer = receipt.get("reviewer_approval")
     cap = receipt.get("whole_task_active_wall_cap_seconds")
+    package_root, _readiness_path, _seed_path = _formal_paths(formal, identity)
+    carry_sha256 = receipt.get("predecessor_carry_manifest_sha256")
+    if isinstance(carry_sha256, str):
+        _validate_carry_manifest(formal, package_root, identity, expected_sha256=carry_sha256)
     if (
         receipt.get("schema_id") != AUTH_SCHEMA
         or receipt.get("issue") != 85
@@ -147,12 +630,13 @@ def validate_authorization(
         or receipt.get("seed_table_sha256") != readiness.get("formal_seed_table_sha256")
         or receipt.get("actor_update_schedule_sha256") != seed.get("actor_update_schedule_sha256")
         or receipt.get("analysis_source_sha256") != formal.file_sha256(formal.STUDY / "formal_analysis.py")
-        or isinstance(cap, bool) or not isinstance(cap, int) or cap <= 0
+        or isinstance(cap, bool) or not isinstance(cap, int) or cap != FORMAL_ACTIVE_WALL_CAP_SECONDS
+        or not isinstance(carry_sha256, str) or len(carry_sha256) != 64
         or receipt.get("pilot_report_sha256") != ACCEPTED_PILOT_REPORT_SHA256
         or not isinstance(owner, Mapping)
         or owner.get("status") != "APPROVED"
         or owner.get("decision") != "FORMAL_GO"
-        or not _issue_comment_url(owner.get("comment_url"))
+        or owner.get("comment_url") != FORMAL_GO_COMMENT_URL
         or not isinstance(reviewer, Mapping)
         or reviewer.get("status") != "APPROVED"
         or reviewer.get("package_commit") != identity.get("package_commit")
@@ -195,6 +679,7 @@ def validate_authorization(
         "owner_approval_comment_url": owner["comment_url"],
         "reviewer_approval_comment_url": reviewer["comment_url"],
         "pilot_report_sha256": formal.file_sha256(pilot_report_path),
+        "predecessor_carry_manifest_sha256": carry_sha256,
         "prior_active_wall_seconds": float(elapsed),
     }
 
@@ -470,6 +955,7 @@ def worker_main(formal: Any, job_path: Path) -> int:
 def _unit_attempts(
     formal: Any, backend: Any, *, root: Path, row: Mapping[str, Any], package_commit: str,
     lock_sha: str, seed_table_sha256: str, authorization_receipt_sha256: str,
+    check_live_workers: bool = True,
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     unit_id = str(row["unit_id"])
     unit_root = Path(root) / "units" / backend.unit_key(unit_id)
@@ -525,14 +1011,15 @@ def _unit_attempts(
                 or isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0
             ):
                 raise RuntimeError(f"formal attempt start receipt differs: {started_path}")
-            try:
-                os.kill(pid, 0)
-            except ProcessLookupError:
-                pass
-            except PermissionError as exc:
-                raise RuntimeError(f"cannot verify formal worker {pid}; refusing a duplicate attempt") from exc
-            else:
-                raise RuntimeError(f"formal worker {pid} is still alive; refusing a duplicate attempt")
+            if check_live_workers:
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    pass
+                except PermissionError as exc:
+                    raise RuntimeError(f"cannot verify formal worker {pid}; refusing a duplicate attempt") from exc
+                else:
+                    raise RuntimeError(f"formal worker {pid} is still alive; refusing a duplicate attempt")
         if finished is not None:
             if (
                 finished.get("schema_id") != "issue79-owner-attempt-finish-v1"
@@ -839,8 +1326,15 @@ def _read_update_receipt(
         raise RuntimeError(f"formal actor update receipt is missing for {arm} block {block}")
     receipt = formal.read_json(path)
     digest = formal.file_sha256(path)
+    training_data_package = PREDECESSOR_PACKAGE_COMMIT if arm == "B" and block == 0 else identity["package_commit"]
+    carry_manifest_sha256 = None
+    if arm == "B" and block == 0:
+        _carry, carry_manifest_sha256 = _validate_carry_manifest(formal, package_root, identity)
     if (
-        receipt.get("schema_id") != UPDATE_SCHEMA or receipt.get("status") != "SUCCEEDED"
+        receipt.get("training_data_package_commit") != training_data_package
+        or receipt.get("predecessor_carry_manifest_sha256") != carry_manifest_sha256
+        or (arm == "B" and block == 0 and receipt.get("training_group_receipt_sha256") != PREDECESSOR_GROUP_RECEIPT_SHA256)
+        or receipt.get("schema_id") != UPDATE_SCHEMA or receipt.get("status") != "SUCCEEDED"
         or receipt.get("arm") != arm or receipt.get("block_index") != block
         or receipt.get("package_commit") != identity["package_commit"]
         or receipt.get("source_lock_sha256") != identity["source_lock_sha256"]
@@ -876,6 +1370,7 @@ def _rng_from_json(value: Mapping[str, Any]) -> tuple[Any, ...]:
 def _valid_checkpoint(
     formal: Any, checkpoint_dir: Path, *, identity: Mapping[str, str], arm: str,
     block: int, owner_sha: str, train_group_sha: str, schedule_sha: str, update_seed: int,
+    training_data_package_commit: str, predecessor_carry_manifest_sha256: str | None,
 ) -> tuple[int, dict[str, Any], Path, Path]:
     metadata_path = checkpoint_dir / "checkpoint.json"
     actor_path = checkpoint_dir / "actor-state.pt"
@@ -890,6 +1385,8 @@ def _valid_checkpoint(
         or metadata.get("arm") != arm or metadata.get("block_index") != block
         or metadata.get("owner_seed_sha256") != owner_sha
         or metadata.get("training_group_receipt_sha256") != train_group_sha
+        or metadata.get("training_data_package_commit") != training_data_package_commit
+        or metadata.get("predecessor_carry_manifest_sha256") != predecessor_carry_manifest_sha256
         or metadata.get("actor_update_schedule_sha256") != schedule_sha
         or metadata.get("actor_update_seed") != update_seed
         or isinstance(step, bool) or not isinstance(step, int) or step <= 0 or step > 64 or step % interval
@@ -907,6 +1404,7 @@ def _valid_checkpoint(
 def _latest_resume_checkpoint(
     formal: Any, update_root: Path, *, identity: Mapping[str, str], arm: str, block: int,
     owner_sha: str, train_group_sha: str, schedule_sha: str, update_seed: int,
+    training_data_package_commit: str, predecessor_carry_manifest_sha256: str | None,
 ) -> tuple[int, dict[str, Any], Path, Path] | None:
     candidates = []
     for attempt in sorted(path for path in update_root.glob("attempt-*") if path.is_dir()):
@@ -915,6 +1413,8 @@ def _latest_resume_checkpoint(
                 formal, checkpoint, identity=identity, arm=arm, block=block,
                 owner_sha=owner_sha, train_group_sha=train_group_sha,
                 schedule_sha=schedule_sha, update_seed=update_seed,
+                training_data_package_commit=training_data_package_commit,
+                predecessor_carry_manifest_sha256=predecessor_carry_manifest_sha256,
             ))
     if not candidates:
         return None
@@ -943,6 +1443,21 @@ def _train_actor_block(
     update_seed = int(update_row["seed"])
     owner_sha = _owner_hash(rows)
     group_sha = str(training_group["receipt_sha256"])
+    training_data_package = str(training_group.get("training_data_package_commit", identity["package_commit"]))
+    carry_manifest_sha256 = training_group.get("predecessor_carry_manifest_sha256")
+    if arm == "B" and block == 0:
+        _manifest, expected_carry_sha256 = _validate_carry_manifest(
+            formal, package_root, identity,
+            expected_sha256=str(carry_manifest_sha256) if carry_manifest_sha256 is not None else None,
+        )
+        if (
+            training_data_package != PREDECESSOR_PACKAGE_COMMIT
+            or group_sha != PREDECESSOR_GROUP_RECEIPT_SHA256
+            or carry_manifest_sha256 != expected_carry_sha256
+        ):
+            raise RuntimeError("B/block-00 actor update is not bound to the verified predecessor group")
+    elif training_data_package != identity["package_commit"] or carry_manifest_sha256 is not None:
+        raise RuntimeError("non-predecessor actor update has an unexpected training-data package")
     update_root = package_root / "training" / arm / "updates" / f"block-{block:02d}"
     success_path = update_root / "success-receipt.json"
     if success_path.is_file():
@@ -958,7 +1473,7 @@ def _train_actor_block(
     actor.train()
     examples, _outcomes = issue84_driver.load_training_outcomes(
         rows, root=Path(training_group["group_root"]), executor=executor,
-        package=identity["package_commit"],
+        package=training_data_package,
     )
     if len(examples) != expected_owners or [int(item.owner_seed) for item in examples] != [int(row["owner_seed"]) for row in rows]:
         raise RuntimeError(f"formal learner {arm}/{block} loaded an incorrect owner set or order")
@@ -987,6 +1502,8 @@ def _train_actor_block(
         formal, update_root, identity=identity, arm=arm, block=block,
         owner_sha=owner_sha, train_group_sha=group_sha,
         schedule_sha=schedule_sha, update_seed=update_seed,
+        training_data_package_commit=training_data_package,
+        predecessor_carry_manifest_sha256=carry_manifest_sha256,
     )
     attempt_number = _next_attempt(update_root)
     attempt = update_root / f"attempt-{attempt_number:04d}"
@@ -1022,6 +1539,8 @@ def _train_actor_block(
         "source_lock_sha256": identity["source_lock_sha256"],
         "seed_table_sha256": seed_table_sha256,
         "training_group_receipt_sha256": group_sha,
+        "training_data_package_commit": training_data_package,
+        "predecessor_carry_manifest_sha256": carry_manifest_sha256,
         "owner_seed_sha256": owner_sha,
         "actor_update_schedule_sha256": schedule_sha,
         "actor_update_seed": update_seed,
@@ -1053,6 +1572,8 @@ def _train_actor_block(
             "source_lock_sha256": identity["source_lock_sha256"],
             "seed_table_sha256": seed_table_sha256,
             "training_group_receipt_sha256": group_sha,
+            "training_data_package_commit": training_data_package,
+            "predecessor_carry_manifest_sha256": carry_manifest_sha256,
             "arm": arm,
             "block_index": block,
             "owner_seed_sha256": owner_sha,
@@ -1146,6 +1667,8 @@ def _train_actor_block(
             "source_lock_sha256": identity["source_lock_sha256"],
             "seed_table_sha256": seed_table_sha256,
             "training_group_receipt_sha256": group_sha,
+            "training_data_package_commit": training_data_package,
+            "predecessor_carry_manifest_sha256": carry_manifest_sha256,
             "owner_count": expected_owners,
             "owner_seed_sha256": owner_sha,
             "actor_update_schedule_sha256": schedule_sha,
@@ -1196,6 +1719,8 @@ def _train_actor_block(
             "source_lock_sha256": identity["source_lock_sha256"],
             "seed_table_sha256": seed_table_sha256,
             "training_group_receipt_sha256": group_sha,
+            "training_data_package_commit": training_data_package,
+            "predecessor_carry_manifest_sha256": carry_manifest_sha256,
             "completed_steps": int(attempts_live.get("completed_steps", completed)),
             "failure_type": type(exc).__name__,
             "failure_detail": str(exc)[:2000],
@@ -1551,9 +2076,21 @@ def execute_formal(
         or prior_progress.get("source_lock_sha256") != identity["source_lock_sha256"]
         or prior_progress.get("seed_table_sha256") != seed_table_sha256
         or prior_progress.get("authorization_receipt_sha256") != authorization["sha256"]
+        or prior_progress.get("predecessor_carry_manifest_sha256") != authorization["predecessor_carry_manifest_sha256"]
     ):
-        raise RuntimeError("formal progress is bound to a different source, seed or owner authorization")
+        raise RuntimeError("formal progress is bound to a different source, seed, carry manifest or owner authorization")
     backend, issue84_driver = _configure_formal_runtime(formal, issue84_source, identity, package_root)
+    carry_report = verify_predecessor_carry(
+        formal, issue84_source=issue84_source, identity=identity,
+        readiness=readiness, seed=seed, package_root=package_root,
+        write_manifest=False, backend=backend, issue84_driver=issue84_driver,
+    )
+    if carry_report["manifest_sha256"] != authorization["predecessor_carry_manifest_sha256"]:
+        raise RuntimeError("source-bound authorization references a different predecessor carry manifest")
+    carried_training_group = _predecessor_training_group(
+        formal, package_root, identity,
+        expected_carry_sha256=authorization["predecessor_carry_manifest_sha256"],
+    )
     clock = backend.ActiveClock("issue85-task", float(authorization["whole_task_active_wall_cap_seconds"]))
     progress = prior_progress or {
         "schema_id": PROGRESS_SCHEMA,
@@ -1562,6 +2099,9 @@ def execute_formal(
         "source_lock_sha256": identity["source_lock_sha256"],
         "seed_table_sha256": seed_table_sha256,
         "authorization_receipt_sha256": authorization["sha256"],
+        "predecessor_carry_manifest_path": _predecessor_carry_path(package_root).relative_to(package_root).as_posix(),
+        "predecessor_carry_manifest_sha256": authorization["predecessor_carry_manifest_sha256"],
+        "predecessor_game_group_receipt_sha256": PREDECESSOR_GROUP_RECEIPT_SHA256,
         "game_groups": {},
         "actor_updates": {},
         "started_utc": _now(),
@@ -1581,14 +2121,21 @@ def execute_formal(
                 if clock.expired():
                     raise TimeoutError("whole-task active-wall cap reached before the next registered training block")
                 block_key = f"{arm}:{block}"
-                progress["active_stage"] = f"TRAIN-{arm}-BLOCK-{block:02d}-GAMES"
-                save_progress()
-                game_group = _run_training_games(
-                    formal, backend, package_root=package_root, seed=seed,
-                    arm=arm, block=block, clock=clock, identity=identity,
-                    seed_table_sha256=seed_table_sha256, authorization=authorization,
-                    issue84_source=Path(issue84_source).resolve(strict=True), progress_path=progress_path,
+                is_predecessor_carry = arm == "B" and block == 0
+                progress["active_stage"] = (
+                    "TRAIN-B-BLOCK-00-GAMES-CARRY-READ" if is_predecessor_carry
+                    else f"TRAIN-{arm}-BLOCK-{block:02d}-GAMES"
                 )
+                save_progress()
+                if is_predecessor_carry:
+                    game_group = dict(carried_training_group)
+                else:
+                    game_group = _run_training_games(
+                        formal, backend, package_root=package_root, seed=seed,
+                        arm=arm, block=block, clock=clock, identity=identity,
+                        seed_table_sha256=seed_table_sha256, authorization=authorization,
+                        issue84_source=Path(issue84_source).resolve(strict=True), progress_path=progress_path,
+                    )
                 progress["game_groups"][f"TRAIN-{arm}-BLOCK-{block:02d}"] = game_group
                 save_progress()
                 if game_group.get("status") != "SUCCEEDED" or game_group.get("completed") != int(formal.CONTRACT["training"]["owners_per_block"]):
@@ -1680,6 +2227,8 @@ def execute_formal(
             "seed_table_sha256": seed_table_sha256,
             "analysis_source_sha256": formal.file_sha256(formal.STUDY / "formal_analysis.py"),
             "authorization_receipt_sha256": authorization["sha256"],
+            "predecessor_carry_manifest_sha256": authorization["predecessor_carry_manifest_sha256"],
+            "predecessor_game_group_receipt_sha256": PREDECESSOR_GROUP_RECEIPT_SHA256,
             "owner_approval_comment_url": authorization["owner_approval_comment_url"],
             "reviewer_approval_comment_url": authorization["reviewer_approval_comment_url"],
             "pilot_report_sha256": authorization["pilot_report_sha256"],
