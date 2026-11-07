@@ -58,6 +58,9 @@ RESUMED_B01_GROUP_ROOT = (
 RESUMED_B01_UPDATE_RECEIPT_SHA256 = "301a74e4cca79e813eebdaa843c948acbdd864a24cab81c647a75d4dc6c32358"
 RESUMED_B01_MODEL_DIGEST = "a272f206458ac60644805a9773a5eac66f7c7b2bcbf7be502bdc03a5939d6165"
 RESUMED_B01_FORMAL_FAILURE = "formal training worker has an invalid arm/block/model label"
+PRESERVED_ACTIVE_WALL_CARRY_PACKAGE_COMMIT = "fe33f0ccde3098b8b907d371321d2d0533112e86"
+PRESERVED_ACTIVE_WALL_CARRY_MANIFEST_SHA256 = "e3066a4390c6d2b235723e26449f3ddc12a0a9e022930fe16c0f3f1d30c7a972"
+PRESERVED_ACTIVE_WALL_CARRY_SECONDS = 34996.25197497001
 RESUMED_B01_GROUP_CARRY = {
     "arm": "B",
     "block_index": 1,
@@ -167,6 +170,77 @@ def _validate_active_wall_clock(
     if require_idle and prior_clock.get("active_session") is None and process_ids:
         raise RuntimeError("the closed Issue 85 active-wall receipt still lists processes")
     return float(elapsed)
+
+
+def _validated_active_wall_seconds(value: Any, *, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise RuntimeError(f"{label} is malformed or exceeds the approved active-wall cap")
+    try:
+        seconds = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise RuntimeError(f"{label} is malformed or exceeds the approved active-wall cap") from exc
+    if not math.isfinite(seconds) or seconds < 0 or seconds > FORMAL_ACTIVE_WALL_CAP_SECONDS:
+        raise RuntimeError(f"{label} is malformed or exceeds the approved active-wall cap")
+    return seconds
+
+
+def _require_active_wall_high_water(
+    current_seconds: Any, predecessor_seconds: Any, *, context: str,
+) -> float:
+    current = _validated_active_wall_seconds(current_seconds, label=f"{context} current clock")
+    predecessor = _validated_active_wall_seconds(
+        predecessor_seconds, label=f"{context} pinned predecessor progress",
+    )
+    if current < predecessor:
+        raise RuntimeError(
+            f"{context} active wall is below pinned predecessor high-water "
+            f"({current} < {predecessor}); refusing to lower the cumulative budget floor"
+        )
+    return predecessor
+
+
+def _preserved_active_wall_high_water(formal: Any) -> float:
+    data_root = Path(formal.DATA_ROOT).resolve(strict=True)
+    manifest_path = _inside(
+        data_root,
+        f"issue85/artifacts/formal/{PRESERVED_ACTIVE_WALL_CARRY_PACKAGE_COMMIT}/predecessor-carry-manifest.json",
+    )
+    if (
+        not manifest_path.is_file()
+        or formal.file_sha256(manifest_path) != PRESERVED_ACTIVE_WALL_CARRY_MANIFEST_SHA256
+    ):
+        raise RuntimeError("the pinned prior active-wall carry is missing or changed")
+    manifest = formal.read_json(manifest_path)
+    unsigned = {key: value for key, value in manifest.items() if key != "manifest_sha256"}
+    successor = manifest.get("successor")
+    carries = manifest.get("actor_update_carries")
+    if (
+        manifest.get("schema_id") != PREDECESSOR_CARRY_SCHEMA
+        or manifest.get("status") != "VERIFIED_READ_ONLY_CONTINUATION"
+        or not isinstance(successor, Mapping)
+        or successor.get("package_commit") != PRESERVED_ACTIVE_WALL_CARRY_PACKAGE_COMMIT
+        or successor.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or manifest.get("manifest_sha256") != _hash_json(formal, unsigned)
+        or not isinstance(carries, list)
+        or len(carries) != 1
+        or not isinstance(carries[0], Mapping)
+    ):
+        raise RuntimeError("the pinned prior active-wall carry is malformed or has changed lineage")
+    snapshot = carries[0].get("active_wall_clock_snapshot")
+    if not isinstance(snapshot, Mapping):
+        raise RuntimeError("the pinned prior active-wall carry has no clock snapshot")
+    snapshot_body = {key: value for key, value in snapshot.items() if key != "snapshot_sha256"}
+    elapsed = _validated_active_wall_seconds(
+        snapshot.get("elapsed_seconds"), label="pinned prior carry active-wall floor",
+    )
+    if (
+        snapshot.get("snapshot_sha256") != _hash_json(formal, snapshot_body)
+        or snapshot.get("active_session") is not None
+        or snapshot.get("process_ids") != []
+        or elapsed != PRESERVED_ACTIVE_WALL_CARRY_SECONDS
+    ):
+        raise RuntimeError("the pinned prior active-wall floor is malformed or differs from retained evidence")
+    return elapsed
 
 
 def _carried_active_wall_high_water(
@@ -456,17 +530,29 @@ def _operational_predecessor_actor_update(
             **snapshot_body,
             "snapshot_sha256": _hash_json(formal, snapshot_body),
         }
-    else:
-        snapshot = dict(active_wall_clock_snapshot)
-        snapshot_hash = snapshot.pop("snapshot_sha256", None)
-        if (
-            snapshot_hash != _hash_json(formal, snapshot)
-            or snapshot.get("active_session") is not None
-            or snapshot.get("process_ids") != []
-            or not isinstance(snapshot.get("elapsed_seconds"), (int, float))
-            or snapshot.get("elapsed_seconds") > FORMAL_ACTIVE_WALL_CAP_SECONDS
-        ):
-            raise RuntimeError("carried active-wall pause snapshot is malformed or exceeds the approved cap")
+    snapshot = dict(active_wall_clock_snapshot)
+    snapshot_hash = snapshot.pop("snapshot_sha256", None)
+    snapshot_elapsed = _validated_active_wall_seconds(
+        snapshot.get("elapsed_seconds"), label="carried active-wall pause snapshot",
+    )
+    operational_predecessor_elapsed = _validated_active_wall_seconds(
+        progress.get("cumulative_active_wall_seconds"),
+        label="pinned operational predecessor cumulative active wall",
+    )
+    if (
+        snapshot_hash != _hash_json(formal, snapshot)
+        or snapshot.get("active_session") is not None
+        or snapshot.get("process_ids") != []
+    ):
+        raise RuntimeError("carried active-wall pause snapshot is malformed or exceeds the approved cap")
+    _require_active_wall_high_water(
+        snapshot_elapsed, operational_predecessor_elapsed,
+        context="operational predecessor carry",
+    )
+    _require_active_wall_high_water(
+        snapshot_elapsed, _preserved_active_wall_high_water(formal),
+        context="preserved prior continuation carry",
+    )
 
     return {
         "arm": "B",
@@ -509,6 +595,7 @@ def _validate_operational_actor_update_carry(formal: Any, carry: Mapping[str, An
 
 def _verify_resumed_b01_training_group(
     formal: Any, backend: Any, issue84_driver: Any, *, seed: Mapping[str, Any],
+    active_wall_clock_snapshot: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Validate the successful 318bdc B/01 games for read-only source continuation."""
     data_root = Path(formal.DATA_ROOT).resolve(strict=True)
@@ -572,6 +659,21 @@ def _verify_resumed_b01_training_group(
         or reviewer.get("seed_table_sha256") != RESUMED_GAMES_SEED_TABLE_SHA256
     ):
         raise RuntimeError("read-only B/01 continuation changed its authorized source, cohort, or stop boundary")
+
+    if not isinstance(active_wall_clock_snapshot, Mapping):
+        raise RuntimeError("read-only B/01 continuation is missing the verified active-wall carry snapshot")
+    snapshot_elapsed = _validated_active_wall_seconds(
+        active_wall_clock_snapshot.get("elapsed_seconds"),
+        label="B/01 continuation active-wall carry snapshot",
+    )
+    _require_active_wall_high_water(
+        snapshot_elapsed, old_progress.get("cumulative_active_wall_seconds"),
+        context="pinned 318bdc B/01 progress carry",
+    )
+    _require_active_wall_high_water(
+        snapshot_elapsed, _preserved_active_wall_high_water(formal),
+        context="preserved prior continuation carry",
+    )
 
     rows = _training_rows(seed, "B", 1)
     owners = list(range(8400129, 8400257))
@@ -1024,12 +1126,15 @@ def verify_predecessor_carry(
             formal, active_wall_clock_snapshot=stored_actor_update_snapshot,
         )]
     )
-    resumed_training_group_carries = (
-        [] if identity["package_commit"] == OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT
-        else [_verify_resumed_b01_training_group(
+    if identity["package_commit"] == OPERATIONAL_PREDECESSOR_PACKAGE_COMMIT:
+        resumed_training_group_carries = []
+    else:
+        if len(actor_update_carries) != 1:
+            raise RuntimeError("resumed B/01 games require the same validated active-wall carry snapshot")
+        resumed_training_group_carries = [_verify_resumed_b01_training_group(
             formal, backend, issue84_driver, seed=seed,
+            active_wall_clock_snapshot=actor_update_carries[0].get("active_wall_clock_snapshot"),
         )]
-    )
     manifest: dict[str, Any] = {
         "schema_id": PREDECESSOR_CARRY_SCHEMA,
         "status": "VERIFIED_READ_ONLY_CONTINUATION",

@@ -155,6 +155,112 @@ def test_stale_active_wall_session_is_resumable_without_resetting_elapsed(monkey
 @pytest.mark.parametrize(
     ("current_elapsed", "must_reject"),
     [
+        (34_996.251722737004 - 0.25, True),
+        (34_996.251722737004, False),
+        (34_996.251722737004 + 0.25, False),
+    ],
+)
+def test_fresh_carry_cannot_lower_pinned_predecessor_progress_time(
+    current_elapsed: float, must_reject: bool,
+) -> None:
+    predecessor_elapsed = 34_996.251722737004
+    if must_reject:
+        with pytest.raises(RuntimeError, match="below pinned predecessor high-water"):
+            formal_execution._require_active_wall_high_water(
+                current_elapsed, predecessor_elapsed, context="test predecessor progress",
+            )
+    else:
+        assert formal_execution._require_active_wall_high_water(
+            current_elapsed, predecessor_elapsed, context="test predecessor progress",
+        ) == pytest.approx(predecessor_elapsed)
+
+
+@pytest.mark.parametrize(
+    ("current_elapsed", "must_reject"),
+    [
+        (formal_execution.PRESERVED_ACTIVE_WALL_CARRY_SECONDS - 0.25, True),
+        (formal_execution.PRESERVED_ACTIVE_WALL_CARRY_SECONDS, False),
+        (formal_execution.PRESERVED_ACTIVE_WALL_CARRY_SECONDS + 0.25, False),
+    ],
+)
+def test_fresh_carry_preserves_existing_active_wall_floor(
+    current_elapsed: float, must_reject: bool,
+) -> None:
+    floor = formal_execution.PRESERVED_ACTIVE_WALL_CARRY_SECONDS
+    if must_reject:
+        with pytest.raises(RuntimeError, match="below pinned predecessor high-water"):
+            formal_execution._require_active_wall_high_water(
+                current_elapsed, floor, context="test preserved carry",
+            )
+    else:
+        assert formal_execution._require_active_wall_high_water(
+            current_elapsed, floor, context="test preserved carry",
+        ) == pytest.approx(floor)
+
+
+@pytest.mark.parametrize(
+    "predecessor_elapsed",
+    [True, float("nan"), float("inf"), -1.0, formal_execution.FORMAL_ACTIVE_WALL_CAP_SECONDS + 1, None],
+)
+def test_carry_rejects_malformed_pinned_predecessor_active_wall(
+    predecessor_elapsed: object,
+) -> None:
+    with pytest.raises(RuntimeError, match="pinned predecessor progress"):
+        formal_execution._require_active_wall_high_water(
+            40_000.0, predecessor_elapsed, context="test predecessor progress",
+        )
+
+
+def test_prior_carry_active_wall_floor_is_source_and_snapshot_verified(tmp_path: Path, monkeypatch) -> None:
+    data_root = tmp_path
+    package_root = (
+        data_root / "issue85" / "artifacts" / "formal"
+        / formal_execution.PRESERVED_ACTIVE_WALL_CARRY_PACKAGE_COMMIT
+    )
+    package_root.mkdir(parents=True)
+    formal = SimpleNamespace(
+        DATA_ROOT=data_root,
+        read_json=formal_runner.read_json,
+        file_sha256=formal_runner.file_sha256,
+        canonical=formal_runner.canonical,
+        sha256_bytes=formal_runner.sha256_bytes,
+    )
+    snapshot_body = {
+        "elapsed_seconds": formal_execution.PRESERVED_ACTIVE_WALL_CARRY_SECONDS,
+        "active_session": None,
+        "process_ids": [],
+        "receipt_file_sha256": "f" * 64,
+    }
+    snapshot = {
+        **snapshot_body,
+        "snapshot_sha256": formal_execution._hash_json(formal, snapshot_body),
+    }
+    manifest = {
+        "schema_id": formal_execution.PREDECESSOR_CARRY_SCHEMA,
+        "status": "VERIFIED_READ_ONLY_CONTINUATION",
+        "successor": {
+            "package_commit": formal_execution.PRESERVED_ACTIVE_WALL_CARRY_PACKAGE_COMMIT,
+            "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        },
+        "actor_update_carries": [{"active_wall_clock_snapshot": snapshot}],
+    }
+    manifest["manifest_sha256"] = formal_execution._hash_json(formal, manifest)
+    manifest_path = formal_execution._predecessor_carry_path(package_root)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(
+        formal_execution,
+        "PRESERVED_ACTIVE_WALL_CARRY_MANIFEST_SHA256",
+        formal_runner.file_sha256(manifest_path),
+    )
+
+    assert formal_execution._preserved_active_wall_high_water(formal) == pytest.approx(
+        formal_execution.PRESERVED_ACTIVE_WALL_CARRY_SECONDS,
+    )
+
+
+@pytest.mark.parametrize(
+    ("current_elapsed", "must_reject"),
+    [
         (33_893.47028780101 - 0.25, True),
         (33_893.47028780101, False),
         (33_893.47028780101 + 10.0, False),
