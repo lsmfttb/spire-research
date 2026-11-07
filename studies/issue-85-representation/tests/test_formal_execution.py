@@ -1678,6 +1678,174 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
     assert ("B", 1) not in training_game_calls
     assert not (package_root / "test").exists()
 
+
+def test_resumed_formal_continuation_consumes_b03_features_from_group_root(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    data_root = tmp_path / "data"
+    source_root = data_root / formal_execution.RESUMED_FORMAL_PACKAGE_ROOT
+    source_root.mkdir(parents=True)
+    b02_root = data_root / formal_execution.RESUMED_B02_GROUP_ROOT
+    b02_root.mkdir(parents=True)
+    b03_root = data_root / formal_execution.RESUMED_B03_GROUP_ROOT
+    b03_root.mkdir(parents=True)
+    formal_files = {
+        key: source_root / f"{key}.json"
+        for key in ("seed", "progress", "authorization", "carry", "b02_group", "b03_live")
+    }
+    formal_files["seed"].write_text('{"rows": []}', encoding="utf-8")
+    for key, path in formal_files.items():
+        if key != "seed":
+            path.write_text("{}" if key == "b02_group" else key, encoding="utf-8")
+
+    def file_sha256(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    file_hashes = {key: file_sha256(path) for key, path in formal_files.items()}
+    continuation = {
+        "formal_seed_table_sha256": file_hashes["seed"],
+        "formal_progress_sha256": file_hashes["progress"],
+        "authorization_receipt_sha256": file_hashes["authorization"],
+        "predecessor_carry_manifest_sha256": file_hashes["carry"],
+        "b02_group_receipt_sha256": file_hashes["b02_group"],
+        "b03_live_progress_sha256": file_hashes["b03_live"],
+    }
+    b01_receipt = {
+        "receipt_file_sha256": "1" * 64,
+        "receipt_sha256": "2" * 64,
+        "actor_checkpoint_sha256": "3" * 64,
+        "optimizer_checkpoint_sha256": "4" * 64,
+        "result_model_digest": "5" * 64,
+    }
+    b02_receipt = {
+        "receipt_file_sha256": "6" * 64,
+        "receipt_sha256": "7" * 64,
+        "actor_checkpoint_sha256": "8" * 64,
+        "optimizer_checkpoint_sha256": "9" * 64,
+        "result_model_digest": "a" * 64,
+    }
+
+    def update_reference(receipt: dict) -> dict:
+        return {
+            "source_update_receipt_file_sha256": receipt["receipt_file_sha256"],
+            "receipt_sha256": receipt["receipt_sha256"],
+            "actor_checkpoint_sha256": receipt["actor_checkpoint_sha256"],
+            "optimizer_checkpoint_sha256": receipt["optimizer_checkpoint_sha256"],
+            "result_model_digest": receipt["result_model_digest"],
+        }
+
+    continuation["b01_actor_update"] = update_reference(b01_receipt)
+    continuation["b02_actor_update"] = update_reference(b02_receipt)
+    unit_id = "TRAIN:8400385:B"
+    failed_id = "TRAIN:8400417:B"
+    backend = SimpleNamespace(unit_key=lambda value: value.replace(":", "-"))
+    feature_relative = Path(
+        f"units/{backend.unit_key(unit_id)}/attempt-0001/training-features.json.zlib"
+    )
+    feature_path = b03_root / feature_relative
+    feature_path.parent.mkdir(parents=True)
+    feature_bytes = b"retained compressed training features"
+    feature_path.write_bytes(feature_bytes)
+    attempt = b03_root / "units" / backend.unit_key(unit_id) / "attempt-0001"
+    assert not (attempt / feature_relative).exists()
+    result_path = attempt / "result.json"
+    finished_path = attempt / "finished.json"
+    finished_path.write_bytes(b"retained terminal receipt")
+    result = {
+        "status": "SUCCEEDED",
+        "unit_id": unit_id,
+        "owner_seed": 8400385,
+        "package_commit": formal_execution.RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+        "model_digest": b02_receipt["result_model_digest"],
+        "expert_decisions": 0,
+        "training_features": {
+            "path": feature_relative.as_posix(),
+            "sha256": file_sha256(feature_path),
+            "uncompressed_sha256": "b" * 64,
+        },
+        "policy_source": {
+            "previous_update_receipt_sha256": b02_receipt["receipt_sha256"],
+        },
+    }
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+    successful_reference = {
+        "unit_id": unit_id,
+        "owner_seed": 8400385,
+        "attempt_count": 1,
+        "attempt_path": attempt.relative_to(source_root).as_posix(),
+        "result_sha256": file_sha256(result_path),
+        "finished_receipt_sha256": file_sha256(finished_path),
+        "training_features_path": feature_relative.as_posix(),
+        "training_features_sha256": file_sha256(feature_path),
+        "training_features_uncompressed_sha256": "b" * 64,
+    }
+    failed_reference = {
+        "unit_id": failed_id,
+        "attempt": "attempt-0001",
+        "attempt_path": "training/B/block-03/games/units/TRAIN-8400417-B/attempt-0001",
+        "status": "PRE_START_AUTHORIZATION_FAILURE",
+        "failure_boundary": "before_started_receipt",
+        "attempt_count": 1,
+        "next_attempt": "attempt-0002",
+        "worker_job_sha256": "c" * 64,
+        "worker_log_sha256": "d" * 64,
+    }
+    continuation.update({
+        "b03_successful_units": [successful_reference],
+        "b03_failed_attempt": failed_reference,
+    })
+    carry_manifest = {"resumed_formal_continuation": continuation}
+    formal = SimpleNamespace(
+        DATA_ROOT=data_root,
+        file_sha256=file_sha256,
+        read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+    )
+    identity = {
+        "package_commit": "e" * 40,
+        "source_lock_sha256": formal_execution.RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+    }
+    monkeypatch.setattr(
+        formal_execution, "_validate_carry_manifest",
+        lambda *_args, **_kwargs: (carry_manifest, "f" * 64),
+    )
+    monkeypatch.setattr(
+        formal_execution, "_validate_resumed_formal_continuation_shape",
+        lambda *_args: True,
+    )
+    monkeypatch.setattr(
+        formal_execution, "_resumed_formal_continuation_files",
+        lambda _formal: (source_root, formal_files),
+    )
+    monkeypatch.setattr(
+        formal_execution, "_read_update_receipt",
+        lambda _formal, _root, _identity, *, arm, block: b01_receipt if block == 1 else b02_receipt,
+    )
+    monkeypatch.setattr(
+        formal_execution, "_training_rows",
+        lambda *_args: [
+            {"unit_id": unit_id, "owner_seed": 8400385},
+            {"unit_id": failed_id, "owner_seed": 8400417},
+        ],
+    )
+    monkeypatch.setattr(
+        formal_execution, "_verify_b03_prestart_failure_reference",
+        lambda *_args, **_kwargs: {"unit_id": failed_id},
+    )
+
+    resumed = formal_execution._validate_resumed_formal_continuation(
+        formal, tmp_path, identity, backend,
+    )
+
+    assert resumed is not None
+    assert resumed["b03_carried_units"][unit_id]["result"] == result
+    assert (
+        resumed["b03_carried_units"][unit_id]["reference"]["training_features_path"]
+        == feature_relative.as_posix()
+    )
+    assert resumed["b03_carried_units"][failed_id]["next_attempt"] == "attempt-0002"
+
+
 def _formal_attempt_fixture(tmp_path: Path, *, terminal: bool = True):
     root = tmp_path / "validation" / "A"
     row = {

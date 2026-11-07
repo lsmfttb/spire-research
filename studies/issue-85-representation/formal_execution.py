@@ -2030,7 +2030,9 @@ def _validate_resumed_formal_continuation(
             raise RuntimeError(f"retained b8 B/03 attempt path differs from its owner: {unit_id}")
         result_path = attempt / "result.json"
         finish_path = attempt / "finished.json"
-        feature_path = _inside(attempt, str(reference["training_features_path"]))
+        feature_path = _resumed_b03_feature_path(
+            b03_root, backend, unit_id, reference["training_features_path"],
+        )
         if (
             formal.file_sha256(result_path) != reference["result_sha256"]
             or formal.file_sha256(finish_path) != reference["finished_receipt_sha256"]
