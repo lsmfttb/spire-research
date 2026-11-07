@@ -18,6 +18,33 @@ def test_formal_runner_exports_the_locked_wsl_data_root() -> None:
     assert formal_runner.DATA_ROOT_WSL == formal_runner.pilot.DATA_ROOT_WSL
 
 
+@pytest.mark.parametrize(
+    ("steps", "parameter_count", "allowed", "valid"),
+    [
+        ([128] * 6, 6, {64, 128}, True),
+        ([64, 128, 128, 128, 128, 128], 6, {64, 128}, True),
+        ([64] * 6, 6, {64}, True),
+        ([129] * 6, 6, {64, 128}, False),
+        ([128] * 6, 6, {64}, False),
+        ([128] * 5, 6, {64, 128}, False),
+    ],
+)
+def test_formal_adamw_lineage_checks_each_parameter_step(
+    steps: list[int], parameter_count: int, allowed: set[int], valid: bool,
+) -> None:
+    if valid:
+        formal_execution._validate_formal_adamw_lineage(
+            steps, parameter_count=parameter_count, allowed_steps=allowed,
+            arm="B", block=0, context="formal",
+        )
+    else:
+        with pytest.raises(RuntimeError, match="AdamW"):
+            formal_execution._validate_formal_adamw_lineage(
+                steps, parameter_count=parameter_count, allowed_steps=allowed,
+                arm="B", block=0, context="formal",
+            )
+
+
 def _active_clock(*, elapsed: float, active_session: str | None, process_ids: list[int]) -> dict:
     return {
         "schema_id": "issue79-active-wall-clock-v1",

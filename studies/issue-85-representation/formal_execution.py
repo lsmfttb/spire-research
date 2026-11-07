@@ -1424,6 +1424,20 @@ def _latest_resume_checkpoint(
     return candidates[-1]
 
 
+def _validate_formal_adamw_lineage(
+    actual_steps: Sequence[int], *, parameter_count: int, allowed_steps: set[int],
+    arm: str, block: int, context: str,
+) -> None:
+    """Check every trainable parameter has an allowed AdamW step count."""
+    if (
+        len(actual_steps) != parameter_count
+        or not actual_steps
+        or any(step not in allowed_steps for step in actual_steps)
+    ):
+        label = "resumed AdamW step state is invalid" if context == "resumed" else "formal AdamW lineage differs"
+        raise RuntimeError(f"{label} for {arm}/{block}: {list(actual_steps)}")
+
+
 def _train_actor_block(
     formal: Any, backend: Any, issue84_driver: Any, *, arm: str, block: int,
     rows: list[dict[str, Any]], package_root: Path, identity: Mapping[str, str],
@@ -1524,8 +1538,14 @@ def _train_actor_block(
             if isinstance(value, dict) and "step" in value
         )
         expected_step_values = {64 + completed, completed} if block == 0 else {completed}
-        if set(parameter_steps) != expected_step_values:
-            raise RuntimeError(f"resumed AdamW step state is invalid for {arm}/{block}: {parameter_steps}")
+        _validate_formal_adamw_lineage(
+            parameter_steps,
+            parameter_count=len(tuple(actor.parameters())),
+            allowed_steps=expected_step_values,
+            arm=arm,
+            block=block,
+            context="resumed",
+        )
     last_checkpoint: dict[str, Any] | None = None
     status = "RUNNING"
     began = time.monotonic()
@@ -1648,8 +1668,14 @@ def _train_actor_block(
             if isinstance(value, dict) and "step" in value
         )
         expected_step_values = {64, 128} if block == 0 else {64}
-        if len(actual_steps) != len(tuple(actor.parameters())) or set(actual_steps) != expected_step_values:
-            raise RuntimeError(f"formal AdamW lineage differs for {arm}/{block}: {actual_steps}")
+        _validate_formal_adamw_lineage(
+            actual_steps,
+            parameter_count=len(tuple(actor.parameters())),
+            allowed_steps=expected_step_values,
+            arm=arm,
+            block=block,
+            context="formal",
+        )
         actor.eval()
         digest = model.model_digest(actor)
         actor_path = attempt / "actor-state.pt"
