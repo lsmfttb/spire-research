@@ -640,6 +640,109 @@ def test_new_successor_carry_requires_an_actor_update_reference(tmp_path: Path, 
 
 
 
+def test_predecessor_units_reuse_authenticated_manifest_with_owner_and_hash_checks() -> None:
+    formal = SimpleNamespace(
+        canonical=formal_runner.canonical,
+        sha256_bytes=formal_runner.sha256_bytes,
+    )
+    backend = SimpleNamespace(unit_key=lambda unit_id: unit_id.replace(":", "-"))
+    rows = [
+        {"unit_id": f"TRAIN:{owner}:B", "owner_seed": owner}
+        for owner in range(8400001, 8400129)
+    ]
+    units = []
+    outcomes = []
+    for row in rows:
+        unit_id = row["unit_id"]
+        owner_seed = row["owner_seed"]
+        unit_key = backend.unit_key(unit_id)
+        units.append({
+            "unit_id": unit_id,
+            "owner_seed": owner_seed,
+            "attempt_path": f"training/B/block-00/games/units/{unit_key}/attempt-0001",
+            "result_sha256": "1" * 64,
+            "model_digest": formal_execution.PREDECESSOR_INITIAL_MODEL_DIGEST,
+            "training_features_path": f"units/{unit_key}/attempt-0001/training-features.json.zlib",
+            "training_features_sha256": "2" * 64,
+            "training_features_uncompressed_sha256": "3" * 64,
+            "terminal_floor": 16.0,
+            "heart_victory": False,
+            "complete": True,
+            "expert_decisions": 0,
+        })
+        outcomes.append({
+            "unit_id": unit_id, "owner_seed": owner_seed,
+            "terminal_floor": 16.0, "heart_victory": False,
+        })
+    manifest = {
+        "validated_units": 128,
+        "formal_games_carried": 128,
+        "features_loaded_by_pinned_issue84_parser": 128,
+        "initial_model_digest": formal_execution.PREDECESSOR_INITIAL_MODEL_DIGEST,
+        "units": units,
+        "units_sha256": formal_execution._hash_json(formal, units),
+        "outcome_manifest_sha256": formal_execution._hash_json(formal, outcomes),
+    }
+
+    carried_units, decoded_outcomes = formal_execution._predecessor_units_from_carry_manifest(
+        formal, manifest, rows, backend,
+    )
+    assert carried_units == units
+    assert decoded_outcomes == outcomes
+
+    changed = [dict(unit) for unit in units]
+    changed[0]["owner_seed"] += 1
+    malformed = {
+        **manifest,
+        "units": changed,
+        "units_sha256": formal_execution._hash_json(formal, changed),
+    }
+    with pytest.raises(RuntimeError, match="unit identity or outcome differs"):
+        formal_execution._predecessor_units_from_carry_manifest(
+            formal, malformed, rows, backend,
+        )
+
+    malformed = {**manifest, "units_sha256": "0" * 64}
+    with pytest.raises(RuntimeError, match="unit or feature summary"):
+        formal_execution._predecessor_units_from_carry_manifest(
+            formal, malformed, rows, backend,
+        )
+
+    malformed = {**manifest, "outcome_manifest_sha256": "0" * 64}
+    with pytest.raises(RuntimeError, match="outcome summary hash"):
+        formal_execution._predecessor_units_from_carry_manifest(
+            formal, malformed, rows, backend,
+        )
+
+
+def test_resumed_b02_group_receipt_uses_actual_count_schema() -> None:
+    unit_ids = [f"TRAIN:{owner}:B" for owner in range(8400257, 8400385)]
+    receipt = {
+        "schema_id": formal_execution.GROUP_SCHEMA,
+        "status": "SUCCEEDED",
+        "stage_id": "TRAIN-B-BLOCK-02-GAMES",
+        "package_commit": formal_execution.RESUMED_FORMAL_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.RESUMED_FORMAL_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": formal_execution.RESUMED_FORMAL_SEED_TABLE_SHA256,
+        "authorization_receipt_sha256": formal_execution.RESUMED_FORMAL_AUTHORIZATION_SHA256,
+        "expected": 128,
+        "completed": 128,
+        "failed_attempt_count": formal_execution.RESUMED_B02_FAILED,
+        "units": [{"unit_id": unit_id} for unit_id in unit_ids],
+    }
+
+    assert "row_count" not in receipt
+    assert formal_execution._resumed_b02_group_receipt_matches(
+        receipt, expected_unit_ids=unit_ids,
+    )
+    assert not formal_execution._resumed_b02_group_receipt_matches(
+        {**receipt, "completed": 127}, expected_unit_ids=unit_ids,
+    )
+    assert not formal_execution._resumed_b02_group_receipt_matches(
+        {**receipt, "units": receipt["units"][:-1]}, expected_unit_ids=unit_ids,
+    )
+
+
 def test_group_receipt_attempt_paths_resolve_from_package_root(tmp_path: Path) -> None:
     package_root = tmp_path / "b8-package"
     group_root = package_root / "training/B/block-02/games"
@@ -760,6 +863,50 @@ def test_resumed_formal_continuation_shape_binds_actor_update_and_failed_attempt
         continuation["b03_failed_attempt"], next_attempt="attempt-0003",
     )
     assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_next_attempt)
+
+
+def test_resumed_b03_feature_path_is_group_relative_and_owner_bound(tmp_path: Path) -> None:
+    b03_root = tmp_path / "training/B/block-03/games"
+    b03_root.mkdir(parents=True)
+    backend = SimpleNamespace(unit_key=lambda unit_id: unit_id.replace(":", "-"))
+    unit_id = "TRAIN:8400385:B"
+    relative = Path("units/TRAIN-8400385-B/attempt-0001/training-features.json.zlib")
+    feature = b03_root / relative
+    feature.parent.mkdir(parents=True)
+    feature.write_bytes(b"feature")
+
+    assert formal_execution._resumed_b03_feature_path(
+        b03_root, backend, unit_id, relative,
+    ) == b03_root / relative
+    with pytest.raises(RuntimeError, match="feature path escapes"):
+        formal_execution._resumed_b03_feature_path(
+            b03_root, backend, unit_id, "../../outside.json.zlib",
+        )
+
+
+def test_resumed_b03_history_preserves_empty_owners_and_the_prestart_failure() -> None:
+    unit_ids = [f"TRAIN:{owner}:B" for owner in range(8400385, 8400513)]
+    failure_unit_id = "TRAIN:8400417:B"
+    history = {unit_id: [] for unit_id in unit_ids}
+    history[failure_unit_id] = [{
+        "attempt": "attempt-0001", "status": "STARTED_WITHOUT_TERMINAL",
+    }]
+
+    assert formal_execution._resumed_b03_historical_attempts_match(
+        history, unit_ids, failure_unit_id,
+    )
+    assert not formal_execution._resumed_b03_historical_attempts_match(
+        {key: value for key, value in history.items() if key != unit_ids[-1]},
+        unit_ids, failure_unit_id,
+    )
+    assert not formal_execution._resumed_b03_historical_attempts_match(
+        {**history, "TRAIN:8409999:B": []}, unit_ids, failure_unit_id,
+    )
+    changed = {key: list(value) for key, value in history.items()}
+    changed[unit_ids[0]] = [{"attempt": "attempt-0001", "status": "STARTED_WITHOUT_TERMINAL"}]
+    assert not formal_execution._resumed_b03_historical_attempts_match(
+        changed, unit_ids, failure_unit_id,
+    )
 
 
 def test_b03_prestart_failure_without_receipts_binds_job_log_and_next_attempt(tmp_path: Path) -> None:
