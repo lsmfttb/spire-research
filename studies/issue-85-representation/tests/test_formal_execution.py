@@ -19,6 +19,25 @@ def test_formal_runner_exports_the_locked_wsl_data_root() -> None:
     assert formal_runner.DATA_ROOT_WSL == formal_runner.pilot.DATA_ROOT_WSL
 
 
+def test_carried_attempt_path_matches_its_source_group(tmp_path: Path) -> None:
+    group_root = tmp_path / "training" / "B" / "block-04" / "games"
+    attempt = group_root / "units" / "TRAIN-8400513-B" / "attempt-0001"
+    attempt.mkdir(parents=True)
+
+    assert formal_execution._carried_attempt_path_matches_source_group(
+        attempt, group_root, "TRAIN-8400513-B",
+    )
+    assert not formal_execution._carried_attempt_path_matches_source_group(
+        attempt, group_root, "TRAIN-8400514-B",
+    )
+    assert not formal_execution._carried_attempt_path_matches_source_group(
+        attempt, group_root / "other-group", "TRAIN-8400513-B",
+    )
+    assert not formal_execution._carried_attempt_path_matches_source_group(
+        attempt.parent / "attempt-1", group_root, "TRAIN-8400513-B",
+    )
+
+
 @pytest.mark.parametrize(
     ("pending_count", "active_count", "stop_after_failure", "expected"),
     [

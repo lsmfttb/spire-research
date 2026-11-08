@@ -181,6 +181,21 @@ def _resolves_to(value: Any, expected: Path) -> bool:
         return False
 
 
+def _carried_attempt_path_matches_source_group(
+    source_attempt: Path, source_group_root: Path, unit_key: str,
+) -> bool:
+    attempt_path = Path(source_attempt)
+    group_root = Path(source_group_root)
+    if re.fullmatch(r"attempt-[0-9]{4,}", attempt_path.name) is None:
+        return False
+    try:
+        attempt_path = attempt_path.resolve(strict=True)
+        group_root = group_root.resolve(strict=True)
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return attempt_path.parent == group_root / "units" / unit_key
+
+
 def _validate_active_wall_clock(
     prior_clock: Mapping[str, Any], cap_seconds: int, *, require_idle: bool,
 ) -> float:
@@ -3550,8 +3565,9 @@ def _run_formal_units(
             if not isinstance(reference, Mapping):
                 raise RuntimeError(f"{stage_id} carried attempt reference is outside its verified source unit: {unit_id}")
             source_attempt = _inside(source_package_root, str(reference.get("attempt_path", "")))
-            expected_attempt = source_group_root / "units" / backend.unit_key(unit_id) / source_attempt.name
-            if source_attempt != expected_attempt or not re.fullmatch(r"attempt-[0-9]{4,}", source_attempt.name):
+            if not _carried_attempt_path_matches_source_group(
+                source_attempt, source_group_root, backend.unit_key(unit_id),
+            ):
                 raise RuntimeError(f"{stage_id} carried attempt reference is outside its verified source unit: {unit_id}")
             if carried.get("result") is None and any(
                 int(path.name.removeprefix("attempt-")) <= int(carried["attempt_count"])
@@ -3754,7 +3770,9 @@ def _run_formal_units(
             source_group_root = Path(str(carried["group_root"])).resolve(strict=True)
             source_group_relative = source_group_root.relative_to(Path(formal.DATA_ROOT).resolve(strict=True)).as_posix()
             source_attempt = _inside(source_package_root, str(reference["attempt_path"]))
-            if source_attempt.parent != source_group_root / "units" / backend.unit_key(unit_id) / source_attempt.name:
+            if not _carried_attempt_path_matches_source_group(
+                source_attempt, source_group_root, backend.unit_key(unit_id),
+            ):
                 raise RuntimeError(f"{stage_id} carried attempt path does not match its source group: {unit_id}")
             reference.update({
                 "source_package_commit": source_commit,
