@@ -4728,11 +4728,13 @@ def _train_actor_block(
     receipt_roots_by_owner = {}
     if carried_sources:
         for unit_id, source in carried_sources.items():
-            expected_source_commit = (
-                STOPPED_FORMAL_PACKAGE_COMMIT if arm == "B" and block == 4
-                else RESUMED_FORMAL_PACKAGE_COMMIT
-            )
-            if not isinstance(source, Mapping) or source.get("package_commit") != expected_source_commit:
+            if not isinstance(source, Mapping):
+                raise RuntimeError(f"mixed-source training group has a malformed carried receipt binding: {unit_id}")
+            if arm == "B" and block == 4:
+                expected_source = expected_sources.get(str(unit_id))
+                if not isinstance(expected_source, Mapping) or dict(source) != dict(expected_source):
+                    raise RuntimeError(f"mixed-source training group has a malformed carried receipt binding: {unit_id}")
+            elif source.get("package_commit") != RESUMED_FORMAL_PACKAGE_COMMIT:
                 raise RuntimeError(f"mixed-source training group has a malformed carried receipt binding: {unit_id}")
             receipt_roots_by_owner[str(unit_id)] = (
                 _inside(Path(formal.DATA_ROOT), str(source.get("group_root", ""))),

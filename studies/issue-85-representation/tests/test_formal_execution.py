@@ -2373,3 +2373,151 @@ def test_formal_attempt_still_refuses_a_started_worker_without_terminal_receipt(
             seed_table_sha256=seed, authorization_receipt_sha256=authorization,
         )
     assert live_pids == [(639, 0)]
+
+
+def test_b04_actor_update_accepts_registered_mixed_source_carry_before_loading_examples(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    package_commit = 'f' * 40
+    carry_sha = 'e' * 64
+    old_source = formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT
+    recovered_source = formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+    assert old_source != recovered_source
+    source_group_roots = {
+        old_source: formal_execution.STOPPED_FORMAL_B04_GROUP_ROOT,
+        recovered_source: formal_execution.FAILED_STAGE_RECOVERY_GROUP_ROOT,
+    }
+    recovered_owners = {8400635, 8400637, 8400638, 8400639, 8400640}
+    data_root = tmp_path / 'data'
+    package_root = tmp_path / package_commit
+    references = []
+    carried_sources = {}
+    units = []
+    rows = []
+
+    for owner_seed in range(8400635, 8400763):
+        unit_id = f'TRAIN:{owner_seed}:B'
+        unit_key = unit_id.replace(':', '-')
+        source_commit = recovered_source if owner_seed in recovered_owners else old_source
+        source_group_root = source_group_roots[source_commit]
+        attempt_number = 2 if owner_seed == 8400635 else 1
+        attempt_path = f'training/B/block-04/games/units/{unit_key}/attempt-{attempt_number:04d}'
+        feature_path = f'units/{unit_key}/training-features.json.z'
+        attempt = data_root / 'issue85' / 'artifacts' / 'formal' / source_commit / attempt_path
+        attempt.mkdir(parents=True)
+        result = {
+            'status': 'SUCCEEDED',
+            'unit_id': unit_id,
+            'owner_seed': owner_seed,
+            'package_commit': source_commit,
+            'source_lock_sha256': formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        }
+        result_bytes = json.dumps(result, sort_keys=True).encode()
+        (attempt / 'result.json').write_bytes(result_bytes)
+        finished_bytes = json.dumps({'status': 'SUCCEEDED'}).encode()
+        (attempt / 'finished.json').write_bytes(finished_bytes)
+
+        compressed_features = zlib.compress(f'features:{unit_id}'.encode())
+        feature_file = data_root / source_group_root / feature_path
+        feature_file.parent.mkdir(parents=True, exist_ok=True)
+        feature_file.write_bytes(compressed_features)
+        raw_features = zlib.decompress(compressed_features)
+        reference = {
+            'unit_id': unit_id,
+            'owner_seed': owner_seed,
+            'source_package_commit': source_commit,
+            'source_group_root': source_group_root,
+            'attempt_path': attempt_path,
+            'training_features_path': feature_path,
+            'result_sha256': hashlib.sha256(result_bytes).hexdigest(),
+            'finished_receipt_sha256': hashlib.sha256(finished_bytes).hexdigest(),
+            'training_features_sha256': hashlib.sha256(compressed_features).hexdigest(),
+            'training_features_uncompressed_sha256': hashlib.sha256(raw_features).hexdigest(),
+        }
+        references.append(reference)
+        carried_sources[unit_id] = {
+            'package_commit': source_commit,
+            'group_root': source_group_root,
+        }
+        units.append(dict(reference))
+        rows.append({'unit_id': unit_id, 'owner_seed': owner_seed})
+
+    old_references = [item for item in references if item['source_package_commit'] == old_source]
+    recovered_references = [item for item in references if item['source_package_commit'] == recovered_source]
+    assert len(old_references) == 123
+    assert len(recovered_references) == 5
+    manifest = {
+        'resumed_formal_continuation': {
+            'schema_id': formal_execution.STOPPED_FORMAL_CONTINUATION_SCHEMA,
+            'b04_successful_units': old_references,
+            'failed_stage_recovery': {'additional_successful_units': recovered_references},
+        },
+    }
+    monkeypatch.setattr(
+        formal_execution, '_validate_carry_manifest',
+        lambda *_args, **_kwargs: (manifest, carry_sha),
+    )
+    group_receipt = package_root / 'training/B/block-04/games/group-receipt.json'
+    group_receipt.parent.mkdir(parents=True)
+    group_receipt.write_text('{}', encoding='utf-8')
+    group_sha = formal_execution.hashlib.sha256(group_receipt.read_bytes()).hexdigest()
+    training_group = {
+        'receipt_sha256': group_sha,
+        'group_root': str(package_root / 'training/B/block-04/games'),
+        'training_data_package_commit': package_commit,
+        'predecessor_carry_manifest_sha256': carry_sha,
+        'carried_unit_sources': carried_sources,
+        'units': units,
+    }
+    seen_receipt_roots = {}
+
+    class StopAfterExamplesLoaded(Exception):
+        pass
+
+    def load_examples(_driver, _rows, **kwargs):
+        seen_receipt_roots.update(kwargs['receipt_roots_by_owner'])
+        raise StopAfterExamplesLoaded
+
+    actor = SimpleNamespace(train=lambda: None)
+    executor = SimpleNamespace(_load_model=lambda *_args, **_kwargs: (actor, 'model-digest', {}))
+    backend = SimpleNamespace(load_modules=lambda *_args, **_kwargs: (None, None, None, None, executor))
+    fake_formal = SimpleNamespace(
+        DATA_ROOT=data_root,
+        CONTRACT={'training': {'owners_per_block': 128, 'updates_per_block': 64, 'minibatch_owners': 32}},
+        pilot=SimpleNamespace(
+            _CURRENT_ROW=ContextVar('issue85-b04-row', default=None),
+            _load_pilot_training_examples=load_examples,
+        ),
+        sha256_bytes=lambda value: hashlib.sha256(value).hexdigest(),
+        read_json=lambda path: json.loads(Path(path).read_text(encoding='utf-8')),
+    )
+    fake_formal.file_sha256 = lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    seed_table = {
+        'actor_update_schedule': [{'arm': 'B', 'block_index': 4, 'seed': 12345}],
+        'actor_update_schedule_sha256': 'a' * 64,
+    }
+
+    def run_actor_update(group):
+        formal_execution._train_actor_block(
+            fake_formal, backend, object(), arm='B', block=4, rows=rows,
+            package_root=package_root, identity={
+                'package_commit': package_commit,
+                'source_lock_sha256': formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+            }, seed_table=seed_table, seed_table_sha256='d' * 64,
+            training_group=group, clock=object(),
+        )
+
+    with pytest.raises(StopAfterExamplesLoaded):
+        run_actor_update(training_group)
+    assert seen_receipt_roots == {
+        unit_id: (
+            data_root / source_group_roots[source],
+            source,
+        )
+        for unit_id, source in ((item['unit_id'], item['source_package_commit']) for item in references)
+    }
+
+    tampered_sources = {unit_id: dict(source) for unit_id, source in carried_sources.items()}
+    tampered_sources['TRAIN:8400635:B']['group_root'] = source_group_roots[old_source]
+    with pytest.raises(RuntimeError, match='not bound to the verified stopped-package carry'):
+        run_actor_update({**training_group, 'carried_unit_sources': tampered_sources})
