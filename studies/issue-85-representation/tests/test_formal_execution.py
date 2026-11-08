@@ -2000,7 +2000,9 @@ def test_stopped_b04_carry_includes_failed_owner_for_attempt_two(tmp_path: Path)
 
 
 def test_stopped_formal_clock_snapshot_accepts_monotonic_receipt_updates(tmp_path: Path) -> None:
-    clock_path = tmp_path / "active-wall.json"
+    data_root = tmp_path / "data"
+    clock_path = data_root / "issue85" / "artifacts" / "active-wall-issue85-task.json"
+    clock_path.parent.mkdir(parents=True)
     clock = {
         "schema_id": "issue79-active-wall-clock-v1",
         "mode": "issue85-task",
@@ -2009,9 +2011,34 @@ def test_stopped_formal_clock_snapshot_accepts_monotonic_receipt_updates(tmp_pat
         "process_ids": [],
     }
     clock_path.write_text(json.dumps(clock), encoding="utf-8")
+    progress_path = (
+        data_root / "issue85" / "artifacts" / "formal"
+        / formal_execution.STOPPED_FORMAL_LATEST_PROGRESS_PACKAGE_COMMIT
+        / "formal-progress.json"
+    )
+    progress_path.parent.mkdir(parents=True)
+    progress_path.write_text(json.dumps({
+        "schema_id": formal_execution.PROGRESS_SCHEMA,
+        "package_commit": formal_execution.STOPPED_FORMAL_LATEST_PROGRESS_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "status": "FAILED_OR_PAUSED",
+        "active_stage": "TRAIN-B-BLOCK-04-GAMES",
+        "cumulative_active_wall_seconds": formal_execution.STOPPED_FORMAL_LATEST_ACTIVE_WALL_SECONDS,
+    }), encoding="utf-8")
+
+    hashed_paths: list[Path] = []
+
+    def file_sha256(path: Path) -> str:
+        path = Path(path)
+        hashed_paths.append(path)
+        if path == progress_path:
+            return formal_execution.STOPPED_FORMAL_LATEST_PROGRESS_SHA256
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
     formal = SimpleNamespace(
+        DATA_ROOT=data_root,
         read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
-        file_sha256=lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+        file_sha256=file_sha256,
     )
     original_snapshot = {
         "elapsed_seconds": formal_execution.STOPPED_FORMAL_ACTIVE_WALL_SECONDS,
@@ -2033,8 +2060,17 @@ def test_stopped_formal_clock_snapshot_accepts_monotonic_receipt_updates(tmp_pat
     assert formal_execution._validate_stopped_formal_clock_snapshot(
         formal, clock_path, current_snapshot,
     ) == clock["elapsed_seconds"]
+    assert progress_path in hashed_paths
+
+    rolled_back_clock = {**clock, "elapsed_seconds": 41970.596}
+    clock_path.write_text(json.dumps(rolled_back_clock), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="below the latest retained progress high-water"):
+        formal_execution._validate_stopped_formal_clock_snapshot(
+            formal, clock_path, original_snapshot,
+        )
 
     stale_snapshot = {**current_snapshot, "elapsed_seconds": clock["elapsed_seconds"] + 1}
+    clock_path.write_text(json.dumps(clock), encoding="utf-8")
     with pytest.raises(RuntimeError, match="stale, active, or below the retained high-water"):
         formal_execution._validate_stopped_formal_clock_snapshot(
             formal, clock_path, stale_snapshot,

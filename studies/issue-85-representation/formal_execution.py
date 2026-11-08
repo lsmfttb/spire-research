@@ -108,6 +108,9 @@ STOPPED_FORMAL_B04_LIVE_SHA256 = "10c2c42d7c7998eaf045f854070034ec7df787f4e984ce
 STOPPED_FORMAL_STOP_RECORD_SHA256 = "032a1e8c6b6391ae6abe054c3401edc74e263ef2905def6631aa67f250d8364c"
 STOPPED_FORMAL_WALL_RECEIPT_SHA256 = "8866d9f26e1130ae38db13b883bb5345b254a6e76bc6beb4032609195fd28259"
 STOPPED_FORMAL_ACTIVE_WALL_SECONDS = 41970.595754022004
+STOPPED_FORMAL_LATEST_PROGRESS_PACKAGE_COMMIT = "a4b1532c2b2eb2a516e64da283781c974644c6b8"
+STOPPED_FORMAL_LATEST_PROGRESS_SHA256 = "27e2d45f9a64a41e901b3a3df5b10c686d879e2a9419bee83349407240c62148"
+STOPPED_FORMAL_LATEST_ACTIVE_WALL_SECONDS = 41975.092163208006
 STOPPED_FORMAL_B03_GROUP_ROOT = STOPPED_FORMAL_PACKAGE_ROOT + "/training/B/block-03/games"
 STOPPED_FORMAL_B04_GROUP_ROOT = STOPPED_FORMAL_PACKAGE_ROOT + "/training/B/block-04/games"
 STOPPED_FORMAL_B04_LIVE_PATH = STOPPED_FORMAL_PACKAGE_ROOT + "/live-training-B-04.json"
@@ -226,6 +229,26 @@ def _validate_stopped_formal_clock_snapshot(
     )
     if current_clock.get("active_session") is not None or current_clock.get("process_ids") != []:
         raise RuntimeError("the authoritative Issue 85 active-wall clock is not idle")
+    progress_path = _inside(
+        Path(formal.DATA_ROOT).resolve(strict=True),
+        "issue85/artifacts/formal/"
+        f"{STOPPED_FORMAL_LATEST_PROGRESS_PACKAGE_COMMIT}/formal-progress.json",
+    )
+    if (
+        not progress_path.is_file()
+        or formal.file_sha256(progress_path) != STOPPED_FORMAL_LATEST_PROGRESS_SHA256
+    ):
+        raise RuntimeError("the latest retained Issue 85 active-wall high-water progress is missing or changed")
+    progress = formal.read_json(progress_path)
+    if (
+        progress.get("schema_id") != PROGRESS_SCHEMA
+        or progress.get("package_commit") != STOPPED_FORMAL_LATEST_PROGRESS_PACKAGE_COMMIT
+        or progress.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or progress.get("status") != "FAILED_OR_PAUSED"
+        or progress.get("active_stage") != "TRAIN-B-BLOCK-04-GAMES"
+        or progress.get("cumulative_active_wall_seconds") != STOPPED_FORMAL_LATEST_ACTIVE_WALL_SECONDS
+    ):
+        raise RuntimeError("the latest retained Issue 85 active-wall high-water progress is inconsistent")
     snapshot_elapsed = snapshot.get("elapsed_seconds")
     source_sha = snapshot.get("source_active_wall_file_sha256")
     if (
@@ -248,6 +271,11 @@ def _validate_stopped_formal_clock_snapshot(
         )
     ):
         raise RuntimeError("stopped-package wall-clock snapshot is stale, active, or below the retained high-water")
+    if current < max(STOPPED_FORMAL_LATEST_ACTIVE_WALL_SECONDS, float(snapshot_elapsed)):
+        raise RuntimeError(
+            "the authoritative Issue 85 active-wall clock is below the latest retained progress high-water "
+            f"({current} < {STOPPED_FORMAL_LATEST_ACTIVE_WALL_SECONDS})"
+        )
     return current
 
 
