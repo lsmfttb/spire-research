@@ -119,6 +119,20 @@ STOPPED_FORMAL_B03_COMPLETED = 128
 STOPPED_FORMAL_B04_COMPLETED = 123
 STOPPED_FORMAL_B04_FAILED = 1
 STOPPED_FORMAL_B04_PENDING = 4
+FAILED_STAGE_RECOVERY_PACKAGE_COMMIT = "d3cb729faf78e2c9771ddf48466adcecefb891a3"
+FAILED_STAGE_RECOVERY_PACKAGE_ROOT = "issue85/artifacts/formal/" + FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256 = "3d009071ba79e8a144df655f936ebd3e346eb8fedb742f7872454d23e0dd7723"
+FAILED_STAGE_RECOVERY_PREFLIGHT_SHA256 = "08614f0b760fefcddbf7b5dbb17291d34d63474c01d3617f10af7913fb823393"
+FAILED_STAGE_RECOVERY_PROGRESS_SHA256 = "98cef53af690065dc3c870855a4b790476980663d221dd0dffa8cd928e85f85d"
+FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256 = "ddede79715333776cd9f71f14cb3f95ab5dd7a9bd34d3337403e3a119e6be956"
+FAILED_STAGE_RECOVERY_CARRY_SHA256 = "adaa0ce95070871f714c1893a0c487ae5147f54c73399fe1b942109c24685b5f"
+FAILED_STAGE_RECOVERY_LIVE_PATH = FAILED_STAGE_RECOVERY_PACKAGE_ROOT + "/live-training-B-04.json"
+FAILED_STAGE_RECOVERY_LIVE_SHA256 = "a3c802b33f8b58ebd25fd69e8cc674a8db4be51510a5d6e9a54fb81ba908e5f0"
+FAILED_STAGE_RECOVERY_GROUP_ROOT = FAILED_STAGE_RECOVERY_PACKAGE_ROOT + "/training/B/block-04/games"
+FAILED_STAGE_RECOVERY_UNIT_IDS = (
+    "TRAIN:8400635:B", "TRAIN:8400637:B", "TRAIN:8400638:B",
+    "TRAIN:8400639:B", "TRAIN:8400640:B",
+)
 RESUMED_B03_COMPLETED = 33
 RESUMED_B03_FAILED = 1
 RESUMED_B03_PENDING = 94
@@ -518,6 +532,77 @@ def _validate_resumed_formal_continuation_v2_shape(
     )
 
 
+def _validate_failed_stage_recovery_shape(recovery: Any) -> bool:
+    if not isinstance(recovery, Mapping):
+        return False
+    recovered = recovery.get("additional_successful_units")
+    expected_ids = list(FAILED_STAGE_RECOVERY_UNIT_IDS)
+    expected_all_ids = [f"TRAIN:{owner}:B" for owner in range(8400513, 8400641)]
+
+    def valid_digest(value: Any) -> bool:
+        return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+    valid_references = (
+        isinstance(recovered, list)
+        and [item.get("unit_id") for item in recovered if isinstance(item, Mapping)] == expected_ids
+        and all(
+            isinstance(item, Mapping)
+            and isinstance(item.get("unit_id"), str)
+            and item.get("owner_seed") == int(item["unit_id"].split(":")[1])
+            and item.get("source_package_commit") == FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+            and item.get("source_group_root") == FAILED_STAGE_RECOVERY_GROUP_ROOT
+            and item.get("attempt_count") == (2 if item["unit_id"] == FAILED_STAGE_RECOVERY_UNIT_IDS[0] else 1)
+            and item.get("attempt_path") == (
+                "training/B/block-04/games/units/" + item["unit_id"].replace(":", "-")
+                + ("/attempt-0002" if item["unit_id"] == FAILED_STAGE_RECOVERY_UNIT_IDS[0] else "/attempt-0001")
+            )
+            and all(valid_digest(item.get(key)) for key in (
+                "result_sha256", "started_receipt_sha256", "finished_receipt_sha256",
+                "worker_job_sha256", "worker_log_sha256",
+                "training_features_sha256", "training_features_uncompressed_sha256",
+            ))
+            and isinstance(item.get("training_features_path"), str)
+            for item in recovered
+        )
+    )
+    failure = recovery.get("preserved_prior_failure")
+    attempts = recovery.get("expected_attempt_counts")
+    return bool(
+        recovery.get("schema_id") == "issue85-formal-failed-stage-recovery-v1"
+        and recovery.get("source_package_commit") == FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+        and recovery.get("source_package_root") == FAILED_STAGE_RECOVERY_PACKAGE_ROOT
+        and recovery.get("source_lock_sha256") == PREDECESSOR_SOURCE_LOCK_SHA256
+        and recovery.get("formal_seed_table_sha256") == FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256
+        and recovery.get("source_preflight_sha256") == FAILED_STAGE_RECOVERY_PREFLIGHT_SHA256
+        and recovery.get("formal_progress_path") == FAILED_STAGE_RECOVERY_PACKAGE_ROOT + "/formal-progress.json"
+        and recovery.get("formal_progress_sha256") == FAILED_STAGE_RECOVERY_PROGRESS_SHA256
+        and recovery.get("authorization_receipt_sha256") == FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256
+        and recovery.get("predecessor_carry_manifest_sha256") == FAILED_STAGE_RECOVERY_CARRY_SHA256
+        and recovery.get("live_progress_path") == FAILED_STAGE_RECOVERY_LIVE_PATH
+        and recovery.get("live_progress_sha256") == FAILED_STAGE_RECOVERY_LIVE_SHA256
+        and recovery.get("stage_id") == "TRAIN-B-BLOCK-04-GAMES"
+        and recovery.get("expected") == 128
+        and recovery.get("successful_completions") == 128
+        and recovery.get("successful_unit_ids") == expected_all_ids
+        and isinstance(recovery.get("active_wall_high_water_seconds"), (int, float))
+        and not isinstance(recovery.get("active_wall_high_water_seconds"), bool)
+        and math.isfinite(float(recovery["active_wall_high_water_seconds"]))
+        and 0 <= float(recovery["active_wall_high_water_seconds"]) <= FORMAL_ACTIVE_WALL_CAP_SECONDS
+        and recovery.get("pending_unit_ids") == []
+        and recovery.get("active_unit_ids") == []
+        and recovery.get("recent_failures") == []
+        and valid_digest(recovery.get("source_rows_sha256"))
+        and valid_digest(recovery.get("b03_actor_model_digest"))
+        and isinstance(attempts, Mapping)
+        and attempts == {unit_id: (2 if unit_id == "TRAIN:8400635:B" else 1) for unit_id in expected_all_ids}
+        and isinstance(failure, Mapping)
+        and failure.get("unit_id") == "TRAIN:8400635:B"
+        and failure.get("attempt") == "attempt-0001"
+        and failure.get("next_attempt") == "attempt-0002"
+        and valid_references
+    )
+
+
 def _validate_resumed_formal_continuation_shape(
     formal: Any, continuation: Any,
 ) -> bool:
@@ -529,6 +614,7 @@ def _validate_resumed_formal_continuation_shape(
     updates = continuation.get("actor_updates")
     b04_units = continuation.get("b04_successful_units")
     failed = continuation.get("b04_failed_attempt")
+    failed_stage_recovery = continuation.get("failed_stage_recovery")
     pending = continuation.get("b04_pending_unit_ids")
     snapshot = continuation.get("active_wall_clock_snapshot")
     elapsed = snapshot.get("elapsed_seconds") if isinstance(snapshot, Mapping) else None
@@ -621,6 +707,8 @@ def _validate_resumed_formal_continuation_shape(
         and failed.get("result_receipt_absent") is True
         and failed.get("finished_receipt_absent") is True
         and pending == pending_ids
+        and _validate_failed_stage_recovery_shape(failed_stage_recovery)
+        and failed_stage_recovery.get("preserved_prior_failure") == failed
         and isinstance(elapsed, (int, float)) and not isinstance(elapsed, bool)
         and math.isfinite(float(elapsed))
         and STOPPED_FORMAL_ACTIVE_WALL_SECONDS <= float(elapsed) <= FORMAL_ACTIVE_WALL_CAP_SECONDS
@@ -661,7 +749,7 @@ def _validate_carry_manifest(
         128 + RESUMED_B03_COMPLETED
         if isinstance(resumed_formal_continuation, Mapping)
         and resumed_formal_continuation.get("schema_id") == RESUMED_FORMAL_CONTINUATION_SCHEMA
-        else 128 + STOPPED_FORMAL_B03_COMPLETED + STOPPED_FORMAL_B04_COMPLETED
+        else 128 + STOPPED_FORMAL_B03_COMPLETED + STOPPED_FORMAL_B04_COMPLETED + len(FAILED_STAGE_RECOVERY_UNIT_IDS)
     )
     resumed_formal_updates_expected = (
         0 if not needs_formal_continuation else
@@ -1659,7 +1747,7 @@ def verify_predecessor_carry(
         manifest["resumed_formal_continuation"] = resumed_formal_continuation
         if resumed_formal_continuation.get("schema_id") == STOPPED_FORMAL_CONTINUATION_SCHEMA:
             manifest["resumed_formal_games_carried"] = (
-                128 + STOPPED_FORMAL_B03_COMPLETED + STOPPED_FORMAL_B04_COMPLETED
+                128 + STOPPED_FORMAL_B03_COMPLETED + STOPPED_FORMAL_B04_COMPLETED + len(FAILED_STAGE_RECOVERY_UNIT_IDS)
             )
             manifest["resumed_formal_actor_updates_carried"] = 3
         else:
@@ -1897,6 +1985,61 @@ def _stopped_b04_carried_units(
     if len(carried) != STOPPED_FORMAL_B04_COMPLETED + STOPPED_FORMAL_B04_FAILED:
         raise RuntimeError("stopped B/04 carried unit count differs from retained progress")
     return carried
+
+
+def _merge_failed_stage_recovery_units(
+    formal: Any, *, backend: Any, carried: Mapping[str, Mapping[str, Any]],
+    recovery: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Overlay the five d3cb B/04 successes while retaining the original failure history."""
+    merged = {str(unit_id): dict(value) for unit_id, value in carried.items()}
+    source_root = _inside(Path(formal.DATA_ROOT), str(recovery["source_package_root"]))
+    source_group_root = _inside(Path(formal.DATA_ROOT), str(recovery["additional_successful_units"][0]["source_group_root"]))
+    expected_ids = [f"TRAIN:{owner}:B" for owner in range(8400513, 8400641)]
+    references = recovery.get("additional_successful_units")
+    if not isinstance(references, list) or len(references) != 5:
+        raise RuntimeError("failed-stage recovery must contain exactly five independently verified successes")
+    for reference in references:
+        if not isinstance(reference, Mapping):
+            raise RuntimeError("failed-stage recovery contains a malformed unit reference")
+        unit_id = str(reference.get("unit_id", ""))
+        prior = merged.get(unit_id)
+        if unit_id == "TRAIN:8400635:B":
+            if (
+                not isinstance(prior, Mapping) or prior.get("result") is not None
+                or prior.get("next_attempt") != "attempt-0002"
+                or len(prior.get("history", [])) != 1
+            ):
+                raise RuntimeError("recovered failed owner lost its original pre-start failure history")
+            history = [dict(item) for item in prior["history"]]
+        else:
+            if prior is not None:
+                raise RuntimeError(f"d3cb recovery overlaps another carried owner: {unit_id}")
+            history = []
+        attempt = _inside(source_root, str(reference["attempt_path"]))
+        result_path = attempt / "result.json"
+        result = formal.read_json(result_path)
+        if (
+            formal.file_sha256(result_path) != reference.get("result_sha256")
+            or result.get("status") != "SUCCEEDED"
+            or result.get("unit_id") != unit_id
+            or result.get("owner_seed") != reference.get("owner_seed")
+            or result.get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+            or result.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+            or result.get("model_digest") != reference.get("model_digest")
+        ):
+            raise RuntimeError(f"d3cb recovery result changed after source verification: {unit_id}")
+        merged[unit_id] = {
+            "result": result,
+            "history": history,
+            "attempt_count": int(reference["attempt_count"]),
+            "reference": dict(reference),
+            "group_root": str(source_group_root),
+            "package_commit": FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+        }
+    if len(merged) != 128 or set(merged) != set(expected_ids):
+        raise RuntimeError("combined stopped-package and d3cb B/04 carries do not cover exactly 128 owners")
+    return merged
 
 
 def _resumed_b02_group_receipt_matches(
@@ -2656,6 +2799,235 @@ def _stopped_formal_source_payload(
     }
 
 
+def _failed_stage_recovery_payload(
+    formal: Any, *, backend: Any, seed: Mapping[str, Any],
+    b03_actor_model_digest: str, preserved_prior_failure: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Verify the five genuine d3cb B/04 successes after its group assembly stopped."""
+    data_root = Path(formal.DATA_ROOT).resolve(strict=True)
+    source_root = _inside(data_root, FAILED_STAGE_RECOVERY_PACKAGE_ROOT)
+    source_group_root = _inside(data_root, FAILED_STAGE_RECOVERY_GROUP_ROOT)
+    files = {
+        "seed": source_root / "formal-seed-table.json",
+        "preflight": source_root / "source-preflight.json",
+        "progress": source_root / "formal-progress.json",
+        "authorization": source_root / "formal-execution-authorization.json",
+        "carry": source_root / "predecessor-carry-manifest.json",
+        "live": _inside(data_root, FAILED_STAGE_RECOVERY_LIVE_PATH),
+    }
+    expected_hashes = {
+        "seed": FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256,
+        "preflight": FAILED_STAGE_RECOVERY_PREFLIGHT_SHA256,
+        "progress": FAILED_STAGE_RECOVERY_PROGRESS_SHA256,
+        "authorization": FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256,
+        "carry": FAILED_STAGE_RECOVERY_CARRY_SHA256,
+        "live": FAILED_STAGE_RECOVERY_LIVE_SHA256,
+    }
+    for key, path in files.items():
+        if not path.is_file() or formal.file_sha256(path) != expected_hashes[key]:
+            raise RuntimeError(f"d3cb failed-stage recovery source is missing or changed: {key}")
+    if (source_group_root / "group-receipt.json").exists():
+        raise RuntimeError("d3cb failed-stage recovery must not replace or amend its absent group receipt")
+
+    source_seed = formal.read_json(files["seed"])
+    source_preflight = formal.read_json(files["preflight"])
+    source_progress = formal.read_json(files["progress"])
+    source_authorization = formal.read_json(files["authorization"])
+    source_live = formal.read_json(files["live"])
+    expected_ids = [str(row["unit_id"]) for row in _training_rows(seed, "B", 4)]
+    expected_all_ids = [f"TRAIN:{owner}:B" for owner in range(8400513, 8400641)]
+    expected_attempt_counts = {
+        unit_id: (2 if unit_id == "TRAIN:8400635:B" else 1)
+        for unit_id in expected_all_ids
+    }
+    if (
+        source_seed.get("schema_id") != "issue85-formal-seed-table-v1"
+        or source_seed.get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+        or source_seed.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or source_seed.get("contract_sha256") != formal.file_sha256(formal.CONTRACT_PATH)
+        or source_seed.get("rows") != seed.get("rows")
+        or source_seed.get("actor_update_schedule") != seed.get("actor_update_schedule")
+        or source_seed.get("actor_update_schedule_sha256") != seed.get("actor_update_schedule_sha256")
+        or source_preflight.get("schema_id") != "issue85-frozen-baseline-preflight-v1"
+        or source_preflight.get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+        or source_preflight.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or source_preflight.get("seed_table_sha256") != FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256
+        or source_preflight.get("verified") is not True
+        or source_preflight.get("formal_or_pilot_games_started_by_this_check") != 0
+        or source_progress.get("schema_id") != PROGRESS_SCHEMA
+        or source_progress.get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+        or source_progress.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or source_progress.get("seed_table_sha256") != FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256
+        or source_progress.get("authorization_receipt_sha256") != FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256
+        or source_progress.get("predecessor_carry_manifest_sha256") != FAILED_STAGE_RECOVERY_CARRY_SHA256
+        or source_progress.get("status") != "FAILED_OR_PAUSED"
+        or source_progress.get("active_stage") != "TRAIN-B-BLOCK-04-GAMES"
+        or source_progress.get("failure", {}).get("type") != "RuntimeError"
+        or "carried attempt path does not match its source group" not in str(source_progress.get("failure", {}).get("detail", ""))
+        or not isinstance(source_progress.get("cumulative_active_wall_seconds"), (int, float))
+        or isinstance(source_progress.get("cumulative_active_wall_seconds"), bool)
+        or not math.isfinite(float(source_progress["cumulative_active_wall_seconds"]))
+        or float(source_progress["cumulative_active_wall_seconds"]) < STOPPED_FORMAL_LATEST_ACTIVE_WALL_SECONDS
+        or set(source_progress.get("game_groups", {})) != {
+            "TRAIN-B-BLOCK-00", "TRAIN-B-BLOCK-01", "TRAIN-B-BLOCK-02", "TRAIN-B-BLOCK-03",
+        }
+        or any(
+            source_progress["game_groups"][key].get("status") != "SUCCEEDED"
+            for key in source_progress.get("game_groups", {})
+        )
+        or any(source_progress.get("actor_updates", {}).get(f"B:{block}", {}).get("status") != "SUCCEEDED"
+               for block in range(4))
+        or source_progress.get("actor_updates", {}).get("B:4") is not None
+        or source_authorization.get("schema_id") != AUTH_SCHEMA
+        or source_authorization.get("issue") != 85
+        or source_authorization.get("formal_go") is not True
+        or source_authorization.get("status") != "APPROVED"
+        or source_authorization.get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+        or source_authorization.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or source_authorization.get("seed_table_sha256") != FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256
+        or source_authorization.get("contract_sha256") != formal.file_sha256(formal.CONTRACT_PATH)
+        or source_authorization.get("actor_update_schedule_sha256") != source_seed.get("actor_update_schedule_sha256")
+        or source_authorization.get("analysis_source_sha256") != formal.file_sha256(formal.STUDY / "formal_analysis.py")
+        or source_authorization.get("whole_task_active_wall_cap_seconds") != FORMAL_ACTIVE_WALL_CAP_SECONDS
+        or source_authorization.get("predecessor_carry_manifest_sha256") != FAILED_STAGE_RECOVERY_CARRY_SHA256
+        or source_authorization.get("owner_approval", {}).get("decision") != "FORMAL_GO"
+        or source_authorization.get("owner_approval", {}).get("comment_url") != FORMAL_GO_COMMENT_URL
+        or source_authorization.get("reviewer_approval", {}).get("decision") != "PASS"
+        or source_authorization.get("reviewer_approval", {}).get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+        or source_authorization.get("reviewer_approval", {}).get("comment_url") != "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-6719623503"
+        or source_live.get("schema_id") != "issue85-formal-live-stage-v1"
+        or source_live.get("status") != "RUNNING"
+        or source_live.get("stage_id") != "TRAIN-B-BLOCK-04-GAMES"
+        or source_live.get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+        or source_live.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or source_live.get("seed_table_sha256") != FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256
+        or source_live.get("authorization_receipt_sha256") != FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256
+        or source_live.get("expected") != 128
+        or source_live.get("successful_completions") != 128
+        or source_live.get("successful_unit_ids") != expected_all_ids
+        or source_live.get("pending_unit_ids") != []
+        or source_live.get("active_unit_ids") != []
+        or source_live.get("recent_failures") != []
+        or source_live.get("attempt_counts") != expected_attempt_counts
+        or source_live.get("historical_attempts", {}).get("TRAIN:8400635:B") != [
+            {
+                "attempt": "attempt-0001", "status": "PRE_START_WORKER_FAILURE",
+                "failure_boundary": "before_started_receipt",
+                "worker_job_sha256": str(preserved_prior_failure.get("worker_job_sha256", "")),
+                "worker_log_sha256": str(preserved_prior_failure.get("worker_log_sha256", "")),
+                "started_receipt_absent": True, "result_receipt_absent": True,
+                "finished_receipt_absent": True,
+                "source_package_commit": STOPPED_FORMAL_PACKAGE_COMMIT,
+                "next_attempt": "attempt-0002",
+            },
+        ]
+        or any(
+            source_live.get("historical_attempts", {}).get(unit_id, []) != []
+            for unit_id in expected_all_ids if unit_id != "TRAIN:8400635:B"
+        )
+        or expected_ids != expected_all_ids
+        or len(_training_rows(seed, "B", 4)) != 128
+    ):
+        raise RuntimeError("d3cb B/04 live receipts do not describe the exact retained 128-owner failed-stage boundary")
+
+    active_wall_path = data_root / "issue85/artifacts/active-wall-issue85-task.json"
+    current_wall = formal.read_json(active_wall_path)
+    elapsed = _validate_active_wall_clock(current_wall, FORMAL_ACTIVE_WALL_CAP_SECONDS, require_idle=True)
+    source_high_water = float(source_progress["cumulative_active_wall_seconds"])
+    if elapsed < source_high_water:
+        raise RuntimeError("active-wall clock is below the d3cb failed-stage high-water; refusing recovery")
+
+    source_identity = {
+        "package_commit": FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+        "source_lock_sha256": PREDECESSOR_SOURCE_LOCK_SHA256,
+    }
+    b04_rows = _training_rows(seed, "B", 4)
+    rows_by_id = {str(row["unit_id"]): row for row in b04_rows}
+    expected_model = str(b03_actor_model_digest)
+    recovered_units = []
+    observed_unit_dirs = sorted(
+        directory.name for directory in (source_group_root / "units").iterdir()
+        if directory.is_dir()
+    ) if (source_group_root / "units").is_dir() else []
+    expected_unit_dirs = sorted(backend.unit_key(unit_id) for unit_id in FAILED_STAGE_RECOVERY_UNIT_IDS)
+    if observed_unit_dirs != expected_unit_dirs:
+        raise RuntimeError("d3cb B/04 local attempt inventory differs from the five retained new successes")
+    for unit_id in FAILED_STAGE_RECOVERY_UNIT_IDS:
+        row = rows_by_id[unit_id]
+        result, history = _unit_attempts(
+            formal, backend, root=source_group_root, row=row,
+            package_commit=FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+            lock_sha=PREDECESSOR_SOURCE_LOCK_SHA256,
+            seed_table_sha256=FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256,
+            authorization_receipt_sha256=FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256,
+            check_live_workers=False,
+        )
+        expected_attempt_name = "attempt-0002" if unit_id == "TRAIN:8400635:B" else "attempt-0001"
+        unit_root = source_group_root / "units" / backend.unit_key(unit_id)
+        attempt_dirs = sorted(path for path in unit_root.glob("attempt-*") if path.is_dir())
+        if (
+            result is None or history or len(attempt_dirs) != 1
+            or attempt_dirs[0].name != expected_attempt_name
+            or int(source_live["attempt_counts"][unit_id]) != int(expected_attempt_name.removeprefix("attempt-"))
+            or result.get("model_digest") != expected_model
+            or result.get("expert_decisions") != 0
+        ):
+            raise RuntimeError(f"d3cb recovered B/04 success is missing, duplicated, or off lineage: {unit_id}")
+        attempt = attempt_dirs[0]
+        started_path, result_path, finish_path = attempt / "started.json", attempt / "result.json", attempt / "finished.json"
+        job_path, log_path = attempt / "worker-job.json", attempt / "worker.log"
+        feature = _verify_training_feature_artifact(
+            formal, backend, group_root=source_group_root, attempt=attempt,
+            result=result, row=row,
+        )
+        reference = {
+            "unit_id": unit_id,
+            "owner_seed": int(row["owner_seed"]),
+            "attempt_path": attempt.relative_to(source_root).as_posix(),
+            "attempt_count": int(source_live["attempt_counts"][unit_id]),
+            "result_sha256": formal.file_sha256(result_path),
+            "started_receipt_sha256": formal.file_sha256(started_path),
+            "finished_receipt_sha256": formal.file_sha256(finish_path),
+            "worker_job_sha256": formal.file_sha256(job_path),
+            "worker_log_sha256": formal.file_sha256(log_path),
+            "training_features_path": feature["path"],
+            "training_features_sha256": feature["sha256"],
+            "training_features_uncompressed_sha256": feature["uncompressed_sha256"],
+            "model_digest": str(result["model_digest"]),
+            "source_package_commit": FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+            "source_group_root": FAILED_STAGE_RECOVERY_GROUP_ROOT,
+        }
+        recovered_units.append(reference)
+
+    return {
+        "schema_id": "issue85-formal-failed-stage-recovery-v1",
+        "source_package_commit": FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+        "source_package_root": FAILED_STAGE_RECOVERY_PACKAGE_ROOT,
+        "source_lock_sha256": PREDECESSOR_SOURCE_LOCK_SHA256,
+        "formal_seed_table_sha256": FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256,
+        "source_preflight_sha256": FAILED_STAGE_RECOVERY_PREFLIGHT_SHA256,
+        "source_rows_sha256": _hash_json(formal, source_seed.get("rows")),
+        "formal_progress_path": FAILED_STAGE_RECOVERY_PACKAGE_ROOT + "/formal-progress.json",
+        "formal_progress_sha256": FAILED_STAGE_RECOVERY_PROGRESS_SHA256,
+        "authorization_receipt_sha256": FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256,
+        "predecessor_carry_manifest_sha256": FAILED_STAGE_RECOVERY_CARRY_SHA256,
+        "live_progress_path": FAILED_STAGE_RECOVERY_LIVE_PATH,
+        "live_progress_sha256": FAILED_STAGE_RECOVERY_LIVE_SHA256,
+        "stage_id": "TRAIN-B-BLOCK-04-GAMES",
+        "expected": 128,
+        "successful_completions": 128,
+        "successful_unit_ids": expected_all_ids,
+        "pending_unit_ids": [],
+        "active_unit_ids": [],
+        "recent_failures": [],
+        "active_wall_high_water_seconds": source_high_water,
+        "b03_actor_model_digest": expected_model,
+        "expected_attempt_counts": expected_attempt_counts,
+        "preserved_prior_failure": dict(preserved_prior_failure),
+        "additional_successful_units": recovered_units,
+    }
+
+
 def _build_stopped_formal_continuation(
     formal: Any, *, issue84_source: Path, seed: Mapping[str, Any],
     backend: Any, issue84_driver: Any,
@@ -2670,7 +3042,7 @@ def _build_stopped_formal_continuation(
         formal, seed=seed, backend=backend,
         active_wall_clock_snapshot=b8["active_wall_clock_snapshot"],
     )
-    return {
+    continuation = {
         "schema_id": STOPPED_FORMAL_CONTINUATION_SCHEMA,
         "source_package_commit": STOPPED_FORMAL_PACKAGE_COMMIT,
         "source_package_root": STOPPED_FORMAL_PACKAGE_ROOT,
@@ -2695,6 +3067,12 @@ def _build_stopped_formal_continuation(
             }
         },
     }
+    continuation["failed_stage_recovery"] = _failed_stage_recovery_payload(
+        formal, backend=backend, seed=seed,
+        b03_actor_model_digest=str(payload["b03_actor_update_receipt"]["result_model_digest"]),
+        preserved_prior_failure=payload["b04_failed_attempt"],
+    )
+    return continuation
 
 
 def _validate_resumed_formal_continuation(
@@ -2879,12 +3257,25 @@ def _validate_resumed_formal_continuation(
     )
     if any(stopped_continuation.get(key) != stopped_payload.get(key) for key in comparison_keys):
         raise RuntimeError("stopped B/03 or B/04 carry references differ from current immutable source receipts")
+    recovery = _failed_stage_recovery_payload(
+        formal, backend=backend, seed=current_seed,
+        b03_actor_model_digest=str(stopped_payload["b03_actor_update_receipt"]["result_model_digest"]),
+        preserved_prior_failure=stopped_payload["b04_failed_attempt"],
+    )
+    if stopped_continuation.get("failed_stage_recovery") != recovery:
+        raise RuntimeError("d3cb failed-stage recovery references differ from current immutable receipts")
+    b04_carried_units = _merge_failed_stage_recovery_units(
+        formal, backend=backend,
+        carried=_stopped_b04_carried_units(formal, stopped_payload),
+        recovery=recovery,
+    )
     return {
         **validated,
         "b03_completed_group": stopped_payload["b03_group_receipt"],
         "b03_completed_group_root": stopped_payload["b03_group_root_path"],
         "b03_actor_update": stopped_payload["b03_actor_update_receipt"],
-        "b04_carried_units": _stopped_b04_carried_units(formal, stopped_payload),
+        "b04_carried_units": b04_carried_units,
+        "b04_failed_stage_recovery": recovery,
         "b04_failed_attempt": stopped_payload["b04_failed_attempt"],
         "b04_pending_unit_ids": stopped_payload["b04_pending_unit_ids"],
     }
@@ -3549,6 +3940,7 @@ def _run_formal_units(
             expected_group_root = {
                 RESUMED_FORMAL_PACKAGE_COMMIT: RESUMED_B03_GROUP_ROOT,
                 STOPPED_FORMAL_PACKAGE_COMMIT: STOPPED_FORMAL_B04_GROUP_ROOT,
+                FAILED_STAGE_RECOVERY_PACKAGE_COMMIT: FAILED_STAGE_RECOVERY_GROUP_ROOT,
             }.get(source_package_commit)
             source_package_root = Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal" / source_package_commit
             source_group_root = Path(str(carried.get("group_root", ""))).resolve(strict=True)
@@ -4236,13 +4628,17 @@ def _train_actor_block(
         )
         continuation = manifest.get("resumed_formal_continuation")
         carried_sources = training_group.get("carried_unit_sources")
+        recovery = continuation.get("failed_stage_recovery") if isinstance(continuation, Mapping) else None
+        original_references = continuation.get("b04_successful_units", []) if isinstance(continuation, Mapping) else []
+        recovered_references = recovery.get("additional_successful_units", []) if isinstance(recovery, Mapping) else []
+        b04_references = [*original_references, *recovered_references]
         expected_sources = {
             str(item["unit_id"]): {
-                "package_commit": STOPPED_FORMAL_PACKAGE_COMMIT,
-                "group_root": STOPPED_FORMAL_B04_GROUP_ROOT,
+                "package_commit": item.get("source_package_commit", STOPPED_FORMAL_PACKAGE_COMMIT),
+                "group_root": item.get("source_group_root", STOPPED_FORMAL_B04_GROUP_ROOT),
             }
-            for item in continuation.get("b04_successful_units", [])
-        } if isinstance(continuation, Mapping) else {}
+            for item in b04_references if isinstance(item, Mapping)
+        }
         group_receipt_path = package_root / "training/B/block-04/games/group-receipt.json"
         units_by_id = {
             str(item.get("unit_id")): item
@@ -4253,6 +4649,7 @@ def _train_actor_block(
             or carry_manifest_sha256 != expected_carry_sha256
             or not isinstance(continuation, Mapping)
             or continuation.get("schema_id") != STOPPED_FORMAL_CONTINUATION_SCHEMA
+            or len(b04_references) != 128
             or not isinstance(carried_sources, Mapping)
             or dict(carried_sources) != expected_sources
             or not group_receipt_path.is_file()
@@ -4260,14 +4657,16 @@ def _train_actor_block(
             or set(units_by_id) != {str(row["unit_id"]) for row in rows}
         ):
             raise RuntimeError("B/block-04 actor update is not bound to the verified stopped-package carry")
-        source_root = _inside(Path(formal.DATA_ROOT), STOPPED_FORMAL_PACKAGE_ROOT)
-        source_group_root = _inside(Path(formal.DATA_ROOT), STOPPED_FORMAL_B04_GROUP_ROOT)
-        for reference in continuation["b04_successful_units"]:
+        for reference in b04_references:
             unit_id = str(reference["unit_id"])
+            source_commit = str(reference.get("source_package_commit", STOPPED_FORMAL_PACKAGE_COMMIT))
+            source_group_relative = str(reference.get("source_group_root", STOPPED_FORMAL_B04_GROUP_ROOT))
+            source_root = _inside(Path(formal.DATA_ROOT), f"issue85/artifacts/formal/{source_commit}")
+            source_group_root = _inside(Path(formal.DATA_ROOT), source_group_relative)
             expected_unit = dict(reference)
             expected_unit.update({
-                "source_package_commit": STOPPED_FORMAL_PACKAGE_COMMIT,
-                "source_group_root": STOPPED_FORMAL_B04_GROUP_ROOT,
+                "source_package_commit": source_commit,
+                "source_group_root": source_group_relative,
             })
             if units_by_id.get(unit_id) != expected_unit:
                 raise RuntimeError(f"B/04 carried group unit reference changed before training: {unit_id}")
@@ -4276,11 +4675,33 @@ def _train_actor_block(
             feature_path = _inside(source_group_root, str(reference["training_features_path"]))
             compressed = feature_path.read_bytes()
             raw = zlib.decompress(compressed)
+            result = formal.read_json(result_path)
             if (
                 formal.file_sha256(result_path) != reference["result_sha256"]
                 or formal.file_sha256(finish_path) != reference["finished_receipt_sha256"]
                 or formal.sha256_bytes(compressed) != reference["training_features_sha256"]
                 or formal.sha256_bytes(raw) != reference["training_features_uncompressed_sha256"]
+                or result.get("status") != "SUCCEEDED"
+                or result.get("unit_id") != unit_id
+                or result.get("owner_seed") != reference.get("owner_seed")
+                or result.get("package_commit") != source_commit
+                or result.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+                or (
+                    reference.get("model_digest") is not None
+                    and result.get("model_digest") != reference.get("model_digest")
+                )
+                or (
+                    reference.get("started_receipt_sha256") is not None
+                    and formal.file_sha256(attempt / "started.json") != reference["started_receipt_sha256"]
+                )
+                or (
+                    reference.get("worker_job_sha256") is not None
+                    and formal.file_sha256(attempt / "worker-job.json") != reference["worker_job_sha256"]
+                )
+                or (
+                    reference.get("worker_log_sha256") is not None
+                    and formal.file_sha256(attempt / "worker.log") != reference["worker_log_sha256"]
+                )
             ):
                 raise RuntimeError(f"B/04 carried result or feature hash changed before training: {unit_id}")
     elif training_data_package != identity["package_commit"] or carry_manifest_sha256 is not None:
@@ -4767,9 +5188,10 @@ def _run_training_games(
         carry_manifest_sha256 = resumed_formal_continuation.get("manifest_sha256")
         if (
             not isinstance(carried_unit_results, Mapping)
-            or len(carried_unit_results) != STOPPED_FORMAL_B04_COMPLETED + STOPPED_FORMAL_B04_FAILED
+            or len(carried_unit_results) != 128
+            or set(carried_unit_results) != {str(row["unit_id"]) for row in rows}
         ):
-            raise RuntimeError("B/04 continuation count differs from retained stopped-stage progress")
+            raise RuntimeError("B/04 continuation must carry all 128 verified stopped and d3cb owners")
     return _run_formal_units(
         formal, backend, rows=rows, root=root,
         stage_id=f"TRAIN-{arm}-BLOCK-{block:02d}-GAMES",

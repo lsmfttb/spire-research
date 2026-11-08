@@ -1165,6 +1165,59 @@ def test_resumed_formal_continuation_shape_binds_actor_update_and_failed_attempt
             "source_active_wall_file_sha256": formal_execution.STOPPED_FORMAL_WALL_RECEIPT_SHA256,
         },
     }
+    stopped["failed_stage_recovery"] = {
+        "schema_id": "issue85-formal-failed-stage-recovery-v1",
+        "source_package_commit": formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+        "source_package_root": formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_ROOT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "formal_seed_table_sha256": formal_execution.FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256,
+        "source_preflight_sha256": formal_execution.FAILED_STAGE_RECOVERY_PREFLIGHT_SHA256,
+        "source_rows_sha256": "3" * 64,
+        "formal_progress_path": formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_ROOT + "/formal-progress.json",
+        "formal_progress_sha256": formal_execution.FAILED_STAGE_RECOVERY_PROGRESS_SHA256,
+        "authorization_receipt_sha256": formal_execution.FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256,
+        "predecessor_carry_manifest_sha256": formal_execution.FAILED_STAGE_RECOVERY_CARRY_SHA256,
+        "live_progress_path": formal_execution.FAILED_STAGE_RECOVERY_LIVE_PATH,
+        "live_progress_sha256": formal_execution.FAILED_STAGE_RECOVERY_LIVE_SHA256,
+        "stage_id": "TRAIN-B-BLOCK-04-GAMES",
+        "expected": 128,
+        "successful_completions": 128,
+        "successful_unit_ids": [f"TRAIN:{owner}:B" for owner in range(8400513, 8400641)],
+        "pending_unit_ids": [],
+        "active_unit_ids": [],
+        "recent_failures": [],
+        "active_wall_high_water_seconds": 42045.301445717,
+        "b03_actor_model_digest": "4" * 64,
+        "expected_attempt_counts": {
+            f"TRAIN:{owner}:B": (2 if owner == 8400635 else 1)
+            for owner in range(8400513, 8400641)
+        },
+        "preserved_prior_failure": stopped["b04_failed_attempt"],
+        "additional_successful_units": [
+            {
+                "unit_id": unit_id,
+                "owner_seed": int(unit_id.split(":")[1]),
+                "attempt_path": (
+                    "training/B/block-04/games/units/" + unit_id.replace(":", "-")
+                    + ("/attempt-0002" if unit_id == "TRAIN:8400635:B" else "/attempt-0001")
+                ),
+                "attempt_count": 2 if unit_id == "TRAIN:8400635:B" else 1,
+                "result_sha256": "5" * 64,
+                "started_receipt_sha256": "6" * 64,
+                "finished_receipt_sha256": "7" * 64,
+                "worker_job_sha256": "8" * 64,
+                "worker_log_sha256": "9" * 64,
+                "training_features_path": "units/" + unit_id.replace(":", "-") + "/features.npz",
+                "training_features_sha256": "a" * 64,
+                "training_features_uncompressed_sha256": "b" * 64,
+                "model_digest": "4" * 64,
+                "source_package_commit": formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+                "source_group_root": formal_execution.FAILED_STAGE_RECOVERY_GROUP_ROOT,
+            }
+            for unit_id in formal_execution.FAILED_STAGE_RECOVERY_UNIT_IDS
+        ],
+    }
+    assert formal_execution._validate_failed_stage_recovery_shape(stopped["failed_stage_recovery"])
     assert formal_execution._validate_resumed_formal_continuation_shape(formal, stopped)
     wrong_stopped_owner = dict(stopped)
     wrong_stopped_owner["b04_successful_units"] = [dict(b04_units[0], owner_seed=999)] + b04_units[1:]
@@ -1177,6 +1230,19 @@ def test_resumed_formal_continuation_shape_binds_actor_update_and_failed_attempt
         stopped["b04_failed_attempt"], status="SUCCEEDED",
     )
     assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_stopped_failure)
+    wrong_recovery = dict(stopped)
+    wrong_recovery["failed_stage_recovery"] = dict(
+        stopped["failed_stage_recovery"], source_package_commit="f" * 40,
+    )
+    assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_recovery)
+    wrong_recovered_attempt = dict(stopped)
+    recovery = dict(stopped["failed_stage_recovery"])
+    recovery["additional_successful_units"] = [
+        dict(recovery["additional_successful_units"][0], attempt_path="outside/attempt-0002"),
+        *recovery["additional_successful_units"][1:],
+    ]
+    wrong_recovered_attempt["failed_stage_recovery"] = recovery
+    assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_recovered_attempt)
 
 
 def test_resumed_b03_feature_path_is_group_relative_and_owner_bound(tmp_path: Path) -> None:
@@ -2016,6 +2082,88 @@ def test_stopped_b04_carry_includes_failed_owner_for_attempt_two(tmp_path: Path)
     assert failed_carry["next_attempt"] == "attempt-0002"
     assert failed_carry["reference"] == failed
     formal_execution._validate_prestart_carried_attempt(failed_carry)
+
+
+def test_failed_stage_recovery_overlays_five_d3cb_successes_and_keeps_failure_history(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    source_root = data_root / formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_ROOT
+    group_root = data_root / formal_execution.FAILED_STAGE_RECOVERY_GROUP_ROOT
+    group_root.mkdir(parents=True)
+    expected_ids = [f"TRAIN:{owner}:B" for owner in range(8400513, 8400641)]
+    failed_id = "TRAIN:8400635:B"
+    prior_failure = {
+        "attempt": "attempt-0001",
+        "status": "PRE_START_WORKER_FAILURE",
+        "failure_boundary": "before_started_receipt",
+        "worker_job_sha256": "a" * 64,
+        "worker_log_sha256": "b" * 64,
+        "started_receipt_absent": True,
+        "result_receipt_absent": True,
+        "finished_receipt_absent": True,
+        "source_package_commit": formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT,
+        "next_attempt": "attempt-0002",
+    }
+    base = {
+        unit_id: {
+            "result": {"status": "SUCCEEDED"},
+            "history": [], "attempt_count": 1,
+            "reference": {"unit_id": unit_id},
+            "group_root": "old-group",
+            "package_commit": formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT,
+        }
+        for unit_id in [*(f"TRAIN:{owner}:B" for owner in range(8400513, 8400635)), "TRAIN:8400636:B"]
+    }
+    base[failed_id] = {
+        "result": None,
+        "history": [prior_failure],
+        "attempt_count": 1,
+        "reference": {"unit_id": failed_id, "status": "PRE_START_WORKER_FAILURE"},
+        "next_attempt": "attempt-0002",
+        "group_root": "old-group",
+        "package_commit": formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT,
+    }
+    references = []
+    for unit_id in formal_execution.FAILED_STAGE_RECOVERY_UNIT_IDS:
+        owner = int(unit_id.split(":")[1])
+        attempt_name = "attempt-0002" if unit_id == failed_id else "attempt-0001"
+        attempt = group_root / "units" / unit_id.replace(":", "-") / attempt_name
+        attempt.mkdir(parents=True)
+        result = {
+            "status": "SUCCEEDED", "unit_id": unit_id, "owner_seed": owner,
+            "package_commit": formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+            "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+            "model_digest": "c" * 64,
+        }
+        result_path = attempt / "result.json"
+        result_path.write_text(json.dumps(result), encoding="utf-8")
+        references.append({
+            "unit_id": unit_id, "owner_seed": owner,
+            "attempt_path": result_path.parent.relative_to(source_root).as_posix(),
+            "attempt_count": 2 if unit_id == failed_id else 1,
+            "result_sha256": hashlib.sha256(result_path.read_bytes()).hexdigest(),
+            "model_digest": "c" * 64,
+            "source_package_commit": formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+            "source_group_root": formal_execution.FAILED_STAGE_RECOVERY_GROUP_ROOT,
+        })
+    formal = SimpleNamespace(
+        DATA_ROOT=data_root,
+        read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        file_sha256=lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+    )
+
+    merged = formal_execution._merge_failed_stage_recovery_units(
+        formal, backend=SimpleNamespace(), carried=base,
+        recovery={"source_package_root": formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_ROOT,
+                  "additional_successful_units": references},
+    )
+
+    assert set(merged) == set(expected_ids)
+    assert len(merged) == 128
+    assert merged[failed_id]["result"]["status"] == "SUCCEEDED"
+    assert merged[failed_id]["attempt_count"] == 2
+    assert merged[failed_id]["history"] == [prior_failure]
+    assert merged[failed_id]["package_commit"] == formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+    assert {merged[unit_id]["attempt_count"] for unit_id in formal_execution.FAILED_STAGE_RECOVERY_UNIT_IDS} == {1, 2}
 
 
 def test_stopped_formal_clock_snapshot_accepts_monotonic_receipt_updates(tmp_path: Path) -> None:
