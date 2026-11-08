@@ -1064,6 +1064,101 @@ def test_resumed_formal_continuation_shape_binds_actor_update_and_failed_attempt
     )
     assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_next_attempt)
 
+    b03_update = {
+        "arm": "B",
+        "block_index": 3,
+        "source_package_commit": formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT,
+        "source_package_root": formal_execution.STOPPED_FORMAL_PACKAGE_ROOT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "source_update_receipt_path": "training/B/updates/block-03/success-receipt.json",
+        "source_update_receipt_file_sha256": formal_execution.STOPPED_FORMAL_B03_UPDATE_FILE_SHA256,
+        "receipt_sha256": "8" * 64,
+        "training_group_receipt_sha256": formal_execution.STOPPED_FORMAL_B03_GROUP_RECEIPT_SHA256,
+        "training_data_package_commit": formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT,
+        "source_predecessor_carry_manifest_sha256": formal_execution.STOPPED_FORMAL_CARRY_SHA256,
+        "actor_checkpoint_path": "training/B/updates/block-03/attempt-0001/actor-state.pt",
+        "actor_checkpoint_sha256": "9" * 64,
+        "optimizer_checkpoint_path": "training/B/updates/block-03/attempt-0001/optimizer-state.pt",
+        "optimizer_checkpoint_sha256": "a" * 64,
+        "result_model_digest": "b" * 64,
+        "completed_steps": 64,
+        "actor_update_seed": 42,
+        "actor_update_schedule_sha256": "c" * 64,
+        "owner_seed_sha256": "d" * 64,
+    }
+    b04_units = [
+        {
+            "unit_id": f"TRAIN:{owner}:B",
+            "owner_seed": owner,
+            "attempt_path": f"training/B/block-04/games/units/TRAIN-{owner}-B/attempt-0001",
+            "attempt_count": 1,
+            "result_sha256": "e" * 64,
+            "finished_receipt_sha256": "f" * 64,
+            "training_features_sha256": "1" * 64,
+            "training_features_uncompressed_sha256": "2" * 64,
+        }
+        for owner in [*range(8400513, 8400635), 8400636]
+    ]
+    stopped = {
+        "schema_id": formal_execution.STOPPED_FORMAL_CONTINUATION_SCHEMA,
+        "source_package_commit": formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT,
+        "source_package_root": formal_execution.STOPPED_FORMAL_PACKAGE_ROOT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "formal_seed_table_sha256": formal_execution.STOPPED_FORMAL_SEED_TABLE_SHA256,
+        "formal_progress_sha256": formal_execution.STOPPED_FORMAL_PROGRESS_SHA256,
+        "authorization_receipt_sha256": formal_execution.STOPPED_FORMAL_AUTHORIZATION_SHA256,
+        "predecessor_carry_manifest_sha256": formal_execution.STOPPED_FORMAL_CARRY_SHA256,
+        "b8_continuation": continuation,
+        "actor_updates": {"b01": continuation["b01_actor_update"], "b02": continuation["b02_actor_update"]},
+        "b03_group_root": formal_execution.STOPPED_FORMAL_B03_GROUP_ROOT,
+        "b03_group_receipt_sha256": formal_execution.STOPPED_FORMAL_B03_GROUP_RECEIPT_SHA256,
+        "b03_actor_update": b03_update,
+        "b04_live_progress_path": formal_execution.STOPPED_FORMAL_B04_LIVE_PATH,
+        "b04_live_progress_sha256": formal_execution.STOPPED_FORMAL_B04_LIVE_SHA256,
+        "stop_record_sha256": formal_execution.STOPPED_FORMAL_STOP_RECORD_SHA256,
+        "active_wall_receipt_sha256": formal_execution.STOPPED_FORMAL_WALL_RECEIPT_SHA256,
+        "b03_expected": 128,
+        "b03_completed": 128,
+        "b04_expected": 128,
+        "b04_completed": 123,
+        "b04_failed_attempt_count": 1,
+        "b04_pending": 4,
+        "b04_successful_units": b04_units,
+        "b04_failed_attempt": {
+            "unit_id": "TRAIN:8400635:B",
+            "attempt": "attempt-0001",
+            "attempt_path": "training/B/block-04/games/units/TRAIN-8400635-B/attempt-0001",
+            "status": "PRE_START_WORKER_FAILURE",
+            "failure_boundary": "before_started_receipt",
+            "attempt_count": 1,
+            "next_attempt": "attempt-0002",
+            "worker_job_sha256": "dca1cd7d15cb0733da7c8707e94868b66943f8fe542ed7159261d0dbaf8f448c",
+            "worker_log_sha256": "e987704fb27e5ecfd84bce4fee45eb13dabb79293bcc8c28912428e62165bb3f",
+            "started_receipt_absent": True,
+            "result_receipt_absent": True,
+            "finished_receipt_absent": True,
+        },
+        "b04_pending_unit_ids": [f"TRAIN:{owner}:B" for owner in range(8400637, 8400641)],
+        "active_wall_clock_snapshot": {
+            "elapsed_seconds": 41970.595754022004,
+            "active_session": None,
+            "process_ids": [],
+            "source_active_wall_file_sha256": formal_execution.STOPPED_FORMAL_WALL_RECEIPT_SHA256,
+        },
+    }
+    assert formal_execution._validate_resumed_formal_continuation_shape(formal, stopped)
+    wrong_stopped_owner = dict(stopped)
+    wrong_stopped_owner["b04_successful_units"] = [dict(b04_units[0], owner_seed=999)] + b04_units[1:]
+    assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_stopped_owner)
+    wrong_stopped_update = dict(stopped)
+    wrong_stopped_update["b03_actor_update"] = dict(b03_update, source_package_commit="e" * 40)
+    assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_stopped_update)
+    wrong_stopped_failure = dict(stopped)
+    wrong_stopped_failure["b04_failed_attempt"] = dict(
+        stopped["b04_failed_attempt"], status="SUCCEEDED",
+    )
+    assert not formal_execution._validate_resumed_formal_continuation_shape(formal, wrong_stopped_failure)
+
 
 def test_resumed_b03_feature_path_is_group_relative_and_owner_bound(tmp_path: Path) -> None:
     b03_root = tmp_path / "training/B/block-03/games"
