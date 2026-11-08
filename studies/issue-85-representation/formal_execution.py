@@ -2700,6 +2700,13 @@ def _snapshot_stage(formal: Any, *, progress_path: Path, group: Mapping[str, Any
     _atomic_json(formal, progress_path, {**dict(group), "updated_utc": _now()})
 
 
+def _stage_has_work_to_poll(
+    pending: Sequence[Any], active: Mapping[str, Any], *, stop_after_failure: bool,
+) -> bool:
+    """Drain launched workers after a failure, then return with pending work retained."""
+    return bool(active) or (bool(pending) and not stop_after_failure)
+
+
 def _run_formal_units(
     formal: Any, backend: Any, *, rows: list[dict[str, Any]], root: Path,
     stage_id: str, package_commit: str, source_lock_sha256: str,
@@ -2811,7 +2818,7 @@ def _run_formal_units(
         })
         _snapshot_stage(formal, progress_path=progress_path, group=group)
 
-    while pending or active:
+    while _stage_has_work_to_poll(pending, active, stop_after_failure=stop_after_failure):
         if clock.expired():
             stop_after_failure = True
             group["stop_reason"] = "WHOLE_TASK_ACTIVE_WALL_CAP_REACHED"

@@ -19,6 +19,27 @@ def test_formal_runner_exports_the_locked_wsl_data_root() -> None:
     assert formal_runner.DATA_ROOT_WSL == formal_runner.pilot.DATA_ROOT_WSL
 
 
+@pytest.mark.parametrize(
+    ("pending_count", "active_count", "stop_after_failure", "expected"),
+    [
+        (0, 0, False, False),
+        (1, 0, False, True),
+        (1, 0, True, False),
+        (1, 1, True, True),
+        (0, 1, True, True),
+    ],
+)
+def test_formal_stage_stops_polling_pending_owners_after_failure_but_drains_active_workers(
+    pending_count: int, active_count: int, stop_after_failure: bool, expected: bool,
+) -> None:
+    pending = [{}] * pending_count
+    active = {f"worker-{index}": object() for index in range(active_count)}
+
+    assert formal_execution._stage_has_work_to_poll(
+        pending, active, stop_after_failure=stop_after_failure,
+    ) is expected
+
+
 @pytest.mark.parametrize("block", range(8))
 def test_training_worker_accepts_issue84_block_dispatch_for_locked_pi12_lineage(block: int) -> None:
     row = {
