@@ -2084,6 +2084,25 @@ def test_stopped_b04_carry_includes_failed_owner_for_attempt_two(tmp_path: Path)
     formal_execution._validate_prestart_carried_attempt(failed_carry)
 
 
+def test_failed_stage_recovery_accepts_emitted_hash_pinned_preflight_schema() -> None:
+    preflight = {
+        "schema_id": "issue85-frozen-baseline-preflight-v1",
+        "verified": True,
+        "errors": [],
+        "formal_or_pilot_games_started_by_this_check": 0,
+        "checks": {"native_source": {"commit": "8ded44c7ee341f48bb1bd49eeaae6cf6bc0384b2"}},
+    }
+
+    assert formal_execution._is_verified_frozen_baseline_preflight(preflight)
+    for update in (
+        {"verified": False},
+        {"errors": ["source check failed"]},
+        {"formal_or_pilot_games_started_by_this_check": 1},
+        {"checks": {}},
+    ):
+        assert not formal_execution._is_verified_frozen_baseline_preflight({**preflight, **update})
+
+
 def test_failed_stage_live_snapshot_uses_unit_evidence_not_stale_running_label() -> None:
     expected_ids = [f"TRAIN:{owner}:B" for owner in range(8400513, 8400641)]
     failed_id = "TRAIN:8400635:B"

@@ -2799,6 +2799,20 @@ def _stopped_formal_source_payload(
     }
 
 
+def _is_verified_frozen_baseline_preflight(source_preflight: Any) -> bool:
+    # The hash-pinned legacy receipt uses this schema; source identity is bound
+    # independently by the seed, progress, authorization, and source-lock receipts.
+    return bool(
+        isinstance(source_preflight, Mapping)
+        and source_preflight.get("schema_id") == "issue85-frozen-baseline-preflight-v1"
+        and source_preflight.get("verified") is True
+        and source_preflight.get("errors") == []
+        and source_preflight.get("formal_or_pilot_games_started_by_this_check") == 0
+        and isinstance(source_preflight.get("checks"), Mapping)
+        and bool(source_preflight["checks"])
+    )
+
+
 def _matches_failed_stage_recovery_live_snapshot(
     source_live: Any, *, expected_ids: list[str],
     expected_attempt_counts: Mapping[str, int],
@@ -2894,12 +2908,7 @@ def _failed_stage_recovery_payload(
         or source_seed.get("rows") != seed.get("rows")
         or source_seed.get("actor_update_schedule") != seed.get("actor_update_schedule")
         or source_seed.get("actor_update_schedule_sha256") != seed.get("actor_update_schedule_sha256")
-        or source_preflight.get("schema_id") != "issue85-frozen-baseline-preflight-v1"
-        or source_preflight.get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
-        or source_preflight.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
-        or source_preflight.get("seed_table_sha256") != FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256
-        or source_preflight.get("verified") is not True
-        or source_preflight.get("formal_or_pilot_games_started_by_this_check") != 0
+        or not _is_verified_frozen_baseline_preflight(source_preflight)
         or source_progress.get("schema_id") != PROGRESS_SCHEMA
         or source_progress.get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
         or source_progress.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
