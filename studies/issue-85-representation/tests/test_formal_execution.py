@@ -151,6 +151,31 @@ def test_completed_training_recovery_reuses_full_immutable_group_receipt(
     assert receipt_path.read_bytes() == original_bytes
 
 
+@pytest.mark.parametrize(("missing_reads", "succeeds"), [(2, True), (5, False)])
+def test_active_wall_clock_reader_retries_only_a_bounded_missing_window(
+    tmp_path: Path, monkeypatch, missing_reads: int, succeeds: bool,
+) -> None:
+    calls = []
+
+    def read_json(path: Path):
+        calls.append(path)
+        if len(calls) <= missing_reads:
+            raise FileNotFoundError(path)
+        return {"elapsed_seconds": 66915.0}
+
+    monkeypatch.setattr(formal_execution.time, "sleep", lambda _seconds: None)
+    formal = SimpleNamespace(read_json=read_json)
+    path = tmp_path / "active-wall-issue85-task.json"
+
+    if succeeds:
+        assert formal_execution._read_active_wall_clock(formal, path) == {"elapsed_seconds": 66915.0}
+        assert len(calls) == missing_reads + 1
+    else:
+        with pytest.raises(RuntimeError, match="active-wall clock is missing"):
+            formal_execution._read_active_wall_clock(formal, path)
+        assert len(calls) == 5
+
+
 @pytest.mark.parametrize("block", range(8))
 def test_training_worker_accepts_issue84_block_dispatch_for_locked_pi12_lineage(block: int) -> None:
     row = {

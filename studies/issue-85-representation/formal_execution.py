@@ -210,6 +210,21 @@ def _carried_attempt_path_matches_source_group(
     return attempt_path.parent == group_root / "units" / unit_key
 
 
+def _read_active_wall_clock(formal: Any, path: Path) -> dict[str, Any]:
+    """Retry a brief missing-file window while the clock atomically replaces its receipt."""
+    last_error: FileNotFoundError | None = None
+    for attempt in range(5):
+        try:
+            return formal.read_json(path)
+        except FileNotFoundError as exc:
+            last_error = exc
+            if attempt < 4:
+                time.sleep(0.01 * (attempt + 1))
+    raise RuntimeError(
+        "the cumulative Issue 85 active-wall clock is missing; refusing to reset study time"
+    ) from last_error
+
+
 def _validate_active_wall_clock(
     prior_clock: Mapping[str, Any], cap_seconds: int, *, require_idle: bool,
 ) -> float:
@@ -3468,9 +3483,7 @@ def validate_authorization(
             "formal execution is blocked: exact owner FORMAL_GO, whole-task wall cap, and independent review receipts are required"
         )
     active_wall = Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "active-wall-issue85-task.json"
-    if not active_wall.is_file():
-        raise RuntimeError("the cumulative Issue 85 active-wall clock is missing; refusing to reset study time")
-    prior_clock = formal.read_json(active_wall)
+    prior_clock = _read_active_wall_clock(formal, active_wall)
     elapsed = _validate_active_wall_clock(prior_clock, cap, require_idle=require_idle_clock)
     if carry_manifest is not None:
         high_water = _carried_active_wall_high_water(carry_manifest, cap)
@@ -3525,7 +3538,7 @@ def _validate_worker_authorization(
     ):
         raise RuntimeError("worker job authorization/source/seed binding differs")
     wall_path = Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "active-wall-issue85-task.json"
-    wall = formal.read_json(wall_path)
+    wall = _read_active_wall_clock(formal, wall_path)
     supervisor = job.get("supervisor_pid")
     if (
         isinstance(supervisor, bool) or not isinstance(supervisor, int) or supervisor <= 0
