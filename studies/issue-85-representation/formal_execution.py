@@ -5166,24 +5166,33 @@ def _run_training_games(
         raise RuntimeError(f"formal training {arm}/{block} has {len(rows)} rows, expected {expected}")
     root = package_root / "training" / arm / f"block-{block:02d}" / "games"
     existing = []
+    existing_histories = []
     for row in rows:
-        result, _history = _unit_attempts(
+        result, history = _unit_attempts(
             formal, backend, root=root, row=row, package_commit=identity["package_commit"],
             lock_sha=identity["source_lock_sha256"], seed_table_sha256=seed_table_sha256,
             authorization_receipt_sha256=str(authorization["sha256"]),
         )
         existing.append(result)
+        existing_histories.append(history)
     if all(result is not None for result in existing):
         successes = []
-        for row in rows:
-            result, path = backend.existing_success_record(root, row, identity["package_commit"])
-            if result is None:
-                raise RuntimeError("formal training game success was not recoverable")
+        histories = {}
+        for index, row in enumerate(rows):
+            result = existing[index]
+            history = existing_histories[index]
+            record = backend.existing_success_record(root, row, identity["package_commit"])
+            if record is None:
+                raise RuntimeError("formal training game success record was not recoverable")
+            result, path = record
+            unit_id = str(row["unit_id"])
+            histories[unit_id] = history
             successes.append({
-                "unit_id": row["unit_id"], "owner_seed": int(row["owner_seed"]),
+                "unit_id": unit_id, "owner_seed": int(row["owner_seed"]),
                 "attempt_path": path.parent.relative_to(package_root).as_posix(),
                 "result_sha256": formal.file_sha256(path),
-                "attempt_count": len(list((root / "units" / backend.unit_key(row["unit_id"])).glob("attempt-*"))),
+                "model_digest": str(result["model_digest"]),
+                "attempt_count": len(list((root / "units" / backend.unit_key(unit_id)).glob("attempt-*"))),
             })
         receipt = {
             "schema_id": GROUP_SCHEMA, "status": "SUCCEEDED",
@@ -5192,13 +5201,28 @@ def _run_training_games(
             "source_lock_sha256": identity["source_lock_sha256"],
             "seed_table_sha256": seed_table_sha256,
             "authorization_receipt_sha256": str(authorization["sha256"]),
-            "row_count": len(rows), "completed": len(successes), "units": successes,
-            "created_utc": _now(),
+            "expected": len(rows), "completed": len(successes),
+            "successful_unit_ids": [item["unit_id"] for item in successes],
+            "units": successes,
+            "historical_attempts": histories,
+            "failed_attempt_count": sum(
+                1 for entries in histories.values() for item in entries
+                if item.get("status") != "SUCCEEDED"
+            ),
+            "active_wall_seconds_at_stage_close": clock.elapsed(),
         }
         receipt_path = root / "group-receipt.json"
         if receipt_path.is_file():
             existing_receipt = formal.read_json(receipt_path)
-            if {key: value for key, value in existing_receipt.items() if key != "created_utc"} != {key: value for key, value in receipt.items() if key != "created_utc"}:
+            comparable_existing = {
+                key: value for key, value in existing_receipt.items()
+                if key != "active_wall_seconds_at_stage_close"
+            }
+            comparable_receipt = {
+                key: value for key, value in receipt.items()
+                if key != "active_wall_seconds_at_stage_close"
+            }
+            if comparable_existing != comparable_receipt:
                 raise RuntimeError("immutable formal training group receipt differs")
             receipt = existing_receipt
         else:

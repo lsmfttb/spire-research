@@ -59,6 +59,98 @@ def test_formal_stage_stops_polling_pending_owners_after_failure_but_drains_acti
     ) is expected
 
 
+def test_completed_training_recovery_reuses_full_immutable_group_receipt(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    package_root = tmp_path / "package"
+    rows = [
+        {"owner_seed": 8400641, "unit_id": "TRAIN:8400641:B"},
+        {"owner_seed": 8400642, "unit_id": "TRAIN:8400642:B"},
+    ]
+    histories = {
+        rows[0]["unit_id"]: [{"attempt": "attempt-0001", "status": "FAILED", "failure_boundary": "worker"}],
+        rows[1]["unit_id"]: [],
+    }
+    results = {}
+    result_paths = {}
+    attempts = {rows[0]["unit_id"]: 2, rows[1]["unit_id"]: 1}
+    for row in rows:
+        unit_id = row["unit_id"]
+        unit_root = package_root / "training/B/block-05/games/units" / unit_id.replace(":", "-")
+        for attempt in range(1, attempts[unit_id] + 1):
+            attempt_root = unit_root / f"attempt-{attempt:04d}"
+            attempt_root.mkdir(parents=True, exist_ok=True)
+        result_path = unit_root / f"attempt-{attempts[unit_id]:04d}/result.json"
+        result = {"model_digest": "d" * 64, "unit_id": unit_id}
+        result_path.write_text(json.dumps(result, sort_keys=True), encoding="utf-8")
+        results[unit_id] = result
+        result_paths[unit_id] = result_path
+
+    group_root = package_root / "training/B/block-05/games"
+    receipt_path = group_root / "group-receipt.json"
+    units = [
+        {
+            "unit_id": row["unit_id"],
+            "owner_seed": row["owner_seed"],
+            "attempt_path": result_paths[row["unit_id"]].parent.relative_to(package_root).as_posix(),
+            "result_sha256": hashlib.sha256(result_paths[row["unit_id"]].read_bytes()).hexdigest(),
+            "model_digest": results[row["unit_id"]]["model_digest"],
+            "attempt_count": attempts[row["unit_id"]],
+        }
+        for row in rows
+    ]
+    receipt = {
+        "schema_id": formal_execution.GROUP_SCHEMA,
+        "status": "SUCCEEDED",
+        "stage_id": "TRAIN-B-BLOCK-05-GAMES",
+        "package_commit": "e" * 40,
+        "source_lock_sha256": "a" * 64,
+        "seed_table_sha256": "b" * 64,
+        "authorization_receipt_sha256": "c" * 64,
+        "expected": len(rows),
+        "completed": len(rows),
+        "successful_unit_ids": [row["unit_id"] for row in rows],
+        "units": units,
+        "historical_attempts": histories,
+        "failed_attempt_count": 1,
+        "active_wall_seconds_at_stage_close": 123.0,
+    }
+    receipt_path.write_text(json.dumps(receipt, sort_keys=True), encoding="utf-8")
+    original_bytes = receipt_path.read_bytes()
+
+    formal = SimpleNamespace(
+        CONTRACT={"training": {"owners_per_block": len(rows)}},
+        pilot=SimpleNamespace(_write_or_verify_once=lambda *_args: pytest.fail("existing receipt must not be rewritten")),
+        read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        file_sha256=lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+    )
+    backend = SimpleNamespace(
+        unit_key=lambda unit_id: unit_id.replace(":", "-"),
+        existing_success_record=lambda _root, row, _commit: (
+            results[row["unit_id"]], result_paths[row["unit_id"]],
+        ),
+    )
+    monkeypatch.setattr(formal_execution, "_training_rows", lambda *_args: rows)
+    monkeypatch.setattr(
+        formal_execution, "_unit_attempts",
+        lambda _formal, _backend, *, row, **_kwargs: (results[row["unit_id"]], histories[row["unit_id"]]),
+    )
+    clock = SimpleNamespace(elapsed=lambda: 999.0)
+
+    recovered = formal_execution._run_training_games(
+        formal, backend, package_root=package_root, seed={}, arm="B", block=5,
+        clock=clock,
+        identity={"package_commit": "e" * 40, "source_lock_sha256": "a" * 64},
+        seed_table_sha256="b" * 64, authorization={"sha256": "c" * 64},
+        issue84_source=tmp_path, progress_path=tmp_path / "formal-progress.json",
+    )
+
+    assert recovered["status"] == "SUCCEEDED"
+    assert recovered["active_wall_seconds_at_stage_close"] == 123.0
+    assert recovered["receipt_sha256"] == hashlib.sha256(original_bytes).hexdigest()
+    assert receipt_path.read_bytes() == original_bytes
+
+
 @pytest.mark.parametrize("block", range(8))
 def test_training_worker_accepts_issue84_block_dispatch_for_locked_pi12_lineage(block: int) -> None:
     row = {
