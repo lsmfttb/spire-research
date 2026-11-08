@@ -1962,6 +1962,43 @@ def test_resumed_formal_continuation_consumes_b03_features_from_group_root(
     assert resumed["b03_carried_units"][failed_id]["next_attempt"] == "attempt-0002"
 
 
+def test_stopped_b04_carry_includes_failed_owner_for_attempt_two(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    group_root = data_root / formal_execution.STOPPED_FORMAL_B04_GROUP_ROOT
+    group_root.mkdir(parents=True)
+    successful = {
+        f"TRAIN:{8400001 + index}:B": {"result": {"status": "SUCCEEDED"}}
+        for index in range(formal_execution.STOPPED_FORMAL_B04_COMPLETED)
+    }
+    failed = {
+        "unit_id": "TRAIN:8400635:B",
+        "attempt": "attempt-0001",
+        "attempt_path": "training/B/block-04/games/units/TRAIN-8400635-B/attempt-0001",
+        "status": "PRE_START_WORKER_FAILURE",
+        "failure_boundary": "before_started_receipt",
+        "attempt_count": 1,
+        "next_attempt": "attempt-0002",
+        "worker_job_sha256": "a" * 64,
+        "worker_log_sha256": "b" * 64,
+    }
+
+    carried = formal_execution._stopped_b04_carried_units(
+        SimpleNamespace(DATA_ROOT=data_root),
+        {"b04_carried_units": successful, "b04_failed_attempt": failed},
+    )
+
+    assert len(carried) == (
+        formal_execution.STOPPED_FORMAL_B04_COMPLETED
+        + formal_execution.STOPPED_FORMAL_B04_FAILED
+    )
+    failed_carry = carried["TRAIN:8400635:B"]
+    assert failed_carry["result"] is None
+    assert failed_carry["attempt_count"] == 1
+    assert failed_carry["next_attempt"] == "attempt-0002"
+    assert failed_carry["reference"] == failed
+    formal_execution._validate_prestart_carried_attempt(failed_carry)
+
+
 def _formal_attempt_fixture(tmp_path: Path, *, terminal: bool = True):
     root = tmp_path / "validation" / "A"
     row = {

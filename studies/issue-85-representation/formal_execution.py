@@ -1778,6 +1778,45 @@ def _validate_prestart_carried_attempt(carried: Mapping[str, Any]) -> None:
         raise RuntimeError("carried pre-start failure must resume at exactly its next attempt number")
 
 
+def _stopped_b04_carried_units(
+    formal: Any, stopped_payload: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Add the separately verified B/04 pre-start failure to the carried unit map."""
+    successful = stopped_payload.get("b04_carried_units")
+    failed = stopped_payload.get("b04_failed_attempt")
+    if not isinstance(successful, Mapping) or not isinstance(failed, Mapping):
+        raise RuntimeError("stopped B/04 carry lacks successful units or its retained failed attempt")
+    carried = {str(unit_id): dict(value) for unit_id, value in successful.items()}
+    unit_id = str(failed.get("unit_id", ""))
+    if not unit_id or unit_id in carried:
+        raise RuntimeError("stopped B/04 failed owner overlaps a successful carried unit")
+    failed_carry = {
+        "result": None,
+        "history": [{
+            "attempt": str(failed["attempt"]),
+            "status": str(failed["status"]),
+            "failure_boundary": str(failed["failure_boundary"]),
+            "worker_job_sha256": str(failed["worker_job_sha256"]),
+            "worker_log_sha256": str(failed["worker_log_sha256"]),
+            "started_receipt_absent": True,
+            "result_receipt_absent": True,
+            "finished_receipt_absent": True,
+            "source_package_commit": STOPPED_FORMAL_PACKAGE_COMMIT,
+            "next_attempt": str(failed["next_attempt"]),
+        }],
+        "attempt_count": int(failed["attempt_count"]),
+        "reference": dict(failed),
+        "next_attempt": str(failed["next_attempt"]),
+        "group_root": str(_inside(Path(formal.DATA_ROOT), STOPPED_FORMAL_B04_GROUP_ROOT)),
+        "package_commit": STOPPED_FORMAL_PACKAGE_COMMIT,
+    }
+    _validate_prestart_carried_attempt(failed_carry)
+    carried[unit_id] = failed_carry
+    if len(carried) != STOPPED_FORMAL_B04_COMPLETED + STOPPED_FORMAL_B04_FAILED:
+        raise RuntimeError("stopped B/04 carried unit count differs from retained progress")
+    return carried
+
+
 def _resumed_b02_group_receipt_matches(
     group: Mapping[str, Any], *, expected_unit_ids: Sequence[str],
 ) -> bool:
@@ -2769,7 +2808,7 @@ def _validate_resumed_formal_continuation(
         "b03_completed_group": stopped_payload["b03_group_receipt"],
         "b03_completed_group_root": stopped_payload["b03_group_root_path"],
         "b03_actor_update": stopped_payload["b03_actor_update_receipt"],
-        "b04_carried_units": stopped_payload["b04_carried_units"],
+        "b04_carried_units": _stopped_b04_carried_units(formal, stopped_payload),
         "b04_failed_attempt": stopped_payload["b04_failed_attempt"],
         "b04_pending_unit_ids": stopped_payload["b04_pending_unit_ids"],
     }
