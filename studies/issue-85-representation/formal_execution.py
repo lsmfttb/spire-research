@@ -2799,6 +2799,52 @@ def _stopped_formal_source_payload(
     }
 
 
+def _matches_failed_stage_recovery_live_snapshot(
+    source_live: Any, *, expected_ids: list[str],
+    expected_attempt_counts: Mapping[str, int],
+    preserved_prior_failure: Mapping[str, Any],
+) -> bool:
+    # The live status is mutable orchestration bookkeeping. The caller separately
+    # authenticates the failed formal-progress boundary and idle wall clock; the
+    # exact per-owner success/attempt fields below define this carryable boundary.
+    if not isinstance(source_live, Mapping):
+        return False
+    historical_attempts = source_live.get("historical_attempts")
+    if not isinstance(historical_attempts, Mapping):
+        return False
+    failed_id = "TRAIN:8400635:B"
+    expected_failed_history = [{
+        "attempt": "attempt-0001", "status": "PRE_START_WORKER_FAILURE",
+        "failure_boundary": "before_started_receipt",
+        "worker_job_sha256": str(preserved_prior_failure.get("worker_job_sha256", "")),
+        "worker_log_sha256": str(preserved_prior_failure.get("worker_log_sha256", "")),
+        "started_receipt_absent": True, "result_receipt_absent": True,
+        "finished_receipt_absent": True,
+        "source_package_commit": STOPPED_FORMAL_PACKAGE_COMMIT,
+        "next_attempt": "attempt-0002",
+    }]
+    return bool(
+        source_live.get("schema_id") == "issue85-formal-live-stage-v1"
+        and source_live.get("stage_id") == "TRAIN-B-BLOCK-04-GAMES"
+        and source_live.get("package_commit") == FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+        and source_live.get("source_lock_sha256") == PREDECESSOR_SOURCE_LOCK_SHA256
+        and source_live.get("seed_table_sha256") == FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256
+        and source_live.get("authorization_receipt_sha256") == FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256
+        and source_live.get("expected") == len(expected_ids) == 128
+        and source_live.get("successful_completions") == len(expected_ids)
+        and source_live.get("successful_unit_ids") == expected_ids
+        and source_live.get("pending_unit_ids") == []
+        and source_live.get("active_unit_ids") == []
+        and source_live.get("recent_failures") == []
+        and source_live.get("attempt_counts") == dict(expected_attempt_counts)
+        and historical_attempts.get(failed_id) == expected_failed_history
+        and all(
+            historical_attempts.get(unit_id, []) == []
+            for unit_id in expected_ids if unit_id != failed_id
+        )
+    )
+
+
 def _failed_stage_recovery_payload(
     formal: Any, *, backend: Any, seed: Mapping[str, Any],
     b03_actor_model_digest: str, preserved_prior_failure: Mapping[str, Any],
@@ -2895,35 +2941,10 @@ def _failed_stage_recovery_payload(
         or source_authorization.get("reviewer_approval", {}).get("decision") != "PASS"
         or source_authorization.get("reviewer_approval", {}).get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
         or source_authorization.get("reviewer_approval", {}).get("comment_url") != "https://github.com/lsmfttb/spire-research/issues/85#issuecomment-6719623503"
-        or source_live.get("schema_id") != "issue85-formal-live-stage-v1"
-        or source_live.get("status") != "RUNNING"
-        or source_live.get("stage_id") != "TRAIN-B-BLOCK-04-GAMES"
-        or source_live.get("package_commit") != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
-        or source_live.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
-        or source_live.get("seed_table_sha256") != FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256
-        or source_live.get("authorization_receipt_sha256") != FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256
-        or source_live.get("expected") != 128
-        or source_live.get("successful_completions") != 128
-        or source_live.get("successful_unit_ids") != expected_all_ids
-        or source_live.get("pending_unit_ids") != []
-        or source_live.get("active_unit_ids") != []
-        or source_live.get("recent_failures") != []
-        or source_live.get("attempt_counts") != expected_attempt_counts
-        or source_live.get("historical_attempts", {}).get("TRAIN:8400635:B") != [
-            {
-                "attempt": "attempt-0001", "status": "PRE_START_WORKER_FAILURE",
-                "failure_boundary": "before_started_receipt",
-                "worker_job_sha256": str(preserved_prior_failure.get("worker_job_sha256", "")),
-                "worker_log_sha256": str(preserved_prior_failure.get("worker_log_sha256", "")),
-                "started_receipt_absent": True, "result_receipt_absent": True,
-                "finished_receipt_absent": True,
-                "source_package_commit": STOPPED_FORMAL_PACKAGE_COMMIT,
-                "next_attempt": "attempt-0002",
-            },
-        ]
-        or any(
-            source_live.get("historical_attempts", {}).get(unit_id, []) != []
-            for unit_id in expected_all_ids if unit_id != "TRAIN:8400635:B"
+        or not _matches_failed_stage_recovery_live_snapshot(
+            source_live, expected_ids=expected_all_ids,
+            expected_attempt_counts=expected_attempt_counts,
+            preserved_prior_failure=preserved_prior_failure,
         )
         or expected_ids != expected_all_ids
         or len(_training_rows(seed, "B", 4)) != 128

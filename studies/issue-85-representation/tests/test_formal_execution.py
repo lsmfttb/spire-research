@@ -2084,6 +2084,51 @@ def test_stopped_b04_carry_includes_failed_owner_for_attempt_two(tmp_path: Path)
     formal_execution._validate_prestart_carried_attempt(failed_carry)
 
 
+def test_failed_stage_live_snapshot_uses_unit_evidence_not_stale_running_label() -> None:
+    expected_ids = [f"TRAIN:{owner}:B" for owner in range(8400513, 8400641)]
+    failed_id = "TRAIN:8400635:B"
+    attempts = {unit_id: (2 if unit_id == failed_id else 1) for unit_id in expected_ids}
+    prior_failure = {"worker_job_sha256": "a" * 64, "worker_log_sha256": "b" * 64}
+    live = {
+        "schema_id": "issue85-formal-live-stage-v1",
+        "status": "RUNNING",  # Stale heartbeat label after complete unit successes.
+        "stage_id": "TRAIN-B-BLOCK-04-GAMES",
+        "package_commit": formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": formal_execution.FAILED_STAGE_RECOVERY_SEED_TABLE_SHA256,
+        "authorization_receipt_sha256": formal_execution.FAILED_STAGE_RECOVERY_AUTHORIZATION_SHA256,
+        "expected": 128,
+        "successful_completions": 128,
+        "successful_unit_ids": expected_ids,
+        "pending_unit_ids": [],
+        "active_unit_ids": [],
+        "recent_failures": [],
+        "attempt_counts": attempts,
+        "historical_attempts": {
+            failed_id: [{
+                "attempt": "attempt-0001", "status": "PRE_START_WORKER_FAILURE",
+                "failure_boundary": "before_started_receipt",
+                "worker_job_sha256": prior_failure["worker_job_sha256"],
+                "worker_log_sha256": prior_failure["worker_log_sha256"],
+                "started_receipt_absent": True, "result_receipt_absent": True,
+                "finished_receipt_absent": True,
+                "source_package_commit": formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT,
+                "next_attempt": "attempt-0002",
+            }],
+        },
+    }
+
+    assert formal_execution._matches_failed_stage_recovery_live_snapshot(
+        live, expected_ids=expected_ids, expected_attempt_counts=attempts,
+        preserved_prior_failure=prior_failure,
+    )
+    with_active = dict(live, active_unit_ids=[expected_ids[-1]])
+    assert not formal_execution._matches_failed_stage_recovery_live_snapshot(
+        with_active, expected_ids=expected_ids, expected_attempt_counts=attempts,
+        preserved_prior_failure=prior_failure,
+    )
+
+
 def test_failed_stage_recovery_overlays_five_d3cb_successes_and_keeps_failure_history(tmp_path: Path) -> None:
     data_root = tmp_path / "data"
     source_root = data_root / formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_ROOT
@@ -2395,7 +2440,8 @@ def test_b04_actor_update_accepts_registered_mixed_source_carry_before_loading_e
     units = []
     rows = []
 
-    for owner_seed in range(8400635, 8400763):
+    # Exercise the registered B/04 roster, not a shifted synthetic 128-owner range.
+    for owner_seed in range(8400513, 8400641):
         unit_id = f'TRAIN:{owner_seed}:B'
         unit_key = unit_id.replace(':', '-')
         source_commit = recovered_source if owner_seed in recovered_owners else old_source
