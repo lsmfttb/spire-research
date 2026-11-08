@@ -107,6 +107,7 @@ STOPPED_FORMAL_B03_UPDATE_FILE_SHA256 = "3e841452dee9b4def012bb192a911aeaf41fbf9
 STOPPED_FORMAL_B04_LIVE_SHA256 = "10c2c42d7c7998eaf045f854070034ec7df787f4e984ce2b62540dd9d9a3e014"
 STOPPED_FORMAL_STOP_RECORD_SHA256 = "032a1e8c6b6391ae6abe054c3401edc74e263ef2905def6631aa67f250d8364c"
 STOPPED_FORMAL_WALL_RECEIPT_SHA256 = "8866d9f26e1130ae38db13b883bb5345b254a6e76bc6beb4032609195fd28259"
+STOPPED_FORMAL_ACTIVE_WALL_SECONDS = 41970.595754022004
 STOPPED_FORMAL_B03_GROUP_ROOT = STOPPED_FORMAL_PACKAGE_ROOT + "/training/B/block-03/games"
 STOPPED_FORMAL_B04_GROUP_ROOT = STOPPED_FORMAL_PACKAGE_ROOT + "/training/B/block-04/games"
 STOPPED_FORMAL_B04_LIVE_PATH = STOPPED_FORMAL_PACKAGE_ROOT + "/live-training-B-04.json"
@@ -210,6 +211,44 @@ def _validate_active_wall_clock(
     if require_idle and prior_clock.get("active_session") is None and process_ids:
         raise RuntimeError("the closed Issue 85 active-wall receipt still lists processes")
     return float(elapsed)
+
+
+def _validate_stopped_formal_clock_snapshot(
+    formal: Any, clock_path: Path, snapshot: Mapping[str, Any],
+) -> float:
+    """Accept the retained stop-time clock or an idle monotonic successor receipt."""
+    clock_path = Path(clock_path)
+    if not clock_path.is_file():
+        raise RuntimeError("the authoritative Issue 85 active-wall clock is missing")
+    current_clock = formal.read_json(clock_path)
+    current = _validate_active_wall_clock(
+        current_clock, FORMAL_ACTIVE_WALL_CAP_SECONDS, require_idle=True,
+    )
+    if current_clock.get("active_session") is not None or current_clock.get("process_ids") != []:
+        raise RuntimeError("the authoritative Issue 85 active-wall clock is not idle")
+    snapshot_elapsed = snapshot.get("elapsed_seconds")
+    source_sha = snapshot.get("source_active_wall_file_sha256")
+    if (
+        isinstance(snapshot_elapsed, bool)
+        or not isinstance(snapshot_elapsed, (int, float))
+        or not math.isfinite(float(snapshot_elapsed))
+        or float(snapshot_elapsed) < STOPPED_FORMAL_ACTIVE_WALL_SECONDS
+        or float(snapshot_elapsed) > current
+        or snapshot.get("active_session") is not None
+        or snapshot.get("process_ids") != []
+        or not isinstance(source_sha, str)
+        or re.fullmatch(r"[0-9a-f]{64}", source_sha) is None
+        or (
+            float(snapshot_elapsed) == current
+            and source_sha != formal.file_sha256(clock_path)
+        )
+        or (
+            float(snapshot_elapsed) == STOPPED_FORMAL_ACTIVE_WALL_SECONDS
+            and source_sha != STOPPED_FORMAL_WALL_RECEIPT_SHA256
+        )
+    ):
+        raise RuntimeError("stopped-package wall-clock snapshot is stale, active, or below the retained high-water")
+    return current
 
 
 def _validated_active_wall_seconds(value: Any, *, label: str) -> float:
@@ -541,7 +580,7 @@ def _validate_resumed_formal_continuation_shape(
         and pending == pending_ids
         and isinstance(elapsed, (int, float)) and not isinstance(elapsed, bool)
         and math.isfinite(float(elapsed))
-        and 41970.595754022004 <= float(elapsed) <= FORMAL_ACTIVE_WALL_CAP_SECONDS
+        and STOPPED_FORMAL_ACTIVE_WALL_SECONDS <= float(elapsed) <= FORMAL_ACTIVE_WALL_CAP_SECONDS
         and snapshot.get("active_session") is None and snapshot.get("process_ids") == []
         and valid_digest(snapshot.get("source_active_wall_file_sha256"))
     )
@@ -2227,20 +2266,14 @@ def _stopped_formal_source_payload(
         "b03_update": STOPPED_FORMAL_B03_UPDATE_FILE_SHA256,
         "b04_live": STOPPED_FORMAL_B04_LIVE_SHA256,
         "stop_record": STOPPED_FORMAL_STOP_RECORD_SHA256,
-        "active_wall": STOPPED_FORMAL_WALL_RECEIPT_SHA256,
     }
     for key, path in files.items():
+        if key == "active_wall":
+            continue
         if not path.is_file() or formal.file_sha256(path) != expected_hashes[key]:
             raise RuntimeError(f"retained stopped-package evidence is missing or changed: {key}")
     snapshot = dict(active_wall_clock_snapshot)
-    clock = formal.read_json(files["active_wall"])
-    elapsed = _validate_active_wall_clock(clock, FORMAL_ACTIVE_WALL_CAP_SECONDS, require_idle=True)
-    if (
-        snapshot.get("active_session") is not None or snapshot.get("process_ids") != []
-        or float(snapshot.get("elapsed_seconds", -1)) > float(elapsed)
-        or snapshot.get("source_active_wall_file_sha256") != formal.file_sha256(files["active_wall"])
-    ):
-        raise RuntimeError("stopped-package wall-clock snapshot is stale, active, or below the retained clock")
+    elapsed = _validate_stopped_formal_clock_snapshot(formal, files["active_wall"], snapshot)
 
     source_identity = {
         "package_commit": STOPPED_FORMAL_PACKAGE_COMMIT,

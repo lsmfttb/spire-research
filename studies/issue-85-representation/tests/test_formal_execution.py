@@ -1999,6 +1999,55 @@ def test_stopped_b04_carry_includes_failed_owner_for_attempt_two(tmp_path: Path)
     formal_execution._validate_prestart_carried_attempt(failed_carry)
 
 
+def test_stopped_formal_clock_snapshot_accepts_monotonic_receipt_updates(tmp_path: Path) -> None:
+    clock_path = tmp_path / "active-wall.json"
+    clock = {
+        "schema_id": "issue79-active-wall-clock-v1",
+        "mode": "issue85-task",
+        "elapsed_seconds": 41975.092402468006,
+        "active_session": None,
+        "process_ids": [],
+    }
+    clock_path.write_text(json.dumps(clock), encoding="utf-8")
+    formal = SimpleNamespace(
+        read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        file_sha256=lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+    )
+    original_snapshot = {
+        "elapsed_seconds": formal_execution.STOPPED_FORMAL_ACTIVE_WALL_SECONDS,
+        "active_session": None,
+        "process_ids": [],
+        "source_active_wall_file_sha256": formal_execution.STOPPED_FORMAL_WALL_RECEIPT_SHA256,
+    }
+
+    assert formal_execution._validate_stopped_formal_clock_snapshot(
+        formal, clock_path, original_snapshot,
+    ) == clock["elapsed_seconds"]
+
+    current_snapshot = {
+        "elapsed_seconds": clock["elapsed_seconds"],
+        "active_session": None,
+        "process_ids": [],
+        "source_active_wall_file_sha256": formal.file_sha256(clock_path),
+    }
+    assert formal_execution._validate_stopped_formal_clock_snapshot(
+        formal, clock_path, current_snapshot,
+    ) == clock["elapsed_seconds"]
+
+    stale_snapshot = {**current_snapshot, "elapsed_seconds": clock["elapsed_seconds"] + 1}
+    with pytest.raises(RuntimeError, match="stale, active, or below the retained high-water"):
+        formal_execution._validate_stopped_formal_clock_snapshot(
+            formal, clock_path, stale_snapshot,
+        )
+
+    active_clock = {**clock, "active_session": {"pid": 123}}
+    clock_path.write_text(json.dumps(active_clock), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="authoritative Issue 85 active-wall clock is not idle"):
+        formal_execution._validate_stopped_formal_clock_snapshot(
+            formal, clock_path, current_snapshot,
+        )
+
+
 def _formal_attempt_fixture(tmp_path: Path, *, terminal: bool = True):
     root = tmp_path / "validation" / "A"
     row = {
