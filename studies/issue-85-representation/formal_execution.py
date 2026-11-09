@@ -96,6 +96,15 @@ RESUMED_B03_GROUP_ROOT = RESUMED_FORMAL_PACKAGE_ROOT + "/training/B/block-03/gam
 RESUMED_B03_LIVE_PROGRESS_PATH = RESUMED_FORMAL_PACKAGE_ROOT + "/live-training-B-03.json"
 RESUMED_B03_LIVE_PROGRESS_SHA256 = "ca0579f756c1ca3d136b5b0ae59b65471b18ae9b681ffd5ad52b9e17fec56ee5"
 RESUMED_FORMAL_CONTINUATION_SCHEMA = "issue85-formal-resumed-package-continuation-v2"
+E902_CANONICAL_PACKAGE_COMMIT = "e902a953d55dfa5a2adbfbdaf0329370e9f2217a"
+E902_CANONICAL_PACKAGE_ROOT = "issue85/artifacts/formal/" + E902_CANONICAL_PACKAGE_COMMIT
+E902_CANONICAL_RECONCILIATION_SCHEMA = "issue85-formal-e902-canonical-reconciliation-v1"
+E902_CANONICAL_STAGE_KEYS = tuple(
+    [("B", block) for block in range(4, 8)]
+    + [("C", block) for block in range(6)]
+)
+E902_C06_STAGE_ID = "TRAIN-C-BLOCK-06-GAMES"
+B61_DUPLICATE_PACKAGE_COMMIT = "b61c6674e104739dc86a243486b0ed08335c6a76"
 STOPPED_FORMAL_PACKAGE_COMMIT = "8ac6fa868d4a81625304c7e9024db6e538b5a5b6"
 STOPPED_FORMAL_PACKAGE_ROOT = "issue85/artifacts/formal/" + STOPPED_FORMAL_PACKAGE_COMMIT
 STOPPED_FORMAL_SEED_TABLE_SHA256 = "0d831e3985b9dac909c9d745c817f3b3c2a26be82848654776fb3bd26af8735f"
@@ -433,6 +442,33 @@ def _resumed_formal_continuation_required(package_commit: str) -> bool:
         RESUMED_GAMES_PACKAGE_COMMIT,
         RESUMED_FORMAL_PACKAGE_COMMIT,
     }
+
+
+_E902_LINEAGE_REQUIRED_CACHE: dict[tuple[str, str], bool] = {}
+
+
+def _e902_canonical_lineage_required(formal: Any, identity: Mapping[str, str]) -> bool:
+    package_commit = str(identity.get("package_commit", ""))
+    if (
+        package_commit in {E902_CANONICAL_PACKAGE_COMMIT, B61_DUPLICATE_PACKAGE_COMMIT}
+        or identity.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or re.fullmatch(r"[0-9a-f]{40}", package_commit) is None
+        or not hasattr(formal, "__file__")
+    ):
+        return False
+    repository = Path(formal.__file__).resolve().parents[2]
+    key = (str(repository), package_commit)
+    if key not in _E902_LINEAGE_REQUIRED_CACHE:
+        head = subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "HEAD"],
+            check=False, capture_output=True, text=True,
+        )
+        ancestor = subprocess.run(
+            ["git", "-C", str(repository), "merge-base", "--is-ancestor", B61_DUPLICATE_PACKAGE_COMMIT, "HEAD"],
+            check=False, capture_output=True, text=True,
+        ) if head.returncode == 0 and head.stdout.strip() == package_commit else None
+        _E902_LINEAGE_REQUIRED_CACHE[key] = bool(ancestor is not None and ancestor.returncode == 0)
+    return _E902_LINEAGE_REQUIRED_CACHE[key]
 
 
 def _validate_resumed_formal_continuation_v2_shape(
@@ -815,7 +851,980 @@ def _validate_carry_manifest(
         raise RuntimeError("predecessor carry manifest is malformed or bound to another source/evidence")
     if actor_update_carries:
         _validate_operational_actor_update_carry(formal, actor_update_carries[0])
+    canonical_e902 = manifest.get("e902_canonical_reconciliation")
+    if canonical_e902 is not None:
+        _validate_e902_canonical_reconciliation(formal, package_root, identity, canonical_e902)
     return manifest, digest
+
+
+class _E902UnitBackend:
+    """Minimal path-key adapter for source-only receipt verification."""
+
+    @staticmethod
+    def unit_key(unit_id: str) -> str:
+        if re.fullmatch(r"TRAIN:[0-9]+:[BCDEF]", str(unit_id)) is None:
+            raise RuntimeError(f"invalid registered Issue 85 training unit id: {unit_id}")
+        return str(unit_id).replace(":", "-")
+
+
+def _e902_source_package_context(
+    formal: Any, data_root: Path, package_commit: str, rows_sha256: str,
+) -> dict[str, Any]:
+    root = _inside(data_root, f"issue85/artifacts/formal/{package_commit}")
+    seed_path = root / "formal-seed-table.json"
+    authorization_path = root / "formal-execution-authorization.json"
+    if not seed_path.is_file() or not authorization_path.is_file():
+        raise RuntimeError(f"canonical source package is missing its seed or authorization receipt: {package_commit}")
+    seed = formal.read_json(seed_path)
+    authorization = formal.read_json(authorization_path)
+    seed_sha256 = formal.file_sha256(seed_path)
+    authorization_sha256 = formal.file_sha256(authorization_path)
+    owner = authorization.get("owner_approval")
+    reviewer = authorization.get("reviewer_approval")
+    if (
+        seed.get("schema_id") != "issue85-formal-seed-table-v1"
+        or seed.get("package_commit") != package_commit
+        or seed.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or seed.get("contract_sha256") != formal.file_sha256(formal.CONTRACT_PATH)
+        or seed.get("row_count") != 7808
+        or seed.get("rows_sha256") != _hash_json(formal, seed.get("rows"))
+        or seed.get("rows_sha256") != rows_sha256
+        or authorization.get("schema_id") != AUTH_SCHEMA
+        or authorization.get("issue") != 85
+        or authorization.get("status") != "APPROVED"
+        or authorization.get("formal_go") is not True
+        or authorization.get("package_commit") != package_commit
+        or authorization.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or authorization.get("seed_table_sha256") != seed_sha256
+        or authorization.get("actor_update_schedule_sha256") != seed.get("actor_update_schedule_sha256")
+        or authorization.get("whole_task_active_wall_cap_seconds") != FORMAL_ACTIVE_WALL_CAP_SECONDS
+        or not isinstance(owner, Mapping)
+        or owner.get("status") != "APPROVED"
+        or owner.get("decision") != "FORMAL_GO"
+        or owner.get("comment_url") != FORMAL_GO_COMMENT_URL
+        or not isinstance(reviewer, Mapping)
+        or reviewer.get("status") != "APPROVED"
+        or reviewer.get("decision") != "PASS"
+        or reviewer.get("package_commit") != package_commit
+        or reviewer.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or reviewer.get("seed_table_sha256") != seed_sha256
+        or reviewer.get("actor_update_schedule_sha256") != seed.get("actor_update_schedule_sha256")
+    ):
+        raise RuntimeError(f"source package authorization/seed binding differs: {package_commit}")
+    return {
+        "package_root": root,
+        "seed": seed,
+        "seed_path": seed_path,
+        "seed_sha256": seed_sha256,
+        "authorization": authorization,
+        "authorization_path": authorization_path,
+        "authorization_sha256": authorization_sha256,
+    }
+
+
+def _e902_source_group_root(
+    data_root: Path, package_commit: str, arm: str, block: int,
+    unit_record: Mapping[str, Any],
+) -> tuple[Path, str]:
+    expected = f"{E902_CANONICAL_PACKAGE_ROOT}/training/{arm}/block-{block:02d}/games"
+    if package_commit == E902_CANONICAL_PACKAGE_COMMIT:
+        expected_root = expected
+    elif (arm, block) == ("B", 4) and package_commit in {
+        STOPPED_FORMAL_PACKAGE_COMMIT, FAILED_STAGE_RECOVERY_PACKAGE_COMMIT,
+    }:
+        expected_root = f"issue85/artifacts/formal/{package_commit}/training/B/block-04/games"
+    else:
+        raise RuntimeError(f"noncanonical source package appears in e902 {arm}/{block:02d}: {package_commit}")
+    declared_root = str(unit_record.get("source_group_root", expected_root))
+    if declared_root != expected_root:
+        raise RuntimeError(f"canonical source unit points at an unexpected group root: {declared_root}")
+    return _inside(data_root, expected_root), expected_root
+
+
+def _e902_cross_package_prestart_history(
+    formal: Any, *, data_root: Path, row: Mapping[str, Any], arm: str, block: int,
+    package_commit: str, source_attempt: Path, recorded_history: Any,
+    rows_sha256: str,
+) -> list[dict[str, Any]]:
+    """Verify the one B/04 attempt retained in 8ac before its d3cb retry."""
+    if recorded_history in (None, []):
+        return []
+    if (
+        package_commit != FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+        or (arm, block) != ("B", 4)
+        or not isinstance(recorded_history, list)
+        or len(recorded_history) != 1
+    ):
+        raise RuntimeError(f"unexpected cross-package attempt history for {row.get('unit_id')}")
+    entry = recorded_history[0]
+    expected_keys = {
+        "attempt", "failure_boundary", "finished_receipt_absent", "next_attempt",
+        "result_receipt_absent", "source_package_commit", "started_receipt_absent",
+        "status", "worker_job_sha256", "worker_log_sha256",
+    }
+    if (
+        not isinstance(entry, Mapping)
+        or set(entry) != expected_keys
+        or entry.get("attempt") != "attempt-0001"
+        or entry.get("failure_boundary") != "before_started_receipt"
+        or entry.get("finished_receipt_absent") is not True
+        or entry.get("next_attempt") != "attempt-0002"
+        or entry.get("result_receipt_absent") is not True
+        or entry.get("source_package_commit") != STOPPED_FORMAL_PACKAGE_COMMIT
+        or entry.get("started_receipt_absent") is not True
+        or entry.get("status") != "PRE_START_WORKER_FAILURE"
+        or re.fullmatch(r"[0-9a-f]{64}", str(entry.get("worker_job_sha256", ""))) is None
+        or re.fullmatch(r"[0-9a-f]{64}", str(entry.get("worker_log_sha256", ""))) is None
+        or source_attempt.name != "attempt-0002"
+    ):
+        raise RuntimeError(f"cross-package pre-start history differs from the registered B/04 retry: {row.get('unit_id')}")
+    old_source = _e902_source_package_context(
+        formal, data_root, STOPPED_FORMAL_PACKAGE_COMMIT, rows_sha256,
+    )
+    old_row = next((
+        value for value in old_source["seed"]["rows"]
+        if value.get("unit_id") == row.get("unit_id")
+    ), None)
+    old_root = _inside(data_root, STOPPED_FORMAL_B04_GROUP_ROOT)
+    old_attempt = old_root / "units" / str(row["unit_id"]).replace(":", "-") / "attempt-0001"
+    job_path, log_path = old_attempt / "worker-job.json", old_attempt / "worker.log"
+    started_path, result_path, finished_path = (
+        old_attempt / "started.json", old_attempt / "result.json", old_attempt / "finished.json",
+    )
+    job = formal.read_json(job_path) if job_path.is_file() else {}
+    if (
+        old_row != row
+        or not job_path.is_file() or not log_path.is_file()
+        or any(path.exists() for path in (started_path, result_path, finished_path))
+        or formal.file_sha256(job_path) != entry.get("worker_job_sha256")
+        or formal.file_sha256(log_path) != entry.get("worker_log_sha256")
+        or job.get("schema_id") != "issue79-owner-worker-job-v1"
+        or job.get("pilot") is not False or job.get("formal") is not True
+        or job.get("unit_id") != row.get("unit_id")
+        or job.get("run_id") != f"{row['unit_id']}-attempt-0001"
+        or job.get("row") != dict(row)
+        or job.get("phase") != row.get("phase")
+        or job.get("package_commit") != STOPPED_FORMAL_PACKAGE_COMMIT
+        or job.get("runner_code_commit") != STOPPED_FORMAL_PACKAGE_COMMIT
+        or job.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or job.get("seed_table_sha256") != old_source["seed_sha256"]
+        or job.get("authorization_receipt_sha256") != old_source["authorization_sha256"]
+        or Path(str(job.get("artifact_root", ""))).resolve() != old_root.resolve()
+        or Path(str(job.get("attempt_dir", ""))).resolve() != old_attempt.resolve()
+        or Path(str(job.get("result_path", ""))).resolve() != result_path.resolve()
+        or Path(str(job.get("output_dir", ""))).resolve() != (old_attempt / "native").resolve()
+        or "cumulative Issue 85 active-wall clock is missing" not in log_path.read_text(
+            encoding="utf-8", errors="replace",
+        )
+    ):
+        raise RuntimeError(f"cross-package B/04 pre-start attempt provenance differs: {row.get('unit_id')}")
+    return [dict(entry)]
+
+
+def _e902_unit_reference(
+    formal: Any, backend: Any, *, data_root: Path, context: Mapping[str, Any],
+    row: Mapping[str, Any], arm: str, block: int, group_root: Path,
+    group_root_relative: str, declared: Mapping[str, Any], recorded_history: Any = None,
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
+    package_commit = str(declared.get("source_package_commit", E902_CANONICAL_PACKAGE_COMMIT))
+    source = context if context.get("package_root") == _inside(data_root, f"issue85/artifacts/formal/{package_commit}") else None
+    if source is None:
+        raise RuntimeError(f"canonical unit lacks a verified source-package context: {package_commit}")
+    attempt_path = str(declared.get("attempt_path", ""))
+    source_attempt = _inside(Path(source["package_root"]), attempt_path)
+    if not _carried_attempt_path_matches_source_group(
+        source_attempt, group_root, backend.unit_key(str(row["unit_id"])),
+    ):
+        raise RuntimeError(f"canonical unit attempt path differs from its registered owner: {row['unit_id']}")
+    result, history = _unit_attempts(
+        formal, backend, root=group_root, row=row, package_commit=package_commit,
+        lock_sha=PREDECESSOR_SOURCE_LOCK_SHA256,
+        seed_table_sha256=str(source["seed_sha256"]),
+        authorization_receipt_sha256=str(source["authorization_sha256"]),
+        check_live_workers=False,
+    )
+    result_path = source_attempt / "result.json"
+    local_attempt_count = len([
+        path for path in (group_root / "units" / backend.unit_key(str(row["unit_id"]))).glob("attempt-*")
+        if path.is_dir()
+    ])
+    group_history = history if recorded_history is None else recorded_history
+    if not isinstance(group_history, list):
+        raise RuntimeError(f"canonical group history is malformed for {row['unit_id']}")
+    cross_package_history = (
+        _e902_cross_package_prestart_history(
+            formal, data_root=data_root, row=row, arm=arm, block=block,
+            package_commit=package_commit, source_attempt=source_attempt,
+            recorded_history=group_history, rows_sha256=str(source["seed"]["rows_sha256"]),
+        )
+        if package_commit == FAILED_STAGE_RECOVERY_PACKAGE_COMMIT else []
+    )
+    expected_group_history = cross_package_history + [dict(item) for item in history]
+    if group_history != expected_group_history:
+        raise RuntimeError(f"canonical group history differs from its source attempts: {row['unit_id']}")
+    attempt_count = local_attempt_count + len(cross_package_history)
+    combined_history = cross_package_history + [dict(item) for item in history]
+    if (
+        result is None
+        or result.get("status") != "SUCCEEDED"
+        or result.get("unit_id") != row.get("unit_id")
+        or result.get("owner_seed") != int(row["owner_seed"])
+        or result.get("package_commit") != package_commit
+        or result.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or result.get("expert_decisions") != 0
+        or formal.file_sha256(result_path) != declared.get("result_sha256")
+        or declared.get("attempt_count") != attempt_count
+        or (
+            declared.get("model_digest") is not None
+            and declared.get("model_digest") != result.get("model_digest")
+        )
+    ):
+        raise RuntimeError(f"canonical successful owner result/attempt differs: {row['unit_id']}")
+    started_path, finished_path = source_attempt / "started.json", source_attempt / "finished.json"
+    job_path, log_path = source_attempt / "worker-job.json", source_attempt / "worker.log"
+    if not all(path.is_file() for path in (started_path, finished_path, job_path, log_path)):
+        raise RuntimeError(f"canonical successful owner lacks immutable attempt provenance: {row['unit_id']}")
+    feature = _verify_training_feature_artifact(
+        formal, backend, group_root=group_root, attempt=source_attempt, result=result, row=row,
+    )
+    feature_path = _inside(group_root, feature["path"])
+    reference = {
+        "unit_id": str(row["unit_id"]),
+        "owner_seed": int(row["owner_seed"]),
+        "source_package_commit": package_commit,
+        "source_group_root": group_root_relative,
+        "source_seed_table_sha256": str(source["seed_sha256"]),
+        "source_authorization_path": Path(source["authorization_path"]).relative_to(
+            Path(source["package_root"]),
+        ).as_posix(),
+        "source_authorization_receipt_sha256": str(source["authorization_sha256"]),
+        "attempt_path": attempt_path,
+        "attempt_count": attempt_count,
+        "result_sha256": formal.file_sha256(result_path),
+        "started_receipt_sha256": formal.file_sha256(started_path),
+        "finished_receipt_sha256": formal.file_sha256(finished_path),
+        "worker_job_sha256": formal.file_sha256(job_path),
+        "worker_log_sha256": formal.file_sha256(log_path),
+        "training_features_path": feature["path"],
+        "training_features_sha256": feature["sha256"],
+        "training_features_uncompressed_sha256": feature["uncompressed_sha256"],
+        "model_digest": str(result["model_digest"]),
+        "history": combined_history,
+    }
+    if (
+        declared.get("finished_receipt_sha256") not in (None, reference["finished_receipt_sha256"])
+        or declared.get("training_features_sha256") not in (None, reference["training_features_sha256"])
+        or declared.get("training_features_uncompressed_sha256") not in (
+            None, reference["training_features_uncompressed_sha256"],
+        )
+    ):
+        raise RuntimeError(f"canonical group receipt feature/terminal hashes differ: {row['unit_id']}")
+    return reference, result, combined_history
+
+
+def _e902_formal_processes() -> list[dict[str, Any]]:
+    proc_root = Path("/proc")
+    if not proc_root.is_dir():
+        raise RuntimeError("cannot inspect /proc before resuming the canonical Issue 85 cohort")
+    active: list[dict[str, Any]] = []
+    for entry in proc_root.iterdir():
+        if not entry.name.isdecimal() or int(entry.name) in {os.getpid(), os.getppid()}:
+            continue
+        try:
+            command = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+        except OSError:
+            continue
+        if (
+            "formal_runner.py" in command and "--execute" in command
+        ) or (
+            "formal_execution.py" in command and "--worker" in command
+            and "issue85/artifacts/formal/" in command
+        ):
+            active.append({"pid": int(entry.name), "command": command[:1000]})
+    return active
+
+
+def _build_e902_canonical_reconciliation(
+    formal: Any, *, identity: Mapping[str, str], seed: Mapping[str, Any],
+    backend: Any | None = None,
+    wall_snapshot: Mapping[str, Any] | None = None,
+    require_idle: bool = True,
+) -> dict[str, Any]:
+    if (
+        identity.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or formal.file_sha256(formal.LOCK_PATH) != PREDECESSOR_SOURCE_LOCK_SHA256
+        or len(seed.get("rows", [])) != 7808
+        or seed.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+    ):
+        raise RuntimeError("canonical e902 carry requires the unchanged Issue 85 source lock and registered roster")
+    data_root = Path(formal.DATA_ROOT).resolve(strict=True)
+    successor_seed_path = data_root / "issue85" / "artifacts" / "formal" / str(identity["package_commit"]) / "formal-seed-table.json"
+    if not successor_seed_path.is_file():
+        raise RuntimeError("successor formal seed table must be frozen before canonical e902 reconciliation")
+    successor_seed = formal.read_json(successor_seed_path)
+    rows_sha256 = _hash_json(formal, seed["rows"])
+    if (
+        successor_seed.get("package_commit") != identity.get("package_commit")
+        or successor_seed.get("rows_sha256") != rows_sha256
+        or successor_seed.get("rows") != seed.get("rows")
+        or successor_seed.get("contract_sha256") != formal.file_sha256(formal.CONTRACT_PATH)
+    ):
+        raise RuntimeError("successor seed table differs from the frozen canonical e902 owner rows or contract")
+    canonical = _e902_source_package_context(
+        formal, data_root, E902_CANONICAL_PACKAGE_COMMIT, rows_sha256,
+    )
+    e902_root = Path(canonical["package_root"])
+    e902_progress_path = e902_root / "formal-progress.json"
+    b61_root = _inside(data_root, f"issue85/artifacts/formal/{B61_DUPLICATE_PACKAGE_COMMIT}")
+    b61_progress_path = b61_root / "formal-progress.json"
+    wall_path = data_root / "issue85/artifacts/active-wall-issue85-task.json"
+    for path in (e902_progress_path, b61_progress_path, wall_path):
+        if not path.is_file():
+            raise RuntimeError(f"canonical lineage reconciliation is missing required immutable clock/progress evidence: {path}")
+    e902_progress = formal.read_json(e902_progress_path)
+    b61_progress = formal.read_json(b61_progress_path)
+    current_wall = _validate_active_wall_clock(
+        formal.read_json(wall_path), FORMAL_ACTIVE_WALL_CAP_SECONDS,
+        require_idle=require_idle,
+    )
+    if require_idle and _e902_formal_processes():
+        raise RuntimeError("an Issue 85 formal supervisor or worker is still active; no continuation may start")
+    if (
+        e902_progress.get("schema_id") != PROGRESS_SCHEMA
+        or e902_progress.get("package_commit") != E902_CANONICAL_PACKAGE_COMMIT
+        or e902_progress.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or e902_progress.get("seed_table_sha256") != canonical["seed_sha256"]
+        or e902_progress.get("authorization_receipt_sha256") != canonical["authorization_sha256"]
+        or e902_progress.get("status") != "FAILED_OR_PAUSED"
+        or b61_progress.get("schema_id") != PROGRESS_SCHEMA
+        or b61_progress.get("package_commit") != B61_DUPLICATE_PACKAGE_COMMIT
+        or b61_progress.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or b61_progress.get("status") != "FAILED_OR_PAUSED"
+    ):
+        raise RuntimeError("canonical e902/b61 progress lineage differs from the audited paused execution trees")
+    e902_wall = _validated_active_wall_seconds(
+        e902_progress.get("cumulative_active_wall_seconds"), label="e902 cumulative active wall",
+    )
+    b61_wall = _validated_active_wall_seconds(
+        b61_progress.get("cumulative_active_wall_seconds"), label="b61 cumulative active wall",
+    )
+    if wall_snapshot is None:
+        wall_hash = formal.file_sha256(wall_path)
+        elapsed = float(current_wall)
+    else:
+        wall_hash = str(wall_snapshot.get("sha256", ""))
+        elapsed = _validated_active_wall_seconds(
+            wall_snapshot.get("elapsed_seconds"), label="recorded authoritative active wall",
+        )
+        if (
+            wall_snapshot.get("path") != wall_path.relative_to(data_root).as_posix()
+            or re.fullmatch(r"[0-9a-f]{64}", wall_hash) is None
+            or float(current_wall) < elapsed
+        ):
+            raise RuntimeError("authoritative active wall moved behind its immutable carry high-water")
+    if elapsed < b61_wall or round(b61_wall - e902_wall, 3) != 4489.969:
+        raise RuntimeError("authoritative wall clock or retained duplicate-run wall delta differs from the Planner ruling")
+    contexts: dict[str, dict[str, Any]] = {E902_CANONICAL_PACKAGE_COMMIT: canonical}
+    unit_backend = backend if backend is not None else _E902UnitBackend()
+    source_progress = formal.read_json(e902_progress_path)
+    groups: dict[str, Any] = {}
+    updates: dict[str, Any] = {}
+    model_digest_chains: dict[str, list[str]] = {}
+    for arm, block in E902_CANONICAL_STAGE_KEYS:
+        key = f"{arm}:{block}"
+        source_group_root = e902_root / "training" / arm / f"block-{block:02d}" / "games"
+        group_path = source_group_root / "group-receipt.json"
+        if not group_path.is_file():
+            raise RuntimeError(f"canonical e902 completed group receipt is missing: {arm}/{block:02d}")
+        group_sha256 = formal.file_sha256(group_path)
+        group = formal.read_json(group_path)
+        rows = _training_rows(canonical["seed"], arm, block)
+        expected_owners = list(range(8400001 + 128 * block, 8400001 + 128 * (block + 1)))
+        expected_ids = [f"TRAIN:{owner}:{arm}" for owner in expected_owners]
+        progress_group = source_progress.get("game_groups", {}).get(f"TRAIN-{arm}-BLOCK-{block:02d}")
+        if (
+            [int(row["owner_seed"]) for row in rows] != expected_owners
+            or [str(row["unit_id"]) for row in rows] != expected_ids
+            or group.get("schema_id") != GROUP_SCHEMA
+            or group.get("status") != "SUCCEEDED"
+            or group.get("stage_id") != f"TRAIN-{arm}-BLOCK-{block:02d}-GAMES"
+            or group.get("package_commit") != E902_CANONICAL_PACKAGE_COMMIT
+            or group.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+            or group.get("seed_table_sha256") != canonical["seed_sha256"]
+            or group.get("authorization_receipt_sha256") != canonical["authorization_sha256"]
+            or group.get("expected") != 128
+            or group.get("completed") != 128
+            or len(group.get("units", [])) != 128
+            or [str(item.get("unit_id")) for item in group.get("units", [])] != expected_ids
+            or not isinstance(progress_group, Mapping)
+            or progress_group.get("status") != "SUCCEEDED"
+            or progress_group.get("completed") != 128
+            or progress_group.get("receipt_sha256") != group_sha256
+        ):
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} group receipt or registered owner roster differs")
+        units: list[dict[str, Any]] = []
+        model_digests: set[str] = set()
+        for row, declared in zip(rows, group["units"], strict=True):
+            package_commit = str(declared.get("source_package_commit", E902_CANONICAL_PACKAGE_COMMIT))
+            if package_commit not in contexts:
+                contexts[package_commit] = _e902_source_package_context(
+                    formal, data_root, package_commit, rows_sha256,
+                )
+            group_root, group_root_relative = _e902_source_group_root(
+                data_root, package_commit, arm, block, declared,
+            )
+            source_row = next((value for value in contexts[package_commit]["seed"]["rows"] if value.get("unit_id") == row["unit_id"]), None)
+            if source_row != row:
+                raise RuntimeError(f"canonical source seed row differs for {row['unit_id']}")
+            reference, result, _history = _e902_unit_reference(
+                formal, unit_backend, data_root=data_root,
+                context=contexts[package_commit], row=row, arm=arm, block=block,
+                group_root=group_root, group_root_relative=group_root_relative,
+                declared=declared,
+                recorded_history=group.get("historical_attempts", {}).get(str(row["unit_id"]), []),
+            )
+            units.append(reference)
+            model_digests.add(str(result.get("model_digest")))
+        update_identity = {
+            "package_commit": E902_CANONICAL_PACKAGE_COMMIT,
+            "source_lock_sha256": PREDECESSOR_SOURCE_LOCK_SHA256,
+        }
+        update = _read_update_receipt(formal, e902_root, update_identity, arm=arm, block=block)
+        progress_update = source_progress.get("actor_updates", {}).get(key)
+        group_model_digest = next(iter(model_digests)) if len(model_digests) == 1 else None
+        if (
+            group_model_digest is None
+            or update.get("training_group_receipt_sha256") != group_sha256
+            or update.get("training_data_package_commit") != E902_CANONICAL_PACKAGE_COMMIT
+            or update.get("source_model_digest") != group_model_digest
+            or update.get("completed_steps") != int(formal.CONTRACT["training"]["updates_per_block"])
+            or not isinstance(progress_update, Mapping)
+            or progress_update.get("status") != "SUCCEEDED"
+            or progress_update.get("receipt_sha256") != update.get("receipt_sha256")
+            or progress_update.get("receipt_file_sha256") != update.get("receipt_file_sha256")
+        ):
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} update/checkpoint is not bound to its game group")
+        if block > 0:
+            previous = updates.get(f"{arm}:{block - 1}")
+            if previous is None:
+                previous = _read_update_receipt(
+                    formal, e902_root, update_identity, arm=arm, block=block - 1,
+                )
+            if update.get("source_model_digest") != previous.get("result_model_digest"):
+                raise RuntimeError(f"canonical e902 {arm}/{block:02d} model-digest chain is broken")
+        elif arm == "B":
+            previous = _read_update_receipt(formal, e902_root, update_identity, arm="B", block=3)
+            if update.get("source_model_digest") != previous.get("result_model_digest"):
+                raise RuntimeError("canonical e902 B/04 input model differs from the completed B/03 output")
+        elif update.get("source_model_record", {}).get("parent_checkpoint_sha256") != formal.LOCK["baseline_P"]["checkpoint_sha256"]:
+            raise RuntimeError("canonical e902 C/00 update is not initialized from the locked parent checkpoint")
+        model_digest_chains.setdefault(arm, []).append(str(update["result_model_digest"]))
+        groups[key] = {
+            "stage_id": str(group["stage_id"]),
+            "group_receipt_path": group_path.relative_to(e902_root).as_posix(),
+            "group_receipt_sha256": group_sha256,
+            "group_root": group_root_relative if len({u["source_group_root"] for u in units}) == 1 else str(source_group_root.relative_to(data_root)),
+            "completed": 128,
+            "units": units,
+        }
+        updates[key] = {
+            "arm": arm,
+            "block_index": block,
+            "source_package_commit": E902_CANONICAL_PACKAGE_COMMIT,
+            "source_package_root": E902_CANONICAL_PACKAGE_ROOT,
+            "source_lock_sha256": PREDECESSOR_SOURCE_LOCK_SHA256,
+            "source_update_receipt_path": str(update["receipt_path"]),
+            "source_update_receipt_file_sha256": str(update["receipt_file_sha256"]),
+            "source_predecessor_carry_manifest_sha256": update.get("predecessor_carry_manifest_sha256"),
+            "receipt_sha256": str(update["receipt_sha256"]),
+            "training_group_receipt_sha256": group_sha256,
+            "training_data_package_commit": E902_CANONICAL_PACKAGE_COMMIT,
+            "actor_checkpoint_path": str(update["actor_checkpoint_path"]),
+            "actor_checkpoint_sha256": str(update["actor_checkpoint_sha256"]),
+            "optimizer_checkpoint_path": str(update["optimizer_checkpoint_path"]),
+            "optimizer_checkpoint_sha256": str(update["optimizer_checkpoint_sha256"]),
+            "source_model_digest": str(update["source_model_digest"]),
+            "result_model_digest": str(update["result_model_digest"]),
+            "completed_steps": int(update["completed_steps"]),
+            "receipt_file_sha256": str(update["receipt_file_sha256"]),
+        }
+    c06_rows = _training_rows(canonical["seed"], "C", 6)
+    c06_root = e902_root / "training/C/block-06/games"
+    live_path = e902_root / "live-training-C-06.json"
+    if not live_path.is_file():
+        raise RuntimeError("canonical e902 C/06 partial live receipt is missing")
+    live = formal.read_json(live_path)
+    expected_success_ids = [f"TRAIN:{owner}:C" for owner in range(8400769, 8400851)]
+    failed_id = "TRAIN:8400851:C"
+    unstarted_ids = [f"TRAIN:{owner}:C" for owner in range(8400852, 8400897)]
+    if (
+        live.get("stage_id") != E902_C06_STAGE_ID
+        or live.get("package_commit") != E902_CANONICAL_PACKAGE_COMMIT
+        or live.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or live.get("seed_table_sha256") != canonical["seed_sha256"]
+        or live.get("authorization_receipt_sha256") != canonical["authorization_sha256"]
+        or live.get("status") != "PAUSED_AFTER_FAILED_ATTEMPT"
+        or live.get("successful_unit_ids") != expected_success_ids
+        or live.get("historical_attempts", {}).get(failed_id)
+        != [{"attempt": "attempt-0001", "status": "STARTED_WITHOUT_TERMINAL"}]
+    ):
+        raise RuntimeError("canonical e902 C/06 partial receipt does not match the 82/1/45 ruling")
+    if [str(row["unit_id"]) for row in c06_rows] != [
+        f"TRAIN:{owner}:C" for owner in range(8400769, 8400897)
+    ]:
+        raise RuntimeError("canonical e902 C/06 seed rows differ from the registered owner interval")
+    c06_units: list[dict[str, Any]] = []
+    rows_by_id = {str(row["unit_id"]): row for row in c06_rows}
+    for unit_id in expected_success_ids:
+        row = rows_by_id[unit_id]
+        source_group, source_group_relative = _e902_source_group_root(
+            data_root, E902_CANONICAL_PACKAGE_COMMIT, "C", 6, {},
+        )
+        context = canonical
+        unit_root = source_group / "units" / unit_backend.unit_key(unit_id)
+        attempts = sorted(path for path in unit_root.glob("attempt-*") if path.is_dir())
+        declared = next((
+            {"attempt_path": path.relative_to(e902_root).as_posix(),
+             "attempt_count": len(attempts),
+             "result_sha256": formal.file_sha256(path / "result.json"),
+             "model_digest": formal.read_json(path / "result.json").get("model_digest")}
+            for path in attempts if (path / "result.json").is_file()
+            and formal.read_json(path / "result.json").get("status") == "SUCCEEDED"
+        ), None)
+        if declared is None:
+            raise RuntimeError(f"canonical e902 C/06 success receipt is missing: {unit_id}")
+        reference, _result, _history = _e902_unit_reference(
+            formal, unit_backend, data_root=data_root, context=context,
+            row=row, arm="C", block=6, group_root=source_group,
+            group_root_relative=source_group_relative, declared=declared,
+        )
+        c06_units.append(reference)
+    failed_row = rows_by_id[failed_id]
+    failed_attempt = c06_root / "units" / unit_backend.unit_key(failed_id) / "attempt-0001"
+    failed_attempt_dirs = sorted(
+        path.name for path in (c06_root / "units" / unit_backend.unit_key(failed_id)).glob("attempt-*")
+        if path.is_dir()
+    )
+    failed_job, failed_log = failed_attempt / "worker-job.json", failed_attempt / "worker.log"
+    if (
+        failed_attempt_dirs != ["attempt-0001"]
+        or not failed_job.is_file() or not failed_log.is_file()
+        or (failed_attempt / "started.json").exists()
+        or (failed_attempt / "result.json").exists()
+        or (failed_attempt / "finished.json").exists()
+    ):
+        raise RuntimeError("canonical e902 C/06 8400851 attempt-0001 crossed a terminal boundary")
+    job = formal.read_json(failed_job)
+    if (
+        job.get("schema_id") != "issue79-owner-worker-job-v1"
+        or job.get("unit_id") != failed_id
+        or job.get("row") != failed_row
+        or job.get("package_commit") != E902_CANONICAL_PACKAGE_COMMIT
+        or job.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or job.get("seed_table_sha256") != canonical["seed_sha256"]
+        or job.get("authorization_receipt_sha256") != canonical["authorization_sha256"]
+        or not job.get("run_id", "").endswith("attempt-0001")
+    ):
+        raise RuntimeError("canonical e902 C/06 8400851 attempt-0001 job is not source/owner-bound")
+    partial_files = [
+        {"path": path.relative_to(failed_attempt).as_posix(), "sha256": formal.file_sha256(path)}
+        for path in sorted(failed_attempt.rglob("*"))
+        if path.is_file()
+    ]
+    unit_root = c06_root / "units" / unit_backend.unit_key(failed_id)
+    for unit_id in unstarted_ids:
+        root = c06_root / "units" / unit_backend.unit_key(unit_id)
+        if root.exists() and any(root.iterdir()):
+            raise RuntimeError(f"canonical e902 C/06 registered unstarted owner already has an attempt: {unit_id}")
+    c06_partial = {
+        "stage_id": E902_C06_STAGE_ID,
+        "live_progress_path": live_path.relative_to(e902_root).as_posix(),
+        "live_progress_sha256": formal.file_sha256(live_path),
+        "expected": 128,
+        "successful_completions": 82,
+        "successful_units": c06_units,
+        "started_without_terminal": {
+            "unit_id": failed_id,
+            "owner_seed": int(failed_row["owner_seed"]),
+            "source_package_commit": E902_CANONICAL_PACKAGE_COMMIT,
+            "source_group_root": str(c06_root.relative_to(data_root)),
+            "attempt_path": failed_attempt.relative_to(e902_root).as_posix(),
+            "status": "STARTED_WITHOUT_TERMINAL",
+            "attempt_count": 1,
+            "next_attempt": "attempt-0002",
+            "worker_job_sha256": formal.file_sha256(failed_job),
+            "worker_log_sha256": formal.file_sha256(failed_log),
+            "partial_attempt_files": partial_files,
+            "terminal_receipts_absent": True,
+        },
+        "unstarted_owner_ids": unstarted_ids,
+    }
+    record: dict[str, Any] = {
+        "schema_id": E902_CANONICAL_RECONCILIATION_SCHEMA,
+        "status": "VERIFIED_READ_ONLY_CANONICAL_CARRY",
+        "successor_package_commit": str(identity["package_commit"]),
+        "successor_source_lock_sha256": PREDECESSOR_SOURCE_LOCK_SHA256,
+        "successor_seed_table_sha256": formal.file_sha256(successor_seed_path),
+        "successor_rows_sha256": rows_sha256,
+        "contract_sha256": formal.file_sha256(formal.CONTRACT_PATH),
+        "owner_go_comment_url": FORMAL_GO_COMMENT_URL,
+        "canonical_source_package_commit": E902_CANONICAL_PACKAGE_COMMIT,
+        "canonical_source_package_root": E902_CANONICAL_PACKAGE_ROOT,
+        "canonical_source_lock_sha256": PREDECESSOR_SOURCE_LOCK_SHA256,
+        "canonical_seed_table_sha256": canonical["seed_sha256"],
+        "canonical_authorization_receipt_sha256": canonical["authorization_sha256"],
+        "canonical_rows_sha256": rows_sha256,
+        "canonical_formal_progress_sha256": formal.file_sha256(e902_progress_path),
+        "excluded_duplicate_package_commit": B61_DUPLICATE_PACKAGE_COMMIT,
+        "excluded_duplicate_formal_progress_sha256": formal.file_sha256(b61_progress_path),
+        "e902_cumulative_active_wall_seconds": e902_wall,
+        "b61_cumulative_active_wall_seconds": b61_wall,
+        "excluded_duplicate_active_wall_seconds": b61_wall - e902_wall,
+        "authoritative_active_wall_clock_path": wall_path.relative_to(data_root).as_posix(),
+        "authoritative_active_wall_clock_sha256": wall_hash,
+        "authoritative_active_wall_seconds": elapsed,
+        "groups": groups,
+        "actor_updates": updates,
+        "model_digest_chains": model_digest_chains,
+        "c06_partial": c06_partial,
+    }
+    record["record_sha256"] = _hash_json(formal, record)
+    return record
+
+
+def _validate_e902_canonical_reconciliation(
+    formal: Any, package_root: Path, identity: Mapping[str, str],
+    recorded: Mapping[str, Any],
+) -> dict[str, Any]:
+    seed_path = Path(package_root) / "formal-seed-table.json"
+    if not seed_path.is_file():
+        raise RuntimeError("canonical e902 continuation cannot validate before the successor seed table is frozen")
+    seed = formal.read_json(seed_path)
+    unsigned = {key: value for key, value in recorded.items() if key != "record_sha256"}
+    rows_sha256 = _hash_json(formal, seed.get("rows"))
+    data_root = Path(formal.DATA_ROOT).resolve(strict=True)
+    e902_root = _inside(data_root, E902_CANONICAL_PACKAGE_ROOT)
+    b61_root = _inside(data_root, f"issue85/artifacts/formal/{B61_DUPLICATE_PACKAGE_COMMIT}")
+    expected_keys = {f"{arm}:{block}" for arm, block in E902_CANONICAL_STAGE_KEYS}
+    groups = recorded.get("groups")
+    updates = recorded.get("actor_updates")
+    partial = recorded.get("c06_partial")
+    if (
+        recorded.get("schema_id") != E902_CANONICAL_RECONCILIATION_SCHEMA
+        or recorded.get("status") != "VERIFIED_READ_ONLY_CANONICAL_CARRY"
+        or recorded.get("record_sha256") != _hash_json(formal, unsigned)
+        or identity.get("package_commit") != recorded.get("successor_package_commit")
+        or identity.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or recorded.get("successor_source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or recorded.get("successor_seed_table_sha256") != formal.file_sha256(seed_path)
+        or recorded.get("successor_rows_sha256") != rows_sha256
+        or seed.get("row_count") != 7808 or len(seed.get("rows", [])) != 7808
+        or seed.get("rows_sha256") != rows_sha256
+        or recorded.get("contract_sha256") != formal.file_sha256(formal.CONTRACT_PATH)
+        or recorded.get("owner_go_comment_url") != FORMAL_GO_COMMENT_URL
+        or recorded.get("canonical_source_package_commit") != E902_CANONICAL_PACKAGE_COMMIT
+        or recorded.get("canonical_source_package_root") != E902_CANONICAL_PACKAGE_ROOT
+        or recorded.get("canonical_source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or recorded.get("excluded_duplicate_package_commit") != B61_DUPLICATE_PACKAGE_COMMIT
+        or not isinstance(groups, Mapping) or set(groups) != expected_keys
+        or not isinstance(updates, Mapping) or set(updates) != expected_keys
+        or not isinstance(partial, Mapping)
+        or partial.get("expected") != 128
+        or partial.get("successful_completions") != 82
+        or not isinstance(partial.get("successful_units"), list)
+        or any(not isinstance(item, Mapping) for item in partial.get("successful_units", []))
+        or [item.get("unit_id") for item in partial.get("successful_units", [])]
+        != [f"TRAIN:{owner}:C" for owner in range(8400769, 8400851)]
+        or not isinstance(partial.get("started_without_terminal"), Mapping)
+        or partial.get("unstarted_owner_ids")
+        != [f"TRAIN:{owner}:C" for owner in range(8400852, 8400897)]
+        or partial.get("started_without_terminal", {}).get("unit_id") != "TRAIN:8400851:C"
+        or partial.get("started_without_terminal", {}).get("status") != "STARTED_WITHOUT_TERMINAL"
+        or partial.get("started_without_terminal", {}).get("next_attempt") != "attempt-0002"
+    ):
+        raise RuntimeError("immutable e902 canonical reconciliation is malformed or bound to another source/roster")
+    for root, name, expected_sha in (
+        (e902_root, "formal-progress.json", recorded.get("canonical_formal_progress_sha256")),
+        (b61_root, "formal-progress.json", recorded.get("excluded_duplicate_formal_progress_sha256")),
+    ):
+        path = root / name
+        if not path.is_file() or formal.file_sha256(path) != expected_sha:
+            raise RuntimeError("canonical/duplicate formal progress changed after reconciliation")
+    canonical = _e902_source_package_context(
+        formal, data_root, E902_CANONICAL_PACKAGE_COMMIT, rows_sha256,
+    )
+    if (
+        canonical.get("seed_sha256") != recorded.get("canonical_seed_table_sha256")
+        or canonical.get("authorization_sha256") != recorded.get("canonical_authorization_receipt_sha256")
+        or recorded.get("canonical_rows_sha256") != rows_sha256
+    ):
+        raise RuntimeError("canonical e902 seed, authorization or owner rows changed after reconciliation")
+    wall_path = data_root / str(recorded.get("authoritative_active_wall_clock_path", ""))
+    if (
+        not wall_path.is_file()
+        or wall_path.relative_to(data_root).as_posix() != "issue85/artifacts/active-wall-issue85-task.json"
+        or re.fullmatch(r"[0-9a-f]{64}", str(recorded.get("authoritative_active_wall_clock_sha256", ""))) is None
+    ):
+        raise RuntimeError("canonical e902 carry lacks its original authoritative active-wall snapshot")
+    current_wall = _validate_active_wall_clock(
+        formal.read_json(wall_path), FORMAL_ACTIVE_WALL_CAP_SECONDS, require_idle=False,
+    )
+    if current_wall < _validated_active_wall_seconds(
+        recorded.get("authoritative_active_wall_seconds"), label="recorded authoritative active wall",
+    ):
+        raise RuntimeError("authoritative active wall moved behind its immutable carry high-water")
+    for arm, block in E902_CANONICAL_STAGE_KEYS:
+        key = f"{arm}:{block}"
+        group = groups[key]
+        if not isinstance(group, Mapping) or not isinstance(group.get("units"), list):
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} group unit map is malformed")
+        if any(not isinstance(item, Mapping) for item in group["units"]):
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} group contains a malformed unit reference")
+        rows = _training_rows(seed, arm, block)
+        expected_ids = [str(row["unit_id"]) for row in rows]
+        group_path = _inside(e902_root, str(group.get("group_receipt_path", "")))
+        if (
+            group.get("completed") != 128
+            or group.get("stage_id") != f"TRAIN-{arm}-BLOCK-{block:02d}-GAMES"
+            or len(rows) != 128
+            or [str(item.get("unit_id")) for item in group.get("units", [])] != expected_ids
+            or not group_path.is_file()
+            or formal.file_sha256(group_path) != group.get("group_receipt_sha256")
+        ):
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} group map or immutable receipt changed")
+        for row, reference in zip(rows, group["units"], strict=True):
+            if (
+                reference.get("owner_seed") != int(row["owner_seed"])
+                or reference.get("source_package_commit") == B61_DUPLICATE_PACKAGE_COMMIT
+                or not re.fullmatch(r"[0-9a-f]{64}", str(reference.get("result_sha256", "")))
+                or not re.fullmatch(r"[0-9a-f]{64}", str(reference.get("training_features_sha256", "")))
+                or not re.fullmatch(r"[0-9a-f]{64}", str(reference.get("training_features_uncompressed_sha256", "")))
+            ):
+                raise RuntimeError(f"canonical e902 {arm}/{block:02d} unit map has an invalid owner/source binding")
+            _e902_source_group_root(
+                data_root, str(reference.get("source_package_commit", "")), arm, block, reference,
+            )
+        update = updates[key]
+        if not isinstance(update, Mapping):
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} update map is malformed")
+        if (
+            update.get("source_package_commit") != E902_CANONICAL_PACKAGE_COMMIT
+            or update.get("source_package_root") != E902_CANONICAL_PACKAGE_ROOT
+            or update.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+            or update.get("training_group_receipt_sha256") != group.get("group_receipt_sha256")
+            or update.get("completed_steps") != int(formal.CONTRACT["training"]["updates_per_block"])
+            or not re.fullmatch(r"[0-9a-f]{64}", str(update.get("source_update_receipt_file_sha256", "")))
+        ):
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} update map is not bound to its group")
+        update_receipt = _inside(e902_root, str(update.get("source_update_receipt_path", "")))
+        if formal.file_sha256(update_receipt) != update.get("source_update_receipt_file_sha256"):
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} update receipt changed")
+    live_path = _inside(e902_root, str(partial.get("live_progress_path", "")))
+    if formal.file_sha256(live_path) != partial.get("live_progress_sha256"):
+        raise RuntimeError("canonical e902 C/06 partial live receipt changed")
+    failed = partial["started_without_terminal"]
+    failed_root = _inside(e902_root, str(failed.get("attempt_path", "")))
+    inventory = [
+        {"path": path.relative_to(failed_root).as_posix(), "sha256": formal.file_sha256(path)}
+        for path in sorted(failed_root.rglob("*")) if path.is_file()
+    ]
+    if inventory != failed.get("partial_attempt_files"):
+        raise RuntimeError("canonical e902 C/06 interrupted attempt changed after reconciliation")
+    duplicate_wall = float(recorded.get("b61_cumulative_active_wall_seconds", -1)) - float(
+        recorded.get("e902_cumulative_active_wall_seconds", -1)
+    )
+    if (
+        duplicate_wall <= 0
+        or not math.isclose(duplicate_wall, 4489.969, abs_tol=0.0005)
+        or recorded.get("excluded_duplicate_active_wall_seconds") != duplicate_wall
+    ):
+        raise RuntimeError("duplicate-run active-wall accounting differs from the Planner ruling")
+    return dict(recorded)
+
+
+def _e902_carried_units_from_references(
+    formal: Any, backend: Any, *, data_root: Path, seed: Mapping[str, Any],
+    references: Sequence[Mapping[str, Any]],
+    reconciliation_sha256: str,
+) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]]]:
+    rows = {str(row["unit_id"]): dict(row) for row in seed["rows"]}
+    contexts: dict[str, dict[str, Any]] = {}
+    carried: dict[str, dict[str, Any]] = {}
+    allowed_roots: dict[str, set[str]] = {}
+    for reference in references:
+        unit_id = str(reference["unit_id"])
+        row = rows.get(unit_id)
+        commit = str(reference["source_package_commit"])
+        if row is None:
+            raise RuntimeError(f"canonical e902 carry references an unregistered owner: {unit_id}")
+        if commit not in contexts:
+            contexts[commit] = _e902_source_package_context(
+                formal, data_root, commit, str(seed.get("rows_sha256", "")),
+            )
+        context = contexts[commit]
+        source_root = Path(context["package_root"])
+        group_root = _inside(data_root, str(reference["source_group_root"]))
+        attempt = _inside(source_root, str(reference["attempt_path"]))
+        if (
+            formal.file_sha256(context["seed_path"]) != reference.get("source_seed_table_sha256")
+            or formal.file_sha256(context["authorization_path"]) != reference.get("source_authorization_receipt_sha256")
+            or formal.file_sha256(attempt / "result.json") != reference.get("result_sha256")
+            or formal.file_sha256(attempt / "started.json") != reference.get("started_receipt_sha256")
+            or formal.file_sha256(attempt / "finished.json") != reference.get("finished_receipt_sha256")
+            or formal.file_sha256(attempt / "worker-job.json") != reference.get("worker_job_sha256")
+            or formal.file_sha256(attempt / "worker.log") != reference.get("worker_log_sha256")
+        ):
+            raise RuntimeError(f"canonical e902 unit evidence changed after reconciliation: {unit_id}")
+        result, history = _unit_attempts(
+            formal, backend, root=group_root, row=row, package_commit=commit,
+            lock_sha=PREDECESSOR_SOURCE_LOCK_SHA256,
+            seed_table_sha256=str(context["seed_sha256"]),
+            authorization_receipt_sha256=str(context["authorization_sha256"]),
+            check_live_workers=False,
+        )
+        if result is None or result.get("model_digest") != reference.get("model_digest"):
+            raise RuntimeError(f"canonical e902 carried result no longer validates: {unit_id}")
+        if int(reference["attempt_count"]) < 1:
+            raise RuntimeError(f"canonical e902 carried attempt count is invalid: {unit_id}")
+        carried[unit_id] = {
+            "result": result,
+            "history": history,
+            "attempt_count": int(reference["attempt_count"]),
+            "reference": dict(reference),
+            "group_root": str(group_root),
+            "package_commit": commit,
+            "canonical_reconciliation_sha256": reconciliation_sha256,
+        }
+        allowed_roots.setdefault(commit, set()).add(str(group_root.relative_to(data_root)))
+    return carried, {key: sorted(values) for key, values in allowed_roots.items()}
+
+
+def _e902_c06_carried_units(
+    formal: Any, backend: Any, *, data_root: Path, seed: Mapping[str, Any],
+    reconciliation: Mapping[str, Any],
+) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]]]:
+    partial = reconciliation["c06_partial"]
+    carried, allowed_roots = _e902_carried_units_from_references(
+        formal, backend, data_root=data_root, seed=seed,
+        references=partial["successful_units"],
+        reconciliation_sha256=str(reconciliation["record_sha256"]),
+    )
+    failed = dict(partial["started_without_terminal"])
+    unit_id = str(failed["unit_id"])
+    source_root = _inside(data_root, E902_CANONICAL_PACKAGE_ROOT)
+    group_root = _inside(data_root, str(failed["source_group_root"]))
+    attempt = _inside(source_root, str(failed["attempt_path"]))
+    inventory = [
+        {"path": path.relative_to(attempt).as_posix(), "sha256": formal.file_sha256(path)}
+        for path in sorted(attempt.rglob("*")) if path.is_file()
+    ]
+    if inventory != failed.get("partial_attempt_files"):
+        raise RuntimeError("canonical C/06 interrupted attempt files changed after reconciliation")
+    job_path, log_path = attempt / "worker-job.json", attempt / "worker.log"
+    if (
+        formal.file_sha256(job_path) != failed.get("worker_job_sha256")
+        or formal.file_sha256(log_path) != failed.get("worker_log_sha256")
+        or any((attempt / name).exists() for name in ("started.json", "result.json", "finished.json"))
+    ):
+        raise RuntimeError("canonical C/06 interrupted attempt now has a terminal or changed worker receipt")
+    ref = {
+        **failed,
+        "source_seed_table_sha256": str(reconciliation["canonical_seed_table_sha256"]),
+        "source_authorization_path": "formal-execution-authorization.json",
+        "source_authorization_receipt_sha256": str(reconciliation["canonical_authorization_receipt_sha256"]),
+    }
+    carried[unit_id] = {
+        "result": None,
+        "history": [{
+            "attempt": "attempt-0001",
+            "status": "STARTED_WITHOUT_TERMINAL",
+            "failure_boundary": "worker-job-started-without-terminal-receipt",
+            "worker_job_sha256": str(failed["worker_job_sha256"]),
+            "worker_log_sha256": str(failed["worker_log_sha256"]),
+            "started_receipt_absent": True,
+            "result_receipt_absent": True,
+            "finished_receipt_absent": True,
+            "source_package_commit": E902_CANONICAL_PACKAGE_COMMIT,
+            "next_attempt": "attempt-0002",
+        }],
+        "attempt_count": 1,
+        "reference": ref,
+        "next_attempt": "attempt-0002",
+        "group_root": str(group_root),
+        "package_commit": E902_CANONICAL_PACKAGE_COMMIT,
+        "canonical_reconciliation_sha256": str(reconciliation["record_sha256"]),
+    }
+    allowed_roots.setdefault(E902_CANONICAL_PACKAGE_COMMIT, set()).add(
+        str(group_root.relative_to(data_root)),
+    )
+    if set(carried) != {
+        *(str(item["unit_id"]) for item in partial["successful_units"]),
+        unit_id,
+    } or len(carried) != 83:
+        raise RuntimeError("canonical C/06 continuation must carry 82 successes and one nonterminal attempt")
+    return carried, {key: sorted(values) for key, values in allowed_roots.items()}
+
+
+def _validate_e902_carried_training_group(
+    formal: Any, backend: Any, *, arm: str, block: int,
+    rows: Sequence[Mapping[str, Any]], package_root: Path,
+    identity: Mapping[str, str], seed: Mapping[str, Any],
+    training_group: Mapping[str, Any], carry_manifest_sha256: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    manifest, expected_manifest_sha256 = _validate_carry_manifest(
+        formal, package_root, identity, expected_sha256=carry_manifest_sha256,
+    )
+    record = manifest.get("e902_canonical_reconciliation")
+    if not isinstance(record, Mapping):
+        raise RuntimeError("training group carry has no canonical e902 reconciliation")
+    record_sha256 = str(record.get("record_sha256", ""))
+    if (arm, block) == ("C", 6):
+        references = record.get("c06_partial", {}).get("successful_units")
+    else:
+        references = record.get("groups", {}).get(f"{arm}:{block}", {}).get("units")
+    if not isinstance(references, list):
+        raise RuntimeError(f"canonical e902 carry lacks the {arm}/{block:02d} source-unit map")
+    row_ids = {str(row["unit_id"]) for row in rows}
+    ref_ids = {str(item.get("unit_id")) for item in references if isinstance(item, Mapping)}
+    if len(ref_ids) != len(references) or not ref_ids.issubset(row_ids):
+        raise RuntimeError(f"canonical e902 {arm}/{block:02d} carry changes or duplicates registered owners")
+    expected_sources = {
+        str(item["unit_id"]): {
+            "package_commit": str(item["source_package_commit"]),
+            "group_root": str(item["source_group_root"]),
+        }
+        for item in references
+    }
+    group_receipt_path = package_root / "training" / arm / f"block-{block:02d}" / "games" / "group-receipt.json"
+    units_by_id = {
+        str(item.get("unit_id")): item
+        for item in training_group.get("units", []) if isinstance(item, Mapping)
+    }
+    if (
+        identity.get("source_lock_sha256") != PREDECESSOR_SOURCE_LOCK_SHA256
+        or expected_manifest_sha256 != carry_manifest_sha256
+        or training_group.get("status") != "SUCCEEDED"
+        or training_group.get("completed") != len(rows)
+        or training_group.get("training_data_package_commit") != identity.get("package_commit")
+        or training_group.get("predecessor_carry_manifest_sha256") != carry_manifest_sha256
+        or training_group.get("e902_canonical_reconciliation_sha256") != record_sha256
+        or dict(training_group.get("carried_unit_sources", {})) != expected_sources
+        or not group_receipt_path.is_file()
+        or formal.file_sha256(group_receipt_path) != training_group.get("receipt_sha256")
+        or set(units_by_id) != row_ids
+    ):
+        raise RuntimeError(f"canonical e902 {arm}/{block:02d} wrapper group is not bound to its carry map")
+    for reference in references:
+        unit_id = str(reference["unit_id"])
+        expected_unit = dict(reference)
+        expected_unit.update(expected_sources[unit_id])
+        if units_by_id.get(unit_id) != expected_unit:
+            raise RuntimeError(f"canonical e902 wrapper unit differs from its source reference: {unit_id}")
+    _e902_carried_units_from_references(
+        formal, backend, data_root=Path(formal.DATA_ROOT), seed=seed,
+        references=references, reconciliation_sha256=record_sha256,
+    )
+    return dict(record), [dict(item) for item in references]
 
 
 def _predecessor_units_from_carry_manifest(
@@ -1768,6 +2777,10 @@ def verify_predecessor_carry(
         else:
             manifest["resumed_formal_games_carried"] = 128 + RESUMED_B03_COMPLETED
             manifest["resumed_formal_actor_updates_carried"] = 2
+    if _e902_canonical_lineage_required(formal, identity):
+        manifest["e902_canonical_reconciliation"] = _build_e902_canonical_reconciliation(
+            formal, identity=identity, seed=seed, backend=backend,
+        )
     manifest["manifest_sha256"] = _hash_json(formal, manifest)
     created_manifest = False
     if manifest_path.exists():
@@ -1784,6 +2797,15 @@ def verify_predecessor_carry(
     else:
         raise RuntimeError("successor predecessor-carry manifest has not been established")
     manifest_sha = formal.file_sha256(manifest_path)
+    e902_reconciliation = manifest.get("e902_canonical_reconciliation")
+    e902_games_carried = (
+        sum(int(group.get("completed", 0)) for group in e902_reconciliation.get("groups", {}).values())
+        if isinstance(e902_reconciliation, Mapping) else 0
+    )
+    e902_updates_carried = (
+        len(e902_reconciliation.get("actor_updates", {}))
+        if isinstance(e902_reconciliation, Mapping) else 0
+    )
     return {
         "schema_id": "issue85-formal-predecessor-carry-verification-report-v1",
         "status": (
@@ -1801,7 +2823,10 @@ def verify_predecessor_carry(
         "total_formal_games_carried": (
             len(unit_manifest) + 128 * len(resumed_training_group_carries)
             + (0 if resumed_formal_continuation is None else int(manifest["resumed_formal_games_carried"]))
+            + e902_games_carried
         ),
+        "canonical_e902_games_carried": e902_games_carried,
+        "canonical_e902_actor_updates_carried": e902_updates_carried,
         "resumed_formal_games_carried": (
             0 if resumed_formal_continuation is None else int(manifest["resumed_formal_games_carried"])
         ),
@@ -1951,6 +2976,7 @@ def _validate_prestart_carried_attempt(carried: Mapping[str, Any]) -> None:
     reference = carried.get("reference")
     if not isinstance(reference, Mapping) or reference.get("status") not in {
         "PRE_START_AUTHORIZATION_FAILURE", "PRE_START_WORKER_FAILURE",
+        "STARTED_WITHOUT_TERMINAL",
     }:
         return
     attempt_count = carried.get("attempt_count")
@@ -1961,6 +2987,13 @@ def _validate_prestart_carried_attempt(carried: Mapping[str, Any]) -> None:
         or reference.get("next_attempt") != carried.get("next_attempt")
     ):
         raise RuntimeError("carried pre-start failure must resume at exactly its next attempt number")
+    if reference.get("status") == "STARTED_WITHOUT_TERMINAL" and (
+        reference.get("terminal_receipts_absent") is not True
+        or reference.get("attempt_path") == ""
+        or not re.fullmatch(r"[0-9a-f]{64}", str(reference.get("worker_job_sha256", "")))
+        or not re.fullmatch(r"[0-9a-f]{64}", str(reference.get("worker_log_sha256", "")))
+    ):
+        raise RuntimeError("carried started-without-terminal attempt lacks its immutable nonterminal evidence")
 
 
 def _stopped_b04_carried_units(
@@ -3282,6 +4315,12 @@ def _validate_resumed_formal_continuation(
         "b03_carried_units": carried_units,
         "b03_failed_attempt": dict(failed),
     }
+    e902_reconciliation = manifest.get("e902_canonical_reconciliation")
+    if isinstance(e902_reconciliation, Mapping):
+        validated["e902_canonical_reconciliation"] = dict(e902_reconciliation)
+        validated["e902_canonical_reconciliation_sha256"] = str(
+            e902_reconciliation["record_sha256"]
+        )
     if stopped_continuation is None:
         return validated
     current_seed = formal.read_json(package_root / "formal-seed-table.json")
@@ -3952,6 +4991,7 @@ def _run_formal_units(
     issue84_source: Path, clock: Any, progress_path: Path,
     carried_unit_results: Mapping[str, Mapping[str, Any]] | None = None,
     predecessor_carry_manifest_sha256: str | None = None,
+    e902_canonical_reconciliation_sha256: str | None = None,
 ) -> dict[str, Any]:
     if not rows or len({str(row["unit_id"]) for row in rows}) != len(rows):
         raise ValueError(f"{stage_id} must contain unique registered rows")
@@ -3979,26 +5019,50 @@ def _run_formal_units(
         )
         if carried is not None:
             _validate_prestart_carried_attempt(carried)
+            reference = carried.get("reference")
+            if not isinstance(reference, Mapping):
+                raise RuntimeError(f"{stage_id} carried attempt reference is outside its verified source unit: {unit_id}")
             source_package_commit = str(carried.get("package_commit", ""))
             expected_group_root = {
                 RESUMED_FORMAL_PACKAGE_COMMIT: RESUMED_B03_GROUP_ROOT,
                 STOPPED_FORMAL_PACKAGE_COMMIT: STOPPED_FORMAL_B04_GROUP_ROOT,
                 FAILED_STAGE_RECOVERY_PACKAGE_COMMIT: FAILED_STAGE_RECOVERY_GROUP_ROOT,
             }.get(source_package_commit)
+            canonical_e902 = carried.get("canonical_reconciliation_sha256")
+            canonical_stage = re.fullmatch(r"TRAIN-([BCDEF])-BLOCK-([0-7]{2})-GAMES", stage_id)
+            if (
+                (e902_canonical_reconciliation_sha256 is None and canonical_e902 is not None)
+                or (
+                    e902_canonical_reconciliation_sha256 is not None
+                    and canonical_e902 != e902_canonical_reconciliation_sha256
+                )
+            ):
+                raise RuntimeError(f"{stage_id} carried owner is not bound to the authenticated e902 reconciliation")
+            if canonical_e902 is not None:
+                if (
+                    e902_canonical_reconciliation_sha256 is None
+                    or canonical_e902 != e902_canonical_reconciliation_sha256
+                    or canonical_stage is None
+                ):
+                    raise RuntimeError(f"{stage_id} canonical e902 carry lacks its authenticated reconciliation")
+                expected_group_root, _expected_relative = _e902_source_group_root(
+                    Path(formal.DATA_ROOT), source_package_commit,
+                    canonical_stage.group(1), int(canonical_stage.group(2)),
+                    reference,
+                )
+            elif expected_group_root is not None:
+                expected_group_root = _inside(Path(formal.DATA_ROOT), expected_group_root)
             source_package_root = Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal" / source_package_commit
             source_group_root = Path(str(carried.get("group_root", ""))).resolve(strict=True)
             if (
                 int(carried.get("attempt_count", -1)) < 0
                 or expected_group_root is None
-                or source_group_root != _inside(Path(formal.DATA_ROOT), expected_group_root)
+                or source_group_root != expected_group_root
                 or not isinstance(carried.get("history"), list)
                 or (carried.get("result") is not None and local_attempts)
                 or (carried.get("result") is not None and local_result is not None)
             ):
                 raise RuntimeError(f"{stage_id} carried and successor attempts overlap or are malformed: {unit_id}")
-            reference = carried.get("reference")
-            if not isinstance(reference, Mapping):
-                raise RuntimeError(f"{stage_id} carried attempt reference is outside its verified source unit: {unit_id}")
             source_attempt = _inside(source_package_root, str(reference.get("attempt_path", "")))
             if not _carried_attempt_path_matches_source_group(
                 source_attempt, source_group_root, backend.unit_key(unit_id),
@@ -4250,6 +5314,8 @@ def _run_formal_units(
         final["carried_unit_sources"] = carried_sources
         final["training_data_package_commit"] = package_commit
         final["predecessor_carry_manifest_sha256"] = predecessor_carry_manifest_sha256
+    if e902_canonical_reconciliation_sha256 is not None:
+        final["e902_canonical_reconciliation_sha256"] = e902_canonical_reconciliation_sha256
     if rows[0].get("issue85_phase") == "validation":
         final["model_selection_or_tuning"] = False
     group_receipt = root / "group-receipt.json"
@@ -4299,6 +5365,71 @@ def _read_update_receipt(
     formal: Any, package_root: Path, identity: Mapping[str, str], *, arm: str, block: int,
 ) -> dict[str, Any]:
     path = package_root / "training" / arm / "updates" / f"block-{block:02d}" / "success-receipt.json"
+    if (
+        (arm, block) in E902_CANONICAL_STAGE_KEYS
+        and _e902_canonical_lineage_required(formal, identity)
+    ):
+        manifest, carry_manifest_sha256 = _validate_carry_manifest(formal, package_root, identity)
+        record = manifest.get("e902_canonical_reconciliation")
+        reference = record.get("actor_updates", {}).get(f"{arm}:{block}") if isinstance(record, Mapping) else None
+        if not isinstance(reference, Mapping):
+            raise RuntimeError(f"{arm}/{block:02d} actor update lacks a canonical e902 receipt reference")
+        if path.parent.exists() and any(path.parent.iterdir()):
+            raise RuntimeError(f"{arm}/{block:02d} actor update is both carried by reference and has local attempts")
+        source_root = _inside(Path(formal.DATA_ROOT), str(reference.get("source_package_root", "")))
+        source_identity = {
+            "package_commit": str(reference.get("source_package_commit", "")),
+            "source_lock_sha256": str(reference.get("source_lock_sha256", "")),
+        }
+        source_receipt = _read_update_receipt(
+            formal, source_root, source_identity, arm=arm, block=block,
+        )
+        bindings = {
+            "source_update_receipt_path": "receipt_path",
+            "source_update_receipt_file_sha256": "receipt_file_sha256",
+            "receipt_sha256": "receipt_sha256",
+            "training_group_receipt_sha256": "training_group_receipt_sha256",
+            "training_data_package_commit": "training_data_package_commit",
+            "source_predecessor_carry_manifest_sha256": "predecessor_carry_manifest_sha256",
+            "actor_checkpoint_path": "actor_checkpoint_path",
+            "actor_checkpoint_sha256": "actor_checkpoint_sha256",
+            "optimizer_checkpoint_path": "optimizer_checkpoint_path",
+            "optimizer_checkpoint_sha256": "optimizer_checkpoint_sha256",
+            "source_model_digest": "source_model_digest",
+            "result_model_digest": "result_model_digest",
+            "completed_steps": "completed_steps",
+        }
+        if (
+            any(reference.get(key) != source_receipt.get(value) for key, value in bindings.items())
+            or reference.get("source_update_receipt_file_sha256") != formal.file_sha256(
+                _inside(source_root, str(reference.get("source_update_receipt_path", "")))
+            )
+            or reference.get("training_group_receipt_sha256")
+            != record.get("groups", {}).get(f"{arm}:{block}", {}).get("group_receipt_sha256")
+        ):
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} update/checkpoint reference changed")
+        group_path = package_root / "training" / arm / f"block-{block:02d}" / "games" / "group-receipt.json"
+        if not group_path.is_file():
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} source update has no successor carry group")
+        group_receipt = formal.read_json(group_path)
+        group = {
+            **group_receipt,
+            "receipt_sha256": formal.file_sha256(group_path),
+            "group_root": str(group_path.parent),
+        }
+        _validate_e902_carried_training_group(
+            formal, _E902UnitBackend(), arm=arm, block=block,
+            rows=_training_rows(formal.read_json(package_root / "formal-seed-table.json"), arm, block),
+            package_root=package_root, identity=identity,
+            seed=formal.read_json(package_root / "formal-seed-table.json"),
+            training_group=group, carry_manifest_sha256=carry_manifest_sha256,
+        )
+        return {
+            **source_receipt,
+            "producer_package_root": str(source_root),
+            "carried_from_package_commit": str(reference["source_package_commit"]),
+            "carried_by_manifest_sha256": carry_manifest_sha256,
+        }
     if arm == "B" and block == 3 and _resumed_formal_continuation_required(str(identity.get("package_commit", ""))):
         carry_manifest, carry_manifest_sha256 = _validate_carry_manifest(formal, package_root, identity)
         continuation = carry_manifest.get("resumed_formal_continuation")
@@ -4664,6 +5795,23 @@ def _train_actor_block(
             or formal.file_sha256(group_receipt_path) != group_sha
         ):
             raise RuntimeError("B/block-03 actor update is not bound to the reviewed mixed-source game group")
+    elif training_group.get("e902_canonical_reconciliation_sha256") is not None:
+        manifest, expected_carry_sha256 = _validate_carry_manifest(
+            formal, package_root, identity,
+            expected_sha256=str(carry_manifest_sha256) if carry_manifest_sha256 is not None else None,
+        )
+        if (
+            training_data_package != identity["package_commit"]
+            or carry_manifest_sha256 != expected_carry_sha256
+            or not isinstance(manifest.get("e902_canonical_reconciliation"), Mapping)
+        ):
+            raise RuntimeError(f"{arm}/{block:02d} actor update lacks the canonical e902 lineage")
+        _validate_e902_carried_training_group(
+            formal, backend, arm=arm, block=block, rows=rows,
+            package_root=package_root, identity=identity,
+            seed=seed_table, training_group=training_group,
+            carry_manifest_sha256=expected_carry_sha256,
+        )
     elif arm == "B" and block == 4:
         manifest, expected_carry_sha256 = _validate_carry_manifest(
             formal, package_root, identity,
@@ -5243,7 +6391,34 @@ def _run_training_games(
         return {**receipt, "receipt_sha256": formal.file_sha256(receipt_path), "group_root": str(root)}
     carried_unit_results = None
     carry_manifest_sha256 = None
-    if arm == "B" and block == 3:
+    e902_reconciliation_sha256 = None
+    e902_reconciliation = (
+        resumed_formal_continuation.get("e902_canonical_reconciliation")
+        if isinstance(resumed_formal_continuation, Mapping) else None
+    )
+    if isinstance(e902_reconciliation, Mapping) and (arm, block) in E902_CANONICAL_STAGE_KEYS:
+        key = f"{arm}:{block}"
+        group = e902_reconciliation.get("groups", {}).get(key)
+        references = group.get("units") if isinstance(group, Mapping) else None
+        if not isinstance(references, list) or len(references) != expected:
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} group lacks its exact read-only owner map")
+        carried_unit_results, _allowed_source_roots = _e902_carried_units_from_references(
+            formal, backend, data_root=Path(formal.DATA_ROOT), seed=seed,
+            references=references,
+            reconciliation_sha256=str(e902_reconciliation["record_sha256"]),
+        )
+        if set(carried_unit_results) != {str(row["unit_id"]) for row in rows}:
+            raise RuntimeError(f"canonical e902 {arm}/{block:02d} carry changes its registered owner set")
+        carry_manifest_sha256 = resumed_formal_continuation.get("manifest_sha256")
+        e902_reconciliation_sha256 = str(e902_reconciliation["record_sha256"])
+    elif isinstance(e902_reconciliation, Mapping) and (arm, block) == ("C", 6):
+        carried_unit_results, _allowed_source_roots = _e902_c06_carried_units(
+            formal, backend, data_root=Path(formal.DATA_ROOT), seed=seed,
+            reconciliation=e902_reconciliation,
+        )
+        carry_manifest_sha256 = resumed_formal_continuation.get("manifest_sha256")
+        e902_reconciliation_sha256 = str(e902_reconciliation["record_sha256"])
+    elif arm == "B" and block == 3:
         if not isinstance(resumed_formal_continuation, Mapping):
             raise RuntimeError("B/03 continuation requires the reviewed read-only b8 package references")
         carried_unit_results = resumed_formal_continuation.get("b03_carried_units")
@@ -5270,6 +6445,7 @@ def _run_training_games(
         progress_path=progress_path.with_name(f"live-training-{arm}-{block:02d}.json"),
         carried_unit_results=carried_unit_results,
         predecessor_carry_manifest_sha256=carry_manifest_sha256,
+        e902_canonical_reconciliation_sha256=e902_reconciliation_sha256,
     ) | {"group_root": str(root)}
 
 
@@ -5472,6 +6648,11 @@ def execute_formal(
         formal, package_root, identity,
         expected_sha256=authorization["predecessor_carry_manifest_sha256"],
     )
+    if (
+        _e902_canonical_lineage_required(formal, identity)
+        and not isinstance(carry_manifest.get("e902_canonical_reconciliation"), Mapping)
+    ):
+        raise RuntimeError("formal continuation is missing its immutable canonical e902 reconciliation")
     if carry_manifest_sha256 != authorization["predecessor_carry_manifest_sha256"]:
         raise RuntimeError("source-bound authorization references a different predecessor carry manifest")
     resumed_formal_continuation = _validate_resumed_formal_continuation(
@@ -5550,8 +6731,16 @@ def execute_formal(
                 if game_group.get("status") != "SUCCEEDED" or game_group.get("completed") != int(formal.CONTRACT["training"]["owners_per_block"]):
                     raise RuntimeError(f"formal training games paused at {arm}/{block}; attempts are retained")
                 update_path = package_root / "training" / arm / "updates" / f"block-{block:02d}" / "success-receipt.json"
-                if not update_path.is_file() and arm == "B" and block in (0, 1, 2, 3) and (
-                    block == 0 or resumed_formal_continuation is not None
+                e902_update_carry = (
+                    isinstance(carry_manifest.get("e902_canonical_reconciliation"), Mapping)
+                    and f"{arm}:{block}" in carry_manifest["e902_canonical_reconciliation"].get("actor_updates", {})
+                )
+                if not update_path.is_file() and (
+                    e902_update_carry
+                    or (
+                        arm == "B" and block in (0, 1, 2, 3)
+                        and (block == 0 or resumed_formal_continuation is not None)
+                    )
                 ):
                     progress["active_stage"] = f"TRAIN-B-BLOCK-{block:02d}-ACTOR-UPDATE-CARRY-READ"
                     save_progress()

@@ -38,6 +38,161 @@ def test_carried_attempt_path_matches_its_source_group(tmp_path: Path) -> None:
     )
 
 
+def test_started_without_terminal_carry_preserves_attempt_and_retries_next_number() -> None:
+    reference = {
+        "status": "STARTED_WITHOUT_TERMINAL",
+        "attempt_count": 1,
+        "next_attempt": "attempt-0002",
+        "attempt_path": "training/C/block-06/games/units/TRAIN-8400851-C/attempt-0001",
+        "terminal_receipts_absent": True,
+        "worker_job_sha256": "a" * 64,
+        "worker_log_sha256": "b" * 64,
+    }
+    carried = {"attempt_count": 1, "next_attempt": "attempt-0002", "reference": reference}
+
+    formal_execution._validate_prestart_carried_attempt(carried)
+
+    with pytest.raises(RuntimeError, match="next attempt number"):
+        formal_execution._validate_prestart_carried_attempt({
+            **carried, "next_attempt": "attempt-0003",
+        })
+    with pytest.raises(RuntimeError, match="nonterminal evidence"):
+        formal_execution._validate_prestart_carried_attempt({
+            **carried, "reference": {**reference, "terminal_receipts_absent": False},
+        })
+
+
+def test_e902_source_group_root_only_accepts_the_registered_package_and_stage(tmp_path: Path) -> None:
+    root = tmp_path / "issue85" / "artifacts" / "formal" / formal_execution.E902_CANONICAL_PACKAGE_COMMIT
+    group = root / "training" / "C" / "block-06" / "games"
+    group.mkdir(parents=True)
+
+    resolved, relative = formal_execution._e902_source_group_root(
+        tmp_path, formal_execution.E902_CANONICAL_PACKAGE_COMMIT, "C", 6, {},
+    )
+
+    assert resolved == group.resolve()
+    assert relative == f"{formal_execution.E902_CANONICAL_PACKAGE_ROOT}/training/C/block-06/games"
+    with pytest.raises(RuntimeError, match="noncanonical source package"):
+        formal_execution._e902_source_group_root(tmp_path, "b61", "C", 6, {})
+
+
+def test_e902_reference_counts_and_validates_cross_package_prestart_history(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    row = {"unit_id": "TRAIN:8400635:B", "owner_seed": 8400635, "phase": "training"}
+    data_root = tmp_path
+    source_commit = formal_execution.FAILED_STAGE_RECOVERY_PACKAGE_COMMIT
+    source_package = data_root / "issue85/artifacts/formal" / source_commit
+    group_root = source_package / "training/B/block-04/games"
+    source_attempt = group_root / "units/TRAIN-8400635-B/attempt-0002"
+    source_attempt.mkdir(parents=True)
+    for name in ("started.json", "finished.json", "worker-job.json", "worker.log"):
+        (source_attempt / name).write_text("{}", encoding="utf-8")
+    result = {
+        "status": "SUCCEEDED", "unit_id": row["unit_id"], "owner_seed": row["owner_seed"],
+        "package_commit": source_commit,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "expert_decisions": 0, "model_digest": "c" * 64,
+    }
+    result_path = source_attempt / "result.json"
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+    feature_path = group_root / "units/TRAIN-8400635-B/attempt-0002/training-features.json.zlib"
+    feature_path.write_bytes(b"features")
+    authorization_path = source_package / "formal-execution-authorization.json"
+    authorization_path.parent.mkdir(parents=True, exist_ok=True)
+    authorization_path.write_text("{}", encoding="utf-8")
+    current_context = {
+        "package_root": source_package, "seed": {"rows_sha256": "a" * 64},
+        "seed_sha256": "b" * 64, "authorization_path": authorization_path,
+        "authorization_sha256": "d" * 64,
+    }
+
+    old_package = data_root / "issue85/artifacts/formal" / formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT
+    old_attempt = old_package / formal_execution.STOPPED_FORMAL_B04_GROUP_ROOT.split(
+        f"issue85/artifacts/formal/{formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT}/", 1,
+    )[1] / "units/TRAIN-8400635-B/attempt-0001"
+    old_attempt.mkdir(parents=True)
+    old_job_path, old_log_path = old_attempt / "worker-job.json", old_attempt / "worker.log"
+    old_authorization = old_package / "formal-execution-authorization.json"
+    old_authorization.parent.mkdir(parents=True, exist_ok=True)
+    old_authorization.write_text("{}", encoding="utf-8")
+    old_group_root = old_attempt.parents[2]
+    old_seed_sha, old_authorization_sha = "e" * 64, "f" * 64
+    old_context = {
+        "seed": {"rows": [row]}, "seed_sha256": old_seed_sha,
+        "authorization_sha256": old_authorization_sha,
+    }
+    monkeypatch.setattr(
+        formal_execution, "_e902_source_package_context",
+        lambda _formal, _data_root, package_commit, _rows_sha: old_context
+        if package_commit == formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT else current_context,
+    )
+    old_job = {
+        "schema_id": "issue79-owner-worker-job-v1", "pilot": False, "formal": True,
+        "unit_id": row["unit_id"], "run_id": f"{row['unit_id']}-attempt-0001",
+        "row": row, "phase": row["phase"],
+        "package_commit": formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT,
+        "runner_code_commit": formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": old_seed_sha,
+        "authorization_receipt_sha256": old_authorization_sha,
+        "artifact_root": str(old_group_root), "attempt_dir": str(old_attempt),
+        "result_path": str(old_attempt / "result.json"),
+        "output_dir": str(old_attempt / "native"),
+    }
+    old_job_path.write_text(json.dumps(old_job), encoding="utf-8")
+    old_log_path.write_text("RuntimeError: the cumulative Issue 85 active-wall clock is missing", encoding="utf-8")
+    sha = lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    recorded_history = [{
+        "attempt": "attempt-0001", "failure_boundary": "before_started_receipt",
+        "finished_receipt_absent": True, "next_attempt": "attempt-0002",
+        "result_receipt_absent": True,
+        "source_package_commit": formal_execution.STOPPED_FORMAL_PACKAGE_COMMIT,
+        "started_receipt_absent": True, "status": "PRE_START_WORKER_FAILURE",
+        "worker_job_sha256": sha(old_job_path), "worker_log_sha256": sha(old_log_path),
+    }]
+    fake_formal = SimpleNamespace(
+        read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        file_sha256=sha,
+    )
+    monkeypatch.setattr(formal_execution, "_unit_attempts", lambda *args, **kwargs: (result, []))
+    monkeypatch.setattr(
+        formal_execution, "_verify_training_feature_artifact",
+        lambda *_args, **_kwargs: {
+            "path": feature_path.relative_to(group_root).as_posix(),
+            "sha256": "1" * 64, "uncompressed_sha256": "2" * 64,
+        },
+    )
+    backend = SimpleNamespace(unit_key=lambda unit_id: unit_id.replace(":", "-"))
+    declared = {
+        "source_package_commit": source_commit,
+        "source_group_root": formal_execution.FAILED_STAGE_RECOVERY_GROUP_ROOT,
+        "attempt_path": "training/B/block-04/games/units/TRAIN-8400635-B/attempt-0002",
+        "attempt_count": 2, "result_sha256": sha(result_path),
+        "model_digest": result["model_digest"],
+    }
+
+    reference, verified_result, history = formal_execution._e902_unit_reference(
+        fake_formal, backend, data_root=data_root, context=current_context, row=row,
+        arm="B", block=4, group_root=group_root,
+        group_root_relative=formal_execution.FAILED_STAGE_RECOVERY_GROUP_ROOT,
+        declared=declared, recorded_history=recorded_history,
+    )
+
+    assert verified_result == result
+    assert reference["attempt_count"] == 2
+    assert history == recorded_history
+    assert reference["history"] == recorded_history
+    with pytest.raises(RuntimeError, match="pre-start attempt provenance"):
+        formal_execution._e902_cross_package_prestart_history(
+            fake_formal, data_root=data_root, row=row, arm="B", block=4,
+            package_commit=source_commit, source_attempt=source_attempt,
+            recorded_history=[{**recorded_history[0], "worker_log_sha256": "0" * 64}],
+            rows_sha256="a" * 64,
+        )
+
+
 @pytest.mark.parametrize(
     ("pending_count", "active_count", "stop_after_failure", "expected"),
     [
