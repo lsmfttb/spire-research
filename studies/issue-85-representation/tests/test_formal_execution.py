@@ -19,6 +19,34 @@ def test_formal_runner_exports_the_locked_wsl_data_root() -> None:
     assert formal_runner.DATA_ROOT_WSL == formal_runner.pilot.DATA_ROOT_WSL
 
 
+def test_same_data_path_accepts_windows_wsl_and_group_relative_spellings(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    target = data_root / "issue85" / "artifacts" / "formal" / "e549" / "games" / "group-receipt.json"
+    target.parent.mkdir(parents=True)
+    target.write_text("{}", encoding="utf-8")
+    relative = target.relative_to(data_root).as_posix()
+    wsl_root = "/mnt/d/DeadlyCatCoding/stsrl-data"
+    wsl_spelling = f"{wsl_root}/{relative}"
+
+    assert formal_execution._same_data_path(
+        str(target), target, data_root=data_root, data_root_wsl=wsl_root,
+    )
+    assert formal_execution._same_data_path(
+        wsl_spelling, target, data_root=data_root, data_root_wsl=wsl_root,
+    )
+    assert formal_execution._same_data_path(
+        target.name, target, data_root=data_root, data_root_wsl=wsl_root,
+    )
+    assert not formal_execution._same_data_path(
+        f"{wsl_root}/{relative}/../other.json", target,
+        data_root=data_root, data_root_wsl=wsl_root,
+    )
+    assert not formal_execution._same_data_path(
+        f"{wsl_root}/issue85/other/group-receipt.json", target,
+        data_root=data_root, data_root_wsl=wsl_root,
+    )
+
+
 def test_formal_game_carry_total_counts_registered_overlap_once() -> None:
     resumed_training = [{"stage_id": "TRAIN-B-BLOCK-01-GAMES", "completed": 128}]
     resumed_formal = {

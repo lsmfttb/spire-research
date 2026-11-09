@@ -12,7 +12,7 @@ import hashlib
 import json
 import math
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import random
 import re
 import signal
@@ -202,6 +202,48 @@ def _resolves_to(value: Any, expected: Path) -> bool:
         return Path(value).resolve(strict=True) == Path(expected).resolve(strict=True)
     except (OSError, RuntimeError, ValueError):
         return False
+
+
+def _same_data_path(
+    value: Any, expected: Path, *, data_root: Path, data_root_wsl: str | None = None,
+) -> bool:
+    """Match an existing pinned artifact path across the Windows and WSL roots."""
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        root = Path(data_root).resolve(strict=True)
+        target = Path(expected).resolve(strict=True)
+        relative = target.relative_to(root).as_posix()
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+    if _resolves_to(value, target):
+        return True
+
+    recorded = value.replace("\\", "/")
+    roots = {root.as_posix().rstrip("/")}
+    if data_root_wsl:
+        roots.add(PurePosixPath(data_root_wsl).as_posix().rstrip("/"))
+    root_text = root.as_posix().rstrip("/")
+    windows_root = re.fullmatch(r"([A-Za-z]):(?:/(.*))?", root_text)
+    if windows_root:
+        drive, tail = windows_root.groups()
+        roots.add(f"/mnt/{drive.lower()}" + (f"/{tail}" if tail else ""))
+    wsl_root = re.fullmatch(r"/mnt/([A-Za-z])(?:/(.*))?", root_text)
+    if wsl_root:
+        drive, tail = wsl_root.groups()
+        roots.add(f"{drive.upper()}:/" + (tail or ""))
+
+    if any(recorded == f"{candidate}/{relative}" for candidate in roots):
+        return True
+
+    # Older receipts may store the leaf receipt name relative to its own group directory.
+    if not PurePosixPath(recorded).is_absolute() and not re.match(r"^[A-Za-z]:/", recorded):
+        try:
+            return (target.parent / value).resolve(strict=True) == target
+        except (OSError, RuntimeError, ValueError):
+            return False
+    return False
 
 
 def _carried_attempt_path_matches_source_group(
@@ -2689,7 +2731,10 @@ def verify_predecessor_carry(
         or prior_group.get("authorization_receipt_sha256") != PREDECESSOR_AUTHORIZATION_SHA256
         or prior_group.get("expected") != 128 or prior_group.get("completed") != 128
         or prior_group.get("failed_attempt_count") != 0
-        or prior_group.get("group_root") != str(old_group_root)
+        or not _same_data_path(
+            prior_group.get("group_root"), old_group_root,
+            data_root=data_root, data_root_wsl=getattr(formal, "DATA_ROOT_WSL", None),
+        )
         or prior_group.get("receipt_sha256") != PREDECESSOR_GROUP_RECEIPT_SHA256
         or not isinstance(group_receipt.get("units"), list)
         or len(group_receipt["units"]) != 128
@@ -2702,7 +2747,10 @@ def verify_predecessor_carry(
         or group_receipt.get("authorization_receipt_sha256") != PREDECESSOR_AUTHORIZATION_SHA256
         or group_receipt.get("completed") != 128
         or prior_group.get("successful_unit_ids") != unit_ids
-        or not _resolves_to(prior_group.get("receipt_path"), old_group_path)
+        or not _same_data_path(
+            prior_group.get("receipt_path"), old_group_path,
+            data_root=data_root, data_root_wsl=getattr(formal, "DATA_ROOT_WSL", None),
+        )
         or prior_group.get("receipt_sha256") != formal.file_sha256(old_group_path)
     ):
         raise RuntimeError("predecessor progress/group receipt is incomplete, inconsistent, or already updated")
