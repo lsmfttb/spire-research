@@ -13,7 +13,10 @@ from c06_resume_adapter import (
 )
 
 
-def _fixture(tmp_path: Path, monkeypatch, *, successful_completions: int = 82):
+def _fixture(
+    tmp_path: Path, monkeypatch, *, successful_completions: int = 82,
+    unstarted_owner_ids: list[str] | None = None,
+):
     package_root = tmp_path / "formal-package"
     package_root.mkdir()
     (package_root / "formal-seed-table.json").write_text('{"seed":"current"}', encoding="utf-8")
@@ -39,7 +42,11 @@ def _fixture(tmp_path: Path, monkeypatch, *, successful_completions: int = 82):
             "stage_id": "TRAIN-C-BLOCK-06-GAMES",
             "successful_completions": successful_completions,
             "successful_units": [{} for _ in range(successful_completions)],
-            "unstarted_owner_ids": 45,
+            "unstarted_owner_ids": (
+                unstarted_owner_ids
+                if unstarted_owner_ids is not None
+                else [f"TRAIN:{owner}:C" for owner in range(8400852, 8400897)]
+            ),
             "started_without_terminal": {
                 "unit_id": "TRAIN:8400851:C",
                 "status": "STARTED_WITHOUT_TERMINAL",
@@ -186,6 +193,29 @@ def test_c06_adapter_rejects_a_changed_canonical_boundary_before_starting(tmp_pa
         formal, execution, authorization, issue84, native, stsr,
         _package_root, runs, updates, _written, clock,
     ) = _fixture(tmp_path, monkeypatch, successful_completions=81)
+
+    with pytest.raises(RuntimeError, match="82/1/45 boundary"):
+        execute_c06_continuation(
+            formal, execution,
+            issue84_source=issue84, native_source=native, stsr_source=stsr,
+            authorization_receipt=authorization, adapter_commit="adapter-commit",
+            adapter_sha256="adapter-hash",
+        )
+
+    assert runs == []
+    assert updates == []
+    assert not clock.closed
+
+
+def test_c06_adapter_rejects_a_changed_unstarted_owner_list_before_starting(tmp_path, monkeypatch):
+    wrong_owner_ids = [
+        *[f"TRAIN:{owner}:C" for owner in range(8400852, 8400896)],
+        "TRAIN:8400897:C",
+    ]
+    (
+        formal, execution, authorization, issue84, native, stsr,
+        _package_root, runs, updates, _written, clock,
+    ) = _fixture(tmp_path, monkeypatch, unstarted_owner_ids=wrong_owner_ids)
 
     with pytest.raises(RuntimeError, match="82/1/45 boundary"):
         execute_c06_continuation(

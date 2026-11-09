@@ -73,11 +73,14 @@ def execute_c06_continuation(
     reconciliation = carry.get("e902_canonical_reconciliation")
     partial = reconciliation.get("c06_partial") if isinstance(reconciliation, Mapping) else None
     interrupted = partial.get("started_without_terminal") if isinstance(partial, Mapping) else None
+    expected_unstarted_owner_ids = [
+        f"TRAIN:{owner}:C" for owner in range(8400852, C06_OWNER_STOP + 1)
+    ]
     if (
         not isinstance(partial, Mapping)
         or partial.get("stage_id") != "TRAIN-C-BLOCK-06-GAMES"
         or partial.get("successful_completions") != 82
-        or partial.get("unstarted_owner_ids") != 45
+        or partial.get("unstarted_owner_ids") != expected_unstarted_owner_ids
         or not isinstance(partial.get("successful_units"), list)
         or len(partial["successful_units"]) != 82
         or not isinstance(interrupted, Mapping)
