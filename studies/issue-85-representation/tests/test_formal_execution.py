@@ -341,6 +341,70 @@ def test_e902_source_group_root_only_accepts_the_registered_package_and_stage(tm
         formal_execution._e902_source_group_root(tmp_path, "b61", "C", 6, {})
 
 
+def test_e902_carried_training_wrapper_preserves_source_unit_shape(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    unit_id = "TRAIN:8400513:B"
+    source_commit = formal_execution.E902_CANONICAL_PACKAGE_COMMIT
+    source_group_root = "issue85/artifacts/formal/e902/training/B/block-04/games"
+    reference = {
+        "unit_id": unit_id,
+        "owner_seed": 8400513,
+        "source_package_commit": source_commit,
+        "source_group_root": source_group_root,
+    }
+    carry_sha256 = "a" * 64
+    record_sha256 = "b" * 64
+    receipt_sha256 = "c" * 64
+    record = {
+        "record_sha256": record_sha256,
+        "groups": {"B:4": {"units": [reference]}},
+    }
+    manifest = {"e902_canonical_reconciliation": record}
+    monkeypatch.setattr(
+        formal_execution, "_validate_carry_manifest",
+        lambda *_args, **_kwargs: (manifest, carry_sha256),
+    )
+    monkeypatch.setattr(
+        formal_execution, "_e902_carried_units_from_references",
+        lambda *_args, **_kwargs: None,
+    )
+    data_root = tmp_path / "data"
+    package_root = tmp_path / "package"
+    group_receipt = package_root / "training/B/block-04/games/group-receipt.json"
+    group_receipt.parent.mkdir(parents=True)
+    group_receipt.write_text("{}", encoding="utf-8")
+    fake_formal = SimpleNamespace(
+        DATA_ROOT=data_root,
+        file_sha256=lambda _path: receipt_sha256,
+    )
+    identity = {
+        "package_commit": "d" * 40,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+    }
+    training_group = {
+        "status": "SUCCEEDED",
+        "completed": 1,
+        "training_data_package_commit": identity["package_commit"],
+        "predecessor_carry_manifest_sha256": carry_sha256,
+        "e902_canonical_reconciliation_sha256": record_sha256,
+        "carried_unit_sources": {
+            unit_id: {"package_commit": source_commit, "group_root": source_group_root},
+        },
+        "receipt_sha256": receipt_sha256,
+        "units": [dict(reference)],
+    }
+
+    checked_record, checked_references = formal_execution._validate_e902_carried_training_group(
+        fake_formal, object(), arm="B", block=4, rows=[{"unit_id": unit_id}],
+        package_root=package_root, identity=identity, seed={},
+        training_group=training_group, carry_manifest_sha256=carry_sha256,
+    )
+
+    assert checked_record == record
+    assert checked_references == [reference]
+
+
 def test_e902_reference_counts_and_validates_cross_package_prestart_history(
     tmp_path: Path, monkeypatch,
 ) -> None:

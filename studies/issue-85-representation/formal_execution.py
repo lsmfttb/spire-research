@@ -1862,7 +1862,6 @@ def _validate_e902_carried_training_group(
     for reference in references:
         unit_id = str(reference["unit_id"])
         expected_unit = dict(reference)
-        expected_unit.update(expected_sources[unit_id])
         if units_by_id.get(unit_id) != expected_unit:
             raise RuntimeError(f"canonical e902 wrapper unit differs from its source reference: {unit_id}")
     _e902_carried_units_from_references(
