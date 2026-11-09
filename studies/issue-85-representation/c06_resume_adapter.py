@@ -60,8 +60,9 @@ def _train_c06_actor_update(
     """Use the authenticated C/06 carry commit for the pinned runner's binding check.
 
     The pinned e902 validator verifies the exact carry manifest and group receipt.
-    Only after it succeeds, temporarily bind the following generic check to the
-    manifest's source commit, then restore the pinned value before loading examples.
+    Only after it succeeds, temporarily bind the later generic source check to the
+    manifest's source commit. The pinned model loader revalidates the carry first,
+    so that validator must still see the original package identity.
     """
     if training_group.get("e902_canonical_reconciliation_sha256") != expected_reconciliation_sha256:
         raise RuntimeError("C/06 game group is not bound to the authenticated e902 reconciliation")
@@ -80,6 +81,7 @@ def _train_c06_actor_update(
 
     original_package_commit = execution.RESUMED_FORMAL_PACKAGE_COMMIT
     original_validator = execution._validate_e902_carried_training_group
+    original_carry_validator = execution._validate_carry_manifest
     original_loader = formal.pilot._load_pilot_training_examples
     binding_active = False
 
@@ -91,6 +93,16 @@ def _train_c06_actor_update(
         binding_active = True
         return result
 
+    def validate_carry_with_pinned_identity(*args: Any, **kwargs: Any) -> Any:
+        if not binding_active:
+            return original_carry_validator(*args, **kwargs)
+        bound_package_commit = execution.RESUMED_FORMAL_PACKAGE_COMMIT
+        execution.RESUMED_FORMAL_PACKAGE_COMMIT = original_package_commit
+        try:
+            return original_carry_validator(*args, **kwargs)
+        finally:
+            execution.RESUMED_FORMAL_PACKAGE_COMMIT = bound_package_commit
+
     def restore_before_loading_examples(*args: Any, **kwargs: Any) -> Any:
         nonlocal binding_active
         if binding_active:
@@ -99,6 +111,7 @@ def _train_c06_actor_update(
         return original_loader(*args, **kwargs)
 
     execution._validate_e902_carried_training_group = validate_then_bind
+    execution._validate_carry_manifest = validate_carry_with_pinned_identity
     formal.pilot._load_pilot_training_examples = restore_before_loading_examples
     try:
         return execution._train_actor_block(
@@ -111,6 +124,7 @@ def _train_c06_actor_update(
     finally:
         execution.RESUMED_FORMAL_PACKAGE_COMMIT = original_package_commit
         execution._validate_e902_carried_training_group = original_validator
+        execution._validate_carry_manifest = original_carry_validator
         formal.pilot._load_pilot_training_examples = original_loader
 
 

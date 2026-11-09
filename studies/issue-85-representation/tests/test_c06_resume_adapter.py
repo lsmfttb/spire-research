@@ -360,10 +360,12 @@ def test_c06_actor_update_restores_pinned_binding_when_runner_raises():
         for reference in references
     }
     original_validator = lambda *_args, **_kwargs: None
+    original_carry_validator = lambda *_args, **_kwargs: None
     original_loader = lambda *_args, **_kwargs: []
     execution = SimpleNamespace(
         RESUMED_FORMAL_PACKAGE_COMMIT=PINNED_RESUMED_PACKAGE_COMMIT,
         _validate_e902_carried_training_group=original_validator,
+        _validate_carry_manifest=original_carry_validator,
     )
     formal = SimpleNamespace(pilot=SimpleNamespace(
         _load_pilot_training_examples=original_loader,
@@ -385,6 +387,67 @@ def test_c06_actor_update_restores_pinned_binding_when_runner_raises():
 
     assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == PINNED_RESUMED_PACKAGE_COMMIT
     assert execution._validate_e902_carried_training_group is original_validator
+    assert execution._validate_carry_manifest is original_carry_validator
+    assert formal.pilot._load_pilot_training_examples is original_loader
+
+
+def test_c06_actor_update_keeps_pinned_identity_for_nested_carry_validation():
+    references = _c06_successful_source_references()
+    sources = {
+        reference["unit_id"]: {
+            "package_commit": reference["source_package_commit"],
+            "group_root": reference["source_group_root"],
+        }
+        for reference in references
+    }
+    carry_validations = []
+    original_validator = lambda *_args, **_kwargs: None
+    original_carry_validator = None
+    original_loader = None
+    execution = SimpleNamespace(
+        RESUMED_FORMAL_PACKAGE_COMMIT=PINNED_RESUMED_PACKAGE_COMMIT,
+        _validate_e902_carried_training_group=original_validator,
+        _validate_carry_manifest=original_carry_validator,
+    )
+
+    def validate_pinned_carry(*_args, **_kwargs):
+        assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == PINNED_RESUMED_PACKAGE_COMMIT
+        carry_validations.append(execution.RESUMED_FORMAL_PACKAGE_COMMIT)
+        return {"status": "VERIFIED"}
+
+    original_carry_validator = validate_pinned_carry
+    execution._validate_carry_manifest = original_carry_validator
+
+    def load_examples(*_args, **_kwargs):
+        assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == PINNED_RESUMED_PACKAGE_COMMIT
+        return []
+
+    original_loader = load_examples
+    formal = SimpleNamespace(pilot=SimpleNamespace(
+        _load_pilot_training_examples=original_loader,
+    ))
+
+    def run_update(*_args, **_kwargs):
+        execution._validate_e902_carried_training_group()
+        assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == C06_SOURCE_PACKAGE_COMMIT
+        assert execution._validate_carry_manifest()["status"] == "VERIFIED"
+        assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == C06_SOURCE_PACKAGE_COMMIT
+        formal.pilot._load_pilot_training_examples()
+        return {"completed_steps": 64}
+
+    execution._train_actor_block = run_update
+    group = {
+        "e902_canonical_reconciliation_sha256": "reconciliation",
+        "carried_unit_sources": sources,
+    }
+
+    result = _call_c06_actor_update(execution, formal, group, references)
+
+    assert result["completed_steps"] == 64
+    assert carry_validations == [PINNED_RESUMED_PACKAGE_COMMIT]
+    assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == PINNED_RESUMED_PACKAGE_COMMIT
+    assert execution._validate_e902_carried_training_group is original_validator
+    assert execution._validate_carry_manifest is original_carry_validator
     assert formal.pilot._load_pilot_training_examples is original_loader
 
 
