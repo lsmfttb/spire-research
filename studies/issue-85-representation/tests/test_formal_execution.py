@@ -24,7 +24,7 @@ def test_formal_game_carry_total_counts_registered_overlap_once() -> None:
     resumed_formal = {
         "schema_id": formal_execution.STOPPED_FORMAL_CONTINUATION_SCHEMA,
         "b03_completed": 128,
-        "b04_carried_units": [{} for _ in range(123)],
+        "b04_successful_units": [{} for _ in range(123)],
         "failed_stage_recovery": {"additional_successful_units": [{} for _ in range(5)]},
     }
     canonical_e902 = {"groups": {
@@ -40,6 +40,203 @@ def test_formal_game_carry_total_counts_registered_overlap_once() -> None:
         resumed_formal_games=384,
         e902_reconciliation=canonical_e902,
     ) == 1792
+
+
+def test_verify_predecessor_carry_returns_unique_count_for_emitted_stopped_shape(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    package_root = tmp_path / "successor"
+    issue84_source = tmp_path / "issue84"
+    data_root.mkdir()
+    package_root.mkdir()
+    issue84_source.mkdir()
+    (package_root / "formal-seed-table.json").write_text("{}", encoding="utf-8")
+
+    old_root = data_root / "issue85" / "artifacts" / "formal" / formal_execution.PREDECESSOR_PACKAGE_COMMIT
+    old_group_root = data_root / formal_execution.PREDECESSOR_GROUP_ROOT
+    old_seed_path = old_root / "formal-seed-table.json"
+    old_progress_path = old_root / "formal-progress.json"
+    old_auth_path = old_root / "formal-execution-authorization-corrected.json"
+    old_failure_log_path = old_root / formal_execution.PREDECESSOR_UPDATE_FAILURE_LOG
+    old_group_path = old_group_root / "group-receipt.json"
+    active_wall_path = data_root / "issue85" / "artifacts" / "active-wall-issue85-task.json"
+    for path in (old_seed_path, old_progress_path, old_auth_path, old_failure_log_path, old_group_path, active_wall_path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+    rows = [{"row": index} for index in range(7808)]
+    unit_rows = [
+        {
+            "owner_seed": owner,
+            "unit_id": f"TRAIN:{owner}:B",
+            "formal": True,
+            "phase": "training",
+            "issue85_phase": "training",
+            "issue85_arm": "B",
+            "issue84_arm": "B",
+            "issue84_policy_label": "pi12",
+        }
+        for owner in range(8400001, 8400129)
+    ]
+    seed = {
+        "package_commit": "successor-package",
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "actor_update_schedule_sha256": "22679fe29f5b7c518c5c5b7e7c22a99bd30c1dd5064540b4cc91162677492774",
+        "actor_update_schedule": {"schedule": "fixed"},
+        "rows": rows,
+    }
+    old_seed = {
+        "schema_id": "issue85-formal-seed-table-v1",
+        "package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "contract_sha256": "contract-sha",
+        "row_count": 7808,
+        "rows": rows,
+        "rows_sha256": "rows-sha",
+        "actor_update_schedule": seed["actor_update_schedule"],
+        "actor_update_schedule_sha256": seed["actor_update_schedule_sha256"],
+    }
+    unit_ids = [row["unit_id"] for row in unit_rows]
+    prior_group = {
+        "schema_id": formal_execution.GROUP_SCHEMA,
+        "status": "SUCCEEDED",
+        "stage_id": "TRAIN-B-BLOCK-00-GAMES",
+        "package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": formal_execution.PREDECESSOR_SEED_TABLE_SHA256,
+        "authorization_receipt_sha256": formal_execution.PREDECESSOR_AUTHORIZATION_SHA256,
+        "expected": 128,
+        "completed": 128,
+        "failed_attempt_count": 0,
+        "group_root": str(old_group_root),
+        "receipt_sha256": formal_execution.PREDECESSOR_GROUP_RECEIPT_SHA256,
+        "receipt_path": "group-receipt.json",
+        "successful_unit_ids": unit_ids,
+    }
+    prior_progress = {
+        "schema_id": formal_execution.PROGRESS_SCHEMA,
+        "status": "FAILED_OR_PAUSED",
+        "package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": formal_execution.PREDECESSOR_SEED_TABLE_SHA256,
+        "authorization_receipt_sha256": formal_execution.PREDECESSOR_AUTHORIZATION_SHA256,
+        "active_stage": "TRAIN-B-BLOCK-00-ACTOR-UPDATE",
+        "failure": {"type": "AttributeError", "detail": formal_execution.PREDECESSOR_UPDATE_FAILURE_DETAIL},
+        "actor_updates": {},
+        "game_groups": {"TRAIN-B-BLOCK-00": prior_group},
+    }
+    group_receipt = {
+        "schema_id": formal_execution.GROUP_SCHEMA,
+        "status": "SUCCEEDED",
+        "stage_id": "TRAIN-B-BLOCK-00-GAMES",
+        "package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": formal_execution.PREDECESSOR_SEED_TABLE_SHA256,
+        "authorization_receipt_sha256": formal_execution.PREDECESSOR_AUTHORIZATION_SHA256,
+        "completed": 128,
+        "units": [{} for _ in range(128)],
+    }
+    lock = {
+        "baseline_A": {"issue84_final_accepted_source_commit": "issue84-source"},
+        "baseline_P": {"model_digest": "parent-model", "checkpoint_sha256": "parent-checkpoint"},
+        "native": {"commit": "native-source"},
+        "stsr_source": {"commit": "stsr-source"},
+    }
+    old_auth = {
+        "schema_id": formal_execution.AUTH_SCHEMA,
+        "issue": 85,
+        "formal_go": True,
+        "status": "APPROVED",
+        "package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+        "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        "seed_table_sha256": formal_execution.PREDECESSOR_SEED_TABLE_SHA256,
+        "actor_update_schedule_sha256": seed["actor_update_schedule_sha256"],
+        "whole_task_active_wall_cap_seconds": formal_execution.FORMAL_ACTIVE_WALL_CAP_SECONDS,
+        "owner_approval": {"status": "APPROVED", "decision": "FORMAL_GO", "comment_url": formal_execution.FORMAL_GO_COMMENT_URL},
+        "reviewer_approval": {
+            "status": "APPROVED", "decision": "PASS",
+            "package_commit": formal_execution.PREDECESSOR_PACKAGE_COMMIT,
+            "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        },
+    }
+    for path, value in ((old_seed_path, old_seed), (old_progress_path, prior_progress),
+                        (old_auth_path, old_auth), (old_group_path, group_receipt),
+                        (active_wall_path, {})):
+        path.write_text(json.dumps(value), encoding="utf-8")
+    old_failure_log_path.write_text(formal_execution.PREDECESSOR_UPDATE_FAILURE_DETAIL, encoding="utf-8")
+
+    file_hashes = {
+        (tmp_path / "source-lock.json").resolve(): formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256,
+        (tmp_path / "contract.json").resolve(): "contract-sha",
+        old_seed_path.resolve(): formal_execution.PREDECESSOR_SEED_TABLE_SHA256,
+        old_progress_path.resolve(): formal_execution.PREDECESSOR_PROGRESS_SHA256,
+        old_auth_path.resolve(): formal_execution.PREDECESSOR_AUTHORIZATION_SHA256,
+        old_failure_log_path.resolve(): formal_execution.PREDECESSOR_UPDATE_FAILURE_LOG_SHA256,
+        old_group_path.resolve(): formal_execution.PREDECESSOR_GROUP_RECEIPT_SHA256,
+    }
+    formal = SimpleNamespace(
+        DATA_ROOT=data_root,
+        LOCK_PATH=tmp_path / "source-lock.json",
+        CONTRACT_PATH=tmp_path / "contract.json",
+        LOCK=lock,
+        read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        file_sha256=lambda path: file_hashes.get(Path(path).resolve(), "generated-sha"),
+        pilot=SimpleNamespace(_write_or_verify_once=lambda path, _payload: Path(path).write_text("{}", encoding="utf-8")),
+    )
+    fake_continuation = {
+        "schema_id": formal_execution.STOPPED_FORMAL_CONTINUATION_SCHEMA,
+        "b03_completed": 128,
+        "b04_successful_units": [{} for _ in range(123)],
+        "failed_stage_recovery": {"additional_successful_units": [{} for _ in range(5)]},
+    }
+    e902 = {"groups": {
+        **{f"B:{block}": {"completed": 128} for block in range(4, 8)},
+        **{f"C:{block}": {"completed": 128} for block in range(6)},
+    }, "actor_updates": {
+        **{f"B:{block}": {} for block in range(4, 8)},
+        **{f"C:{block}": {} for block in range(6)},
+    }}
+    inherited = {
+        "pinned_issue84_source_commit": lock["baseline_A"]["issue84_final_accepted_source_commit"],
+        "parent_model_digest": lock["baseline_P"]["model_digest"],
+        "parent_checkpoint_sha256": lock["baseline_P"]["checkpoint_sha256"],
+        "native_source_commit": lock["native"]["commit"],
+        "stsr_source_commit": lock["stsr_source"]["commit"],
+        "features_loaded_by_pinned_issue84_parser": 0,
+    }
+    monkeypatch.setattr(formal_execution, "_inside", lambda root, relative: Path(root) / relative)
+    monkeypatch.setattr(formal_execution, "_hash_json", lambda _formal, _value: "rows-sha")
+    monkeypatch.setattr(formal_execution, "_training_rows", lambda _seed, _arm, _block: unit_rows)
+    monkeypatch.setattr(formal_execution, "_validate_active_wall_clock", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(formal_execution, "_resolves_to", lambda *_args: True)
+    monkeypatch.setattr(formal_execution, "_validate_carry_manifest", lambda *_args, **_kwargs: (inherited, "carry-sha"))
+    monkeypatch.setattr(formal_execution, "_predecessor_units_from_carry_manifest", lambda *_args: ([{} for _ in range(128)], []))
+    monkeypatch.setattr(formal_execution, "_operational_predecessor_actor_update", lambda *_args, **_kwargs: {"active_wall_clock_snapshot": None})
+    monkeypatch.setattr(formal_execution, "_verify_resumed_b01_training_group", lambda *_args, **_kwargs: {
+        "stage_id": "TRAIN-B-BLOCK-01-GAMES", "completed": 128,
+    })
+    monkeypatch.setattr(formal_execution, "_resumed_formal_continuation_required", lambda _commit: True)
+    monkeypatch.setattr(formal_execution, "_build_stopped_formal_continuation", lambda *_args, **_kwargs: fake_continuation)
+    monkeypatch.setattr(formal_execution, "_e902_canonical_lineage_required", lambda *_args: True)
+    monkeypatch.setattr(formal_execution, "_build_e902_canonical_reconciliation", lambda *_args, **_kwargs: e902)
+
+    report = formal_execution.verify_predecessor_carry(
+        formal,
+        issue84_source=issue84_source,
+        identity={"package_commit": "successor-package", "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256},
+        readiness={"package_commit": "successor-package", "source_lock_sha256": formal_execution.PREDECESSOR_SOURCE_LOCK_SHA256},
+        seed=seed,
+        package_root=package_root,
+        write_manifest=True,
+        backend=object(),
+        issue84_driver=object(),
+    )
+
+    assert report["total_formal_games_carried"] == 1792
+    assert report["canonical_e902_games_carried"] == 1280
+    assert report["canonical_e902_actor_updates_carried"] == 10
+    assert report["resumed_formal_games_carried"] == 384
+    assert report["resumed_formal_actor_updates_carried"] == 3
 
 
 def test_formal_game_carry_total_rejects_inconsistent_overlap() -> None:

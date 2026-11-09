@@ -2542,7 +2542,7 @@ def _formal_game_carry_count(
         if resumed_formal_continuation.get("schema_id") == STOPPED_FORMAL_CONTINUATION_SCHEMA:
             resumed_b03_games = resumed_formal_continuation["b03_completed"]
             resumed_b04_games = (
-                len(resumed_formal_continuation["b04_carried_units"])
+                len(resumed_formal_continuation["b04_successful_units"])
                 + len(resumed_formal_continuation["failed_stage_recovery"]["additional_successful_units"])
             )
         else:
