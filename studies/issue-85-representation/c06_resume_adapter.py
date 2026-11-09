@@ -26,6 +26,66 @@ def _atomic_json(execution: Any, formal: Any, path: Path, payload: Mapping[str, 
     execution._atomic_json(formal, path, payload)
 
 
+def _read_c06_actor_update_receipt(
+    formal: Any,
+    execution: Any,
+    package_root: Path,
+    identity: Mapping[str, str],
+    *,
+    training_group: Mapping[str, Any],
+    expected_carry_sha256: str,
+) -> dict[str, Any]:
+    """Verify the already-written C/06 update without rerunning its optimizer.
+
+    The pinned reader leaves its carry digest unset for C blocks, although the
+    C/06 continuation receipt is correctly bound to the authenticated carry.
+    Keep this repair local to the resumed C/06 receipt path and verify every
+    field the pinned reader checks, using the carry digest authenticated by the
+    adapter before this function is called.
+    """
+    path = package_root / "training/C/updates/block-06/success-receipt.json"
+    if not path.is_file():
+        raise RuntimeError("C/06 actor update success receipt is missing")
+    receipt = formal.read_json(path)
+    if not isinstance(receipt, Mapping):
+        raise RuntimeError("C/06 actor update receipt is malformed")
+    digest = formal.file_sha256(path)
+    actor_relative = receipt.get("actor_checkpoint_path")
+    optimizer_relative = receipt.get("optimizer_checkpoint_path")
+    if not isinstance(actor_relative, str) or not isinstance(optimizer_relative, str):
+        raise RuntimeError("C/06 actor update receipt has invalid checkpoint paths")
+    actor_path = execution._inside(package_root, actor_relative)
+    optimizer_path = execution._inside(package_root, optimizer_relative)
+    if (
+        receipt.get("schema_id") != "issue85-formal-actor-update-v1"
+        or receipt.get("status") != "SUCCEEDED"
+        or receipt.get("arm") != "C"
+        or receipt.get("block_index") != 6
+        or receipt.get("training_data_package_commit") != identity.get("package_commit")
+        or receipt.get("predecessor_carry_manifest_sha256") != expected_carry_sha256
+        or receipt.get("training_group_receipt_sha256") != training_group.get("receipt_sha256")
+        or receipt.get("package_commit") != identity.get("package_commit")
+        or receipt.get("source_lock_sha256") != identity.get("source_lock_sha256")
+        or receipt.get("owner_count") != int(formal.CONTRACT["training"]["owners_per_block"])
+        or receipt.get("completed_steps") != int(formal.CONTRACT["training"]["updates_per_block"])
+        or receipt.get("minibatch_owners") != int(formal.CONTRACT["training"]["minibatch_owners"])
+        or receipt.get("receipt_sha256") != execution._hash_json(
+            formal, {key: value for key, value in receipt.items() if key != "receipt_sha256"},
+        )
+        or not actor_path.is_file()
+        or formal.file_sha256(actor_path) != receipt.get("actor_checkpoint_sha256")
+        or not optimizer_path.is_file()
+        or formal.file_sha256(optimizer_path) != receipt.get("optimizer_checkpoint_sha256")
+    ):
+        raise RuntimeError("C/06 actor update receipt/checkpoint differs from its authenticated inputs")
+    return {
+        **receipt,
+        "receipt_file_sha256": digest,
+        "receipt_path": path.relative_to(package_root).as_posix(),
+        "producer_package_root": str(package_root),
+    }
+
+
 def _run_c06_training_games(execution: Any, *args: Any, **kwargs: Any) -> dict[str, Any]:
     """Adapt the pinned carry helper's list result to C/06's set mutation."""
     original = execution._e902_carried_units_from_references
@@ -366,8 +426,10 @@ def execute_c06_continuation(
         if clock.expired():
             raise TimeoutError("whole-task active-wall cap reached before the C/06 actor update")
         if update_path.is_file():
-            c06_update = execution._read_update_receipt(
-                formal, package_root, identity, arm="C", block=6,
+            c06_update = _read_c06_actor_update_receipt(
+                formal, execution, package_root, identity,
+                training_group=c06_group,
+                expected_carry_sha256=carry_sha,
             )
         else:
             c06_update = _train_c06_actor_update(

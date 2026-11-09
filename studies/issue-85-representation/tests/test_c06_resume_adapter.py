@@ -16,6 +16,7 @@ PINNED_RESUMED_PACKAGE_COMMIT = "b8b3fc043671498628f96d378d9cecd7ac54106f"
 
 from c06_resume_adapter import (
     EXPECTED_PACKAGE_COMMIT,
+    _read_c06_actor_update_receipt,
     _run_c06_training_games,
     _train_c06_actor_update,
     execute_c06_continuation,
@@ -208,6 +209,99 @@ def _fixture(
         formal, execution, authorization_path, issue84_source, native_source, stsr_source,
         package_root, runs, updates, written, clock,
     )
+
+
+def _c06_receipt_fixture(tmp_path: Path, *, receipt_carry: str = "carry"):
+    package_root = tmp_path / "formal-package"
+    actor_path = package_root / "training/C/updates/block-06/attempt-0001/actor-state.pt"
+    optimizer_path = package_root / "training/C/updates/block-06/attempt-0001/optimizer-state.pt"
+    actor_path.parent.mkdir(parents=True)
+    actor_path.write_bytes(b"verified actor checkpoint")
+    optimizer_path.write_bytes(b"verified optimizer checkpoint")
+
+    formal = SimpleNamespace(
+        CONTRACT={"training": {
+            "owners_per_block": 128,
+            "updates_per_block": 64,
+            "minibatch_owners": 32,
+        }},
+        read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        file_sha256=lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+    )
+    formal.canonical = lambda value: json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode("utf-8")
+    formal.sha256_bytes = lambda value: hashlib.sha256(value).hexdigest()
+    execution = SimpleNamespace(
+        _inside=lambda root, relative: (Path(root) / relative).resolve(strict=True),
+        _hash_json=lambda _formal, value: hashlib.sha256(
+            formal.canonical(value),
+        ).hexdigest(),
+    )
+    identity = {"package_commit": "package", "source_lock_sha256": "lock"}
+    training_group = {"receipt_sha256": "group"}
+    receipt = {
+        "schema_id": "issue85-formal-actor-update-v1",
+        "status": "SUCCEEDED",
+        "arm": "C",
+        "block_index": 6,
+        "package_commit": "package",
+        "source_lock_sha256": "lock",
+        "training_data_package_commit": "package",
+        "predecessor_carry_manifest_sha256": receipt_carry,
+        "training_group_receipt_sha256": "group",
+        "owner_count": 128,
+        "completed_steps": 64,
+        "minibatch_owners": 32,
+        "actor_checkpoint_path": actor_path.relative_to(package_root).as_posix(),
+        "actor_checkpoint_sha256": formal.file_sha256(actor_path),
+        "optimizer_checkpoint_path": optimizer_path.relative_to(package_root).as_posix(),
+        "optimizer_checkpoint_sha256": formal.file_sha256(optimizer_path),
+    }
+    receipt["receipt_sha256"] = execution._hash_json(formal, receipt)
+    receipt_path = package_root / "training/C/updates/block-06/success-receipt.json"
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt_path.write_text(json.dumps(receipt, sort_keys=True), encoding="utf-8")
+    return formal, execution, package_root, identity, training_group, receipt_path
+
+
+def test_c06_update_receipt_reader_accepts_authenticated_existing_receipt(tmp_path):
+    formal, execution, root, identity, group, receipt_path = _c06_receipt_fixture(tmp_path)
+
+    result = _read_c06_actor_update_receipt(
+        formal, execution, root, identity,
+        training_group=group, expected_carry_sha256="carry",
+    )
+
+    assert result["status"] == "SUCCEEDED"
+    assert result["completed_steps"] == 64
+    assert result["predecessor_carry_manifest_sha256"] == "carry"
+    assert result["receipt_file_sha256"] == formal.file_sha256(receipt_path)
+
+
+def test_c06_update_receipt_reader_rejects_wrong_authenticated_carry(tmp_path):
+    formal, execution, root, identity, group, _receipt_path = _c06_receipt_fixture(
+        tmp_path, receipt_carry="different-carry",
+    )
+
+    with pytest.raises(RuntimeError, match="authenticated inputs"):
+        _read_c06_actor_update_receipt(
+            formal, execution, root, identity,
+            training_group=group, expected_carry_sha256="carry",
+        )
+
+
+def test_c06_update_receipt_reader_rejects_changed_checkpoint(tmp_path):
+    formal, execution, root, identity, group, _receipt_path = _c06_receipt_fixture(tmp_path)
+    (root / "training/C/updates/block-06/attempt-0001/actor-state.pt").write_bytes(
+        b"changed actor checkpoint",
+    )
+
+    with pytest.raises(RuntimeError, match="authenticated inputs"):
+        _read_c06_actor_update_receipt(
+            formal, execution, root, identity,
+            training_group=group, expected_carry_sha256="carry",
+        )
 
 
 def test_c06_adapter_runs_only_c05_carry_and_c06_games_plus_one_update(tmp_path, monkeypatch):
