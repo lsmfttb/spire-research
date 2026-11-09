@@ -2501,6 +2501,75 @@ def _verify_resumed_b01_training_group(
     return dict(RESUMED_B01_GROUP_CARRY)
 
 
+def _unique_formal_game_carry_count(*lineages: Mapping[str, int]) -> int:
+    """Count verified full-block carry lineages once, even when sources overlap."""
+    groups: dict[str, int] = {}
+    for lineage in lineages:
+        for group_id, completed in lineage.items():
+            if not isinstance(group_id, str):
+                raise RuntimeError("formal-game carry contains an invalid registered group identity")
+            match = re.fullmatch(r"([A-Z])[:/](\d+)", group_id)
+            if match is None:
+                raise RuntimeError("formal-game carry contains an invalid registered group identity")
+            group_id = f"{match.group(1)}/{int(match.group(2)):02d}"
+            if isinstance(completed, bool) or not isinstance(completed, int) or completed < 0:
+                raise RuntimeError(f"formal-game carry has an invalid completed count for {group_id}")
+            previous = groups.get(group_id)
+            if previous is not None and previous != completed:
+                raise RuntimeError(f"overlapping formal-game carry group has inconsistent counts: {group_id}")
+            groups[group_id] = completed
+    return sum(groups.values())
+
+
+def _formal_game_carry_count(
+    *, predecessor_games: int,
+    resumed_training_group_carries: Sequence[Mapping[str, Any]],
+    resumed_formal_continuation: Mapping[str, Any] | None,
+    resumed_formal_games: int,
+    e902_reconciliation: Mapping[str, Any] | None,
+) -> int:
+    resumed_training_groups: dict[str, int] = {}
+    for group in resumed_training_group_carries:
+        stage_id = str(group.get("stage_id", ""))
+        match = re.fullmatch(r"TRAIN-([A-Z])-BLOCK-(\d+)-GAMES", stage_id)
+        if match is None:
+            raise RuntimeError(f"resumed training carry has an invalid registered stage: {stage_id}")
+        group_id = f"{match.group(1)}/{int(match.group(2)):02d}"
+        resumed_training_groups[group_id] = group["completed"]
+
+    resumed_formal_groups: dict[str, int] = {}
+    if resumed_formal_continuation is not None:
+        if resumed_formal_continuation.get("schema_id") == STOPPED_FORMAL_CONTINUATION_SCHEMA:
+            resumed_b03_games = resumed_formal_continuation["b03_completed"]
+            resumed_b04_games = (
+                len(resumed_formal_continuation["b04_carried_units"])
+                + len(resumed_formal_continuation["failed_stage_recovery"]["additional_successful_units"])
+            )
+        else:
+            resumed_b03_games = RESUMED_B03_COMPLETED
+            resumed_b04_games = 0
+        resumed_b02_games = resumed_formal_games - resumed_b03_games - resumed_b04_games
+        if resumed_b02_games < 0:
+            raise RuntimeError("resumed formal lineage has inconsistent per-block carry counts")
+        for block, completed in ((2, resumed_b02_games), (3, resumed_b03_games), (4, resumed_b04_games)):
+            if completed:
+                resumed_formal_groups[f"B/{block:02d}"] = completed
+
+    e902_groups = (
+        {
+            str(group_id): group.get("completed", 0)
+            for group_id, group in e902_reconciliation.get("groups", {}).items()
+        }
+        if isinstance(e902_reconciliation, Mapping) else {}
+    )
+    return _unique_formal_game_carry_count(
+        {"B/00": predecessor_games} if predecessor_games else {},
+        resumed_training_groups,
+        resumed_formal_groups,
+        e902_groups,
+    )
+
+
 def verify_predecessor_carry(
     formal: Any, *, issue84_source: Path, identity: Mapping[str, str],
     readiness: Mapping[str, Any], seed: Mapping[str, Any], package_root: Path,
@@ -2806,6 +2875,13 @@ def verify_predecessor_carry(
         len(e902_reconciliation.get("actor_updates", {}))
         if isinstance(e902_reconciliation, Mapping) else 0
     )
+    total_formal_games_carried = _formal_game_carry_count(
+        predecessor_games=len(unit_manifest),
+        resumed_training_group_carries=resumed_training_group_carries,
+        resumed_formal_continuation=resumed_formal_continuation,
+        resumed_formal_games=int(manifest.get("resumed_formal_games_carried", 0)),
+        e902_reconciliation=e902_reconciliation if isinstance(e902_reconciliation, Mapping) else None,
+    )
     return {
         "schema_id": "issue85-formal-predecessor-carry-verification-report-v1",
         "status": (
@@ -2820,11 +2896,7 @@ def verify_predecessor_carry(
         "formal_games_carried": len(unit_manifest),
         "actor_updates_carried": len(actor_update_carries),
         "resumed_training_games_carried": 128 * len(resumed_training_group_carries),
-        "total_formal_games_carried": (
-            len(unit_manifest) + 128 * len(resumed_training_group_carries)
-            + (0 if resumed_formal_continuation is None else int(manifest["resumed_formal_games_carried"]))
-            + e902_games_carried
-        ),
+        "total_formal_games_carried": total_formal_games_carried,
         "canonical_e902_games_carried": e902_games_carried,
         "canonical_e902_actor_updates_carried": e902_updates_carried,
         "resumed_formal_games_carried": (

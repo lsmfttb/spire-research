@@ -19,6 +19,34 @@ def test_formal_runner_exports_the_locked_wsl_data_root() -> None:
     assert formal_runner.DATA_ROOT_WSL == formal_runner.pilot.DATA_ROOT_WSL
 
 
+def test_formal_game_carry_total_counts_registered_overlap_once() -> None:
+    resumed_training = [{"stage_id": "TRAIN-B-BLOCK-01-GAMES", "completed": 128}]
+    resumed_formal = {
+        "schema_id": formal_execution.STOPPED_FORMAL_CONTINUATION_SCHEMA,
+        "b03_completed": 128,
+        "b04_carried_units": [{} for _ in range(123)],
+        "failed_stage_recovery": {"additional_successful_units": [{} for _ in range(5)]},
+    }
+    canonical_e902 = {"groups": {
+        **{f"B:{block}": {"completed": 128} for block in range(4, 8)},
+        **{f"C:{block}": {"completed": 128} for block in range(6)},
+    }}
+
+    assert 128 + 128 + 384 + 1280 == 1920
+    assert formal_execution._formal_game_carry_count(
+        predecessor_games=128,
+        resumed_training_group_carries=resumed_training,
+        resumed_formal_continuation=resumed_formal,
+        resumed_formal_games=384,
+        e902_reconciliation=canonical_e902,
+    ) == 1792
+
+
+def test_formal_game_carry_total_rejects_inconsistent_overlap() -> None:
+    with pytest.raises(RuntimeError, match="inconsistent counts: B/04"):
+        formal_execution._unique_formal_game_carry_count({"B/04": 128}, {"B/04": 127})
+
+
 def test_carried_attempt_path_matches_its_source_group(tmp_path: Path) -> None:
     group_root = tmp_path / "training" / "B" / "block-04" / "games"
     attempt = group_root / "units" / "TRAIN-8400513-B" / "attempt-0001"
