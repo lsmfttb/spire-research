@@ -9,6 +9,7 @@ import pytest
 
 from c06_resume_adapter import (
     EXPECTED_PACKAGE_COMMIT,
+    _run_c06_training_games,
     execute_c06_continuation,
 )
 
@@ -146,6 +147,7 @@ def _fixture(
         _now=lambda: "2026-11-09T00:00:00Z",
         _atomic_json=atomic_json,
         _run_training_games=training,
+        _e902_carried_units_from_references=lambda *_args, **_kwargs: ({}, {}),
         _read_update_receipt=lambda *_args, **_kwargs: {
             "receipt_sha256": "c05-update",
             "actor_checkpoint_sha256": "c05-actor",
@@ -228,3 +230,77 @@ def test_c06_adapter_rejects_a_changed_unstarted_owner_list_before_starting(tmp_
     assert runs == []
     assert updates == []
     assert not clock.closed
+
+
+def test_c06_training_game_adapter_makes_allowed_roots_mutable_and_restores_helper():
+    execution = SimpleNamespace()
+    original = lambda *_args, **_kwargs: ({"unit": {}}, {"package": ["c06", "c05"]})
+
+    def training(*_args, **_kwargs):
+        carried, allowed_roots = execution._e902_carried_units_from_references()
+        assert carried == {"unit": {}}
+        assert allowed_roots == {"package": {"c06", "c05"}}
+        allowed_roots.setdefault("package", set()).add("interrupted-owner")
+        return {"status": "SUCCEEDED"}
+
+    execution._e902_carried_units_from_references = original
+    execution._run_training_games = training
+
+    result = _run_c06_training_games(execution)
+
+    assert result == {"status": "SUCCEEDED"}
+    assert execution._e902_carried_units_from_references is original
+
+
+def test_c06_adapter_preserves_failed_attempt_when_resuming(tmp_path, monkeypatch):
+    (
+        formal, execution, authorization, issue84, native, stsr,
+        package_root, runs, updates, written, clock,
+    ) = _fixture(tmp_path, monkeypatch)
+    progress_path = package_root / "formal-progress.json"
+    prior = {
+        "schema_id": execution.PROGRESS_SCHEMA,
+        "status": "FAILED_OR_PAUSED",
+        "package_commit": EXPECTED_PACKAGE_COMMIT,
+        "source_lock_sha256": "lock",
+        "seed_table_sha256": formal.file_sha256(package_root / "formal-seed-table.json"),
+        "authorization_receipt_sha256": "authorization",
+        "predecessor_carry_manifest_sha256": "carry",
+        "game_groups": {"TRAIN-C-BLOCK-05": {"status": "SUCCEEDED", "completed": 128}},
+        "actor_updates": {},
+        "adapter_commit": "prior-adapter-commit",
+        "adapter_sha256": "prior-adapter-hash",
+        "started_utc": "2026-11-08T20:00:00Z",
+        "finished_or_paused_utc": "2026-11-08T20:01:00Z",
+        "active_stage": "TRAIN-C-BLOCK-06-GAMES",
+        "failure": {"type": "AttributeError", "detail": "list object has no attribute add"},
+        "cumulative_active_wall_seconds": 71769.5,
+        "clock_start_seconds": 71749.5,
+    }
+    execution._atomic_json(formal, progress_path, prior)
+
+    result = execute_c06_continuation(
+        formal, execution,
+        issue84_source=issue84, native_source=native, stsr_source=stsr,
+        authorization_receipt=authorization, adapter_commit="new-adapter-commit",
+        adapter_sha256="new-adapter-hash",
+    )
+
+    progress = json.loads(progress_path.read_text(encoding="utf-8"))
+    assert result["status"] == "C06_CONTINUATION_SUCCEEDED"
+    assert progress["adapter_attempt_number"] == 2
+    assert progress["adapter_attempt_history"] == [{
+        "status": "FAILED_OR_PAUSED",
+        "active_stage": "TRAIN-C-BLOCK-06-GAMES",
+        "adapter_commit": "prior-adapter-commit",
+        "adapter_sha256": "prior-adapter-hash",
+        "started_utc": "2026-11-08T20:00:00Z",
+        "finished_or_paused_utc": "2026-11-08T20:01:00Z",
+        "failure": {"type": "AttributeError", "detail": "list object has no attribute add"},
+        "cumulative_active_wall_seconds": 71769.5,
+        "clock_start_seconds": 71749.5,
+    }]
+    assert "failure" not in progress
+    assert runs == [("C", 5), ("C", 6)]
+    assert updates == [("C", 6)]
+    assert clock.closed

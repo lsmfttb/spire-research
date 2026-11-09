@@ -26,6 +26,21 @@ def _atomic_json(execution: Any, formal: Any, path: Path, payload: Mapping[str, 
     execution._atomic_json(formal, path, payload)
 
 
+def _run_c06_training_games(execution: Any, *args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Adapt the pinned carry helper's list result to C/06's set mutation."""
+    original = execution._e902_carried_units_from_references
+
+    def mutable_allowed_roots(*call_args: Any, **call_kwargs: Any):
+        carried, allowed_roots = original(*call_args, **call_kwargs)
+        return carried, {key: set(paths) for key, paths in allowed_roots.items()}
+
+    execution._e902_carried_units_from_references = mutable_allowed_roots
+    try:
+        return execution._run_training_games(*args, **kwargs)
+    finally:
+        execution._e902_carried_units_from_references = original
+
+
 def execute_c06_continuation(
     formal: Any,
     execution: Any,
@@ -175,11 +190,33 @@ def execute_c06_continuation(
         "actor_updates": {},
         "started_utc": execution._now(),
     }
+    if prior is None:
+        progress["adapter_attempt_history"] = []
+        progress["adapter_attempt_number"] = 1
+    else:
+        history = prior.get("adapter_attempt_history", [])
+        if not isinstance(history, list) or any(not isinstance(item, Mapping) for item in history):
+            raise RuntimeError("existing adapter attempt history is malformed")
+        history = list(history)
+        history.append({
+            key: prior[key] for key in (
+                "status", "active_stage", "adapter_commit", "adapter_sha256",
+                "started_utc", "current_attempt_started_utc",
+                "finished_or_paused_utc", "failure",
+                "cumulative_active_wall_seconds", "clock_start_seconds",
+            ) if key in prior
+        })
+        progress["adapter_attempt_history"] = history
+        progress["adapter_attempt_number"] = len(history) + 1
+        progress.pop("failure", None)
+        progress.pop("finished_or_paused_utc", None)
+
     progress["scope"] = C06_SCOPE
     progress["adapter_commit"] = adapter_commit
     progress["adapter_sha256"] = adapter_sha256
     progress.update({
         "status": "RUNNING",
+        "current_attempt_started_utc": execution._now(),
         "supervisor_pid": execution.os.getpid(),
         "active_stage": "C06-CARRY-AND-INPUT-VERIFICATION",
         "clock_start_seconds": clock.elapsed_before,
@@ -219,8 +256,8 @@ def execute_c06_continuation(
         if clock.expired():
             raise TimeoutError("whole-task active-wall cap reached before C/06 games")
 
-        c06_group = execution._run_training_games(
-            formal, backend, package_root=package_root, seed=seed,
+        c06_group = _run_c06_training_games(
+            execution, formal, backend, package_root=package_root, seed=seed,
             arm="C", block=6, clock=clock, identity=identity,
             seed_table_sha256=seed_sha, authorization=authorization,
             issue84_source=Path(issue84_source).resolve(strict=True),
