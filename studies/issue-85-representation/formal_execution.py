@@ -212,7 +212,10 @@ def _same_data_path(
         return False
     try:
         root = Path(data_root).resolve(strict=True)
-        target = Path(expected).resolve(strict=True)
+        # Some immutable worker-job fields point to outputs that do not exist
+        # yet (for example result.json before the worker starts). Resolve those
+        # lexically while requiring the data root itself to exist.
+        target = Path(expected).resolve(strict=False)
         relative = target.relative_to(root).as_posix()
     except (OSError, RuntimeError, ValueError):
         return False
@@ -5014,10 +5017,22 @@ def _unit_attempts(
             or job.get("source_lock_sha256") != lock_sha
             or job.get("seed_table_sha256") != seed_table_sha256
             or job.get("authorization_receipt_sha256") != authorization_receipt_sha256
-            or Path(str(job.get("artifact_root", ""))).resolve() != expected_root
-            or Path(str(job.get("attempt_dir", ""))).resolve() != attempt.resolve()
-            or Path(str(job.get("result_path", ""))).resolve() != (attempt / "result.json").resolve()
-            or Path(str(job.get("output_dir", ""))).resolve() != (attempt / "native").resolve()
+            or not _same_data_path(
+                job.get("artifact_root"), expected_root, data_root=Path(formal.DATA_ROOT),
+                data_root_wsl=getattr(formal, "DATA_ROOT_WSL", None),
+            )
+            or not _same_data_path(
+                job.get("attempt_dir"), attempt, data_root=Path(formal.DATA_ROOT),
+                data_root_wsl=getattr(formal, "DATA_ROOT_WSL", None),
+            )
+            or not _same_data_path(
+                job.get("result_path"), attempt / "result.json", data_root=Path(formal.DATA_ROOT),
+                data_root_wsl=getattr(formal, "DATA_ROOT_WSL", None),
+            )
+            or not _same_data_path(
+                job.get("output_dir"), attempt / "native", data_root=Path(formal.DATA_ROOT),
+                data_root_wsl=getattr(formal, "DATA_ROOT_WSL", None),
+            )
         ):
             raise RuntimeError(f"formal attempt {attempt} is misbound to a source, row, or output path")
         started_path, finish_path, result_path = attempt / "started.json", attempt / "finished.json", attempt / "result.json"

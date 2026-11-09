@@ -46,6 +46,17 @@ def test_same_data_path_accepts_windows_wsl_and_group_relative_spellings(tmp_pat
         data_root=data_root, data_root_wsl=wsl_root,
     )
 
+    future_result = target.parent / "attempt-0001" / "result.json"
+    assert not future_result.exists()
+    assert formal_execution._same_data_path(
+        f"{wsl_root}/{future_result.relative_to(data_root).as_posix()}",
+        future_result, data_root=data_root, data_root_wsl=wsl_root,
+    )
+    assert not formal_execution._same_data_path(
+        f"{wsl_root}/{future_result.relative_to(data_root).as_posix()}/../../other.json",
+        future_result, data_root=data_root, data_root_wsl=wsl_root,
+    )
+
 
 def test_formal_game_carry_total_counts_registered_overlap_once() -> None:
     resumed_training = [{"stage_id": "TRAIN-B-BLOCK-01-GAMES", "completed": 128}]
@@ -2126,7 +2137,10 @@ def test_formal_attempt_rejects_job_from_another_frozen_receipt(tmp_path: Path, 
     job[field] = "b" * 64
     (attempt / "worker-job.json").write_text(json.dumps(job), encoding="utf-8")
     backend = SimpleNamespace(unit_key=lambda _unit_id: "unit-8510001")
-    formal = SimpleNamespace(read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")))
+    formal = SimpleNamespace(
+        DATA_ROOT=tmp_path,
+        read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+    )
 
     with pytest.raises(RuntimeError, match="misbound to a source, row, or output path"):
         formal_execution._unit_attempts(
@@ -2918,6 +2932,8 @@ def _formal_attempt_fixture(tmp_path: Path, *, terminal: bool = True):
         }
         (attempt / "finished.json").write_text(json.dumps(finished), encoding="utf-8")
     formal = SimpleNamespace(
+        DATA_ROOT=tmp_path,
+        DATA_ROOT_WSL="/mnt/d/data",
         read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
         file_sha256=lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest(),
         LOCK=formal_runner.LOCK,
@@ -2935,6 +2951,33 @@ def test_formal_attempt_does_not_probe_reused_pid_after_terminal_success(tmp_pat
         raise PermissionError("PID has been reused by another process")
 
     monkeypatch.setattr(formal_execution.os, "kill", reused_pid_is_not_owned)
+    success, historical = formal_execution._unit_attempts(
+        formal, backend, root=root, row=row, package_commit=package, lock_sha=lock,
+        seed_table_sha256=seed, authorization_receipt_sha256=authorization,
+    )
+
+    assert success == result
+    assert historical == []
+
+
+def test_formal_attempt_accepts_wsl_worker_job_paths(tmp_path: Path, monkeypatch) -> None:
+    fixture = _formal_attempt_fixture(tmp_path)
+    formal, backend, root, row, package, lock, seed, authorization, result, row_sha = fixture
+    data_root = tmp_path
+    formal.DATA_ROOT = data_root
+    formal.DATA_ROOT_WSL = "/mnt/d/data"
+    job_path = root / "units" / "unit-8510001" / "attempt-0001" / "worker-job.json"
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    for field, expected in (
+        ("artifact_root", root),
+        ("attempt_dir", job_path.parent),
+        ("result_path", job_path.parent / "result.json"),
+        ("output_dir", job_path.parent / "native"),
+    ):
+        job[field] = f"{formal.DATA_ROOT_WSL}/{expected.relative_to(data_root).as_posix()}"
+    job_path.write_text(json.dumps(job), encoding="utf-8")
+    monkeypatch.setattr(formal_execution, "_hash_json", lambda _formal, _row: row_sha)
+
     success, historical = formal_execution._unit_attempts(
         formal, backend, root=root, row=row, package_commit=package, lock_sha=lock,
         seed_table_sha256=seed, authorization_receipt_sha256=authorization,
