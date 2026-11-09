@@ -41,6 +41,80 @@ def _run_c06_training_games(execution: Any, *args: Any, **kwargs: Any) -> dict[s
         execution._e902_carried_units_from_references = original
 
 
+def _train_c06_actor_update(
+    execution: Any,
+    formal: Any,
+    backend: Any,
+    issue84_driver: Any,
+    *,
+    rows: list[dict[str, Any]],
+    package_root: Path,
+    identity: Mapping[str, str],
+    seed_table: Mapping[str, Any],
+    seed_table_sha256: str,
+    training_group: Mapping[str, Any],
+    clock: Any,
+    authenticated_successful_units: Any,
+    expected_reconciliation_sha256: str,
+) -> dict[str, Any]:
+    """Use the authenticated C/06 carry commit for the pinned runner's binding check.
+
+    The pinned e902 validator verifies the exact carry manifest and group receipt.
+    Only after it succeeds, temporarily bind the following generic check to the
+    manifest's source commit, then restore the pinned value before loading examples.
+    """
+    if training_group.get("e902_canonical_reconciliation_sha256") != expected_reconciliation_sha256:
+        raise RuntimeError("C/06 game group is not bound to the authenticated e902 reconciliation")
+    if not isinstance(authenticated_successful_units, list) or len(authenticated_successful_units) != 82:
+        raise RuntimeError("authenticated C/06 carry does not contain exactly 82 successful source references")
+    source_commits = set()
+    for reference in authenticated_successful_units:
+        if not isinstance(reference, Mapping):
+            raise RuntimeError("authenticated C/06 carry contains a malformed source reference")
+        source_commit = reference.get("source_package_commit")
+        if not isinstance(source_commit, str) or not source_commit:
+            raise RuntimeError("authenticated C/06 carry contains a missing source package commit")
+        source_commits.add(source_commit)
+    if len(source_commits) != 1:
+        raise RuntimeError("C/06 authenticated carried sources do not have one exact package binding")
+
+    original_package_commit = execution.RESUMED_FORMAL_PACKAGE_COMMIT
+    original_validator = execution._validate_e902_carried_training_group
+    original_loader = formal.pilot._load_pilot_training_examples
+    binding_active = False
+
+    def validate_then_bind(*args: Any, **kwargs: Any) -> Any:
+        nonlocal binding_active
+        execution.RESUMED_FORMAL_PACKAGE_COMMIT = original_package_commit
+        result = original_validator(*args, **kwargs)
+        execution.RESUMED_FORMAL_PACKAGE_COMMIT = next(iter(source_commits))
+        binding_active = True
+        return result
+
+    def restore_before_loading_examples(*args: Any, **kwargs: Any) -> Any:
+        nonlocal binding_active
+        if binding_active:
+            execution.RESUMED_FORMAL_PACKAGE_COMMIT = original_package_commit
+            binding_active = False
+        return original_loader(*args, **kwargs)
+
+    execution._validate_e902_carried_training_group = validate_then_bind
+    formal.pilot._load_pilot_training_examples = restore_before_loading_examples
+    try:
+        return execution._train_actor_block(
+            formal, backend, issue84_driver,
+            arm="C", block=6, rows=rows, package_root=package_root,
+            identity=identity, seed_table=seed_table,
+            seed_table_sha256=seed_table_sha256,
+            training_group=training_group, clock=clock,
+        )
+    finally:
+        execution.RESUMED_FORMAL_PACKAGE_COMMIT = original_package_commit
+        execution._validate_e902_carried_training_group = original_validator
+        formal.pilot._load_pilot_training_examples = original_loader
+
+
+
 def execute_c06_continuation(
     formal: Any,
     execution: Any,
@@ -282,11 +356,13 @@ def execute_c06_continuation(
                 formal, package_root, identity, arm="C", block=6,
             )
         else:
-            c06_update = execution._train_actor_block(
-                formal, backend, issue84_driver,
-                arm="C", block=6, rows=rows, package_root=package_root,
-                identity=identity, seed_table=seed, seed_table_sha256=seed_sha,
+            c06_update = _train_c06_actor_update(
+                execution, formal, backend, issue84_driver,
+                rows=rows, package_root=package_root, identity=identity,
+                seed_table=seed, seed_table_sha256=seed_sha,
                 training_group=c06_group, clock=clock,
+                authenticated_successful_units=partial["successful_units"],
+                expected_reconciliation_sha256=reconciliation["record_sha256"],
             )
         if (
             c06_update.get("completed_steps") != 64

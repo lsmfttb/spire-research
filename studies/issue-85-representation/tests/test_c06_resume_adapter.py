@@ -7,9 +7,17 @@ from types import SimpleNamespace
 
 import pytest
 
+C06_SOURCE_PACKAGE_COMMIT = "e902a953d55dfa5a2adbfbdaf0329370e9f2217a"
+C06_SOURCE_GROUP_ROOT = (
+    "issue85/artifacts/formal/e902a953d55dfa5a2adbfbdaf0329370e9f2217a"
+    "/training/C/block-06/games"
+)
+PINNED_RESUMED_PACKAGE_COMMIT = "b8b3fc043671498628f96d378d9cecd7ac54106f"
+
 from c06_resume_adapter import (
     EXPECTED_PACKAGE_COMMIT,
     _run_c06_training_games,
+    _train_c06_actor_update,
     execute_c06_continuation,
 )
 
@@ -17,6 +25,7 @@ from c06_resume_adapter import (
 def _fixture(
     tmp_path: Path, monkeypatch, *, successful_completions: int = 82,
     unstarted_owner_ids: list[str] | None = None,
+    mutate_carried_source: bool = False,
 ):
     package_root = tmp_path / "formal-package"
     package_root.mkdir()
@@ -42,7 +51,14 @@ def _fixture(
         "c06_partial": {
             "stage_id": "TRAIN-C-BLOCK-06-GAMES",
             "successful_completions": successful_completions,
-            "successful_units": [{} for _ in range(successful_completions)],
+            "successful_units": [
+                {
+                    "unit_id": f"TRAIN:{owner}:C",
+                    "source_package_commit": C06_SOURCE_PACKAGE_COMMIT,
+                    "source_group_root": C06_SOURCE_GROUP_ROOT,
+                }
+                for owner in range(8400769, 8400769 + successful_completions)
+            ],
             "unstarted_owner_ids": (
                 unstarted_owner_ids
                 if unstarted_owner_ids is not None
@@ -98,21 +114,40 @@ def _fixture(
         Path(path).write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
 
     formal.pilot._write_or_verify_once = write_once
+    formal.pilot._load_pilot_training_examples = lambda *_args, **_kwargs: []
     runs = []
     updates = []
 
     def training(_formal, _backend, *, arm, block, **_kwargs):
         runs.append((arm, block))
+        carried_unit_sources = {}
+        if arm == "C" and block == 6:
+            carried_unit_sources = {
+                reference["unit_id"]: {
+                    "package_commit": reference["source_package_commit"],
+                    "group_root": reference["source_group_root"],
+                }
+                for reference in reconciliation["c06_partial"]["successful_units"]
+            }
+            if mutate_carried_source:
+                carried_unit_sources["TRAIN:8400769:C"]["package_commit"] = "unverified-package"
         return {
             "status": "SUCCEEDED",
             "completed": 128,
             "receipt_sha256": f"group-{arm}-{block}",
             "failed_attempt_count": 1 if block == 6 else 0,
             "e902_canonical_reconciliation_sha256": "reconciliation",
+            "carried_unit_sources": carried_unit_sources,
         }
 
     def actor_update(_formal, _backend, _driver, *, arm, block, **_kwargs):
         updates.append((arm, block))
+        execution._validate_e902_carried_training_group(
+            training_group=_kwargs["training_group"]
+        )
+        assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == C06_SOURCE_PACKAGE_COMMIT
+        formal.pilot._load_pilot_training_examples()
+        assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == PINNED_RESUMED_PACKAGE_COMMIT
         return {
             "completed_steps": 64,
             "receipt_sha256": "c06-update",
@@ -128,9 +163,22 @@ def _fixture(
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         Path(path).write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
 
+    def validate_c06_source_map(*, training_group):
+        expected = {
+            reference["unit_id"]: {
+                "package_commit": reference["source_package_commit"],
+                "group_root": reference["source_group_root"],
+            }
+            for reference in reconciliation["c06_partial"]["successful_units"]
+        }
+        if dict(training_group.get("carried_unit_sources", {})) != expected:
+            raise RuntimeError("canonical C/06 source map mismatch")
+
     execution = SimpleNamespace(
         os=SimpleNamespace(name="posix", getpid=lambda: 123),
         PROGRESS_SCHEMA="issue85-formal-progress-v1",
+        RESUMED_FORMAL_PACKAGE_COMMIT=PINNED_RESUMED_PACKAGE_COMMIT,
+        _validate_e902_carried_training_group=validate_c06_source_map,
         PREDECESSOR_GROUP_RECEIPT_SHA256="predecessor-group",
         _validate_readiness=lambda *_args: (
             package_root, {"package_commit": EXPECTED_PACKAGE_COMMIT}, {"rows": []},
@@ -250,6 +298,95 @@ def test_c06_training_game_adapter_makes_allowed_roots_mutable_and_restores_help
 
     assert result == {"status": "SUCCEEDED"}
     assert execution._e902_carried_units_from_references is original
+
+
+def _c06_successful_source_references():
+    return [
+        {
+            "unit_id": f"TRAIN:{owner}:C",
+            "source_package_commit": C06_SOURCE_PACKAGE_COMMIT,
+            "source_group_root": C06_SOURCE_GROUP_ROOT,
+        }
+        for owner in range(8400769, 8400851)
+    ]
+
+
+def _call_c06_actor_update(execution, formal, training_group, references):
+    return _train_c06_actor_update(
+        execution, formal, backend=None, issue84_driver=None,
+        rows=[], package_root=Path("."), identity={},
+        seed_table={}, seed_table_sha256="seed", training_group=training_group,
+        clock=None, authenticated_successful_units=references,
+        expected_reconciliation_sha256="reconciliation",
+    )
+
+
+def test_c06_actor_update_rejects_carried_sources_outside_authenticated_manifest(
+    tmp_path, monkeypatch,
+):
+    (
+        formal, execution, authorization, issue84, native, stsr,
+        _package_root, runs, updates, written, clock,
+    ) = _fixture(tmp_path, monkeypatch, mutate_carried_source=True)
+
+    with pytest.raises(RuntimeError, match="canonical C/06 source map mismatch"):
+        execute_c06_continuation(
+            formal, execution,
+            issue84_source=issue84, native_source=native, stsr_source=stsr,
+            authorization_receipt=authorization, adapter_commit="adapter-commit",
+            adapter_sha256="adapter-hash",
+        )
+
+    assert runs == [("C", 5), ("C", 6)]
+    assert updates == [("C", 6)]
+    assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == PINNED_RESUMED_PACKAGE_COMMIT
+    assert clock.closed
+    assert "receipt" not in written
+    progress = json.loads(
+        (_package_root / "formal-progress.json").read_text(encoding="utf-8")
+    )
+    assert progress["status"] == "FAILED_OR_PAUSED"
+    assert progress["game_groups"]["TRAIN-C-BLOCK-06"]["completed"] == 128
+    assert "C:6" not in progress["actor_updates"]
+
+
+def test_c06_actor_update_restores_pinned_binding_when_runner_raises():
+    references = _c06_successful_source_references()
+    sources = {
+        reference["unit_id"]: {
+            "package_commit": reference["source_package_commit"],
+            "group_root": reference["source_group_root"],
+        }
+        for reference in references
+    }
+    original_validator = lambda *_args, **_kwargs: None
+    original_loader = lambda *_args, **_kwargs: []
+    execution = SimpleNamespace(
+        RESUMED_FORMAL_PACKAGE_COMMIT=PINNED_RESUMED_PACKAGE_COMMIT,
+        _validate_e902_carried_training_group=original_validator,
+    )
+    formal = SimpleNamespace(pilot=SimpleNamespace(
+        _load_pilot_training_examples=original_loader,
+    ))
+
+    def fail_after_authenticated_validation(*_args, **_kwargs):
+        execution._validate_e902_carried_training_group()
+        assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == C06_SOURCE_PACKAGE_COMMIT
+        raise RuntimeError("controlled update-stage failure")
+
+    execution._train_actor_block = fail_after_authenticated_validation
+    group = {
+        "e902_canonical_reconciliation_sha256": "reconciliation",
+        "carried_unit_sources": sources,
+    }
+
+    with pytest.raises(RuntimeError, match="controlled update-stage failure"):
+        _call_c06_actor_update(execution, formal, group, references)
+
+    assert execution.RESUMED_FORMAL_PACKAGE_COMMIT == PINNED_RESUMED_PACKAGE_COMMIT
+    assert execution._validate_e902_carried_training_group is original_validator
+    assert formal.pilot._load_pilot_training_examples is original_loader
+
 
 
 def test_c06_adapter_preserves_failed_attempt_when_resuming(tmp_path, monkeypatch):
