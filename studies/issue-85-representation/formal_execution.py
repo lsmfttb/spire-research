@@ -5572,10 +5572,14 @@ def _read_update_receipt(
             raise RuntimeError("policy producer game-group digest is not a SHA-256")
         if str(producer.get("source_lock_sha256", "")) != identity["source_lock_sha256"]:
             raise RuntimeError("policy producer source lock differs from the locked study source")
-        package_root = _inside(
-            Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal",
-            producer_commit,
+        producer_root = (
+            Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal" / producer_commit
         )
+        if not producer_root.is_dir():
+            raise RuntimeError(
+                "policy producer package is absent from the durable formal store"
+            )
+        package_root = _inside(producer_root.parent, producer_commit)
         identity = {
             "package_commit": producer_commit,
             "source_lock_sha256": str(producer["source_lock_sha256"]),
