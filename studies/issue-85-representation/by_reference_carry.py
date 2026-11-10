@@ -171,18 +171,21 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
     """Resolve the full completed roster once, verifying every producer."""
     stages = [resolve_stage(formal, arm, block, g, u) for arm, block, g, u in STAGES]
     seen: set[tuple[str, int]] = set()
-    owners: set[int] = set()
+    # Each arm trains its own lineage over the same 1,024 registered owners, so a
+    # registered outcome is identified by (arm, owner) -- the unit id
+    # TRAIN:<owner>:<arm> -- not by owner alone.
+    units: set[tuple[str, int]] = set()
     for stage in stages:
         key = (stage["arm"], stage["block_index"])
         if key in seen:
             raise RuntimeError(f"duplicate completed stage {key}")
         seen.add(key)
-        span = set(range(stage["owner_first"], stage["owner_last"] + 1))
-        if owners & span:
-            raise RuntimeError(f"completed stages overlap on owners at {key}")
-        owners |= span
-    if len(stages) != len(STAGES) or len(owners) != len(STAGES) * OWNERS_PER_BLOCK:
-        raise RuntimeError("completed roster is not unique across registered owners")
+        span = {(stage["arm"], owner) for owner in range(stage["owner_first"], stage["owner_last"] + 1)}
+        if units & span:
+            raise RuntimeError(f"completed stages overlap on registered outcomes at {key}")
+        units |= span
+    if len(stages) != len(STAGES) or len(units) != len(STAGES) * OWNERS_PER_BLOCK:
+        raise RuntimeError("completed roster is not unique across registered outcomes")
     producers = sorted(
         {stage["games_package_commit"] for stage in stages}
         | {stage["update_package_commit"] for stage in stages}
@@ -192,7 +195,7 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
         "executing_package_commit": identity["package_commit"],
         "source_lock_sha256": identity["source_lock_sha256"],
         "completed_stage_count": len(stages),
-        "completed_train_outcomes": len(owners),
+        "completed_train_outcomes": len(units),
         "first_unfinished_arm": FIRST_UNFINISHED[0],
         "first_unfinished_block": FIRST_UNFINISHED[1],
         "producers": producers,
