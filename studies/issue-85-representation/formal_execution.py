@@ -4737,6 +4737,50 @@ def _formal_training_dispatch(
     return arm, block
 
 
+POLICY_PRODUCER_SCHEMA = "issue85-policy-producers-v1"
+
+
+def _load_policy_producers(
+    formal: Any, package_root: Path, identity: Mapping[str, str],
+) -> dict[str, Mapping[str, Any]]:
+    """Read explicit cross-package prior-block policy bindings for this package.
+
+    A successor package consumes the previous block's actor from the package that
+    produced it. Those bindings are recorded as data next to the executing
+    package so every worker resolves the same authenticated producer without a
+    mutable module global. An absent file means the package owns all of its
+    prior blocks.
+    """
+    path = Path(package_root) / "policy-producers.json"
+    if not path.is_file():
+        return {}
+    document = formal.read_json(path)
+    if (
+        not isinstance(document, Mapping)
+        or document.get("schema_id") != POLICY_PRODUCER_SCHEMA
+        or document.get("executing_package_commit") != identity["package_commit"]
+        or document.get("source_lock_sha256") != identity["source_lock_sha256"]
+        or not isinstance(document.get("producers"), Mapping)
+    ):
+        raise RuntimeError("policy producer bindings are stale or bound to another executing package")
+    producers: dict[str, Mapping[str, Any]] = {}
+    for key, value in document["producers"].items():
+        if not isinstance(key, str) or not re.fullmatch(r"[A-Z]:[0-7]", key):
+            raise RuntimeError("policy producer key is not a registered arm:block")
+        if not isinstance(value, Mapping):
+            raise RuntimeError("policy producer entry is malformed")
+        for field in (
+            "package_commit", "source_lock_sha256",
+            "predecessor_carry_manifest_sha256", "group_receipt_sha256",
+        ):
+            if not isinstance(value.get(field), str) or not re.fullmatch(r"[0-9a-f]{40,64}", value[field]):
+                raise RuntimeError(f"policy producer entry has an invalid {field}")
+        if value["source_lock_sha256"] != identity["source_lock_sha256"]:
+            raise RuntimeError("policy producer source lock differs from the locked study source")
+        producers[key] = dict(value)
+    return producers
+
+
 def _configure_formal_runtime(
     formal: Any, issue84_source: Path, identity: Mapping[str, str], package_root: Path,
 ) -> tuple[Any, Any]:
@@ -4745,6 +4789,7 @@ def _configure_formal_runtime(
     backend.PINNED_PYTHON = _source_locked_formal_python(formal)
     pilot_root_loader = backend.load_modules
     backend.__file__ = str(Path(formal.__file__).resolve())
+    policy_producers = _load_policy_producers(formal, package_root, identity)
 
     def load_modules(active_root: Path, *, pilot: bool):
         # The pinned #84 loader/runtime is reused. Its pilot-specific Issue 85
@@ -4781,7 +4826,10 @@ def _configure_formal_runtime(
             actor, _initial_digest, source = fresh_arm(arm)
             if block == 0:
                 return actor, model.model_digest(actor), source
-            previous = _read_update_receipt(formal, package_root, identity, arm=arm, block=block - 1)
+            previous = _read_update_receipt(
+                formal, package_root, identity, arm=arm, block=block - 1,
+                producer=policy_producers.get(f"{arm}:{block - 1}"),
+            )
             previous_root = Path(str(previous.get("producer_package_root", package_root)))
             checkpoint = _inside(previous_root, str(previous["actor_checkpoint_path"]))
             if formal.file_sha256(checkpoint) != previous.get("actor_checkpoint_sha256"):
@@ -5497,7 +5545,41 @@ def _owner_hash(rows: Sequence[Mapping[str, Any]]) -> str:
 
 def _read_update_receipt(
     formal: Any, package_root: Path, identity: Mapping[str, str], *, arm: str, block: int,
+    producer: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """Read one actor-update receipt.
+
+    ``producer`` explicitly names an authenticated upstream package that produced
+    this update when the executing package does not own the receipt: the previous
+    block's model may legitimately live in an earlier package. It carries the
+    producer root, the producer's own identity and the producer's immutable
+    predecessor-carry digest as data, so a source-bound non-e902 C block can be
+    read without a module-global carry binding and without assuming the carry
+    digest is ``None``.
+    """
+    producer_commit: str | None = None
+    forced_carry_sha256: str | None = None
+    expected_group_sha256: str | None = None
+    if producer is not None:
+        producer_commit = str(producer.get("package_commit", ""))
+        forced_carry_sha256 = str(producer.get("predecessor_carry_manifest_sha256", ""))
+        expected_group_sha256 = str(producer.get("group_receipt_sha256", ""))
+        if not re.fullmatch(r"[0-9a-f]{40}", producer_commit):
+            raise RuntimeError("policy producer package commit is not a full Git commit")
+        if not re.fullmatch(r"[0-9a-f]{64}", forced_carry_sha256):
+            raise RuntimeError("policy producer predecessor-carry digest is not a SHA-256")
+        if not re.fullmatch(r"[0-9a-f]{64}", expected_group_sha256):
+            raise RuntimeError("policy producer game-group digest is not a SHA-256")
+        if str(producer.get("source_lock_sha256", "")) != identity["source_lock_sha256"]:
+            raise RuntimeError("policy producer source lock differs from the locked study source")
+        package_root = _inside(
+            Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal",
+            producer_commit,
+        )
+        identity = {
+            "package_commit": producer_commit,
+            "source_lock_sha256": str(producer["source_lock_sha256"]),
+        }
     path = package_root / "training" / arm / "updates" / f"block-{block:02d}" / "success-receipt.json"
     if (
         (arm, block) in E902_CANONICAL_STAGE_KEYS
@@ -5716,8 +5798,18 @@ def _read_update_receipt(
         raise RuntimeError(f"formal actor update receipt is missing for {arm} block {block}")
     receipt = formal.read_json(path)
     digest = formal.file_sha256(path)
+    if forced_carry_sha256 is not None:
+        group_path = package_root / "training" / arm / f"block-{block:02d}" / "games" / "group-receipt.json"
+        if (
+            not group_path.is_file()
+            or formal.file_sha256(group_path) != expected_group_sha256
+            or receipt.get("training_group_receipt_sha256") != expected_group_sha256
+        ):
+            raise RuntimeError(
+                f"{arm}/{block:02d} producer game group differs from its authenticated receipt"
+            )
     training_data_package = identity["package_commit"]
-    carry_manifest_sha256 = None
+    carry_manifest_sha256 = forced_carry_sha256
     if arm == "B" and block == 0:
         training_data_package = PREDECESSOR_PACKAGE_COMMIT
         _carry, carry_manifest_sha256 = _validate_carry_manifest(formal, package_root, identity)
@@ -5773,6 +5865,13 @@ def _read_update_receipt(
         "receipt_file_sha256": digest,
         "receipt_path": path.relative_to(package_root).as_posix(),
         "producer_package_root": str(package_root),
+        **(
+            {
+                "carried_from_package_commit": producer_commit,
+                "carried_by_manifest_sha256": forced_carry_sha256,
+            }
+            if producer_commit is not None else {}
+        ),
     }
 
 
