@@ -360,9 +360,15 @@ def test_every_carried_stage_reads_through_its_producer_binding(monkeypatch):
     import formal_execution as fe
 
     monkeypatch.setattr(formal, "DATA_ROOT", str(REAL_DATA_ROOT))
+    # Take the lock from real evidence rather than a module constant.
+    probe = formal.read_json(
+        REAL_DATA_ROOT / "issue85" / "artifacts" / "formal"
+        / "2ecd996139778665d60a06f624b41e260c7b7358"
+        / "training" / "C" / "updates" / "block-06" / "success-receipt.json"
+    )
     identity = {
         "package_commit": "0" * 40,
-        "source_lock_sha256": str(formal.LOCK["source_lock_sha256"]),
+        "source_lock_sha256": str(probe["source_lock_sha256"]),
     }
     index = brc.build_index(formal, identity)
     bindings = brc.stage_bindings(index, identity)
