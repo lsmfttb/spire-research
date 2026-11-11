@@ -236,6 +236,7 @@ def policy_producers(
             raise RuntimeError(f"policy input producer {arm}/{block:02d} is not a completed stage")
         producers[f"{arm}:{block}"] = {
             "package_commit": stage["update_package_commit"],
+            "games_package_commit": stage["games_package_commit"],
             "source_lock_sha256": identity["source_lock_sha256"],
             "predecessor_carry_manifest_sha256": stage["predecessor_carry_manifest_sha256"],
             "group_receipt_sha256": stage["group_receipt_sha256"],
@@ -246,6 +247,28 @@ def policy_producers(
         "source_lock_sha256": identity["source_lock_sha256"],
         "producers": producers,
     }
+
+
+def stage_bindings(
+    index: Mapping[str, Any], identity: Mapping[str, str],
+) -> dict[str, dict[str, Any]]:
+    """Producer binding for every completed stage, keyed ``arm:block``.
+
+    A carried stage's update receipt is resolved from the package that really
+    wrote it, while its game group may live in a different package -- B/00's games
+    are in `e549105e` but its update in `fde456f5`. Both are named so verification
+    never has to assume they coincide.
+    """
+    bindings: dict[str, dict[str, Any]] = {}
+    for stage in index["stages"]:
+        bindings[f"{stage['arm']}:{stage['block_index']}"] = {
+            "package_commit": stage["update_package_commit"],
+            "games_package_commit": stage["games_package_commit"],
+            "source_lock_sha256": identity["source_lock_sha256"],
+            "predecessor_carry_manifest_sha256": stage["predecessor_carry_manifest_sha256"],
+            "group_receipt_sha256": stage["group_receipt_sha256"],
+        }
+    return bindings
 
 
 def main(argv: list[str] | None = None) -> int:

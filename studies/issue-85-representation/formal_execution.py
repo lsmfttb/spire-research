@@ -5558,10 +5558,12 @@ def _read_update_receipt(
     digest is ``None``.
     """
     producer_commit: str | None = None
+    games_commit: str | None = None
     forced_carry_sha256: str | None = None
     expected_group_sha256: str | None = None
     if producer is not None:
         producer_commit = str(producer.get("package_commit", ""))
+        games_commit = str(producer.get("games_package_commit", producer_commit))
         forced_carry_sha256 = str(producer.get("predecessor_carry_manifest_sha256", ""))
         expected_group_sha256 = str(producer.get("group_receipt_sha256", ""))
         if not re.fullmatch(r"[0-9a-f]{40}", producer_commit):
@@ -5803,7 +5805,11 @@ def _read_update_receipt(
     receipt = formal.read_json(path)
     digest = formal.file_sha256(path)
     if forced_carry_sha256 is not None:
-        group_path = package_root / "training" / arm / f"block-{block:02d}" / "games" / "group-receipt.json"
+        games_root = (
+            Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal" / games_commit
+            if games_commit is not None else package_root
+        )
+        group_path = games_root / "training" / arm / f"block-{block:02d}" / "games" / "group-receipt.json"
         if (
             not group_path.is_file()
             or formal.file_sha256(group_path) != expected_group_sha256
