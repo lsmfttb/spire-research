@@ -4616,6 +4616,30 @@ def _validate_by_reference_index(
     return index
 
 
+def _by_reference_carried_groups(
+    index: Mapping[str, Any], owners_per_block: int,
+) -> dict[tuple[str, int], dict[str, Any]]:
+    """Completed stages a successor must skip, described from their producers.
+
+    The dispatch loop only ever reads ``status``/``completed`` from a carried
+    group, so these records deliberately carry no result data: the outcome stays
+    in the package that produced it and is never restated here.
+    """
+    return {
+        (str(stage["arm"]), int(stage["block_index"])): {
+            "status": "SUCCEEDED",
+            "completed": owners_per_block,
+            "expected": owners_per_block,
+            "carried_by_reference": True,
+            "producer_package_commit": stage["update_package_commit"],
+            "games_package_commit": stage["games_package_commit"],
+            "training_group_receipt_sha256": stage["group_receipt_sha256"],
+            "update_receipt_sha256": stage["update_receipt_sha256"],
+        }
+        for stage in index["stages"]
+    }
+
+
 def validate_authorization(
     formal: Any, authorization_path: Path, *, identity: Mapping[str, str],
     readiness: Mapping[str, Any], seed: Mapping[str, Any], require_idle_clock: bool = True,
@@ -6955,19 +6979,7 @@ def execute_formal(
         carry_manifest = {}
         resumed_formal_continuation = None
         owners_per_block = int(formal.CONTRACT["training"]["owners_per_block"])
-        carried_training_groups = {
-            (str(stage["arm"]), int(stage["block_index"])): {
-                "status": "SUCCEEDED",
-                "completed": owners_per_block,
-                "expected": owners_per_block,
-                "carried_by_reference": True,
-                "producer_package_commit": stage["update_package_commit"],
-                "games_package_commit": stage["games_package_commit"],
-                "training_group_receipt_sha256": stage["group_receipt_sha256"],
-                "update_receipt_sha256": stage["update_receipt_sha256"],
-            }
-            for stage in index["stages"]
-        }
+        carried_training_groups = _by_reference_carried_groups(index, owners_per_block)
     else:
         carry_manifest, carry_manifest_sha256 = _validate_carry_manifest(
             formal, package_root, identity,
