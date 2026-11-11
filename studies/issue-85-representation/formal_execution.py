@@ -5885,15 +5885,11 @@ def _read_update_receipt(
         raise RuntimeError(f"formal actor update receipt is missing for {arm} block {block}")
     receipt = formal.read_json(path)
     digest = formal.file_sha256(path)
-    if producer is not None and forced_carry_sha256 is None:
-        # Absence is only acceptable when the binding and the receipt agree that
-        # this stage carried nothing; otherwise a receipt could claim a carry the
-        # producer record never authenticated.
-        if receipt.get("predecessor_carry_manifest_sha256") is not None:
-            raise RuntimeError(
-                f"{arm}/{block:02d} producer receipt claims a carry its binding does not name"
-            )
-    if forced_carry_sha256 is not None:
+    if producer is not None:
+        # The group cross-check is what proves "this update consumed this game
+        # group", and resolve_stage sets group_receipt_sha256 for all fifteen
+        # stages. Gating it behind the carry digest left ten stages unchecked --
+        # and made their reads fail outright.
         games_root = (
             Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal" / games_commit
             if games_commit is not None else package_root
@@ -5906,6 +5902,17 @@ def _read_update_receipt(
         ):
             raise RuntimeError(
                 f"{arm}/{block:02d} producer game group differs from its authenticated receipt"
+            )
+        # A carry digest is asserted only where the stage actually had one; ten of
+        # the fifteen recorded none, and demanding it rejected them all.
+        if forced_carry_sha256 is not None:
+            if receipt.get("predecessor_carry_manifest_sha256") != forced_carry_sha256:
+                raise RuntimeError(
+                    f"{arm}/{block:02d} producer receipt does not match its authenticated carry digest"
+                )
+        elif receipt.get("predecessor_carry_manifest_sha256") is not None:
+            raise RuntimeError(
+                f"{arm}/{block:02d} producer receipt claims a carry its binding does not name"
             )
     training_data_package = identity["package_commit"]
     carry_manifest_sha256 = forced_carry_sha256
