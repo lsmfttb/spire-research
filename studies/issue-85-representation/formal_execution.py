@@ -4910,7 +4910,10 @@ def _configure_formal_runtime(
                     "training_package_commit": locked["issue84_training_package_commit"],
                     "formal": True,
                 }
-            receipt = _read_update_receipt(formal, package_root, identity, arm=arm, block=7)
+            receipt = _read_update_receipt(
+                formal, package_root, identity, arm=arm, block=7,
+                producer=policy_producers.get(f"{arm}:7"),
+            )
             checkpoint = _inside(package_root, str(receipt["actor_checkpoint_path"]))
             if formal.file_sha256(checkpoint) != receipt.get("actor_checkpoint_sha256"):
                 raise RuntimeError(f"final Issue 85 {arm} model checkpoint hash differs")
@@ -6935,41 +6938,72 @@ def execute_formal(
     ):
         raise RuntimeError("formal progress is bound to a different source, seed, carry manifest or owner authorization")
     backend, issue84_driver = _configure_formal_runtime(formal, issue84_source, identity, package_root)
-    carry_manifest, carry_manifest_sha256 = _validate_carry_manifest(
-        formal, package_root, identity,
-        expected_sha256=authorization["predecessor_carry_manifest_sha256"],
-    )
-    if (
-        _e902_canonical_lineage_required(formal, identity)
-        and not isinstance(carry_manifest.get("e902_canonical_reconciliation"), Mapping)
-    ):
-        raise RuntimeError("formal continuation is missing its immutable canonical e902 reconciliation")
-    if carry_manifest_sha256 != authorization["predecessor_carry_manifest_sha256"]:
-        raise RuntimeError("source-bound authorization references a different predecessor carry manifest")
-    resumed_formal_continuation = _validate_resumed_formal_continuation(
-        formal, package_root, identity, backend,
-    )
-    carried_training_groups = {
-        ("B", 0): _predecessor_training_group(
+    carry_mode = str(authorization.get("carry_mode", "historical_manifest"))
+    stage_bindings: dict[str, dict[str, Any]] = {}
+    if carry_mode == "by_reference_index":
+        # The successor keeps every completed stage in the package that really
+        # produced it. Each is resolved from its producer and skipped here, so an
+        # empty successor package never schedules B/00 and no historical optimizer
+        # step is replayed.
+        import by_reference_carry
+
+        index = _validate_by_reference_index(
             formal, package_root, identity,
-            expected_carry_sha256=authorization["predecessor_carry_manifest_sha256"],
-        ),
-        ("B", 1): _resumed_b01_training_group(
+            str(authorization["by_reference_carry_index_sha256"]),
+        )
+        stage_bindings = by_reference_carry.stage_bindings(index, identity)
+        carry_manifest = {}
+        resumed_formal_continuation = None
+        owners_per_block = int(formal.CONTRACT["training"]["owners_per_block"])
+        carried_training_groups = {
+            (str(stage["arm"]), int(stage["block_index"])): {
+                "status": "SUCCEEDED",
+                "completed": owners_per_block,
+                "expected": owners_per_block,
+                "carried_by_reference": True,
+                "producer_package_commit": stage["update_package_commit"],
+                "games_package_commit": stage["games_package_commit"],
+                "training_group_receipt_sha256": stage["group_receipt_sha256"],
+                "update_receipt_sha256": stage["update_receipt_sha256"],
+            }
+            for stage in index["stages"]
+        }
+    else:
+        carry_manifest, carry_manifest_sha256 = _validate_carry_manifest(
             formal, package_root, identity,
-            expected_carry_sha256=authorization["predecessor_carry_manifest_sha256"],
-        ),
-    }
-    if resumed_formal_continuation is not None:
-        carried_training_groups[("B", 2)] = _resumed_b02_training_group(
-            formal, package_root, identity, resumed_formal_continuation,
+            expected_sha256=authorization["predecessor_carry_manifest_sha256"],
         )
         if (
-            isinstance(carry_manifest.get("resumed_formal_continuation"), Mapping)
-            and carry_manifest["resumed_formal_continuation"].get("schema_id") == STOPPED_FORMAL_CONTINUATION_SCHEMA
+            _e902_canonical_lineage_required(formal, identity)
+            and not isinstance(carry_manifest.get("e902_canonical_reconciliation"), Mapping)
         ):
-            carried_training_groups[("B", 3)] = _resumed_b03_training_group(
+            raise RuntimeError("formal continuation is missing its immutable canonical e902 reconciliation")
+        if carry_manifest_sha256 != authorization["predecessor_carry_manifest_sha256"]:
+            raise RuntimeError("source-bound authorization references a different predecessor carry manifest")
+        resumed_formal_continuation = _validate_resumed_formal_continuation(
+            formal, package_root, identity, backend,
+        )
+        carried_training_groups = {
+            ("B", 0): _predecessor_training_group(
+                formal, package_root, identity,
+                expected_carry_sha256=authorization["predecessor_carry_manifest_sha256"],
+            ),
+            ("B", 1): _resumed_b01_training_group(
+                formal, package_root, identity,
+                expected_carry_sha256=authorization["predecessor_carry_manifest_sha256"],
+            ),
+        }
+        if resumed_formal_continuation is not None:
+            carried_training_groups[("B", 2)] = _resumed_b02_training_group(
                 formal, package_root, identity, resumed_formal_continuation,
             )
+            if (
+                isinstance(carry_manifest.get("resumed_formal_continuation"), Mapping)
+                and carry_manifest["resumed_formal_continuation"].get("schema_id") == STOPPED_FORMAL_CONTINUATION_SCHEMA
+            ):
+                carried_training_groups[("B", 3)] = _resumed_b03_training_group(
+                    formal, package_root, identity, resumed_formal_continuation,
+                )
     clock = backend.ActiveClock("issue85-task", float(authorization["whole_task_active_wall_cap_seconds"]))
     progress = prior_progress or {
         "schema_id": PROGRESS_SCHEMA,
@@ -7026,7 +7060,17 @@ def execute_formal(
                     isinstance(carry_manifest.get("e902_canonical_reconciliation"), Mapping)
                     and f"{arm}:{block}" in carry_manifest["e902_canonical_reconciliation"].get("actor_updates", {})
                 )
-                if not update_path.is_file() and (
+                block_binding = stage_bindings.get(block_key)
+                if not update_path.is_file() and block_binding is not None:
+                    progress["active_stage"] = (
+                        f"TRAIN-{arm}-BLOCK-{block:02d}-ACTOR-UPDATE-CARRY-READ"
+                    )
+                    save_progress()
+                    progress["actor_updates"][block_key] = _read_update_receipt(
+                        formal, package_root, identity, arm=arm, block=block,
+                        producer=block_binding,
+                    )
+                elif not update_path.is_file() and (
                     e902_update_carry
                     or (
                         arm == "B" and block in (0, 1, 2, 3)
@@ -7071,7 +7115,12 @@ def execute_formal(
             "PARENT": str(formal.LOCK["baseline_P"]["model_digest"]),
             "A": str(formal.LOCK["baseline_A"]["model_digest"]),
             **{
-                arm: str(_read_update_receipt(formal, package_root, identity, arm=arm, block=7)["result_model_digest"])
+                arm: str(
+                    _read_update_receipt(
+                        formal, package_root, identity, arm=arm, block=7,
+                        producer=stage_bindings.get(f"{arm}:7"),
+                    )["result_model_digest"]
+                )
                 for arm in formal.NEW_ARMS
             },
         }
