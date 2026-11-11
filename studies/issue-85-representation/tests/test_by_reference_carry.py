@@ -217,19 +217,46 @@ def test_policy_input_bindings_carry_the_games_producer_too(store):
     assert producers["C:6"]["games_package_commit"] == "2ecd996139778665d60a06f624b41e260c7b7358"
 
 
-def test_index_binds_the_observed_wall_and_never_moves_it_backwards(store):
+def test_clock_advance_cannot_change_the_evidence_digest(store):
+    """The wall advances during the run; the evidence digest must not follow it."""
     first = brc.build_index(formal, IDENTITY)
     assert first["observed_active_wall_seconds"] == pytest.approx(75785.56550202602)
 
-    clock = store / "issue85/artifacts/active-wall-issue85-task.json"
-    clock.write_text(
+    (store / "issue85/artifacts/active-wall-issue85-task.json").write_text(
         json.dumps({"elapsed_seconds": 80000.0, "allowance_seconds": 295632}), encoding="utf-8"
     )
     later = brc.build_index(formal, IDENTITY)
     assert later["observed_active_wall_seconds"] == pytest.approx(80000.0)
-    # The wall is part of the index, so a refreshed index re-binds the higher reading
-    # instead of letting a stale snapshot travel with the evidence.
-    assert later["index_sha256"] != first["index_sha256"]
+    # Only the annotation moves; producer evidence and its digest are identical.
+    assert later["stages"] == first["stages"]
+    assert later["index_sha256"] == first["index_sha256"]
+
+
+def test_stored_index_still_validates_after_the_run_clock_advances(store):
+    """Workers are admitted only after the wall has moved; that must not fail closed."""
+    index = brc.build_index(formal, IDENTITY)
+    root = store / "issue85" / "artifacts" / "formal" / EXECUTING_COMMIT
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / "by-reference-carry-index.json"
+    path.write_text(json.dumps(index), encoding="utf-8")
+
+    # The run starts and the shared ledger advances well past the written value.
+    (store / "issue85/artifacts/active-wall-issue85-task.json").write_text(
+        json.dumps({"elapsed_seconds": 90000.0, "allowance_seconds": 295632}), encoding="utf-8"
+    )
+    assert brc.validate_index(formal, path, IDENTITY)["index_sha256"] == index["index_sha256"]
+
+
+def test_index_rejects_a_wall_annotation_ahead_of_the_ledger(store):
+    """The annotation is unhashed, so it needs its own monotone guard."""
+    index = brc.build_index(formal, IDENTITY)
+    index["observed_active_wall_seconds"] = 999999.0
+    root = store / "issue85" / "artifacts" / "formal" / EXECUTING_COMMIT
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / "by-reference-carry-index.json"
+    path.write_text(json.dumps(index), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="more active wall than the ledger"):
+        brc.validate_index(formal, path, IDENTITY)
 
 
 def test_index_refuses_a_missing_clock(store):
@@ -343,8 +370,9 @@ def test_real_evidence_keeps_c06_attempt_layout_intact(monkeypatch):
     receipt = formal.read_json(receipt_path)
     # The index binds the receipt's internal self-hash (what the reader verifies),
     # not the file digest -- the two differ, and conflating them would hide a swap.
-    assert receipt["receipt_sha256"] == c06["update_receipt_sha256"]
-    assert formal.file_sha256(receipt_path) != c06["update_receipt_sha256"]
+    assert receipt["receipt_sha256"] == c06["update_receipt_self_sha256"]
+    assert formal.file_sha256(receipt_path) == c06["update_receipt_file_sha256"]
+    assert c06["update_receipt_file_sha256"] != c06["update_receipt_self_sha256"]
     assert receipt["status"] == "SUCCEEDED"
     assert receipt["completed_steps"] == 64
     assert receipt["owner_count"] == 128
