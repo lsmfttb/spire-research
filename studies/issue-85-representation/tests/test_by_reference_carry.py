@@ -179,7 +179,7 @@ def test_validate_index_rejects_resigned_tampering(store):
     """Recomputing the self-hash must not rescue a mutated stage."""
     index = brc.build_index(formal, IDENTITY)
     index["stages"][0]["owner_first"] = 1
-    unsigned = {k: v for k, v in index.items() if k != "index_sha256"}
+    unsigned = {k: v for k, v in index.items() if k not in brc.UNHASHED_INDEX_KEYS}
     index["index_sha256"] = brc._hash_json(unsigned)
     package_root = store / "issue85/artifacts/formal" / EXECUTING_COMMIT
     package_root.mkdir(parents=True, exist_ok=True)
