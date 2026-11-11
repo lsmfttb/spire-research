@@ -218,10 +218,47 @@ def _canonical_carry_proofs(formal: Any, stages: list[dict[str, Any]]) -> dict[s
         != fe.E902_CANONICAL_PACKAGE_COMMIT
     ):
         raise RuntimeError("e902 reconciliation does not exclude the duplicate evidence it must")
+    # The reconciliation is self-verifying under the study canonical serializer, so
+    # trusting it is not a matter of trusting the document's own say-so.
+    body = {k: v for k, v in reconciliation.items() if k != "record_sha256"}
+    if reconciliation.get("record_sha256") != _hash_json(body):
+        raise RuntimeError("e902 reconciliation self-digest does not verify")
+
+    # Derive the skip set from the reconciliation instead of asserting it from the
+    # STAGES table: if the table drifted, nothing else would notice. The record
+    # names only the ten stages it reconciled (B/04-B/07, C/00-C/05); the other
+    # five were produced elsewhere and are not derivable from it.
+    named_groups = reconciliation.get("groups")
+    named_updates = reconciliation.get("actor_updates")
+    if not isinstance(named_groups, dict) or not isinstance(named_updates, dict):
+        raise RuntimeError("e902 reconciliation does not name its reconciled stages")
+    if set(named_groups) != set(named_updates):
+        raise RuntimeError("e902 reconciliation names unequal group and update stage sets")
+    by_key = {(s["arm"], s["block_index"]): s for s in stages}
+    canonical_source = str(reconciliation.get("canonical_source_package_commit"))
+    for name, group in named_groups.items():
+        arm, _, block_text = str(name).partition(":")
+        stage = by_key.get((arm, int(block_text)))
+        if stage is None:
+            raise RuntimeError(f"e902 reconciliation names a stage the index does not carry: {name}")
+        if stage["update_package_commit"] != canonical_source:
+            raise RuntimeError(f"{name} was not produced by the canonical e902 package")
+        if stage["group_receipt_sha256"] != group.get("group_receipt_sha256"):
+            raise RuntimeError(f"{name} game group differs from the canonical reconciliation")
+        if int(group.get("completed", -1)) != OWNERS_PER_BLOCK:
+            raise RuntimeError(f"{name} reconciled game group is incomplete")
+        update = named_updates[name]
+        if (
+            stage["actor_checkpoint_sha256"] != update.get("actor_checkpoint_sha256")
+            or stage["optimizer_checkpoint_sha256"] != update.get("optimizer_checkpoint_sha256")
+        ):
+            raise RuntimeError(f"{name} checkpoints differ from the canonical reconciliation")
+
     return {
         "carry_manifest_sha256": digest,
         "e549_failure_proof_sha256": _hash_json(failed),
         "e902_reconciliation_sha256": _hash_json(reconciliation),
+        "e902_reconciled_stages": sorted(str(name) for name in named_groups),
         "e902_excluded_duplicate_package_commit": reconciliation.get(
             "excluded_duplicate_package_commit"
         ),
