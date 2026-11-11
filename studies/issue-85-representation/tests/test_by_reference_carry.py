@@ -539,6 +539,43 @@ def test_index_rejects_a_failure_proof_from_another_lineage(store):
         brc.build_index(formal, IDENTITY)
 
 
+def test_policy_producer_file_accepts_a_null_carry_digest(store):
+    """B/07 went through no carry step, so its binding records none.
+
+    The executor refused the package's own producer file at startup because the
+    loader demanded a digest there -- the same defect as B2, one loader over. It
+    failed before any game, which is the only reason it cost nothing.
+    """
+    import formal_execution as fe
+
+    index = brc.build_index(formal, IDENTITY)
+    document = brc.policy_producers(formal, index, IDENTITY)
+    assert document["producers"]["B:7"]["predecessor_carry_manifest_sha256"] is None
+
+    root = store / "issue85" / "artifacts" / "formal" / EXECUTING_COMMIT
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "policy-producers.json").write_text(json.dumps(document), encoding="utf-8")
+
+    loaded = fe._load_policy_producers(formal, root, IDENTITY)
+    assert loaded["B:7"]["predecessor_carry_manifest_sha256"] is None
+    assert loaded["C:6"]["predecessor_carry_manifest_sha256"] is not None
+
+
+def test_policy_producer_file_rejects_a_malformed_carry_digest(store):
+    import formal_execution as fe
+
+    index = brc.build_index(formal, IDENTITY)
+    document = brc.policy_producers(formal, index, IDENTITY)
+    document["producers"]["C:6"]["predecessor_carry_manifest_sha256"] = "not-a-digest"
+
+    root = store / "issue85" / "artifacts" / "formal" / EXECUTING_COMMIT
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "policy-producers.json").write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="invalid predecessor_carry_manifest_sha256"):
+        fe._load_policy_producers(formal, root, IDENTITY)
+
+
 def test_building_the_index_twice_yields_the_same_identity(store):
     """A restart must re-derive the identical index, not a drifting one."""
     first = brc.build_index(formal, IDENTITY)
