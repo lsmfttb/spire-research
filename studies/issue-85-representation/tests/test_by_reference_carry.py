@@ -236,3 +236,39 @@ def test_index_refuses_a_missing_clock(store):
     (store / "issue85/artifacts/active-wall-issue85-task.json").unlink()
     with pytest.raises(RuntimeError, match="ledger is missing"):
         brc.build_index(formal, IDENTITY)
+
+
+def _write_index(store: Path) -> dict:
+    index = brc.build_index(formal, IDENTITY)
+    root = store / "issue85" / "artifacts" / "formal" / EXECUTING_COMMIT
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "by-reference-carry-index.json").write_text(json.dumps(index), encoding="utf-8")
+    return index
+
+
+def test_gate_helper_accepts_the_matching_index(store):
+    import formal_execution as fe
+
+    index = _write_index(store)
+    root = store / "issue85" / "artifacts" / "formal" / EXECUTING_COMMIT
+    got = fe._validate_by_reference_index(formal, root, IDENTITY, index["index_sha256"])
+    assert got["index_sha256"] == index["index_sha256"]
+    assert got["completed_stage_count"] == 15
+
+
+def test_gate_helper_rejects_a_different_index_digest(store):
+    import formal_execution as fe
+
+    _write_index(store)
+    root = store / "issue85" / "artifacts" / "formal" / EXECUTING_COMMIT
+    with pytest.raises(RuntimeError, match="different by-reference carry index"):
+        fe._validate_by_reference_index(formal, root, IDENTITY, "0" * 64)
+
+
+def test_gate_helper_rejects_a_missing_index(store):
+    import formal_execution as fe
+
+    root = store / "issue85" / "artifacts" / "formal" / EXECUTING_COMMIT
+    root.mkdir(parents=True, exist_ok=True)
+    with pytest.raises(RuntimeError, match="missing from the executing package"):
+        fe._validate_by_reference_index(formal, root, IDENTITY, "0" * 64)
