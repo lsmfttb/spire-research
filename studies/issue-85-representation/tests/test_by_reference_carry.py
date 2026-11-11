@@ -305,3 +305,47 @@ def test_successor_skips_b00_to_c06_and_dispatches_first_at_c07(store):
     first_owner = brc.TRAIN_FIRST_OWNER + 7 * brc.OWNERS_PER_BLOCK
     assert first_owner == 8400897
     assert first_owner + brc.OWNERS_PER_BLOCK - 1 == 8401024
+
+
+def test_building_the_index_twice_yields_the_same_identity(store):
+    """A restart must re-derive the identical index, not a drifting one."""
+    first = brc.build_index(formal, IDENTITY)
+    second = brc.build_index(formal, IDENTITY)
+    assert first["index_sha256"] == second["index_sha256"]
+    assert first["stages"] == second["stages"]
+
+
+REAL_DATA_ROOT = Path("/mnt/d/DeadlycatCoding/stsrl-data")
+
+
+@pytest.mark.skipif(
+    not (REAL_DATA_ROOT / "issue85" / "artifacts" / "formal").is_dir(),
+    reason="durable Issue 85 store is not mounted",
+)
+def test_real_evidence_keeps_c06_failed_attempt_alongside_carried_success(monkeypatch):
+    """The carried stage succeeded *after* a retained failure; both must survive.
+
+    C/06 records a single attempt that was rejected by the reader, so the stage is
+    SUCCEEDED while `failed_attempt_count` stays 1. Carrying the stage by reference
+    must not launder that history into a clean first-try execution.
+    """
+    monkeypatch.setattr(formal, "DATA_ROOT", str(REAL_DATA_ROOT))
+    index = brc.build_index(formal, IDENTITY)
+    stages = {(s["arm"], s["block_index"]): s for s in index["stages"]}
+    c06 = stages[("C", 6)]
+    assert c06["update_package_commit"].startswith("2ecd9961")
+    assert c06["status"] == "SUCCEEDED"
+
+    receipt = formal.read_json(
+        REAL_DATA_ROOT / "issue85" / "artifacts" / "formal"
+        / c06["update_package_commit"]
+        / "training" / "C" / "updates" / "block-06" / "success-receipt.json"
+    )
+    assert receipt["failed_attempt_count"] == 1
+    assert formal.file_sha256(
+        REAL_DATA_ROOT / "issue85" / "artifacts" / "formal"
+        / c06["update_package_commit"]
+        / "training" / "C" / "updates" / "block-06" / "success-receipt.json"
+    ) == c06["update_receipt_sha256"]
+    # The index cites provenance only; it must not restate or clear attempt history.
+    assert "failed_attempt_count" not in c06
