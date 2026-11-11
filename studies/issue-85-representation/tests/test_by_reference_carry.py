@@ -156,6 +156,20 @@ def _stage_packages(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch):
+    import formal_execution as fe
+
+    # The failure log must exist in the predecessor package and hash to the locked
+    # digest, so the fixture plants one and pins the constant to its real bytes.
+    failure_log = (
+        tmp_path / "issue85" / "artifacts" / "formal"
+        / fe.PREDECESSOR_PACKAGE_COMMIT / str(fe.PREDECESSOR_UPDATE_FAILURE_LOG)
+    )
+    failure_log.parent.mkdir(parents=True, exist_ok=True)
+    failure_log.write_bytes(b"fixture e549 failure log\n")
+    monkeypatch.setattr(
+        fe, "PREDECESSOR_UPDATE_FAILURE_LOG_SHA256", _sha(failure_log.read_bytes())
+    )
+
     _stage_packages(tmp_path)
     artifacts = tmp_path / "issue85" / "artifacts"
     artifacts.mkdir(parents=True, exist_ok=True)
