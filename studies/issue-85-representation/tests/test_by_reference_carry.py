@@ -340,8 +340,11 @@ def test_real_evidence_keeps_c06_attempt_layout_intact(monkeypatch):
         / c06["update_package_commit"] / "training" / "C" / "updates" / "block-06"
     )
     receipt_path = update_root / "success-receipt.json"
-    assert formal.file_sha256(receipt_path) == c06["update_receipt_sha256"]
     receipt = formal.read_json(receipt_path)
+    # The index binds the receipt's internal self-hash (what the reader verifies),
+    # not the file digest -- the two differ, and conflating them would hide a swap.
+    assert receipt["receipt_sha256"] == c06["update_receipt_sha256"]
+    assert formal.file_sha256(receipt_path) != c06["update_receipt_sha256"]
     assert receipt["status"] == "SUCCEEDED"
     assert receipt["completed_steps"] == 64
     assert receipt["owner_count"] == 128
