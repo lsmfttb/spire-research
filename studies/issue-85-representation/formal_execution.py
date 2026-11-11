@@ -5639,12 +5639,18 @@ def _read_update_receipt(
     if producer is not None:
         producer_commit = str(producer.get("package_commit", ""))
         games_commit = str(producer.get("games_package_commit", producer_commit))
-        forced_carry_sha256 = str(producer.get("predecessor_carry_manifest_sha256", ""))
         expected_group_sha256 = str(producer.get("group_receipt_sha256", ""))
         if not re.fullmatch(r"[0-9a-f]{40}", producer_commit):
             raise RuntimeError("policy producer package commit is not a full Git commit")
-        if not re.fullmatch(r"[0-9a-f]{64}", forced_carry_sha256):
-            raise RuntimeError("policy producer predecessor-carry digest is not a SHA-256")
+        # Ten of the fifteen carried stages recorded no carry step at all: their
+        # receipts hold predecessor_carry_manifest_sha256 = None, and only B/00,
+        # B/01, B/03, B/04 and C/06 ever went through one. Demanding a digest here
+        # rejected every stage that legitimately has none.
+        raw_carry = producer.get("predecessor_carry_manifest_sha256")
+        if raw_carry is not None:
+            forced_carry_sha256 = str(raw_carry)
+            if not re.fullmatch(r"[0-9a-f]{64}", forced_carry_sha256):
+                raise RuntimeError("policy producer predecessor-carry digest is not a SHA-256")
         if not re.fullmatch(r"[0-9a-f]{64}", expected_group_sha256):
             raise RuntimeError("policy producer game-group digest is not a SHA-256")
         if str(producer.get("source_lock_sha256", "")) != identity["source_lock_sha256"]:
@@ -5879,6 +5885,14 @@ def _read_update_receipt(
         raise RuntimeError(f"formal actor update receipt is missing for {arm} block {block}")
     receipt = formal.read_json(path)
     digest = formal.file_sha256(path)
+    if producer is not None and forced_carry_sha256 is None:
+        # Absence is only acceptable when the binding and the receipt agree that
+        # this stage carried nothing; otherwise a receipt could claim a carry the
+        # producer record never authenticated.
+        if receipt.get("predecessor_carry_manifest_sha256") is not None:
+            raise RuntimeError(
+                f"{arm}/{block:02d} producer receipt claims a carry its binding does not name"
+            )
     if forced_carry_sha256 is not None:
         games_root = (
             Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal" / games_commit
