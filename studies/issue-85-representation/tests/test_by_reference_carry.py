@@ -93,6 +93,42 @@ def _stage_packages(tmp_path: Path) -> Path:
         update_commit for arm, block, _games, update_commit in brc.STAGES
         if (arm, block) == brc.CANONICAL_STAGE
     )
+    # The reconciliation names exactly the ten stages e902 produced (B/04-B/07,
+    # C/00-C/05) and verifies itself, so the fixture must reproduce that shape.
+    reconciled_groups: dict[str, dict] = {}
+    reconciled_updates: dict[str, dict] = {}
+    for arm, block, games_commit, update_commit in brc.STAGES:
+        if update_commit != fe.E902_CANONICAL_PACKAGE_COMMIT:
+            continue
+        name = f"{arm}:{block}"
+        group_path = (
+            root / games_commit / "training" / arm / f"block-{block:02d}"
+            / "games" / "group-receipt.json"
+        )
+        update_path = (
+            root / update_commit / "training" / arm / f"updates/block-{block:02d}"
+            / "success-receipt.json"
+        )
+        update_doc = json.loads(update_path.read_text())
+        reconciled_groups[name] = {
+            "completed": 128,
+            "group_receipt_sha256": _sha(group_path.read_bytes()),
+        }
+        reconciled_updates[name] = {
+            "actor_checkpoint_sha256": update_doc["actor_checkpoint_sha256"],
+            "optimizer_checkpoint_sha256": update_doc["optimizer_checkpoint_sha256"],
+        }
+
+    reconciliation = {
+        "schema_id": "issue85-formal-e902-canonical-reconciliation-v1",
+        "status": "VERIFIED_READ_ONLY_CANONICAL_CARRY",
+        "canonical_source_package_commit": fe.E902_CANONICAL_PACKAGE_COMMIT,
+        "excluded_duplicate_package_commit": brc.EXCLUDED_DUPLICATE_PACKAGE,
+        "groups": reconciled_groups,
+        "actor_updates": reconciled_updates,
+    }
+    reconciliation["record_sha256"] = brc._hash_json(reconciliation)
+
     manifest = {
         "predecessor": {
             "package_commit": fe.PREDECESSOR_PACKAGE_COMMIT,
@@ -103,10 +139,7 @@ def _stage_packages(tmp_path: Path) -> Path:
                 "formal_progress_sha256": fe.PREDECESSOR_PROGRESS_SHA256,
             },
         },
-        "e902_canonical_reconciliation": {
-            "excluded_duplicate_package_commit": brc.EXCLUDED_DUPLICATE_PACKAGE,
-            "canonical_source_package_commit": fe.E902_CANONICAL_PACKAGE_COMMIT,
-        },
+        "e902_canonical_reconciliation": reconciliation,
     }
     manifest_path = root / canonical_update / "predecessor-carry-manifest.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
