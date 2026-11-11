@@ -497,6 +497,19 @@ def test_index_records_the_canonical_carry_proofs(store):
     assert index["e902_excluded_duplicate_package_commit"] == brc.EXCLUDED_DUPLICATE_PACKAGE
 
 
+def test_index_anchors_the_failure_log_to_its_producer_bytes(store):
+    """Agreeing with the constant is not enough; the log itself must still verify."""
+    import formal_execution as fe
+
+    log_path = (
+        store / "issue85" / "artifacts" / "formal"
+        / fe.PREDECESSOR_PACKAGE_COMMIT / str(fe.PREDECESSOR_UPDATE_FAILURE_LOG)
+    )
+    log_path.write_bytes(b"rewritten after the fact\n")
+    with pytest.raises(RuntimeError, match="does not hash to the locked digest"):
+        brc.build_index(formal, IDENTITY)
+
+
 def test_index_rejects_a_failure_proof_from_another_lineage(store):
     """A manifest that no longer proves the e549 failure must be refused."""
     import formal_execution as fe
