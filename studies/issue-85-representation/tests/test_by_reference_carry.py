@@ -28,6 +28,15 @@ EXECUTING_COMMIT = "a" * 40
 LOCK = "b" * 64
 IDENTITY = {"package_commit": EXECUTING_COMMIT, "source_lock_sha256": LOCK}
 
+# Only these five stages ever went through a carry step. A fixture that gave every
+# stage a digest is exactly what hid the B2 defect, so the ten others record None.
+CARRY_DIGEST = "c" * 64
+STAGE_CARRIES = {("B", 0), ("B", 1), ("B", 3), ("B", 4), ("C", 6)}
+
+
+def _carry_for(arm: str, block: int) -> str | None:
+    return CARRY_DIGEST if (arm, block) in STAGE_CARRIES else None
+
 
 def _sha(data: bytes) -> str:
     import hashlib
@@ -69,11 +78,46 @@ def _stage_packages(tmp_path: Path) -> Path:
             "optimizer_checkpoint_path": f"training/{arm}/updates/block-{block:02d}/optimizer.pt",
             "optimizer_checkpoint_sha256": _sha(optimizer),
             "receipt_sha256": f"{index:064x}",
-            "predecessor_carry_manifest_sha256": "c" * 64,
+            "predecessor_carry_manifest_sha256": _carry_for(arm, block),
             "source_model_digest": f"d{index:063x}",
             "result_model_digest": f"e{index:063x}",
         }
         (update_dir / "success-receipt.json").write_text(json.dumps(update), encoding="utf-8")
+
+    # The canonical carry manifest lives in the C/06 producer package and its file
+    # digest is what C/06 really carried. The e549 failure proof and the e902
+    # reconciliation are only obtainable from it, so it must be modelled here.
+    import formal_execution as fe
+
+    canonical_update = next(
+        update_commit for arm, block, _games, update_commit in brc.STAGES
+        if (arm, block) == brc.CANONICAL_STAGE
+    )
+    manifest = {
+        "predecessor": {
+            "package_commit": fe.PREDECESSOR_PACKAGE_COMMIT,
+            "failed_update": {
+                "failure_type": "AttributeError",
+                "log_path": fe.PREDECESSOR_UPDATE_FAILURE_LOG,
+                "log_sha256": fe.PREDECESSOR_UPDATE_FAILURE_LOG_SHA256,
+                "formal_progress_sha256": fe.PREDECESSOR_PROGRESS_SHA256,
+            },
+        },
+        "e902_canonical_reconciliation": {
+            "excluded_duplicate_package_commit": brc.EXCLUDED_DUPLICATE_PACKAGE,
+            "canonical_source_package_commit": fe.E902_CANONICAL_PACKAGE_COMMIT,
+        },
+    }
+    manifest_path = root / canonical_update / "predecessor-carry-manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    receipt_path = (
+        root / canonical_update / "training" / brc.CANONICAL_STAGE[0]
+        / f"updates/block-{brc.CANONICAL_STAGE[1]:02d}" / "success-receipt.json"
+    )
+    receipt = json.loads(receipt_path.read_text())
+    receipt["predecessor_carry_manifest_sha256"] = _sha(manifest_path.read_bytes())
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
     return root
 
 
