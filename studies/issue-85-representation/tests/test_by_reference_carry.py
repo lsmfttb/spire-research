@@ -322,12 +322,12 @@ REAL_DATA_ROOT = Path("/mnt/d/DeadlycatCoding/stsrl-data")
     not (REAL_DATA_ROOT / "issue85" / "artifacts" / "formal").is_dir(),
     reason="durable Issue 85 store is not mounted",
 )
-def test_real_evidence_keeps_c06_failed_attempt_alongside_carried_success(monkeypatch):
-    """The carried stage succeeded *after* a retained failure; both must survive.
+def test_real_evidence_keeps_c06_attempt_layout_intact(monkeypatch):
+    """Carrying C/06 by reference must not re-attempt it in its producer package.
 
-    C/06 records a single attempt that was rejected by the reader, so the stage is
-    SUCCEEDED while `failed_attempt_count` stays 1. Carrying the stage by reference
-    must not launder that history into a clean first-try execution.
+    C/06 already holds a completed 64-step update under a single attempt directory.
+    A successor that replayed it -- or that wrote a second attempt beside the
+    original evidence -- would corrupt the producer package it is supposed to cite.
     """
     monkeypatch.setattr(formal, "DATA_ROOT", str(REAL_DATA_ROOT))
     index = brc.build_index(formal, IDENTITY)
@@ -335,16 +335,17 @@ def test_real_evidence_keeps_c06_failed_attempt_alongside_carried_success(monkey
     c06 = stages[("C", 6)]
     assert c06["update_package_commit"].startswith("2ecd9961")
 
-    receipt = formal.read_json(
+    update_root = (
         REAL_DATA_ROOT / "issue85" / "artifacts" / "formal"
-        / c06["update_package_commit"]
-        / "training" / "C" / "updates" / "block-06" / "success-receipt.json"
+        / c06["update_package_commit"] / "training" / "C" / "updates" / "block-06"
     )
-    assert receipt["failed_attempt_count"] == 1
-    assert formal.file_sha256(
-        REAL_DATA_ROOT / "issue85" / "artifacts" / "formal"
-        / c06["update_package_commit"]
-        / "training" / "C" / "updates" / "block-06" / "success-receipt.json"
-    ) == c06["update_receipt_sha256"]
-    # The index cites provenance only; it must not restate or clear attempt history.
+    receipt_path = update_root / "success-receipt.json"
+    assert formal.file_sha256(receipt_path) == c06["update_receipt_sha256"]
+    receipt = formal.read_json(receipt_path)
+    assert receipt["status"] == "SUCCEEDED"
+    assert receipt["completed_steps"] == 64
+    assert receipt["owner_count"] == 128
+    # Exactly the one attempt that was really run; no replay was appended.
+    assert [p.name for p in update_root.iterdir() if p.is_dir()] == ["attempt-0001"]
+    # The index cites provenance only; it must not restate attempt history.
     assert "failed_attempt_count" not in c06
