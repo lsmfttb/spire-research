@@ -189,3 +189,23 @@ def test_index_binds_only_the_executing_commit(store):
     second = brc.build_index(formal, other_identity)
     assert first["index_sha256"] != second["index_sha256"]
     assert second["executing_package_commit"] == "f" * 40
+
+
+def test_stage_bindings_name_games_and_update_producers_separately(store):
+    index = brc.build_index(formal, IDENTITY)
+    bindings = brc.stage_bindings(index, IDENTITY)
+    assert len(bindings) == 15
+    assert set(bindings) == {f"{a}:{b}" for a, b, _, _ in brc.STAGES}
+    # B/00's games were staged in e549105e but its update was applied in fde456f5.
+    assert bindings["B:0"]["games_package_commit"] == "e549105ead79c9524bee706fc600164f8c7f9f1a"
+    assert bindings["B:0"]["package_commit"] == "fde456f52aaa388b7abc92a2b148ba91d3720e1e"
+    assert bindings["B:0"]["games_package_commit"] != bindings["B:0"]["package_commit"]
+    # B/01 has the same asymmetry.
+    assert bindings["B:1"]["games_package_commit"] == "318bdc800c5f986d67b445c38caeb13cebb154fb"
+    assert bindings["B:1"]["package_commit"] == "b8b3fc043671498628f96d378d9cecd7ac54106f"
+
+
+def test_policy_input_bindings_carry_the_games_producer_too(store):
+    index = brc.build_index(formal, IDENTITY)
+    producers = brc.policy_producers(formal, index, IDENTITY)["producers"]
+    assert producers["C:6"]["games_package_commit"] == "2ecd996139778665d60a06f624b41e260c7b7358"
