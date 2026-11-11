@@ -349,6 +349,50 @@ REAL_DATA_ROOT = Path("/mnt/d/DeadlycatCoding/stsrl-data")
     not (REAL_DATA_ROOT / "issue85" / "artifacts" / "formal").is_dir(),
     reason="durable Issue 85 store is not mounted",
 )
+def test_every_carried_stage_reads_through_its_producer_binding(monkeypatch):
+    """All fifteen stages must be readable, not just the five that carried anything.
+
+    Only B/00, B/01, B/03, B/04 and C/06 recorded a carry digest; the other ten
+    hold None. A binding demanding a 64-hex digest for all of them rejected ten
+    stages, so the successor died at B/02 -- before any game, long before C/07.
+    The synthetic fixture hid this by hardcoding a digest for every stage.
+    """
+    import formal_execution as fe
+
+    monkeypatch.setattr(formal, "DATA_ROOT", str(REAL_DATA_ROOT))
+    identity = {
+        "package_commit": "0" * 40,
+        "source_lock_sha256": str(formal.LOCK["source_lock_sha256"]),
+    }
+    index = brc.build_index(formal, identity)
+    bindings = brc.stage_bindings(index, identity)
+
+    null_carry = [
+        key for key, value in bindings.items()
+        if value["predecessor_carry_manifest_sha256"] is None
+    ]
+    assert len(null_carry) == 10, null_carry
+
+    parent = (
+        REAL_DATA_ROOT / "issue85" / "artifacts" / "formal"
+        / "2ecd996139778665d60a06f624b41e260c7b7358"
+    )
+    for stage in index["stages"]:
+        key = f"{stage['arm']}:{stage['block_index']}"
+        binding = bindings[key]
+        receipt = fe._read_update_receipt(
+            formal, parent, identity,
+            arm=stage["arm"], block=int(stage["block_index"]),
+            producer=binding,
+        )
+        assert receipt.get("status") == "SUCCEEDED", key
+        assert receipt.get("package_commit") == binding["package_commit"], key
+
+
+@pytest.mark.skipif(
+    not (REAL_DATA_ROOT / "issue85" / "artifacts" / "formal").is_dir(),
+    reason="durable Issue 85 store is not mounted",
+)
 def test_real_evidence_keeps_c06_attempt_layout_intact(monkeypatch):
     """Carrying C/06 by reference must not re-attempt it in its producer package.
 
