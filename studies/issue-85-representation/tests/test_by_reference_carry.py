@@ -134,6 +134,7 @@ def _stage_packages(tmp_path: Path) -> Path:
             "package_commit": fe.PREDECESSOR_PACKAGE_COMMIT,
             "failed_update": {
                 "failure_type": "AttributeError",
+                "failure_detail": fe.PREDECESSOR_UPDATE_FAILURE_DETAIL,
                 "log_path": fe.PREDECESSOR_UPDATE_FAILURE_LOG,
                 "log_sha256": fe.PREDECESSOR_UPDATE_FAILURE_LOG_SHA256,
                 "formal_progress_sha256": fe.PREDECESSOR_PROGRESS_SHA256,
