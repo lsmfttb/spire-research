@@ -4595,6 +4595,27 @@ def _validate_readiness(formal: Any, identity: Mapping[str, str]) -> tuple[Path,
     return package_root, readiness, seed
 
 
+def _validate_by_reference_index(
+    formal: Any, package_root: Path, identity: Mapping[str, str], expected_sha256: str,
+) -> dict[str, Any]:
+    """Validate the successor's authenticated index of completed producer stages.
+
+    The index names the package that really produced each completed stage. Every
+    recorded hash is recomputed from live bytes, so a document whose own self-hash
+    was recalculated still fails. This replaces the historical carry manifest only
+    for a successor package; the manifest path stays authoritative otherwise.
+    """
+    import by_reference_carry
+
+    path = Path(package_root) / "by-reference-carry-index.json"
+    if not path.is_file():
+        raise RuntimeError("by-reference carry index is missing from the executing package")
+    index = by_reference_carry.validate_index(formal, path, identity)
+    if index.get("index_sha256") != expected_sha256:
+        raise RuntimeError("formal authorization names a different by-reference carry index")
+    return index
+
+
 def validate_authorization(
     formal: Any, authorization_path: Path, *, identity: Mapping[str, str],
     readiness: Mapping[str, Any], seed: Mapping[str, Any], require_idle_clock: bool = True,
@@ -4606,12 +4627,28 @@ def validate_authorization(
     reviewer = receipt.get("reviewer_approval")
     cap = receipt.get("whole_task_active_wall_cap_seconds")
     package_root, _readiness_path, _seed_path = _formal_paths(formal, identity)
+    carry_mode = receipt.get("carry_mode", "historical_manifest")
+    if carry_mode not in ("historical_manifest", "by_reference_index"):
+        raise RuntimeError("formal authorization names an unsupported carry mode")
     carry_sha256 = receipt.get("predecessor_carry_manifest_sha256")
+    index_sha256 = receipt.get("by_reference_carry_index_sha256")
     carry_manifest = None
-    if isinstance(carry_sha256, str):
-        carry_manifest, _validated_carry_sha256 = _validate_carry_manifest(
-            formal, package_root, identity, expected_sha256=carry_sha256,
+    by_reference_index = None
+    if carry_mode == "by_reference_index":
+        if not isinstance(index_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", index_sha256) is None:
+            raise RuntimeError("by-reference authorization lacks its carry index digest")
+        if carry_sha256 is not None:
+            raise RuntimeError("by-reference authorization must not also claim a carry manifest")
+        by_reference_index = _validate_by_reference_index(
+            formal, package_root, identity, index_sha256,
         )
+    else:
+        if index_sha256 is not None:
+            raise RuntimeError("historical authorization must not claim a by-reference index")
+        if isinstance(carry_sha256, str):
+            carry_manifest, _validated_carry_sha256 = _validate_carry_manifest(
+                formal, package_root, identity, expected_sha256=carry_sha256,
+            )
     if (
         receipt.get("schema_id") != AUTH_SCHEMA
         or receipt.get("issue") != 85
@@ -4624,7 +4661,10 @@ def validate_authorization(
         or receipt.get("actor_update_schedule_sha256") != seed.get("actor_update_schedule_sha256")
         or receipt.get("analysis_source_sha256") != formal.file_sha256(formal.STUDY / "formal_analysis.py")
         or isinstance(cap, bool) or not isinstance(cap, int) or cap != FORMAL_ACTIVE_WALL_CAP_SECONDS
-        or not isinstance(carry_sha256, str) or len(carry_sha256) != 64
+        or (
+            carry_mode == "historical_manifest"
+            and (not isinstance(carry_sha256, str) or len(carry_sha256) != 64)
+        )
         or receipt.get("pilot_report_sha256") != ACCEPTED_PILOT_REPORT_SHA256
         or not isinstance(owner, Mapping)
         or owner.get("status") != "APPROVED"
@@ -4678,6 +4718,14 @@ def validate_authorization(
         "reviewer_approval_comment_url": reviewer["comment_url"],
         "pilot_report_sha256": formal.file_sha256(pilot_report_path),
         "predecessor_carry_manifest_sha256": carry_sha256,
+        "carry_mode": carry_mode,
+        "by_reference_carry_index_sha256": (
+            index_sha256 if carry_mode == "by_reference_index" else None
+        ),
+        "completed_stage_count": (
+            int(by_reference_index["completed_stage_count"])
+            if by_reference_index is not None else None
+        ),
         "prior_active_wall_seconds": float(elapsed),
     }
 

@@ -190,6 +190,14 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
         {stage["games_package_commit"] for stage in stages}
         | {stage["update_package_commit"] for stage in stages}
     )
+    clock_path = (
+        Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "active-wall-issue85-task.json"
+    )
+    if not clock_path.is_file():
+        raise RuntimeError("the shared Issue 85 active-wall ledger is missing")
+    observed_wall = float(formal.read_json(clock_path).get("elapsed_seconds", -1.0))
+    if observed_wall < 0:
+        raise RuntimeError("the shared active-wall ledger has no elapsed reading")
     unsigned = {
         "schema_id": INDEX_SCHEMA,
         "executing_package_commit": identity["package_commit"],
@@ -200,6 +208,7 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
         "first_unfinished_block": FIRST_UNFINISHED[1],
         "producers": producers,
         "excluded_duplicate_package": EXCLUDED_DUPLICATE_PACKAGE,
+        "observed_active_wall_seconds": observed_wall,
         "stages": stages,
     }
     return {**unsigned, "index_sha256": _hash_json(unsigned)}
