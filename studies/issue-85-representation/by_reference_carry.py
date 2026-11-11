@@ -204,11 +204,22 @@ def _canonical_carry_proofs(formal: Any, stages: list[dict[str, Any]]) -> dict[s
         or predecessor.get("package_commit") != fe.PREDECESSOR_PACKAGE_COMMIT
         or not isinstance(failed, dict)
         or failed.get("failure_type") != "AttributeError"
+        or failed.get("failure_detail") != fe.PREDECESSOR_UPDATE_FAILURE_DETAIL
         or failed.get("log_path") != fe.PREDECESSOR_UPDATE_FAILURE_LOG
         or failed.get("log_sha256") != fe.PREDECESSOR_UPDATE_FAILURE_LOG_SHA256
         or failed.get("formal_progress_sha256") != fe.PREDECESSOR_PROGRESS_SHA256
     ):
         raise RuntimeError("predecessor failure proof does not match the locked e549 evidence")
+    # Anchoring to the constant alone proves only that the manifest agrees with the
+    # constant. The log itself still exists in e549's own package, so hash it there
+    # and make the proof point at its producer rather than at a compile-time value.
+    failure_log = _inside(
+        _formal_root(formal) / fe.PREDECESSOR_PACKAGE_COMMIT,
+        str(failed["log_path"]),
+    )
+    failure_log_sha256 = formal.file_sha256(failure_log)
+    if failure_log_sha256 != fe.PREDECESSOR_UPDATE_FAILURE_LOG_SHA256:
+        raise RuntimeError("the e549 failure log does not hash to the locked digest")
     reconciliation = manifest.get("e902_canonical_reconciliation")
     if not isinstance(reconciliation, dict):
         raise RuntimeError("canonical carry manifest lacks the e902 reconciliation")
@@ -257,6 +268,7 @@ def _canonical_carry_proofs(formal: Any, stages: list[dict[str, Any]]) -> dict[s
     return {
         "carry_manifest_sha256": digest,
         "e549_failure_proof_sha256": _hash_json(failed),
+        "e549_failure_log_sha256": failure_log_sha256,
         "e902_reconciliation_sha256": _hash_json(reconciliation),
         "e902_reconciled_stages": sorted(str(name) for name in named_groups),
         "e902_excluded_duplicate_package_commit": reconciliation.get(
