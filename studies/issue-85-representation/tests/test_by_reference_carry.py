@@ -80,6 +80,12 @@ def _stage_packages(tmp_path: Path) -> Path:
 @pytest.fixture()
 def store(tmp_path, monkeypatch):
     _stage_packages(tmp_path)
+    artifacts = tmp_path / "issue85" / "artifacts"
+    artifacts.mkdir(parents=True, exist_ok=True)
+    (artifacts / "active-wall-issue85-task.json").write_text(
+        json.dumps({"elapsed_seconds": 75785.56550202602, "allowance_seconds": 295632}),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(formal, "DATA_ROOT", str(tmp_path))
     return tmp_path
 
@@ -209,3 +215,24 @@ def test_policy_input_bindings_carry_the_games_producer_too(store):
     index = brc.build_index(formal, IDENTITY)
     producers = brc.policy_producers(formal, index, IDENTITY)["producers"]
     assert producers["C:6"]["games_package_commit"] == "2ecd996139778665d60a06f624b41e260c7b7358"
+
+
+def test_index_binds_the_observed_wall_and_never_moves_it_backwards(store):
+    first = brc.build_index(formal, IDENTITY)
+    assert first["observed_active_wall_seconds"] == pytest.approx(75785.56550202602)
+
+    clock = store / "issue85/artifacts/active-wall-issue85-task.json"
+    clock.write_text(
+        json.dumps({"elapsed_seconds": 80000.0, "allowance_seconds": 295632}), encoding="utf-8"
+    )
+    later = brc.build_index(formal, IDENTITY)
+    assert later["observed_active_wall_seconds"] == pytest.approx(80000.0)
+    # The wall is part of the index, so a refreshed index re-binds the higher reading
+    # instead of letting a stale snapshot travel with the evidence.
+    assert later["index_sha256"] != first["index_sha256"]
+
+
+def test_index_refuses_a_missing_clock(store):
+    (store / "issue85/artifacts/active-wall-issue85-task.json").unlink()
+    with pytest.raises(RuntimeError, match="ledger is missing"):
+        brc.build_index(formal, IDENTITY)
