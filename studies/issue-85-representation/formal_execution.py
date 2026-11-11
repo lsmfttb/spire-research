@@ -4841,12 +4841,19 @@ def _load_policy_producers(
             raise RuntimeError("policy producer key is not a registered arm:block")
         if not isinstance(value, Mapping):
             raise RuntimeError("policy producer entry is malformed")
-        for field in (
-            "package_commit", "source_lock_sha256",
-            "predecessor_carry_manifest_sha256", "group_receipt_sha256",
-        ):
+        for field in ("package_commit", "source_lock_sha256", "group_receipt_sha256"):
             if not isinstance(value.get(field), str) or not re.fullmatch(r"[0-9a-f]{40,64}", value[field]):
                 raise RuntimeError(f"policy producer entry has an invalid {field}")
+        # A stage that went through no carry step legitimately has no digest --
+        # B/07 is one. Reject only a value that is present and malformed; this is
+        # the same rule _read_update_receipt applies to the same bindings.
+        carry = value.get("predecessor_carry_manifest_sha256")
+        if carry is not None and (
+            not isinstance(carry, str) or not re.fullmatch(r"[0-9a-f]{64}", carry)
+        ):
+            raise RuntimeError(
+                "policy producer entry has an invalid predecessor_carry_manifest_sha256"
+            )
         if value["source_lock_sha256"] != identity["source_lock_sha256"]:
             raise RuntimeError("policy producer source lock differs from the locked study source")
         producers[key] = dict(value)
