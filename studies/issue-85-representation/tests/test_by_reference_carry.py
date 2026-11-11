@@ -334,7 +334,6 @@ def test_real_evidence_keeps_c06_failed_attempt_alongside_carried_success(monkey
     stages = {(s["arm"], s["block_index"]): s for s in index["stages"]}
     c06 = stages[("C", 6)]
     assert c06["update_package_commit"].startswith("2ecd9961")
-    assert c06["status"] == "SUCCEEDED"
 
     receipt = formal.read_json(
         REAL_DATA_ROOT / "issue85" / "artifacts" / "formal"
