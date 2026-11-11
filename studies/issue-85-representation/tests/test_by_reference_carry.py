@@ -427,7 +427,11 @@ def test_building_the_index_twice_yields_the_same_identity(store):
     assert first["stages"] == second["stages"]
 
 
-REAL_DATA_ROOT = Path("/mnt/d/DeadlycatCoding/stsrl-data")
+# Derived from the study's own data root rather than a hardcoded WSL path: the
+# literal here was also mis-cased ("DeadlycatCoding"), which drvfs tolerates and a
+# native Windows host does not. Deriving it keeps the real-evidence tests from
+# silently skipping, which is what happened on the reviewer's run.
+REAL_DATA_ROOT = Path(formal.DATA_ROOT)
 
 
 @pytest.mark.skipif(
