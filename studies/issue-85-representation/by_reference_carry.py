@@ -72,7 +72,10 @@ def _formal_root(formal: Any) -> Path:
 
 
 def _hash_json(value: Mapping[str, Any]) -> str:
-    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    canonical = json.dumps(
+        value, sort_keys=True, separators=(",", ":"),
+        ensure_ascii=False, allow_nan=False,
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -219,8 +222,12 @@ def _canonical_carry_proofs(formal: Any, stages: list[dict[str, Any]]) -> dict[s
         "carry_manifest_sha256": digest,
         "e549_failure_proof_sha256": _hash_json(failed),
         "e902_reconciliation_sha256": _hash_json(reconciliation),
-        "e902_excluded_duplicate_package_commit": EXCLUDED_DUPLICATE_PACKAGE,
-        "e902_canonical_source_package_commit": fe.E902_CANONICAL_PACKAGE_COMMIT,
+        "e902_excluded_duplicate_package_commit": reconciliation.get(
+            "excluded_duplicate_package_commit"
+        ),
+        "e902_canonical_source_package_commit": reconciliation.get(
+            "canonical_source_package_commit"
+        ),
     }
 
 
