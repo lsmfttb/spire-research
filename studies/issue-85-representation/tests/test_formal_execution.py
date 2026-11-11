@@ -2457,7 +2457,7 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
     )
     monkeypatch.setattr(
         formal_execution, "_read_update_receipt",
-        lambda _formal, _root, _identity, *, arm, block: {
+        lambda _formal, _root, _identity, *, arm, block, producer=None: {
             "result_model_digest": model_digests[arm],
         },
     )
@@ -2623,7 +2623,7 @@ def test_resumed_formal_continuation_consumes_b03_features_from_group_root(
     )
     monkeypatch.setattr(
         formal_execution, "_read_update_receipt",
-        lambda _formal, _root, _identity, *, arm, block: b01_receipt if block == 1 else b02_receipt,
+        lambda _formal, _root, _identity, *, arm, block, producer=None: b01_receipt if block == 1 else b02_receipt,
     )
     monkeypatch.setattr(
         formal_execution, "_training_rows",
