@@ -167,6 +167,63 @@ def resolve_stage(
     }
 
 
+CANONICAL_STAGE = ("C", 6)
+
+
+def _canonical_carry_proofs(formal: Any, stages: list[dict[str, Any]]) -> dict[str, Any]:
+    """Authenticate the e549 failure proof and the e902 reconciliation by reference.
+
+    In by-reference mode `_validate_carry_manifest` is never called, so nothing
+    would otherwise establish that the predecessor's failed update really failed
+    this way, or that the canonical e902 reconciliation governs the carried
+    blocks. Absent this, canonicality rests on the hardcoded STAGES table -- code,
+    not evidence. Both proofs are read from the producer package that holds them
+    and recorded here as digests, never recomputed under the successor root.
+    """
+    import formal_execution as fe
+
+    by_key = {(s["arm"], s["block_index"]): s for s in stages}
+    stage = by_key[CANONICAL_STAGE]
+    manifest_path = (
+        _formal_root(formal) / stage["update_package_commit"]
+        / "predecessor-carry-manifest.json"
+    )
+    if not manifest_path.is_file():
+        raise RuntimeError("canonical carry manifest is missing from its producer package")
+    manifest = formal.read_json(manifest_path)
+    digest = formal.file_sha256(manifest_path)
+    if digest != stage["predecessor_carry_manifest_sha256"]:
+        raise RuntimeError("canonical carry manifest is not the one C/06 carried")
+    predecessor = manifest.get("predecessor")
+    failed = predecessor.get("failed_update") if isinstance(predecessor, dict) else None
+    if (
+        not isinstance(predecessor, dict)
+        or predecessor.get("package_commit") != fe.PREDECESSOR_PACKAGE_COMMIT
+        or not isinstance(failed, dict)
+        or failed.get("failure_type") != "AttributeError"
+        or failed.get("log_path") != fe.PREDECESSOR_UPDATE_FAILURE_LOG
+        or failed.get("log_sha256") != fe.PREDECESSOR_UPDATE_FAILURE_LOG_SHA256
+        or failed.get("formal_progress_sha256") != fe.PREDECESSOR_PROGRESS_SHA256
+    ):
+        raise RuntimeError("predecessor failure proof does not match the locked e549 evidence")
+    reconciliation = manifest.get("e902_canonical_reconciliation")
+    if not isinstance(reconciliation, dict):
+        raise RuntimeError("canonical carry manifest lacks the e902 reconciliation")
+    if (
+        reconciliation.get("excluded_duplicate_package_commit") != EXCLUDED_DUPLICATE_PACKAGE
+        or reconciliation.get("canonical_source_package_commit")
+        != fe.E902_CANONICAL_PACKAGE_COMMIT
+    ):
+        raise RuntimeError("e902 reconciliation does not exclude the duplicate evidence it must")
+    return {
+        "carry_manifest_sha256": digest,
+        "e549_failure_proof_sha256": _hash_json(failed),
+        "e902_reconciliation_sha256": _hash_json(reconciliation),
+        "e902_excluded_duplicate_package_commit": EXCLUDED_DUPLICATE_PACKAGE,
+        "e902_canonical_source_package_commit": fe.E902_CANONICAL_PACKAGE_COMMIT,
+    }
+
+
 def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
     """Resolve the full completed roster once, verifying every producer."""
     stages = [resolve_stage(formal, arm, block, g, u) for arm, block, g, u in STAGES]
@@ -190,6 +247,7 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
         {stage["games_package_commit"] for stage in stages}
         | {stage["update_package_commit"] for stage in stages}
     )
+    proofs = _canonical_carry_proofs(formal, stages)
     clock_path = (
         Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "active-wall-issue85-task.json"
     )
@@ -209,6 +267,7 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
         "producers": producers,
         "excluded_duplicate_package": EXCLUDED_DUPLICATE_PACKAGE,
         "stages": stages,
+        **proofs,
     }
     # The active wall is mutable ledger state, not producer evidence. It advances
     # while the run is in progress -- including before the very first worker is
