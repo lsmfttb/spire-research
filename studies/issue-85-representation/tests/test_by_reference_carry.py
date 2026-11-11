@@ -381,6 +381,44 @@ def test_successor_skips_b00_to_c06_and_dispatches_first_at_c07(store):
     assert first_owner + brc.OWNERS_PER_BLOCK - 1 == 8401024
 
 
+def test_index_records_the_canonical_carry_proofs(store):
+    """Canonicality must be evidence in the index, not a hardcoded table."""
+    index = brc.build_index(formal, IDENTITY)
+    assert len(index["carry_manifest_sha256"]) == 64
+    assert len(index["e549_failure_proof_sha256"]) == 64
+    assert len(index["e902_reconciliation_sha256"]) == 64
+    assert index["e902_excluded_duplicate_package_commit"] == brc.EXCLUDED_DUPLICATE_PACKAGE
+
+
+def test_index_rejects_a_failure_proof_from_another_lineage(store):
+    """A manifest that no longer proves the e549 failure must be refused."""
+    import formal_execution as fe
+
+    canonical_update = next(
+        update_commit for arm, block, _g, update_commit in brc.STAGES
+        if (arm, block) == brc.CANONICAL_STAGE
+    )
+    manifest_path = (
+        store / "issue85" / "artifacts" / "formal" / canonical_update
+        / "predecessor-carry-manifest.json"
+    )
+    manifest = json.loads(manifest_path.read_text())
+    manifest["predecessor"]["failed_update"]["log_sha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    receipt_path = (
+        store / "issue85" / "artifacts" / "formal" / canonical_update
+        / "training" / brc.CANONICAL_STAGE[0]
+        / f"updates/block-{brc.CANONICAL_STAGE[1]:02d}" / "success-receipt.json"
+    )
+    receipt = json.loads(receipt_path.read_text())
+    receipt["predecessor_carry_manifest_sha256"] = _sha(manifest_path.read_bytes())
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="does not match the locked e549 evidence"):
+        brc.build_index(formal, IDENTITY)
+
+
 def test_building_the_index_twice_yields_the_same_identity(store):
     """A restart must re-derive the identical index, not a drifting one."""
     first = brc.build_index(formal, IDENTITY)
