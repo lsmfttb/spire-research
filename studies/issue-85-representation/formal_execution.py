@@ -4634,7 +4634,7 @@ def _by_reference_carried_groups(
             "producer_package_commit": stage["update_package_commit"],
             "games_package_commit": stage["games_package_commit"],
             "training_group_receipt_sha256": stage["group_receipt_sha256"],
-            "update_receipt_sha256": stage["update_receipt_sha256"],
+            "update_receipt_self_sha256": stage["update_receipt_self_sha256"],
         }
         for stage in index["stages"]
     }

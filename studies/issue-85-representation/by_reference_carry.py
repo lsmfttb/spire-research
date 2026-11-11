@@ -156,7 +156,7 @@ def resolve_stage(
         "group_receipt_sha256": group_sha,
         "update_receipt_path": update_rel,
         "update_receipt_file_sha256": formal.file_sha256(update_path),
-        "update_receipt_sha256": update.get("receipt_sha256"),
+        "update_receipt_self_sha256": update.get("receipt_sha256"),
         "predecessor_carry_manifest_sha256": update.get("predecessor_carry_manifest_sha256"),
         "actor_checkpoint_sha256": checkpoints["actor_checkpoint_sha256"],
         "optimizer_checkpoint_sha256": checkpoints["optimizer_checkpoint_sha256"],
@@ -208,16 +208,34 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
         "first_unfinished_block": FIRST_UNFINISHED[1],
         "producers": producers,
         "excluded_duplicate_package": EXCLUDED_DUPLICATE_PACKAGE,
-        "observed_active_wall_seconds": observed_wall,
         "stages": stages,
     }
-    return {**unsigned, "index_sha256": _hash_json(unsigned)}
+    # The active wall is mutable ledger state, not producer evidence. It advances
+    # while the run is in progress -- including before the very first worker is
+    # admitted -- so folding it into index_sha256 would make the digest disagree
+    # with itself the moment the run starts. It is recorded beside the digest and
+    # checked monotonically against the ledger, never hashed into it.
+    return {
+        **unsigned,
+        "index_sha256": _hash_json(unsigned),
+        "observed_active_wall_seconds": observed_wall,
+    }
+
+
+# Recorded beside the digest, never inside it: both change or are re-derived
+# independently of the producer evidence the digest is meant to pin.
+UNHASHED_INDEX_KEYS = ("index_sha256", "observed_active_wall_seconds")
 
 
 def validate_index(formal: Any, path: Path, identity: Mapping[str, str]) -> dict[str, Any]:
-    """Re-verify a stored index against the live producer bytes."""
+    """Re-verify a stored index against the live producer bytes.
+
+    The stored digest covers producer evidence only. The active-wall annotation is
+    checked monotonically against the ledger so a stale or inflated reading cannot
+    be smuggled in, while the run's own clock advance cannot invalidate the index.
+    """
     index = formal.read_json(Path(path))
-    unsigned = {key: value for key, value in index.items() if key != "index_sha256"}
+    unsigned = {key: value for key, value in index.items() if key not in UNHASHED_INDEX_KEYS}
     if (
         index.get("schema_id") != INDEX_SCHEMA
         or index.get("executing_package_commit") != identity["package_commit"]
@@ -230,6 +248,11 @@ def validate_index(formal: Any, path: Path, identity: Mapping[str, str]) -> dict
     expected = build_index(formal, identity)
     if expected["index_sha256"] != index.get("index_sha256"):
         raise RuntimeError("by-reference carry index disagrees with the live producer evidence")
+    stored_wall = index.get("observed_active_wall_seconds")
+    if not isinstance(stored_wall, (int, float)):
+        raise RuntimeError("by-reference carry index lacks its active-wall annotation")
+    if float(stored_wall) > float(expected["observed_active_wall_seconds"]) + 1.0:
+        raise RuntimeError("by-reference carry index claims more active wall than the ledger")
     return index
 
 
