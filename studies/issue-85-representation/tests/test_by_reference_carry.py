@@ -272,3 +272,36 @@ def test_gate_helper_rejects_a_missing_index(store):
     root.mkdir(parents=True, exist_ok=True)
     with pytest.raises(RuntimeError, match="missing from the executing package"):
         fe._validate_by_reference_index(formal, root, IDENTITY, "0" * 64)
+
+
+def test_successor_skips_b00_to_c06_and_dispatches_first_at_c07(store):
+    """An empty successor package must not restart the study at B/00."""
+    import formal_execution as fe
+
+    index = brc.build_index(formal, IDENTITY)
+    groups = fe._by_reference_carried_groups(index, 128)
+
+    assert len(groups) == 15
+    assert set(groups) == {(a, b) for a, b, _, _ in brc.STAGES}
+    assert ("C", 6) in groups
+    assert ("C", 7) not in groups
+    assert all(record["status"] == "SUCCEEDED" for record in groups.values())
+    # Carried records describe provenance, not results: no model digest is restated.
+    assert all("result_model_digest" not in record for record in groups.values())
+
+    # The executor walks arms in order and blocks 0..7; what remains after the
+    # carried set is exactly the work the successor must actually produce.
+    remaining = [
+        (arm, block)
+        for arm in ("B", "C", "D", "E", "F")
+        for block in range(8)
+        if (arm, block) not in groups
+    ]
+    assert remaining[0] == ("C", 7)
+    assert len(remaining) == 25          # 1 remaining C block + 8 each for D, E, F
+    assert ("B", 0) not in remaining
+
+    # That block's registered owners are 8400897..8401024.
+    first_owner = brc.TRAIN_FIRST_OWNER + 7 * brc.OWNERS_PER_BLOCK
+    assert first_owner == 8400897
+    assert first_owner + brc.OWNERS_PER_BLOCK - 1 == 8401024
