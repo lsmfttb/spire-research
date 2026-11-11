@@ -414,6 +414,65 @@ def test_successor_skips_b00_to_c06_and_dispatches_first_at_c07(store):
     assert first_owner + brc.OWNERS_PER_BLOCK - 1 == 8401024
 
 
+def _manifest_path(store: Path) -> Path:
+    canonical_update = next(
+        update_commit for arm, block, _g, update_commit in brc.STAGES
+        if (arm, block) == brc.CANONICAL_STAGE
+    )
+    return (
+        store / "issue85" / "artifacts" / "formal" / canonical_update
+        / "predecessor-carry-manifest.json"
+    )
+
+
+def _repin_c06(store: Path) -> None:
+    """Re-point C/06's carry digest at the current manifest, as a forger would."""
+    canonical_update = next(
+        update_commit for arm, block, _g, update_commit in brc.STAGES
+        if (arm, block) == brc.CANONICAL_STAGE
+    )
+    receipt_path = (
+        store / "issue85" / "artifacts" / "formal" / canonical_update
+        / "training" / brc.CANONICAL_STAGE[0]
+        / f"updates/block-{brc.CANONICAL_STAGE[1]:02d}" / "success-receipt.json"
+    )
+    receipt = json.loads(receipt_path.read_text())
+    receipt["predecessor_carry_manifest_sha256"] = _sha(
+        _manifest_path(store).read_bytes()
+    )
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+
+def test_index_derives_the_skip_set_instead_of_asserting_it(store):
+    """A reconciliation naming a stage e902 did not produce must be refused.
+
+    Without this the index could cite the reconciliation digest while still taking
+    its stages from the hardcoded table, and drift between the two would go unseen.
+    """
+    manifest = json.loads(_manifest_path(store).read_text())
+    reconciliation = manifest["e902_canonical_reconciliation"]
+    # Move a reconciled stage to B/02, which the index carries but e902 never made.
+    reconciliation["groups"]["B:2"] = reconciliation["groups"].pop("B:4")
+    reconciliation["actor_updates"]["B:2"] = reconciliation["actor_updates"].pop("B:4")
+    body = {k: v for k, v in reconciliation.items() if k != "record_sha256"}
+    reconciliation["record_sha256"] = brc._hash_json(body)
+    _manifest_path(store).write_text(json.dumps(manifest), encoding="utf-8")
+    _repin_c06(store)
+
+    with pytest.raises(RuntimeError, match="not produced by the canonical e902 package"):
+        brc.build_index(formal, IDENTITY)
+
+
+def test_index_rejects_a_reconciliation_that_does_not_verify(store):
+    manifest = json.loads(_manifest_path(store).read_text())
+    manifest["e902_canonical_reconciliation"]["record_sha256"] = "0" * 64
+    _manifest_path(store).write_text(json.dumps(manifest), encoding="utf-8")
+    _repin_c06(store)
+
+    with pytest.raises(RuntimeError, match="self-digest does not verify"):
+        brc.build_index(formal, IDENTITY)
+
+
 def test_index_records_the_canonical_carry_proofs(store):
     """Canonicality must be evidence in the index, not a hardcoded table."""
     index = brc.build_index(formal, IDENTITY)
