@@ -149,7 +149,10 @@ def test_c06_and_b07_are_named_as_policy_input_producers(store):
     bindings = brc.policy_producers(formal, index, IDENTITY)
     assert set(bindings["producers"]) == {"C:6", "B:7"}
     assert bindings["producers"]["C:6"]["package_commit"] == "2ecd996139778665d60a06f624b41e260c7b7358"
-    assert bindings["producers"]["C:6"]["predecessor_carry_manifest_sha256"] == "c" * 64
+    # C/06 carried the real canonical manifest, not the fixture placeholder.
+    c06_carry = bindings["producers"]["C:6"]["predecessor_carry_manifest_sha256"]
+    assert len(c06_carry) == 64 and c06_carry != CARRY_DIGEST
+    assert bindings["producers"]["B:7"]["predecessor_carry_manifest_sha256"] is None
     assert bindings["executing_package_commit"] == EXECUTING_COMMIT
 
 
