@@ -495,6 +495,44 @@ def test_carried_validation_receipt_refuses_a_different_model(store):
         )
 
 
+def test_carried_seed_binding_compares_rows_not_the_stamped_digest(store):
+    """The producer's seed table moves only in its package stamp.
+
+    Building a successor showed the two seed tables differing in exactly one of 113
+    fields: `package_commit`. Holding an inherited group to this package's file
+    digest therefore fails forever even though the registered rows are identical.
+    """
+    import formal_execution as fe
+
+    root = store / "issue85" / "artifacts" / "formal"
+    producer = root / brc.SUCCESSOR_PACKAGE_COMMIT
+    rows_sha = "7" * 64
+    (producer / "formal-seed-table.json").write_text(
+        json.dumps({"package_commit": brc.SUCCESSOR_PACKAGE_COMMIT, "rows_sha256": rows_sha}),
+        encoding="utf-8",
+    )
+    seed_sha = _sha((producer / "formal-seed-table.json").read_bytes())
+
+    index = brc.build_index(formal, IDENTITY)
+    carried = brc.carried_validation_groups(index)
+    item = dict(carried["PARENT"])
+    item["seed_table_sha256"] = seed_sha
+    item["group_root"] = str(producer / "validation" / "PARENT")
+
+    # Same registered rows, different package stamp: must be accepted.
+    fe._verify_carried_seed_binding(formal, item, rows_sha)
+
+    # Different registered rows: refused.
+    with pytest.raises(RuntimeError, match="different registered rows"):
+        fe._verify_carried_seed_binding(formal, item, "8" * 64)
+
+    # A seed table that is not the one the receipt named: refused.
+    other = dict(item)
+    other["seed_table_sha256"] = "9" * 64
+    with pytest.raises(RuntimeError, match="not the one it recorded"):
+        fe._verify_carried_seed_binding(formal, other, rows_sha)
+
+
 def test_clock_advance_cannot_change_the_evidence_digest(store):
     """The wall advances during the run; the evidence digest must not follow it."""
     first = brc.build_index(formal, IDENTITY)

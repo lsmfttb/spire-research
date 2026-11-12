@@ -6924,6 +6924,38 @@ def _carried_validation_group_receipt(
     }
 
 
+def _verify_carried_seed_binding(
+    formal: Any, item: Mapping[str, Any], own_rows_sha256: str,
+) -> None:
+    """Verify an inherited group against the seed table that really produced it.
+
+    A carried group recorded the *producer's* seed-table digest. Comparing that
+    against this package's own file digest fails even when the registered science is
+    identical, because the only field that moves is the `package_commit` stamped
+    into the document. Refusing forever on that basis would have been a gate the run
+    could reach but never pass.
+
+    What must actually hold: the producer's seed table is still the one the receipt
+    named, and its registered rows are the same rows this package registers. That
+    compares the science, not the stamp.
+    """
+    producer_root = Path(str(item["group_root"])).parent.parent
+    seed_path = producer_root / "formal-seed-table.json"
+    if not seed_path.is_file():
+        raise RuntimeError(
+            "carried validation group's producer has no seed table to verify against"
+        )
+    if formal.file_sha256(seed_path) != str(item.get("seed_table_sha256", "")):
+        raise RuntimeError(
+            "carried validation group's producer seed table is not the one it recorded"
+        )
+    producer_rows = formal.read_json(seed_path).get("rows_sha256")
+    if producer_rows != own_rows_sha256:
+        raise RuntimeError(
+            "carried validation group was validated against different registered rows"
+        )
+
+
 def _test_open_receipt(
     formal: Any, *, package_root: Path, identity: Mapping[str, str], readiness: Mapping[str, Any],
     seed: Mapping[str, Any], authorization: Mapping[str, Any],
@@ -6970,7 +7002,14 @@ def _test_open_receipt(
             )
         )
         or validation_groups[policy].get("source_lock_sha256") != identity["source_lock_sha256"]
-        or validation_groups[policy].get("seed_table_sha256") != readiness.get("formal_seed_table_sha256")
+        # A carried group recorded the producer's seed-table digest; only a local
+        # group can be held to this package's own. The carried case is verified
+        # against the producer's bytes below, by registered rows rather than by stamp.
+        or (
+            validation_groups[policy].get("carried_by_reference") is not True
+            and validation_groups[policy].get("seed_table_sha256")
+            != readiness.get("formal_seed_table_sha256")
+        )
         or validation_groups[policy].get("model_selection_or_tuning") is not False
         or not re.fullmatch(r"[0-9a-f]{64}", str(validation_groups[policy].get("receipt_sha256", "")))
         or not isinstance(validation_groups[policy].get("units"), list)
@@ -7011,6 +7050,23 @@ def _test_open_receipt(
             }
         ):
             raise RuntimeError(f"TEST remains closed until the exact {policy} validation receipt is verified")
+
+    # Inherited groups are checked against the registered rows they were actually
+    # validated on, not against this package's stamped digest. A package that
+    # produced every group itself has nothing to compare and is left as it was.
+    carried_policies = [
+        policy for policy in formal.POLICIES
+        if validation_groups[policy].get("carried_by_reference") is True
+    ]
+    if carried_policies:
+        own_seed_path = Path(str(readiness.get("formal_seed_table_path", "")))
+        if not own_seed_path.is_file():
+            own_seed_path = package_root / "formal-seed-table.json"
+        own_rows_sha256 = formal.read_json(own_seed_path).get("rows_sha256")
+        if not isinstance(own_rows_sha256, str) or len(own_rows_sha256) != 64:
+            raise RuntimeError("TEST remains closed until this package's registered seed rows are frozen")
+        for policy in carried_policies:
+            _verify_carried_seed_binding(formal, validation_groups[policy], own_rows_sha256)
     if (
         not re.fullmatch(r"[0-9a-f]{64}", str(authorization.get("sha256", "")))
         or not _issue_comment_url(authorization.get("owner_approval_comment_url"))
