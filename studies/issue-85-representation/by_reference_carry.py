@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
-INDEX_SCHEMA = "issue85-by-reference-carry-index-v1"
+INDEX_SCHEMA = "issue85-by-reference-carry-index-v2"
 POLICY_PRODUCER_SCHEMA = "issue85-policy-producers-v1"
 OWNERS_PER_BLOCK = 128
 TRAIN_FIRST_OWNER = 8400001
@@ -59,12 +59,45 @@ STAGES: tuple[tuple[str, int, str, str], ...] = (
 
 EXCLUDED_DUPLICATE_PACKAGE = "b61c6674e104739dc86a243486b0ed08335c6a76"
 
-# Stages whose actor a later stage consumes as its policy input. Only these need
-# a worker-side producer binding; all other completed stages are
-# authenticate-and-skip evidence.
-POLICY_INPUT_PRODUCERS: tuple[tuple[str, int], ...] = (("C", 6), ("B", 7))
+# The successor package that really executed C/07 and D/E/F after the by-reference
+# route opened. Its evidence is carried by exact reference: it is a legitimate
+# producer because legitimacy rests on the executing SHA, the registered owners,
+# the successful receipts and byte-level checkpoint continuity -- not on whether a
+# package is an ancestor, a failure-recovery package, or a same-lineage successor.
+#
+# Nothing here re-runs those stages. Each is read and verified in the package that
+# wrote it, and its outcomes are never restated as if the new package ran them.
+SUCCESSOR_PACKAGE_COMMIT = "57ed39411c8024283a930ed30e80339597b9006e"
 
-FIRST_UNFINISHED = ("C", 7)
+# C/07 is the stage the previous index declared unfinished; D/E/F ran after it.
+SUCCESSOR_STAGES: tuple[tuple[str, int], ...] = (
+    ("C", 7),
+    *((arm, block) for arm in ("D", "E", "F") for block in range(8)),
+)
+
+# Training roster the study registered: the five trained arms over eight blocks.
+# Deriving from this roster rather than from a hardcoded "first unfinished" pair is
+# what keeps the cursor honest once stages from another package are carried.
+TRAINED_ARMS: tuple[str, ...] = ("B", "C", "D", "E", "F")
+
+VALIDATION_POLICIES: tuple[str, ...] = ("PARENT", "A", "B", "C", "D", "E", "F")
+
+# VALIDATION groups completed in the successor package. PARENT and A were run and
+# kept before the evaluation loader defect stopped the run at B; they never entered
+# the defective carried-arm branch, so their evidence stands on its own.
+SUCCESSOR_VALIDATION: tuple[str, ...] = ("PARENT", "A")
+
+# Stages whose actor is consumed as a model input, so a worker needs a producer
+# binding rather than a local read.
+#
+# Every arm's block-07 actor is the evaluation model for that arm's VALIDATION and
+# TEST groups, so once C/07..F/07 are carried (not executed here) each arm's final
+# actor must be named explicitly. C/06 stays because the historical C lineage
+# consumed it and the index must still describe that link.
+POLICY_INPUT_PRODUCERS: tuple[tuple[str, int], ...] = (
+    ("C", 6),
+    *((arm, 7) for arm in TRAINED_ARMS),
+)
 
 
 def _formal_root(formal: Any) -> Path:
@@ -171,6 +204,105 @@ def resolve_stage(
 
 
 CANONICAL_STAGE = ("C", 6)
+
+# Every completed training stage the index carries: the predecessor's audited
+# fifteen plus the successor's twenty-five.
+ALL_STAGES: tuple[tuple[str, int, str, str], ...] = STAGES + tuple(
+    (arm, block, SUCCESSOR_PACKAGE_COMMIT, SUCCESSOR_PACKAGE_COMMIT)
+    for arm, block in SUCCESSOR_STAGES
+)
+
+VALIDATION_OWNERS = 64
+GROUP_SCHEMA = "issue85-formal-game-group-v1"
+
+
+def resolve_validation_group(
+    formal: Any, policy: str, producer_commit: str, source_lock_sha256: str,
+) -> dict[str, Any]:
+    """Verify one completed VALIDATION group in the package that really ran it.
+
+    Returns only facts recomputed from the producer's own bytes. Nothing about the
+    group is restated as though the executing successor had produced it.
+    """
+    import formal_execution as fe
+
+    group_root = _formal_root(formal) / producer_commit / "validation" / policy
+    receipt_path = _inside(group_root, "group-receipt.json")
+    group = formal.read_json(receipt_path)
+    receipt_sha = formal.file_sha256(receipt_path)
+    units = group.get("units")
+    if (
+        group.get("schema_id") != GROUP_SCHEMA
+        or group.get("stage_id") != f"VALIDATION-{policy}"
+        or group.get("status") != "SUCCEEDED"
+        or group.get("completed") != VALIDATION_OWNERS
+        or group.get("expected") != VALIDATION_OWNERS
+        or group.get("package_commit") != producer_commit
+        or group.get("source_lock_sha256") != source_lock_sha256
+        or group.get("model_selection_or_tuning") is not False
+        or not isinstance(units, list)
+        or len(units) != VALIDATION_OWNERS
+        or len(group.get("successful_unit_ids", [])) != VALIDATION_OWNERS
+    ):
+        raise RuntimeError(
+            f"producer VALIDATION group {policy} is not a complete frozen 64-owner stage"
+        )
+    digests = set()
+    for unit in units:
+        digest = unit.get("model_digest") if isinstance(unit, Mapping) else None
+        if not isinstance(digest, str) or len(digest) != 64:
+            raise RuntimeError(f"producer VALIDATION group {policy} lacks a frozen model digest")
+        digests.add(digest)
+    if len(digests) != 1:
+        raise RuntimeError(
+            f"producer VALIDATION group {policy} evaluated more than one model; "
+            "validation must describe a single frozen policy"
+        )
+    # The evaluated model must be the arm's registered evaluation model, which for
+    # PARENT/A is the locked baseline and for B..F is that arm's block-07 actor.
+    expected_digest = (
+        str(formal.LOCK["baseline_P"]["model_digest"]) if policy == "PARENT"
+        else str(formal.LOCK["baseline_A"]["model_digest"]) if policy == "A"
+        else None
+    )
+    if expected_digest is not None and digests.pop() != expected_digest:
+        raise RuntimeError(
+            f"producer VALIDATION group {policy} did not evaluate its locked model"
+        )
+    return {
+        "policy": policy,
+        "producer_package_commit": producer_commit,
+        "group_receipt_path": f"validation/{policy}/group-receipt.json",
+        "group_receipt_sha256": receipt_sha,
+        "completed": VALIDATION_OWNERS,
+        "expected": VALIDATION_OWNERS,
+        "model_digest": next(iter(digests), expected_digest),
+        "seed_table_sha256": group.get("seed_table_sha256"),
+        "authorization_receipt_sha256": group.get("authorization_receipt_sha256"),
+        "active_wall_seconds_at_stage_close": group.get("active_wall_seconds_at_stage_close"),
+    }
+
+
+def derive_next_stage(
+    completed_training: set[tuple[str, int]], carried_validation: set[str],
+) -> dict[str, Any]:
+    """Derive the next unfinished stage from the registered roster.
+
+    Previously this was the constant ``("C", 7)``. That was wrong the moment work
+    beyond C/07 was carried: a fresh package would have declared a completed stage
+    unfinished and re-run it. The cursor is a function of what the roster registers
+    and what has verifiably completed, never a literal.
+    """
+    for arm in TRAINED_ARMS:
+        for block in range(8):
+            if (arm, block) not in completed_training:
+                return {"phase": "TRAIN", "arm": arm, "block": block,
+                        "stage_id": f"TRAIN-{arm}-BLOCK-{block:02d}"}
+    for policy in VALIDATION_POLICIES:
+        if policy not in carried_validation:
+            return {"phase": "VALIDATION", "arm": None, "block": None,
+                    "stage_id": f"VALIDATION-{policy}"}
+    return {"phase": "TEST", "arm": None, "block": None, "stage_id": "TEST"}
 
 
 def _canonical_carry_proofs(formal: Any, stages: list[dict[str, Any]]) -> dict[str, Any]:
@@ -282,7 +414,7 @@ def _canonical_carry_proofs(formal: Any, stages: list[dict[str, Any]]) -> dict[s
 
 def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
     """Resolve the full completed roster once, verifying every producer."""
-    stages = [resolve_stage(formal, arm, block, g, u) for arm, block, g, u in STAGES]
+    stages = [resolve_stage(formal, arm, block, g, u) for arm, block, g, u in ALL_STAGES]
     seen: set[tuple[str, int]] = set()
     # Each arm trains its own lineage over the same 1,024 registered owners, so a
     # registered outcome is identified by (arm, owner) -- the unit id
@@ -297,11 +429,24 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
         if units & span:
             raise RuntimeError(f"completed stages overlap on registered outcomes at {key}")
         units |= span
-    if len(stages) != len(STAGES) or len(units) != len(STAGES) * OWNERS_PER_BLOCK:
+    if len(stages) != len(ALL_STAGES) or len(units) != len(ALL_STAGES) * OWNERS_PER_BLOCK:
         raise RuntimeError("completed roster is not unique across registered outcomes")
+
+    validation_stages = [
+        resolve_validation_group(formal, policy, producer, identity["source_lock_sha256"])
+        for policy, producer in ((p, SUCCESSOR_PACKAGE_COMMIT) for p in SUCCESSOR_VALIDATION)
+    ]
+    carried_validation = {group["policy"] for group in validation_stages}
+    collisions = carried_validation - set(VALIDATION_POLICIES)
+    if collisions:
+        raise RuntimeError(f"carried VALIDATION names unregistered policies: {sorted(collisions)}")
+
+    next_stage = derive_next_stage(seen, carried_validation)
+
     producers = sorted(
         {stage["games_package_commit"] for stage in stages}
         | {stage["update_package_commit"] for stage in stages}
+        | {group["producer_package_commit"] for group in validation_stages}
     )
     proofs = _canonical_carry_proofs(formal, stages)
     clock_path = (
@@ -318,11 +463,14 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
         "source_lock_sha256": identity["source_lock_sha256"],
         "completed_stage_count": len(stages),
         "completed_train_outcomes": len(units),
-        "first_unfinished_arm": FIRST_UNFINISHED[0],
-        "first_unfinished_block": FIRST_UNFINISHED[1],
+        "validation_stage_count": len(validation_stages),
+        "validation_outcomes": sum(group["completed"] for group in validation_stages),
+        "next_stage_phase": next_stage["phase"],
+        "next_stage_id": next_stage["stage_id"],
         "producers": producers,
         "excluded_duplicate_package": EXCLUDED_DUPLICATE_PACKAGE,
         "stages": stages,
+        "validation_stages": validation_stages,
         **proofs,
     }
     # The active wall is mutable ledger state, not producer evidence. It advances
@@ -418,6 +566,32 @@ def stage_bindings(
     return bindings
 
 
+def carried_validation_groups(index: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Completed VALIDATION groups a successor adopts instead of re-running.
+
+    Each record names the package that really ran the group so the caller can
+    verify it there and record an honest provenance, rather than presenting the
+    group as local work.
+    """
+    return {
+        str(group["policy"]): {
+            "policy": str(group["policy"]),
+            "producer_package_commit": str(group["producer_package_commit"]),
+            "group_receipt_sha256": str(group["group_receipt_sha256"]),
+            "completed": int(group["completed"]),
+            "expected": int(group["expected"]),
+            "model_digest": str(group["model_digest"]),
+            # Needed so TEST-open can verify the carried receipt against the
+            # authorization and seed table that really produced it, instead of
+            # demanding this package's own identity where it does not apply.
+            "authorization_receipt_sha256": str(group["authorization_receipt_sha256"]),
+            "seed_table_sha256": str(group["seed_table_sha256"]),
+            "carried_by_reference": True,
+        }
+        for group in index.get("validation_stages", [])
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Build/verify the Issue 85 by-reference carry index. Never starts games."
@@ -438,6 +612,9 @@ def main(argv: list[str] | None = None) -> int:
             "index_sha256": index["index_sha256"],
             "completed_stage_count": index["completed_stage_count"],
             "completed_train_outcomes": index["completed_train_outcomes"],
+            "validation_stage_count": index["validation_stage_count"],
+            "validation_outcomes": index["validation_outcomes"],
+            "next_stage": index["next_stage_id"],
         }, sort_keys=True))
         return 0
 
@@ -448,7 +625,9 @@ def main(argv: list[str] | None = None) -> int:
         "index_sha256": index["index_sha256"],
         "completed_stage_count": index["completed_stage_count"],
         "completed_train_outcomes": index["completed_train_outcomes"],
-        "first_unfinished": f"{index['first_unfinished_arm']}/{index['first_unfinished_block']:02d}",
+        "validation_stage_count": index["validation_stage_count"],
+        "validation_outcomes": index["validation_outcomes"],
+        "next_stage": index["next_stage_id"],
         "producers": index["producers"],
     }
     if args.write:

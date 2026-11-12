@@ -47,7 +47,7 @@ def _sha(data: bytes) -> str:
 def _stage_packages(tmp_path: Path) -> Path:
     """Create synthetic producer packages for every audited stage."""
     root = tmp_path / "issue85" / "artifacts" / "formal"
-    for index, (arm, block, games_commit, update_commit) in enumerate(brc.STAGES):
+    for index, (arm, block, games_commit, update_commit) in enumerate(brc.ALL_STAGES):
         games_dir = root / games_commit / "training" / arm / f"block-{block:02d}" / "games"
         games_dir.mkdir(parents=True, exist_ok=True)
         group = {
@@ -152,6 +152,46 @@ def _stage_packages(tmp_path: Path) -> Path:
     receipt = json.loads(receipt_path.read_text())
     receipt["predecessor_carry_manifest_sha256"] = _sha(manifest_path.read_bytes())
     receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    # VALIDATION groups the producer really completed and kept. These are adopted,
+    # never re-run: modelling them here is what lets the suite prove a successor
+    # reads inherited evidence instead of replaying 128 registered owners.
+    locked = {
+        "PARENT": formal.LOCK["baseline_P"]["model_digest"],
+        "A": formal.LOCK["baseline_A"]["model_digest"],
+    }
+    for order, policy in enumerate(brc.SUCCESSOR_VALIDATION):
+        group_dir = root / brc.SUCCESSOR_PACKAGE_COMMIT / "validation" / policy
+        group_dir.mkdir(parents=True, exist_ok=True)
+        digest = locked[policy]
+        group = {
+            "schema_id": brc.GROUP_SCHEMA,
+            "stage_id": f"VALIDATION-{policy}",
+            "status": "SUCCEEDED",
+            "completed": brc.VALIDATION_OWNERS,
+            "expected": brc.VALIDATION_OWNERS,
+            "package_commit": brc.SUCCESSOR_PACKAGE_COMMIT,
+            "source_lock_sha256": LOCK,
+            "model_selection_or_tuning": False,
+            "seed_table_sha256": "5" * 64,
+            "authorization_receipt_sha256": "6" * 64,
+            "active_wall_seconds_at_stage_close": 133341.5 + order,
+            "successful_unit_ids": [
+                f"VALIDATION:{8510001 + i}:{policy}" for i in range(brc.VALIDATION_OWNERS)
+            ],
+            "units": [
+                {
+                    "model_digest": digest,
+                    "attempt_count": 1,
+                    "attempt_path": (
+                        f"validation/{policy}/units/"
+                        f"VALIDATION-{8510001 + i}-{policy}/attempt-0001"
+                    ),
+                }
+                for i in range(brc.VALIDATION_OWNERS)
+            ],
+        }
+        (group_dir / "group-receipt.json").write_text(json.dumps(group), encoding="utf-8")
     return root
 
 
@@ -182,25 +222,75 @@ def store(tmp_path, monkeypatch):
     return tmp_path
 
 
-def test_index_covers_the_fifteen_completed_stages(store):
+def test_index_covers_every_completed_stage_and_derives_the_next_one(store):
     index = brc.build_index(formal, IDENTITY)
-    assert index["completed_stage_count"] == 15
-    assert index["completed_train_outcomes"] == 1920
-    assert (index["first_unfinished_arm"], index["first_unfinished_block"]) == ("C", 7)
+    # Fifteen audited predecessor stages plus twenty-five the successor really
+    # executed, with no stage counted twice.
+    assert index["completed_stage_count"] == 40
+    assert index["completed_train_outcomes"] == 5120
+    assert index["validation_stage_count"] == 2
+    assert index["validation_outcomes"] == 128
+    # The cursor is derived, not literal: every training block is complete and
+    # PARENT/A are carried, so the next stage is the first unfinished one.
+    assert index["next_stage_id"] == "VALIDATION-B"
     assert index["executing_package_commit"] == EXECUTING_COMMIT
     assert index["excluded_duplicate_package"] == brc.EXCLUDED_DUPLICATE_PACKAGE
     assert brc.EXCLUDED_DUPLICATE_PACKAGE not in index["producers"]
 
 
-def test_c06_and_b07_are_named_as_policy_input_producers(store):
+def test_derived_cursor_reports_the_first_unfinished_registered_stage():
+    everything = {(arm, block) for arm in brc.TRAINED_ARMS for block in range(8)}
+    assert brc.derive_next_stage(set(), set())["stage_id"] == "TRAIN-B-BLOCK-00"
+    assert brc.derive_next_stage(everything - {("D", 3)}, set())["stage_id"] == "TRAIN-D-BLOCK-03"
+    assert brc.derive_next_stage(everything, {"PARENT"})["stage_id"] == "VALIDATION-A"
+    assert brc.derive_next_stage(everything, {"PARENT", "A"})["stage_id"] == "VALIDATION-B"
+    assert brc.derive_next_stage(everything, set(brc.VALIDATION_POLICIES))["stage_id"] == "TEST"
+
+
+def test_carried_validation_groups_record_their_real_producer(store):
+    index = brc.build_index(formal, IDENTITY)
+    carried = brc.carried_validation_groups(index)
+    assert set(carried) == {"PARENT", "A"}
+    for policy, record in carried.items():
+        assert record["producer_package_commit"] == brc.SUCCESSOR_PACKAGE_COMMIT
+        assert record["completed"] == 64
+        assert record["carried_by_reference"] is True
+        assert record["producer_package_commit"] != EXECUTING_COMMIT
+    assert carried["PARENT"]["model_digest"] == formal.LOCK["baseline_P"]["model_digest"]
+
+
+def test_validation_group_rejects_a_drifted_model_digest(store):
+    path = (store / "issue85/artifacts/formal" / brc.SUCCESSOR_PACKAGE_COMMIT
+            / "validation/A/group-receipt.json")
+    group = json.loads(path.read_text())
+    group["units"][0]["model_digest"] = "0" * 64
+    path.write_text(json.dumps(group), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="more than one model"):
+        brc.build_index(formal, IDENTITY)
+
+
+def test_validation_group_rejects_an_incomplete_frozen_stage(store):
+    path = (store / "issue85/artifacts/formal" / brc.SUCCESSOR_PACKAGE_COMMIT
+            / "validation/PARENT/group-receipt.json")
+    group = json.loads(path.read_text())
+    group["completed"] = 63
+    path.write_text(json.dumps(group), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="not a complete frozen"):
+        brc.build_index(formal, IDENTITY)
+
+
+def test_final_actor_of_every_arm_is_named_as_a_policy_input_producer(store):
     index = brc.build_index(formal, IDENTITY)
     bindings = brc.policy_producers(formal, index, IDENTITY)
-    assert set(bindings["producers"]) == {"C:6", "B:7"}
+    # C/06 keeps its historical link, and every arm's block-07 actor is the model
+    # its VALIDATION and TEST groups evaluate, including the ones carried here.
+    assert set(bindings["producers"]) == {"C:6", "B:7", "C:7", "D:7", "E:7", "F:7"}
     assert bindings["producers"]["C:6"]["package_commit"] == "2ecd996139778665d60a06f624b41e260c7b7358"
     # C/06 carried the real canonical manifest, not the fixture placeholder.
     c06_carry = bindings["producers"]["C:6"]["predecessor_carry_manifest_sha256"]
     assert len(c06_carry) == 64 and c06_carry != CARRY_DIGEST
     assert bindings["producers"]["B:7"]["predecessor_carry_manifest_sha256"] is None
+    assert bindings["producers"]["F:7"]["package_commit"] == brc.SUCCESSOR_PACKAGE_COMMIT
     assert bindings["executing_package_commit"] == EXECUTING_COMMIT
 
 
@@ -248,9 +338,9 @@ def test_stage_rejects_foreign_package_commit(store):
 def test_excluded_duplicate_package_cannot_carry_a_stage(store, monkeypatch):
     patched = tuple(
         (arm, block, g, brc.EXCLUDED_DUPLICATE_PACKAGE)
-        for arm, block, g, _ in brc.STAGES
+        for arm, block, g, _ in brc.ALL_STAGES
     )
-    monkeypatch.setattr(brc, "STAGES", patched)
+    monkeypatch.setattr(brc, "ALL_STAGES", patched)
     _stage_packages(store)
     with pytest.raises((RuntimeError, FileNotFoundError)):
         brc.build_index(formal, IDENTITY)
@@ -295,8 +385,8 @@ def test_index_binds_only_the_executing_commit(store):
 def test_stage_bindings_name_games_and_update_producers_separately(store):
     index = brc.build_index(formal, IDENTITY)
     bindings = brc.stage_bindings(index, IDENTITY)
-    assert len(bindings) == 15
-    assert set(bindings) == {f"{a}:{b}" for a, b, _, _ in brc.STAGES}
+    assert len(bindings) == 40
+    assert set(bindings) == {f"{a}:{b}" for a, b, _, _ in brc.ALL_STAGES}
     # B/00's games were staged in e549105e but its update was applied in fde456f5.
     assert bindings["B:0"]["games_package_commit"] == "e549105ead79c9524bee706fc600164f8c7f9f1a"
     assert bindings["B:0"]["package_commit"] == "fde456f52aaa388b7abc92a2b148ba91d3720e1e"
@@ -310,6 +400,99 @@ def test_policy_input_bindings_carry_the_games_producer_too(store):
     index = brc.build_index(formal, IDENTITY)
     producers = brc.policy_producers(formal, index, IDENTITY)["producers"]
     assert producers["C:6"]["games_package_commit"] == "2ecd996139778665d60a06f624b41e260c7b7358"
+
+
+def test_by_reference_clock_floor_comes_from_closed_carried_stages(store):
+    """By-reference mode must obtain a real floor, not skip the comparison.
+
+    The historical high-water comes from `actor_update_carries`, which a
+    by-reference index does not have. `validate_authorization` therefore left
+    `carry_manifest` as None and the reset guard never ran. Carried VALIDATION
+    groups record the cumulative wall at their own close, so they supply the same
+    lower bound -- and only ever a lower bound, since they are closed history.
+    """
+    import formal_execution as fe
+
+    index = brc.build_index(formal, IDENTITY)
+    floor = fe._by_reference_active_wall_high_water(index, 295632)
+    # PARENT closed at 133341.5 and A at 133342.5 in the fixture.
+    assert floor == pytest.approx(133342.5)
+
+    # A clock that dropped below attested history fails closed.
+    with pytest.raises(RuntimeError, match="refusing to reset study time"):
+        fe._enforce_active_wall_floor(130000.0, floor, 295632)
+    # Normal advance is accepted, and no floor means no comparison.
+    fe._enforce_active_wall_floor(140000.0, floor, 295632)
+    fe._enforce_active_wall_floor(1.0, None, 295632)
+
+
+def test_by_reference_clock_floor_rejects_a_malformed_or_over_cap_reading(store):
+    import formal_execution as fe
+
+    index = brc.build_index(formal, IDENTITY)
+    index["validation_stages"][0]["active_wall_seconds_at_stage_close"] = -1.0
+    with pytest.raises(RuntimeError, match="malformed or exceeds the approved cap"):
+        fe._by_reference_active_wall_high_water(index, 295632)
+
+    index["validation_stages"][0]["active_wall_seconds_at_stage_close"] = 400000.0
+    with pytest.raises(RuntimeError, match="malformed or exceeds the approved cap"):
+        fe._by_reference_active_wall_high_water(index, 295632)
+
+    with pytest.raises(RuntimeError, match="malformed or exceeds the approved cap"):
+        fe._enforce_active_wall_floor(140000.0, 400000.0, 295632)
+
+
+def test_carried_validation_receipt_is_read_from_its_producer(store, monkeypatch):
+    """PARENT/A must verify in the producer package, not in the successor's tree."""
+    import formal_execution as fe
+
+    index = brc.build_index(formal, IDENTITY)
+    carried = brc.carried_validation_groups(index)
+    # The successor has no validation/PARENT tree at all.
+    successor_root = store / "issue85/artifacts/formal" / EXECUTING_COMMIT
+    assert not (successor_root / "validation" / "PARENT").exists()
+
+    record = fe._carried_validation_group_receipt(
+        formal, package_root=successor_root, identity=IDENTITY, carried=carried["PARENT"],
+    )
+    assert record["carried_by_reference"] is True
+    assert record["producer_package_commit"] == brc.SUCCESSOR_PACKAGE_COMMIT
+    assert record["producer_authorization_receipt_sha256"] == "6" * 64
+    assert record["completed"] == 64
+    # The receipt shape is what TEST-open consumes, so the frozen model lives in
+    # its units rather than as a top-level field.
+    assert {
+        unit["model_digest"] for unit in record["units"]
+    } == {formal.LOCK["baseline_P"]["model_digest"]}
+
+
+def test_carried_validation_receipt_refuses_a_digest_that_moved(store):
+    import formal_execution as fe
+
+    index = brc.build_index(formal, IDENTITY)
+    carried = brc.carried_validation_groups(index)
+    tampered = dict(carried["A"])
+    tampered["group_receipt_sha256"] = "0" * 64
+    with pytest.raises(RuntimeError, match="differs from the index"):
+        fe._carried_validation_group_receipt(
+            formal, package_root=store / "issue85/artifacts/formal" / EXECUTING_COMMIT,
+            identity=IDENTITY, carried=tampered,
+        )
+
+
+def test_carried_validation_receipt_refuses_a_different_model(store):
+    """A carried group whose frozen model is not the registered one must not pass."""
+    import formal_execution as fe
+
+    index = brc.build_index(formal, IDENTITY)
+    carried = brc.carried_validation_groups(index)
+    tampered = dict(carried["PARENT"])
+    tampered["model_digest"] = "1" * 64
+    with pytest.raises(RuntimeError, match="not a complete frozen producer stage"):
+        fe._carried_validation_group_receipt(
+            formal, package_root=store / "issue85/artifacts/formal" / EXECUTING_COMMIT,
+            identity=IDENTITY, carried=tampered,
+        )
 
 
 def test_clock_advance_cannot_change_the_evidence_digest(store):
@@ -375,7 +558,7 @@ def test_gate_helper_accepts_the_matching_index(store):
     root = store / "issue85" / "artifacts" / "formal" / EXECUTING_COMMIT
     got = fe._validate_by_reference_index(formal, root, IDENTITY, index["index_sha256"])
     assert got["index_sha256"] == index["index_sha256"]
-    assert got["completed_stage_count"] == 15
+    assert got["completed_stage_count"] == 40
 
 
 def test_gate_helper_rejects_a_different_index_digest(store):
@@ -396,32 +579,43 @@ def test_gate_helper_rejects_a_missing_index(store):
         fe._validate_by_reference_index(formal, root, IDENTITY, "0" * 64)
 
 
-def test_successor_skips_b00_to_c06_and_dispatches_first_at_c07(store):
-    """An empty successor package must not restart the study at B/00."""
+def test_successor_carries_all_forty_blocks_and_dispatches_at_validation_b(store):
+    """A successor must not restart training, and must not replay completed blocks.
+
+    The earlier cursor was the literal ("C", 7). Once the successor's own C/07..F/07
+    were carried, that literal declared a completed stage unfinished and would have
+    re-run twenty-five audited blocks. The assertion now pins the corrected
+    behaviour: nothing in the training roster remains, and the first dispatch is
+    validation.
+    """
     import formal_execution as fe
 
     index = brc.build_index(formal, IDENTITY)
     groups = fe._by_reference_carried_groups(index, 128)
 
-    assert len(groups) == 15
-    assert set(groups) == {(a, b) for a, b, _, _ in brc.STAGES}
+    assert len(groups) == 40
+    assert set(groups) == {(a, b) for a, b, _, _ in brc.ALL_STAGES}
     assert ("C", 6) in groups
-    assert ("C", 7) not in groups
+    assert ("C", 7) in groups          # carried now, not "unfinished"
+    assert ("F", 7) in groups
     assert all(record["status"] == "SUCCEEDED" for record in groups.values())
     # Carried records describe provenance, not results: no model digest is restated.
     assert all("result_model_digest" not in record for record in groups.values())
 
-    # The executor walks arms in order and blocks 0..7; what remains after the
-    # carried set is exactly the work the successor must actually produce.
     remaining = [
         (arm, block)
-        for arm in ("B", "C", "D", "E", "F")
+        for arm in brc.TRAINED_ARMS
         for block in range(8)
         if (arm, block) not in groups
     ]
-    assert remaining[0] == ("C", 7)
-    assert len(remaining) == 25          # 1 remaining C block + 8 each for D, E, F
-    assert ("B", 0) not in remaining
+    assert remaining == []             # no completed stage may be re-executed
+    assert index["next_stage_id"] == "VALIDATION-B"
+
+    carried = brc.carried_validation_groups(index)
+    assert set(carried) == {"PARENT", "A"}
+    assert {p for p in brc.VALIDATION_POLICIES if p not in carried} == {
+        "B", "C", "D", "E", "F"
+    }
 
     # That block's registered owners are 8400897..8401024.
     first_owner = brc.TRAIN_FIRST_OWNER + 7 * brc.OWNERS_PER_BLOCK
@@ -596,12 +790,18 @@ REAL_DATA_ROOT = Path(formal.DATA_ROOT)
     reason="durable Issue 85 store is not mounted",
 )
 def test_every_carried_stage_reads_through_its_producer_binding(monkeypatch):
-    """All fifteen stages must be readable, not just the five that carried anything.
+    """Every carried stage must be readable, not just the few that carried anything.
 
     Only B/00, B/01, B/03, B/04 and C/06 recorded a carry digest; the other ten
-    hold None. A binding demanding a 64-hex digest for all of them rejected ten
-    stages, so the successor died at B/02 -- before any game, long before C/07.
-    The synthetic fixture hid this by hardcoding a digest for every stage.
+    predecessor stages hold None. A binding demanding a 64-hex digest for all of
+    them rejected ten stages, so the successor died at B/02 -- before any game,
+    long before C/07. The synthetic fixture hid this by hardcoding a digest for
+    every stage.
+
+    The successor's own twenty-five stages were executed, not carried, so they hold
+    None as well; that is why the expected count is thirty-five rather than ten.
+    What matters is unchanged: every one of the forty must read through its
+    producer binding, which this asserts against the real store.
     """
     import formal_execution as fe
 
@@ -623,7 +823,9 @@ def test_every_carried_stage_reads_through_its_producer_binding(monkeypatch):
         key for key, value in bindings.items()
         if value["predecessor_carry_manifest_sha256"] is None
     ]
-    assert len(null_carry) == 10, null_carry
+    # Ten predecessor stages plus the successor's twenty-five completed ones.
+    assert len(null_carry) == 35, null_carry
+    assert len(bindings) == 40
 
     parent = (
         REAL_DATA_ROOT / "issue85" / "artifacts" / "formal"
@@ -653,7 +855,18 @@ def test_real_evidence_keeps_c06_attempt_layout_intact(monkeypatch):
     original evidence -- would corrupt the producer package it is supposed to cite.
     """
     monkeypatch.setattr(formal, "DATA_ROOT", str(REAL_DATA_ROOT))
-    index = brc.build_index(formal, IDENTITY)
+    # Real evidence carries the real source lock; the synthetic IDENTITY above is
+    # only meaningful against the synthetic fixture.
+    probe = formal.read_json(
+        REAL_DATA_ROOT / "issue85" / "artifacts" / "formal"
+        / "2ecd996139778665d60a06f624b41e260c7b7358"
+        / "training" / "C" / "updates" / "block-06" / "success-receipt.json"
+    )
+    identity = {
+        "package_commit": "0" * 40,
+        "source_lock_sha256": str(probe["source_lock_sha256"]),
+    }
+    index = brc.build_index(formal, identity)
     stages = {(s["arm"], s["block_index"]): s for s in index["stages"]}
     c06 = stages[("C", 6)]
     assert c06["update_package_commit"].startswith("2ecd9961")

@@ -477,6 +477,66 @@ def _carried_active_wall_high_water(
     return max(elapsed_values)
 
 
+def _by_reference_active_wall_high_water(
+    index: Mapping[str, Any], cap_seconds: int,
+) -> float | None:
+    """Immutable active-wall floor attested by carried stages.
+
+    A carried VALIDATION group records the cumulative study wall at the moment its
+    stage closed. Those readings are closed history: they belong to packages that
+    already finished, so they can only ever be a lower bound on the current clock.
+    Taking their maximum gives by-reference mode the floor that the historical
+    carry manifest provides through ``_carried_active_wall_high_water`` -- which
+    ``validate_authorization`` never builds in this mode, leaving the reset guard
+    unreachable.
+
+    Only real elapsed time is involved. Nothing here invents a clock, migrates
+    history, or adds a CPU/worker/attempt limit.
+    """
+    readings: list[float] = []
+    groups = index.get("validation_stages", [])
+    if not isinstance(groups, list):
+        raise RuntimeError("by-reference validation stages are malformed")
+    for group in groups:
+        value = group.get("active_wall_seconds_at_stage_close") if isinstance(group, Mapping) else None
+        if (
+            isinstance(value, bool) or not isinstance(value, (int, float))
+            or not math.isfinite(float(value)) or float(value) < 0
+            or float(value) > cap_seconds
+        ):
+            raise RuntimeError(
+                "carried by-reference active-wall reading is malformed or exceeds the approved cap"
+            )
+        readings.append(float(value))
+    return max(readings) if readings else None
+
+
+def _enforce_active_wall_floor(
+    elapsed: float, high_water: float | None, cap_seconds: int,
+) -> None:
+    """Refuse a cumulative clock that fell below attested history.
+
+    This is the guard itself, split out so it can be exercised directly. It was
+    previously inline and gated on a variable that by-reference mode never assigns,
+    which made a real check indistinguishable from a missing one.
+    """
+    if high_water is None:
+        return
+    if (
+        isinstance(high_water, bool) or not isinstance(high_water, (int, float))
+        or not math.isfinite(float(high_water)) or float(high_water) < 0
+        or float(high_water) > cap_seconds
+    ):
+        raise RuntimeError(
+            "the carried active-wall high-water is malformed or exceeds the approved cap"
+        )
+    if elapsed < float(high_water):
+        raise RuntimeError(
+            "the cumulative Issue 85 active-wall clock is below the immutable carried active-wall high-water "
+            f"({elapsed} < {high_water}); refusing to reset study time"
+        )
+
+
 def _predecessor_carry_path(package_root: Path) -> Path:
     return Path(package_root) / "predecessor-carry-manifest.json"
 
@@ -4712,11 +4772,11 @@ def validate_authorization(
     elapsed = _validate_active_wall_clock(prior_clock, cap, require_idle=require_idle_clock)
     if carry_manifest is not None:
         high_water = _carried_active_wall_high_water(carry_manifest, cap)
-        if high_water is not None and elapsed < high_water:
-            raise RuntimeError(
-                "the cumulative Issue 85 active-wall clock is below the immutable carried active-wall high-water "
-                f"({elapsed} < {high_water}); refusing to reset study time"
-            )
+    elif by_reference_index is not None:
+        high_water = _by_reference_active_wall_high_water(by_reference_index, cap)
+    else:
+        high_water = None
+    _enforce_active_wall_floor(elapsed, high_water, cap)
     pilot_report_path = (
         Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "pilot"
         / ACCEPTED_PILOT_PACKAGE_COMMIT / "pilot-report.json"
@@ -6801,6 +6861,69 @@ def _run_training_games(
     ) | {"group_root": str(root)}
 
 
+def _carried_validation_group_receipt(
+    formal: Any, *, package_root: Path, identity: Mapping[str, str],
+    carried: Mapping[str, str],
+) -> dict[str, dict[str, Any]]:
+    """Read a carried VALIDATION group from the package that really ran it.
+
+    PARENT and A were completed and kept before the evaluation loader defect
+    stopped the run, so a successor adopts their evidence instead of re-running 128
+    owner games. Verification happens against the producer's own bytes and the
+    producer's own authorization and seed table; the record returned keeps the
+    producer identity so TEST-open can state an honest provenance rather than
+    presenting the group as local work.
+    """
+    producer_commit = str(carried.get("producer_package_commit", ""))
+    if re.fullmatch(r"[0-9a-f]{40}", producer_commit) is None:
+        raise RuntimeError("carried VALIDATION group names no full producer commit")
+    policy = str(carried.get("policy", ""))
+    producer_root = _inside(
+        Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "formal", producer_commit,
+    )
+    group_root = _inside(producer_root, f"validation/{policy}")
+    receipt_path = _inside(group_root, "group-receipt.json")
+    receipt_sha = formal.file_sha256(receipt_path)
+    if receipt_sha != str(carried.get("group_receipt_sha256", "")):
+        raise RuntimeError(f"carried {policy} validation receipt digest differs from the index")
+    item = formal.read_json(receipt_path)
+    if formal.read_json(receipt_path) != {
+        key: value for key, value in item.items()
+        if key not in {"receipt_sha256", "group_root"}
+    }:
+        raise RuntimeError(f"carried {policy} validation receipt is not self-consistent")
+    validation_count = len(formal._registered_ranges()["validation"])
+    digests = {
+        str(unit.get("model_digest"))
+        for unit in item.get("units", [])
+        if isinstance(unit, Mapping)
+    }
+    if (
+        item.get("schema_id") != GROUP_SCHEMA
+        or item.get("stage_id") != f"VALIDATION-{policy}"
+        or item.get("status") != "SUCCEEDED"
+        or item.get("completed") != validation_count
+        or item.get("expected") != validation_count
+        or item.get("package_commit") != producer_commit
+        or item.get("source_lock_sha256") != identity["source_lock_sha256"]
+        or item.get("model_selection_or_tuning") is not False
+        or len(item.get("units", [])) != validation_count
+        or len(item.get("successful_unit_ids", [])) != validation_count
+        or digests != {str(carried.get("model_digest", ""))}
+    ):
+        raise RuntimeError(
+            f"carried {policy} validation group is not a complete frozen producer stage"
+        )
+    return {
+        **item,
+        "receipt_sha256": receipt_sha,
+        "group_root": str(group_root),
+        "carried_by_reference": True,
+        "producer_package_commit": producer_commit,
+        "producer_authorization_receipt_sha256": item.get("authorization_receipt_sha256"),
+    }
+
+
 def _test_open_receipt(
     formal: Any, *, package_root: Path, identity: Mapping[str, str], readiness: Mapping[str, Any],
     seed: Mapping[str, Any], authorization: Mapping[str, Any],
@@ -6815,13 +6938,39 @@ def _test_open_receipt(
         or validation_groups[policy].get("status") != "SUCCEEDED"
         or type(validation_groups[policy].get("completed")) is not int
         or validation_groups[policy].get("completed") != validation_count
-        or validation_groups[policy].get("row_count") != validation_count
+        or (
+            validation_groups[policy].get("carried_by_reference") is not True
+            and validation_groups[policy].get("row_count") != validation_count
+        )
         or validation_groups[policy].get("stage_id") != f"VALIDATION-{policy}"
         or validation_groups[policy].get("schema_id") != GROUP_SCHEMA
-        or validation_groups[policy].get("package_commit") != identity["package_commit"]
+        # A carried group was produced and authorized under its own package. Demanding
+        # this package's commit or this package's authorization there would reject
+        # every legitimately inherited group; requiring them of local groups would
+        # let an adopted group be passed off as local work.
+        or (
+            validation_groups[policy].get("carried_by_reference") is True
+            and (
+                re.fullmatch(
+                    r"[0-9a-f]{40}",
+                    str(validation_groups[policy].get("producer_package_commit", "")),
+                ) is None
+                or re.fullmatch(
+                    r"[0-9a-f]{64}",
+                    str(validation_groups[policy].get("producer_authorization_receipt_sha256", "")),
+                ) is None
+            )
+        )
+        or (
+            validation_groups[policy].get("carried_by_reference") is not True
+            and (
+                validation_groups[policy].get("package_commit") != identity["package_commit"]
+                or validation_groups[policy].get("authorization_receipt_sha256")
+                != authorization.get("sha256")
+            )
+        )
         or validation_groups[policy].get("source_lock_sha256") != identity["source_lock_sha256"]
         or validation_groups[policy].get("seed_table_sha256") != readiness.get("formal_seed_table_sha256")
-        or validation_groups[policy].get("authorization_receipt_sha256") != authorization.get("sha256")
         or validation_groups[policy].get("model_selection_or_tuning") is not False
         or not re.fullmatch(r"[0-9a-f]{64}", str(validation_groups[policy].get("receipt_sha256", "")))
         or not isinstance(validation_groups[policy].get("units"), list)
@@ -6844,7 +6993,14 @@ def _test_open_receipt(
     }
     for policy in formal.POLICIES:
         item = validation_groups[policy]
-        group_root = package_root / "validation" / policy
+        # A carried group's receipt lives in its producer package; a local group's
+        # must live here. Both are re-hashed from bytes, so neither is trusted on
+        # the strength of the recorded digest alone.
+        group_root = (
+            Path(str(item["group_root"]))
+            if item.get("carried_by_reference") is True
+            else package_root / "validation" / policy
+        )
         receipt_path = group_root / "group-receipt.json"
         if (
             Path(str(item.get("group_root", ""))).resolve(strict=False) != group_root.resolve(strict=False)
@@ -6871,6 +7027,21 @@ def _test_open_receipt(
         "analysis_source_sha256": formal.file_sha256(formal.STUDY / "formal_analysis.py"),
         "actor_update_schedule_sha256": seed["actor_update_schedule_sha256"],
         "authorization_receipt_sha256": authorization["sha256"],
+        # Honest per-group provenance: which package really produced each frozen
+        # VALIDATION group, so the TEST-open record never implies this package ran
+        # work that was inherited from a producer.
+        "validation_provenance": {
+            policy: {
+                "producer_package_commit": (
+                    identity["package_commit"]
+                    if validation_groups[policy].get("carried_by_reference") is not True
+                    else validation_groups[policy]["producer_package_commit"]
+                ),
+                "carried_by_reference": validation_groups[policy].get("carried_by_reference") is True,
+                "receipt_sha256": validation_groups[policy]["receipt_sha256"],
+            }
+            for policy in sorted(formal.POLICIES)
+        },
         "owner_approval_comment_url": authorization["owner_approval_comment_url"],
         "reviewer_approval_comment_url": authorization["reviewer_approval_comment_url"],
         "validation_group_receipts": validation_bindings,
@@ -6998,6 +7169,7 @@ def execute_formal(
     backend, issue84_driver = _configure_formal_runtime(formal, issue84_source, identity, package_root)
     carry_mode = str(authorization.get("carry_mode", "historical_manifest"))
     stage_bindings: dict[str, dict[str, Any]] = {}
+    carried_validation: dict[str, dict[str, Any]] = {}
     if carry_mode == "by_reference_index":
         # The successor keeps every completed stage in the package that really
         # produced it. Each is resolved from its producer and skipped here, so an
@@ -7010,6 +7182,9 @@ def execute_formal(
             str(authorization["by_reference_carry_index_sha256"]),
         )
         stage_bindings = by_reference_carry.stage_bindings(index, identity)
+        # Completed VALIDATION groups are inherited exactly like completed training
+        # blocks; they are adopted from their producer, never re-run here.
+        carried_validation = by_reference_carry.carried_validation_groups(index)
         carry_manifest = {}
         resumed_formal_continuation = None
         owners_per_block = int(formal.CONTRACT["training"]["owners_per_block"])
@@ -7145,6 +7320,18 @@ def execute_formal(
         # Validation is descriptive and never selects or tunes a checkpoint.
         validation_groups: dict[str, dict[str, Any]] = {}
         for policy in formal.POLICIES:
+            if policy in carried_validation:
+                # Already completed and kept by a real producer. Adopt the evidence;
+                # never re-run 64 registered owners to reproduce a frozen group.
+                progress["active_stage"] = f"VALIDATION-{policy}-CARRY-READ"
+                save_progress()
+                validation_groups[policy] = _carried_validation_group_receipt(
+                    formal, package_root=package_root, identity=identity,
+                    carried=carried_validation[policy],
+                )
+                progress["game_groups"][f"VALIDATION-{policy}"] = validation_groups[policy]
+                save_progress()
+                continue
             progress["active_stage"] = f"VALIDATION-{policy}"
             save_progress()
             validation_groups[policy] = _run_stage(
