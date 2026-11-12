@@ -6970,10 +6970,6 @@ def _test_open_receipt(
         or validation_groups[policy].get("status") != "SUCCEEDED"
         or type(validation_groups[policy].get("completed")) is not int
         or validation_groups[policy].get("completed") != validation_count
-        or (
-            validation_groups[policy].get("carried_by_reference") is not True
-            and validation_groups[policy].get("row_count") != validation_count
-        )
         or validation_groups[policy].get("stage_id") != f"VALIDATION-{policy}"
         or validation_groups[policy].get("schema_id") != GROUP_SCHEMA
         # A carried group was produced and authorized under its own package. Demanding

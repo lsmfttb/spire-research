@@ -2322,7 +2322,6 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
             "source_lock_sha256": source_lock_sha,
             "seed_table_sha256": seed_sha,
             "authorization_receipt_sha256": authorization_sha,
-            "row_count": 64,
             "completed": 64,
             "units": [
                 {
@@ -2358,6 +2357,17 @@ def test_resumed_test_open_receipt_revalidates_every_gate_before_any_test_work(
     )
     assert resumed_path == open_path
     assert resumed_open_sha == initial_open_sha
+    # Dropping the phantom `row_count` requirement must not weaken coverage: the
+    # registered owner rows are still established by completed and by units, so a
+    # short group is still refused.
+    short = {key: dict(value) for key, value in validation_groups.items()}
+    short["A"]["units"] = short["A"]["units"][:63]
+    with pytest.raises(RuntimeError, match="TEST remains closed"):
+        formal_execution._test_open_receipt(
+            formal, package_root=package_root, identity=identity, readiness=readiness,
+            seed=seed, authorization=authorization,
+            validation_groups=short, model_digests=model_digests,
+        )
     saved = read_json(open_path)
     if field == "validation_receipt_sha256":
         saved["validation_group_receipts"]["A"]["receipt_sha256"] = "0" * 64
