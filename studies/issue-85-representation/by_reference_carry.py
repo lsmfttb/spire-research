@@ -412,7 +412,9 @@ def _canonical_carry_proofs(formal: Any, stages: list[dict[str, Any]]) -> dict[s
     }
 
 
-def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
+def build_index(
+    formal: Any, identity: Mapping[str, str], *, require_active_wall: bool = True,
+) -> dict[str, Any]:
     """Resolve the full completed roster once, verifying every producer."""
     stages = [resolve_stage(formal, arm, block, g, u) for arm, block, g, u in ALL_STAGES]
     seen: set[tuple[str, int]] = set()
@@ -449,14 +451,21 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
         | {group["producer_package_commit"] for group in validation_stages}
     )
     proofs = _canonical_carry_proofs(formal, stages)
-    clock_path = (
-        Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "active-wall-issue85-task.json"
-    )
-    if not clock_path.is_file():
-        raise RuntimeError("the shared Issue 85 active-wall ledger is missing")
-    observed_wall = float(formal.read_json(clock_path).get("elapsed_seconds", -1.0))
-    if observed_wall < 0:
-        raise RuntimeError("the shared active-wall ledger has no elapsed reading")
+    # The active wall is live ledger state, not producer evidence. Reading it is
+    # meaningful only when minting the annotation; a re-derivation that exists to
+    # check producer bytes must not depend on a file another process rewrites
+    # continuously. Requiring it there made one worker die when the ledger was
+    # mid-replace, which paused the whole stage for a file the check did not need.
+    observed_wall: float | None = None
+    if require_active_wall:
+        clock_path = (
+            Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "active-wall-issue85-task.json"
+        )
+        if not clock_path.is_file():
+            raise RuntimeError("the shared Issue 85 active-wall ledger is missing")
+        observed_wall = float(formal.read_json(clock_path).get("elapsed_seconds", -1.0))
+        if observed_wall < 0:
+            raise RuntimeError("the shared active-wall ledger has no elapsed reading")
     unsigned = {
         "schema_id": INDEX_SCHEMA,
         "executing_package_commit": identity["package_commit"],
@@ -490,6 +499,25 @@ def build_index(formal: Any, identity: Mapping[str, str]) -> dict[str, Any]:
 UNHASHED_INDEX_KEYS = ("index_sha256", "observed_active_wall_seconds")
 
 
+def _optional_active_wall(formal: Any) -> float | None:
+    """The live cumulative wall, or None when the ledger is mid-replace.
+
+    Read separately from the index rebuild so the annotation can still be checked
+    whenever the ledger is legible, without making producer-evidence verification
+    fail when it is not.
+    """
+    path = (
+        Path(formal.DATA_ROOT) / "issue85" / "artifacts" / "active-wall-issue85-task.json"
+    )
+    try:
+        value = formal.read_json(path).get("elapsed_seconds")
+    except (OSError, ValueError):
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or float(value) < 0:
+        return None
+    return float(value)
+
+
 def validate_index(formal: Any, path: Path, identity: Mapping[str, str]) -> dict[str, Any]:
     """Re-verify a stored index against the live producer bytes.
 
@@ -508,13 +536,18 @@ def validate_index(formal: Any, path: Path, identity: Mapping[str, str]) -> dict
         raise RuntimeError(
             "by-reference carry index is malformed or bound to another executing package"
         )
-    expected = build_index(formal, identity)
+    expected = build_index(formal, identity, require_active_wall=False)
     if expected["index_sha256"] != index.get("index_sha256"):
         raise RuntimeError("by-reference carry index disagrees with the live producer evidence")
+    # The annotation is compared only where it can be read. It is not part of the
+    # digest; the ledger read is best-effort here so that a mid-replace file cannot
+    # fail a check about producer bytes. The floor that protects the study clock is
+    # enforced separately, strictly, against the ledger in validate_authorization.
     stored_wall = index.get("observed_active_wall_seconds")
     if not isinstance(stored_wall, (int, float)):
         raise RuntimeError("by-reference carry index lacks its active-wall annotation")
-    if float(stored_wall) > float(expected["observed_active_wall_seconds"]) + 1.0:
+    live_wall = _optional_active_wall(formal)
+    if live_wall is not None and float(stored_wall) > live_wall + 1.0:
         raise RuntimeError("by-reference carry index claims more active wall than the ledger")
     return index
 

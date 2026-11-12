@@ -533,6 +533,43 @@ def test_carried_seed_binding_compares_rows_not_the_stamped_digest(store):
         fe._verify_carried_seed_binding(formal, other, rows_sha)
 
 
+def test_index_rebuild_does_not_depend_on_the_live_clock(store):
+    """Verifying producer bytes must survive a ledger that is mid-replace.
+
+    A worker re-derives the index on every unit to authenticate the carry. The
+    supervisor rewrites the active-wall ledger continuously, and on this mount a
+    concurrent reader can miss it; one such miss killed a worker and paused
+    VALIDATION-B for a file the evidence check never needed.
+    """
+    package_root = store / "issue85/artifacts/formal" / EXECUTING_COMMIT
+    package_root.mkdir(parents=True, exist_ok=True)
+    minted = brc.build_index(formal, IDENTITY)
+    path = package_root / "by-reference-carry-index.json"
+    path.write_text(json.dumps(minted), encoding="utf-8")
+
+    # The ledger disappears, exactly as it does mid-replace.
+    (store / "issue85/artifacts/active-wall-issue85-task.json").unlink()
+
+    verified = brc.validate_index(formal, path, IDENTITY)
+    assert verified["index_sha256"] == minted["index_sha256"]
+    # Minting still requires the ledger, because that is where the reading is made.
+    with pytest.raises(RuntimeError, match="active-wall ledger is missing"):
+        brc.build_index(formal, IDENTITY)
+
+
+def test_validate_index_still_rejects_an_inflated_annotation(store):
+    package_root = store / "issue85/artifacts/formal" / EXECUTING_COMMIT
+    package_root.mkdir(parents=True, exist_ok=True)
+    minted = brc.build_index(formal, IDENTITY)
+    minted["observed_active_wall_seconds"] = float(
+        minted["observed_active_wall_seconds"]
+    ) + 500.0
+    path = package_root / "by-reference-carry-index.json"
+    path.write_text(json.dumps(minted), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="claims more active wall than the ledger"):
+        brc.validate_index(formal, path, IDENTITY)
+
+
 def test_clock_advance_cannot_change_the_evidence_digest(store):
     """The wall advances during the run; the evidence digest must not follow it."""
     first = brc.build_index(formal, IDENTITY)
