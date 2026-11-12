@@ -82,10 +82,26 @@ TRAINED_ARMS: tuple[str, ...] = ("B", "C", "D", "E", "F")
 
 VALIDATION_POLICIES: tuple[str, ...] = ("PARENT", "A", "B", "C", "D", "E", "F")
 
-# VALIDATION groups completed in the successor package. PARENT and A were run and
-# kept before the evaluation loader defect stopped the run at B; they never entered
-# the defective carried-arm branch, so their evidence stands on its own.
-SUCCESSOR_VALIDATION: tuple[str, ...] = ("PARENT", "A")
+# Which package really produced each VALIDATION group, per policy. PARENT and A were
+# run and kept before the evaluation loader defect stopped the run at B; B..F were
+# then produced in full by the first package that completed validation, 320 local
+# owners plus the 128 inherited, zero failures. Carrying them rather than re-running
+# them is the ruling's own preference: re-executing completed, receipted evidence is
+# what it forbids.
+#
+# Each policy resolves against its own producer, so no group is ever attributed to a
+# package that did not run it.
+VALIDATION_PRODUCERS: tuple[tuple[str, str], ...] = (
+    ("PARENT", "57ed39411c8024283a930ed30e80339597b9006e"),
+    ("A", "57ed39411c8024283a930ed30e80339597b9006e"),
+    ("B", "0c06faa11a5db26451808fde051f9be51bd46b0a"),
+    ("C", "0c06faa11a5db26451808fde051f9be51bd46b0a"),
+    ("D", "0c06faa11a5db26451808fde051f9be51bd46b0a"),
+    ("E", "0c06faa11a5db26451808fde051f9be51bd46b0a"),
+    ("F", "0c06faa11a5db26451808fde051f9be51bd46b0a"),
+)
+
+SUCCESSOR_VALIDATION: tuple[str, ...] = tuple(policy for policy, _ in VALIDATION_PRODUCERS)
 
 # Stages whose actor is consumed as a model input, so a worker needs a producer
 # binding rather than a local read.
@@ -436,7 +452,7 @@ def build_index(
 
     validation_stages = [
         resolve_validation_group(formal, policy, producer, identity["source_lock_sha256"])
-        for policy, producer in ((p, SUCCESSOR_PACKAGE_COMMIT) for p in SUCCESSOR_VALIDATION)
+        for policy, producer in VALIDATION_PRODUCERS
     ]
     carried_validation = {group["policy"] for group in validation_stages}
     collisions = carried_validation - set(VALIDATION_POLICIES)

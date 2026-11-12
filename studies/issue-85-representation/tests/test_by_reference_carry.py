@@ -153,24 +153,37 @@ def _stage_packages(tmp_path: Path) -> Path:
     receipt["predecessor_carry_manifest_sha256"] = _sha(manifest_path.read_bytes())
     receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
 
-    # VALIDATION groups the producer really completed and kept. These are adopted,
+    # VALIDATION groups the producers really completed and kept. These are adopted,
     # never re-run: modelling them here is what lets the suite prove a successor
-    # reads inherited evidence instead of replaying 128 registered owners.
-    locked = {
-        "PARENT": formal.LOCK["baseline_P"]["model_digest"],
-        "A": formal.LOCK["baseline_A"]["model_digest"],
-    }
-    for order, policy in enumerate(brc.SUCCESSOR_VALIDATION):
-        group_dir = root / brc.SUCCESSOR_PACKAGE_COMMIT / "validation" / policy
+    # reads inherited evidence instead of replaying 128 registered owners. Each
+    # policy lives in the package that actually ran it, and evaluated that lineage's
+    # final model -- the locked baseline for PARENT/A, the block-07 actor for arms.
+    for order, (policy, producer) in enumerate(brc.VALIDATION_PRODUCERS):
+        group_dir = root / producer / "validation" / policy
         group_dir.mkdir(parents=True, exist_ok=True)
-        digest = locked[policy]
+        if policy == "PARENT":
+            digest = formal.LOCK["baseline_P"]["model_digest"]
+        elif policy == "A":
+            digest = formal.LOCK["baseline_A"]["model_digest"]
+        else:
+            # The block-07 actor is produced by whichever package really ran that
+            # training stage, which is not the package that ran validation.
+            actor_producer = next(
+                stage[2] for stage in brc.ALL_STAGES
+                if stage[0] == policy and stage[1] == 7
+            )
+            update = json.loads(
+                (root / actor_producer / "training" / policy
+                 / "updates" / "block-07" / "success-receipt.json").read_text()
+            )
+            digest = update["result_model_digest"]
         group = {
             "schema_id": brc.GROUP_SCHEMA,
             "stage_id": f"VALIDATION-{policy}",
             "status": "SUCCEEDED",
             "completed": brc.VALIDATION_OWNERS,
             "expected": brc.VALIDATION_OWNERS,
-            "package_commit": brc.SUCCESSOR_PACKAGE_COMMIT,
+            "package_commit": producer,
             "source_lock_sha256": LOCK,
             "model_selection_or_tuning": False,
             "seed_table_sha256": "5" * 64,
@@ -228,11 +241,11 @@ def test_index_covers_every_completed_stage_and_derives_the_next_one(store):
     # executed, with no stage counted twice.
     assert index["completed_stage_count"] == 40
     assert index["completed_train_outcomes"] == 5120
-    assert index["validation_stage_count"] == 2
-    assert index["validation_outcomes"] == 128
-    # The cursor is derived, not literal: every training block is complete and
-    # PARENT/A are carried, so the next stage is the first unfinished one.
-    assert index["next_stage_id"] == "VALIDATION-B"
+    assert index["validation_stage_count"] == 7
+    assert index["validation_outcomes"] == 448
+    # The cursor is derived, not literal: every training block is complete and all
+    # seven VALIDATION groups are carried, so the first unfinished stage is TEST.
+    assert index["next_stage_id"] == "TEST"
     assert index["executing_package_commit"] == EXECUTING_COMMIT
     assert index["excluded_duplicate_package"] == brc.EXCLUDED_DUPLICATE_PACKAGE
     assert brc.EXCLUDED_DUPLICATE_PACKAGE not in index["producers"]
@@ -250,13 +263,19 @@ def test_derived_cursor_reports_the_first_unfinished_registered_stage():
 def test_carried_validation_groups_record_their_real_producer(store):
     index = brc.build_index(formal, IDENTITY)
     carried = brc.carried_validation_groups(index)
-    assert set(carried) == {"PARENT", "A"}
+    # All seven are inherited. PARENT/A come from the package that ran them before
+    # the loader defect; B..F from the package that completed validation in full.
+    assert set(carried) == set(brc.VALIDATION_POLICIES)
     for policy, record in carried.items():
-        assert record["producer_package_commit"] == brc.SUCCESSOR_PACKAGE_COMMIT
         assert record["completed"] == 64
         assert record["carried_by_reference"] is True
+        # Never attributed to the package about to execute.
         assert record["producer_package_commit"] != EXECUTING_COMMIT
+        assert record["producer_package_commit"] == dict(brc.VALIDATION_PRODUCERS)[policy]
     assert carried["PARENT"]["model_digest"] == formal.LOCK["baseline_P"]["model_digest"]
+    assert carried["A"]["model_digest"] == formal.LOCK["baseline_A"]["model_digest"]
+    # Arms evaluated their own block-07 actor, and the digest is reported as such.
+    assert carried["B"]["model_digest"] != carried["C"]["model_digest"]
 
 
 def test_validation_group_rejects_a_drifted_model_digest(store):
@@ -415,8 +434,9 @@ def test_by_reference_clock_floor_comes_from_closed_carried_stages(store):
 
     index = brc.build_index(formal, IDENTITY)
     floor = fe._by_reference_active_wall_high_water(index, 295632)
-    # PARENT closed at 133341.5 and A at 133342.5 in the fixture.
-    assert floor == pytest.approx(133342.5)
+    # The fixture closes the seven carried groups at 133341.5..133347.5, so the
+    # floor is the latest of those closes, not the earliest.
+    assert floor == pytest.approx(133347.5)
 
     # A clock that dropped below attested history fails closed.
     with pytest.raises(RuntimeError, match="refusing to reset study time"):
@@ -684,13 +704,16 @@ def test_successor_carries_all_forty_blocks_and_dispatches_at_validation_b(store
         if (arm, block) not in groups
     ]
     assert remaining == []             # no completed stage may be re-executed
-    assert index["next_stage_id"] == "VALIDATION-B"
+    assert index["next_stage_id"] == "TEST"
 
     carried = brc.carried_validation_groups(index)
-    assert set(carried) == {"PARENT", "A"}
-    assert {p for p in brc.VALIDATION_POLICIES if p not in carried} == {
-        "B", "C", "D", "E", "F"
-    }
+    assert set(carried) == set(brc.VALIDATION_POLICIES)
+    # Each group names the package that actually ran it, not one blanket producer.
+    assert carried["PARENT"]["producer_package_commit"] == (
+        "57ed39411c8024283a930ed30e80339597b9006e")
+    assert carried["B"]["producer_package_commit"] == (
+        "0c06faa11a5db26451808fde051f9be51bd46b0a")
+    assert {p for p in brc.VALIDATION_POLICIES if p not in carried} == set()
 
     # That block's registered owners are 8400897..8401024.
     first_owner = brc.TRAIN_FIRST_OWNER + 7 * brc.OWNERS_PER_BLOCK
