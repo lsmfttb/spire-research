@@ -4945,7 +4945,13 @@ def _configure_formal_runtime(
                 formal, package_root, identity, arm=arm, block=7,
                 producer=policy_producers.get(f"{arm}:7"),
             )
-            checkpoint = _inside(package_root, str(receipt["actor_checkpoint_path"]))
+            # A carried stage's checkpoint lives in the package that wrote it, not
+            # in the executing package: B/07's final actor is in e902a953 and this
+            # package has never owned a training/B tree. Resolve against the root
+            # the receipt names, exactly as load_training_arm already does for the
+            # previous block; using the executing root rejects every carried arm.
+            checkpoint_root = Path(str(receipt.get("producer_package_root", package_root)))
+            checkpoint = _inside(checkpoint_root, str(receipt["actor_checkpoint_path"]))
             if formal.file_sha256(checkpoint) != receipt.get("actor_checkpoint_sha256"):
                 raise RuntimeError(f"final Issue 85 {arm} model checkpoint hash differs")
             actor, _digest, source = fresh_arm(arm)
