@@ -6956,6 +6956,22 @@ def _verify_carried_seed_binding(
         )
 
 
+# Keys a group *record* adds around the producer's receipt: where the receipt was
+# found, how it was digested, and (for an inherited group) which package produced
+# it. None of them is written by any producer, so none may take part in the check
+# that the recorded receipt is the receipt on disk. Filtering only `receipt_sha256`
+# and `group_root` left four of them in, which made that equality unsatisfiable --
+# for inherited groups and, through `receipt_path`, for locally produced ones too.
+RECORD_ANNOTATION_KEYS = frozenset({
+    "receipt_sha256",
+    "group_root",
+    "receipt_path",
+    "carried_by_reference",
+    "producer_package_commit",
+    "producer_authorization_receipt_sha256",
+})
+
+
 def _test_open_receipt(
     formal: Any, *, package_root: Path, identity: Mapping[str, str], readiness: Mapping[str, Any],
     seed: Mapping[str, Any], authorization: Mapping[str, Any],
@@ -7042,7 +7058,8 @@ def _test_open_receipt(
             or not receipt_path.is_file()
             or formal.file_sha256(receipt_path) != item["receipt_sha256"]
             or formal.read_json(receipt_path) != {
-                key: value for key, value in item.items() if key not in {"receipt_sha256", "group_root"}
+                key: value for key, value in item.items()
+                if key not in RECORD_ANNOTATION_KEYS
             }
         ):
             raise RuntimeError(f"TEST remains closed until the exact {policy} validation receipt is verified")

@@ -3228,3 +3228,51 @@ def test_b04_actor_update_accepts_registered_mixed_source_carry_before_loading_e
     tampered_sources['TRAIN:8400635:B']['group_root'] = source_group_roots[old_source]
     with pytest.raises(RuntimeError, match='not bound to the verified stopped-package carry'):
         run_actor_update({**training_group, 'carried_unit_sources': tampered_sources})
+
+
+def test_carried_group_record_projects_back_onto_its_raw_receipt() -> None:
+    """The receipt check must compare a producer's receipt to a producer's receipt.
+
+    A carried record is the producer's receipt plus the successor's annotation of
+    where it came from. Comparing that annotated record against the raw receipt
+    can only ever fail, and it did: PARENT and A are both carried, so TEST could
+    not open even with seven complete groups. The annotation is envelope, so the
+    projection must drop exactly the annotation and nothing of the receipt.
+    """
+    receipt = {
+        "schema_id": formal_execution.GROUP_SCHEMA,
+        "status": "SUCCEEDED",
+        "stage_id": "VALIDATION-PARENT",
+        "package_commit": "5" * 40,
+        "source_lock_sha256": "a" * 64,
+        "seed_table_sha256": "c" * 64,
+        "authorization_receipt_sha256": "f" * 64,
+        "completed": 64,
+        "units": [{"unit_id": "EVAL:8510001:PARENT", "model_digest": "7" * 64}],
+        "model_selection_or_tuning": False,
+    }
+    carried = {
+        **receipt,
+        "receipt_sha256": "0" * 64,
+        "group_root": "/producer/validation/PARENT",
+        "carried_by_reference": True,
+        "producer_package_commit": "5" * 40,
+        "producer_authorization_receipt_sha256": "f" * 64,
+    }
+    projected = {
+        key: value for key, value in carried.items()
+        if key not in formal_execution.RECORD_ANNOTATION_KEYS
+    }
+    assert projected == receipt
+    # And the annotation really is present, so the test is not vacuous.
+    assert set(carried) - set(projected) == {
+        "receipt_sha256", "group_root", "carried_by_reference",
+        "producer_package_commit", "producer_authorization_receipt_sha256",
+    }
+    # A receipt that differs in content still projects differently, so the check
+    # keeps its force.
+    tampered = {**carried, "completed": 63}
+    assert {
+        key: value for key, value in tampered.items()
+        if key not in formal_execution.RECORD_ANNOTATION_KEYS
+    } != receipt
