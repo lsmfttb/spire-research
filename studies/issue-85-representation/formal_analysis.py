@@ -292,6 +292,71 @@ def _holm_bootstrap(
     return out
 
 
+def _original_analysis_source_sha256(test_producer_commit: str) -> str:
+    """Hash the analysis source exactly as committed at the TEST-producing commit.
+
+    After the Planner-authorised post-TEST amendment this file differs from the
+    one that opened TEST, so the current checkout can no longer reproduce the
+    pre-TEST digest. The original digest stays authenticable from git, which is
+    what ties the recorded value to real bytes instead of to a claim.
+    """
+    study_relative = Path(__file__).resolve().relative_to(formal.REPO).as_posix()
+    try:
+        blob = formal.baseline_preflight.git_bytes(
+            formal.REPO, "show", f"{test_producer_commit}:{study_relative}"
+        )
+    except Exception as error:
+        raise ValueError(
+            "cannot recover the pre-TEST analysis source at the TEST-producing commit "
+            f"{test_producer_commit}"
+        ) from error
+    return hashlib.sha256(blob).hexdigest()
+
+
+def _validation_producers(
+    test_open: Mapping[str, Any], package_commit: str,
+) -> dict[str, tuple[bool, str]]:
+    """Resolve every VALIDATION group to the package that really produced it.
+
+    The TEST-open receipt is the only authority for this mapping. A group may not
+    be carried from the reading package itself, and a local group may not name a
+    different producer; either mistake would make inherited evidence
+    indistinguishable from work this package actually did.
+    """
+    provenance = test_open.get("validation_provenance")
+    if (
+        not isinstance(provenance, Mapping)
+        or set(provenance) != set(POLICIES)
+        or any(
+            not isinstance(provenance.get(policy), Mapping)
+            or not isinstance(provenance[policy].get("carried_by_reference"), bool)
+            or re.fullmatch(
+                r"[0-9a-f]{40}",
+                str(provenance[policy].get("producer_package_commit", "")),
+            )
+            is None
+            for policy in POLICIES
+        )
+    ):
+        raise ValueError(
+            "TEST-open receipt does not declare an authenticated producer for every validation group"
+        )
+    resolved: dict[str, tuple[bool, str]] = {}
+    for policy in POLICIES:
+        carried = provenance[policy]["carried_by_reference"]
+        producer = str(provenance[policy]["producer_package_commit"])
+        if carried and producer == package_commit:
+            raise ValueError(
+                f"formal {policy} validation group is declared carried from the reading package itself"
+            )
+        if not carried and producer != package_commit:
+            raise ValueError(
+                f"formal {policy} validation group is local but names another producer"
+            )
+        resolved[policy] = (carried, producer)
+    return resolved
+
+
 def analyze_test_bundle(
     *, package_root: Path, seed_table_path: Path, test_bundle_path: Path,
     policy_model_digests: Mapping[str, str],
@@ -308,10 +373,14 @@ def analyze_test_bundle(
         raise ValueError("formal TEST analysis received a nonformal or unknown seed table")
     package_commit = str(seed_table.get("package_commit", ""))
     source_lock_sha256 = str(seed_table.get("source_lock_sha256", ""))
-    current_identity = formal.pilot.source_identity(require_clean=True)
+    # The reading code is allowed to differ from the TEST producer under the
+    # Planner-authorised post-TEST technical amendment. What must still hold is
+    # that the *data* package is the original producer and that the registered
+    # contract is untouched. The original analysis source is authenticated
+    # separately below, against its real bytes at the TEST-producing commit.
     if (
-        current_identity.get("package_commit") != package_commit
-        or current_identity.get("source_lock_sha256") != source_lock_sha256
+        seed_table.get("package_commit") != package_commit
+        or seed_table.get("source_lock_sha256") != source_lock_sha256
         or seed_table.get("contract_sha256") != formal.file_sha256(formal.CONTRACT_PATH)
     ):
         raise ValueError("analysis code, source lock, or registered contract differs from the frozen TEST source")
@@ -330,6 +399,9 @@ def analyze_test_bundle(
         raise ValueError("frozen TEST analysis requires a prior source/seed/validation/approval TEST-open receipt")
     test_open = formal.read_json(test_open_path)
     test_open_sha256 = formal.file_sha256(test_open_path)
+    original_analysis_source_sha256 = _original_analysis_source_sha256(package_commit)
+    analysis_code_sha256 = formal.file_sha256(Path(__file__).resolve())
+    post_test_amendment = analysis_code_sha256 != original_analysis_source_sha256
     validation_bindings = test_open.get("validation_group_receipts")
     valid_issue_comment = re.compile(
         r"https://github\.com/lsmfttb/spire-research/issues/85#issuecomment-[1-9][0-9]*"
@@ -341,7 +413,7 @@ def analyze_test_bundle(
         or test_open.get("source_lock_sha256") != source_lock_sha256
         or test_open.get("contract_sha256") != formal.file_sha256(formal.CONTRACT_PATH)
         or test_open.get("seed_table_sha256") != seed_table_sha256
-        or test_open.get("analysis_source_sha256") != formal.file_sha256(Path(__file__).resolve())
+        or test_open.get("analysis_source_sha256") != original_analysis_source_sha256
         or test_open.get("actor_update_schedule_sha256") != seed_table.get("actor_update_schedule_sha256")
         or test_open.get("test_owner_range") != list(formal.CONTRACT["registered_design_unchanged"]["test"]["owners"])
         or test_open.get("test_games_started_before_open_receipt") != 0
@@ -385,22 +457,52 @@ def analyze_test_bundle(
     }
     if any(set(validation_rows[policy]) != set(validation_owners) for policy in POLICIES):
         raise ValueError("frozen formal validation seed table does not contain the exact disjoint 64-owner roster")
+    # Each validation group is read from the package that really produced it. The
+    # TEST-open receipt is the authority for that mapping; a group may not be
+    # carried from the very package that is reading it, and a producer may not be
+    # silently reassigned to whatever package happens to be executing now.
+    validation_producers = _validation_producers(test_open, package_commit)
     for policy in POLICIES:
         binding = validation_bindings[policy]
-        validation_receipt_path = package_root / "validation" / policy / "group-receipt.json"
+        carried, producer_commit = validation_producers[policy]
+        producer_root = (
+            (formal.DATA_ROOT / "issue85" / "artifacts" / "formal" / producer_commit).resolve(strict=False)
+            if carried else package_root
+        )
+        validation_receipt_path = producer_root / "validation" / policy / "group-receipt.json"
         if not validation_receipt_path.is_file() or formal.file_sha256(validation_receipt_path) != binding["receipt_sha256"]:
             raise ValueError(f"TEST-open receipt does not bind the immutable {policy} validation group receipt")
         validation_receipt = formal.read_json(validation_receipt_path)
+        if carried:
+            producer_seed_path = producer_root / "formal-seed-table.json"
+            producer_authorization_path = producer_root / "formal-execution-authorization.json"
+            if not producer_seed_path.is_file() or not producer_authorization_path.is_file():
+                raise ValueError(
+                    f"carried {policy} validation group lacks its producer seed table or authorization"
+                )
+            producer_seed_table_sha256 = formal.file_sha256(producer_seed_path)
+            producer_authorization_sha256 = formal.file_sha256(producer_authorization_path)
+            producer_rows = {
+                int(row["owner_seed"]): row
+                for row in formal.read_json(producer_seed_path)["rows"]
+                if row.get("issue85_phase") == "validation" and row.get("arm") == policy
+            }
+            if producer_rows != validation_rows[policy]:
+                raise ValueError(
+                    f"carried {policy} validation group was produced from a different registered roster"
+                )
+        else:
+            producer_seed_table_sha256 = seed_table_sha256
+            producer_authorization_sha256 = str(test_open["authorization_receipt_sha256"])
         units = validation_receipt.get("units")
         if (
             validation_receipt.get("schema_id") != "issue85-formal-game-group-v1"
             or validation_receipt.get("status") != "SUCCEEDED"
             or validation_receipt.get("stage_id") != f"VALIDATION-{policy}"
-            or validation_receipt.get("package_commit") != package_commit
+            or validation_receipt.get("package_commit") != producer_commit
             or validation_receipt.get("source_lock_sha256") != source_lock_sha256
-            or validation_receipt.get("seed_table_sha256") != seed_table_sha256
-            or validation_receipt.get("authorization_receipt_sha256") != test_open.get("authorization_receipt_sha256")
-            or validation_receipt.get("row_count") != len(validation_owners)
+            or validation_receipt.get("seed_table_sha256") != producer_seed_table_sha256
+            or validation_receipt.get("authorization_receipt_sha256") != producer_authorization_sha256
             or validation_receipt.get("completed") != len(validation_owners)
             or validation_receipt.get("model_selection_or_tuning") is not False
             or binding.get("completed") != len(validation_owners)
@@ -416,14 +518,14 @@ def analyze_test_bundle(
             if row is None or row["unit_id"] != unit.get("unit_id") or owner in seen_validation_owners:
                 raise ValueError(f"formal {policy} validation receipt has a duplicate or unregistered owner")
             outcome = _read_attempt(
-                package_root=package_root,
+                package_root=producer_root,
                 policy=policy,
                 seed_row=row,
                 attempt_relative=str(unit.get("attempt_path", "")),
-                package_commit=package_commit,
+                package_commit=producer_commit,
                 source_lock_sha256=source_lock_sha256,
-                seed_table_sha256=seed_table_sha256,
-                authorization_receipt_sha256=str(test_open["authorization_receipt_sha256"]),
+                seed_table_sha256=producer_seed_table_sha256,
+                authorization_receipt_sha256=producer_authorization_sha256,
                 expected_model_digest=expected_model_digests[policy],
                 stage="validation",
             )
@@ -568,7 +670,18 @@ def analyze_test_bundle(
         "seed_table_sha256": seed_table_sha256,
         "test_receipt_bundle_sha256": formal.file_sha256(test_bundle_path),
         "test_open_receipt_sha256": test_open_sha256,
-        "analysis_code_sha256": formal.file_sha256(Path(__file__).resolve()),
+        "analysis_code_sha256": analysis_code_sha256,
+        # Both source identities stay on the record: the analysis that was frozen
+        # before TEST existed, and the amended reader that actually computed this.
+        "original_pre_test_analysis_source_sha256": original_analysis_source_sha256,
+        "post_test_technical_erratum": post_test_amendment,
+        "test_producer_package_commit": package_commit,
+        "validation_producer_package_commits": {
+            policy: validation_producers[policy][1] for policy in POLICIES
+        },
+        "validation_groups_carried_by_reference": {
+            policy: validation_producers[policy][0] for policy in POLICIES
+        },
         "analysis_seed": analysis_seed,
         "analysis_seed_rule": (
             f"first 31 bits of SHA256({formal.ANALYSIS_SEED_NAMESPACE}|package_commit|"
@@ -616,10 +729,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--test-bundle", type=Path, required=True)
     parser.add_argument("--policy-model-digests", type=Path, required=True)
     args = parser.parse_args(argv)
-    identity = formal.pilot.source_identity(require_clean=True)
-    package_root = (
-        formal.DATA_ROOT / "issue85" / "artifacts" / "formal" / identity["package_commit"]
-    ).resolve(strict=True)
+    # The amended reader is a later commit than the package that produced TEST, so
+    # the package is located from the evidence itself, not from the checkout. The
+    # bundle must sit directly inside a registered durable package, and
+    # analyze_test_bundle re-checks that the package is the original producer.
+    bundle_path = Path(args.test_bundle).resolve(strict=True)
+    package_root = bundle_path.parent
+    registered = (
+        formal.DATA_ROOT / "issue85" / "artifacts" / "formal"
+    ).resolve(strict=False)
+    if package_root.parent != registered:
+        raise SystemExit(
+            f"TEST bundle must live inside a registered durable package, not {package_root}"
+        )
     model_digests = formal.read_json(args.policy_model_digests)
     report = analyze_test_bundle(
         package_root=package_root,
